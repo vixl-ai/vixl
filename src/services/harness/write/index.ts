@@ -1,5 +1,5 @@
 export { default as writeFile } from './file'
-export { default as writeTodos } from './todos'
+export { default as updateTodos } from './todos'
 export { default as writeStudioArtifact } from './studio-artifact'
 export { default as deleteFile } from './delete-file'
 export { default as moveFile } from './move-file'

@@ -77,6 +77,27 @@ describe('mode allowlists resolve_models', () => {
   })
 })
 
+describe('mode allowlists update_todos', () => {
+  it('includes update_todos in agent and orchestrator', () => {
+    expect(MODE_TOOL_ALLOWLIST.agent).toContain('update_todos')
+    expect(MODE_TOOL_ALLOWLIST.orchestrator).toContain('update_todos')
+  })
+
+  it('excludes update_todos from ask, plan, and studio', () => {
+    expect(MODE_TOOL_ALLOWLIST.ask).not.toContain('update_todos')
+    expect(MODE_TOOL_ALLOWLIST.plan).not.toContain('update_todos')
+    expect(MODE_TOOL_ALLOWLIST.studio).not.toContain('update_todos')
+  })
+
+  it('does not include write_todos in any mode', () => {
+    expect(MODE_TOOL_ALLOWLIST.ask).not.toContain('write_todos')
+    expect(MODE_TOOL_ALLOWLIST.plan).not.toContain('write_todos')
+    expect(MODE_TOOL_ALLOWLIST.studio).not.toContain('write_todos')
+    expect(MODE_TOOL_ALLOWLIST.agent).not.toContain('write_todos')
+    expect(MODE_TOOL_ALLOWLIST.orchestrator).not.toContain('write_todos')
+  })
+})
+
 describe('mode allowlists web_fetch', () => {
   it('includes web_fetch in ask, plan, studio, agent, and orchestrator', () => {
     expect(MODE_TOOL_ALLOWLIST.ask).toContain('web_fetch')

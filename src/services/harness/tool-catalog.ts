@@ -33,7 +33,7 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   get_mcp_prompt: 'Retrieve a prompt template from an MCP server',
   create_plan: 'Create a plan document',
   update_plan_todo: 'Update a plan todo item',
-  write_todos: 'Replace the in-chat todo list (Tasks UI)',
+  update_todos: 'Create, update, complete, cancel, or remove in-chat todos (full list)',
   write_studio_artifact: 'Write a studio artifact',
   spawn_subagent: 'Spawn sub-agent (background: end turn, harness resumes)',
   resolve_models:

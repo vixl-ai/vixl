@@ -1,7 +1,13 @@
 import type { TodoItem } from '@/types/harness/harness-event'
 
 const parseTodoUpdate = (name: string, result: unknown): TodoItem[] | null => {
-  if (name !== 'create_plan' && name !== 'update_plan_todo' && name !== 'write_todos') {
+  // write_todos is a legacy tool name kept for historical chat lines
+  if (
+    name !== 'create_plan' &&
+    name !== 'update_plan_todo' &&
+    name !== 'update_todos' &&
+    name !== 'write_todos'
+  ) {
     return null
   }
   if (!result || typeof result !== 'object' || !('todos' in result)) {

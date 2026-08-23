@@ -24,7 +24,7 @@ describe('assertCreatePlanNotAwaitingPlanGo', () => {
     })
 
     expect(() => assertCreatePlanNotAwaitingPlanGo(projectSlug, chatId)).toThrow(
-      `Plan awaiting user Go (${planPath}). Wait for Build / Orchestrate, or call update_plan_todo / write_todos. Do not create another plan.`,
+      `Plan awaiting user Go (${planPath}). Wait for Build / Orchestrate, or call update_plan_todo / update_todos. Do not create another plan.`,
     )
   })
 
@@ -71,11 +71,9 @@ describe('resolveUpdatePlanTodoPath', () => {
     expect(resolveUpdatePlanTodoPath(explicit, session.awaitingPlanGo)).toBe(explicit)
   })
 
-  it('throws when no plan is active and planPath is omitted', () => {
+  it('returns null when no plan is active and planPath is omitted', () => {
     const session = getPlanExecutionSession(projectSlug, chatId)
 
-    expect(() => resolveUpdatePlanTodoPath(undefined, session.awaitingPlanGo)).toThrow(
-      'No active plan; pass planPath or use write_todos for chat-only todos.',
-    )
+    expect(resolveUpdatePlanTodoPath(undefined, session.awaitingPlanGo)).toBeNull()
   })
 })

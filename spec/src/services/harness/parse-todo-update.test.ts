@@ -8,7 +8,11 @@ const sampleTodos: TodoItem[] = [
 ]
 
 describe('parseTodoUpdate', () => {
-  it('accepts write_todos results and returns the todos array', () => {
+  it('accepts update_todos results and returns the todos array', () => {
+    expect(parseTodoUpdate('update_todos', { todos: sampleTodos })).toEqual(sampleTodos)
+  })
+
+  it('accepts write_todos results for historical tool names', () => {
     expect(parseTodoUpdate('write_todos', { todos: sampleTodos })).toEqual(sampleTodos)
   })
 
@@ -23,6 +27,9 @@ describe('parseTodoUpdate', () => {
 
   it('returns null for unrelated tools or missing todos', () => {
     expect(parseTodoUpdate('read_file', { todos: sampleTodos })).toBeNull()
+    expect(parseTodoUpdate('update_todos', { ok: true })).toBeNull()
+    expect(parseTodoUpdate('update_todos', { todos: 'nope' })).toBeNull()
+    expect(parseTodoUpdate('update_todos', null)).toBeNull()
     expect(parseTodoUpdate('write_todos', { ok: true })).toBeNull()
     expect(parseTodoUpdate('write_todos', { todos: 'nope' })).toBeNull()
     expect(parseTodoUpdate('write_todos', null)).toBeNull()
