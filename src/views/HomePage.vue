@@ -83,7 +83,10 @@ const handleSubmit = async (payload: {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col items-center justify-end px-4 pb-4 pt-2">
+  <div
+    class="flex h-full min-h-0 flex-col items-center justify-end px-4 pb-4 pt-2"
+    @contextmenu.prevent
+  >
     <div class="mx-auto flex w-full max-w-3xl flex-col">
       <ChatPromptInput
         show-project-select

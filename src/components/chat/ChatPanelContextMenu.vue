@@ -38,7 +38,6 @@ import sanitizeExportFilename from '@/utils/sanitize-export-filename'
 const props = defineProps<{
   projectSlug: string
   chatId: string
-  disabled?: boolean
 }>()
 
 const chatStore = useChatStore()
@@ -62,10 +61,10 @@ const isPinned = computed(() => {
   )
 })
 
-const menuDisabled = computed(() => Boolean(props.disabled) || !props.chatId)
+const hasChat = computed(() => props.chatId.length > 0)
 
 const handleCopyId = async (): Promise<void> => {
-  if (copying.value || menuDisabled.value) {
+  if (copying.value || !hasChat.value) {
     return
   }
 
@@ -83,7 +82,7 @@ const handleCopyId = async (): Promise<void> => {
 }
 
 const handleExportTranscript = async (): Promise<void> => {
-  if (exporting.value || menuDisabled.value) {
+  if (exporting.value || !hasChat.value) {
     return
   }
 
@@ -105,6 +104,9 @@ const handleExportTranscript = async (): Promise<void> => {
 }
 
 const openRenameDialog = (): void => {
+  if (!hasChat.value) {
+    return
+  }
   renameTitle.value = chatTitle.value
   renameOpen.value = true
 }
@@ -133,7 +135,7 @@ const handleRename = async (): Promise<void> => {
 }
 
 const handleTogglePin = async (): Promise<void> => {
-  if (pinning.value || menuDisabled.value) {
+  if (pinning.value || !hasChat.value) {
     return
   }
 
@@ -169,18 +171,18 @@ watch(
 
 <template>
   <ContextMenu>
-    <ContextMenuTrigger as-child :disabled="menuDisabled">
+    <ContextMenuTrigger as-child>
       <div class="relative flex h-full min-h-0 flex-col">
         <slot />
       </div>
     </ContextMenuTrigger>
     <ContextMenuContent class="w-52">
-      <ContextMenuItem :disabled="menuDisabled || copying" @select="handleCopyId">
+      <ContextMenuItem :disabled="copying" @select="handleCopyId">
         <Copy />
         Copy ID
       </ContextMenuItem>
       <ContextMenuItem
-        :disabled="menuDisabled || exporting"
+        :disabled="exporting"
         @select="handleExportTranscript"
       >
         <Download />
@@ -188,14 +190,14 @@ watch(
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem
-        :disabled="menuDisabled || savingRename"
+        :disabled="savingRename"
         @select="openRenameDialog"
       >
         <Pencil />
         Rename
       </ContextMenuItem>
       <ContextMenuItem
-        :disabled="menuDisabled || pinning"
+        :disabled="pinning"
         @select="handleTogglePin"
       >
         <PinOff v-if="isPinned" />
