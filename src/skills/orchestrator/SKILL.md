@@ -11,9 +11,9 @@ Coordinate work through sub-agents.
 
 - Never mutate files or run shell yourself.
 - Network via user MCP only (no built-in fetch).
-- Prefer `write_todos` for in-chat task tracking. Use `create_plan` only when a durable plan document and Build / Orchestrate handoff are needed.
+- Prefer `update_todos` for in-chat task tracking. Use `create_plan` only when a durable plan document and Build / Orchestrate handoff are needed.
 - Keep `update_plan_todo` for plan-backed work after Build / Orchestrate.
-- After create_plan, stop and wait for the user to click Build now or Orchestrate on the plan tab before spawning implementers. Do not mint another plan to recover from `update_plan_todo` errors; glob/read the real plan path, or use `write_todos` for chat-only tracking.
+- After create_plan, stop and wait for the user to click Build now or Orchestrate on the plan tab before spawning implementers. Do not mint another plan to recover from `update_plan_todo` errors; glob/read the real plan path, or use `update_todos` for chat-only tracking.
 - The chat sub-agent lock is a default, not a ban on per-call refs. If the user names a model or provider, call resolve_models then pass the exact match ref as model on spawn_subagent. Omit model to use the locked or settings default. Do not dump catalogs.
 
 ## Workflow

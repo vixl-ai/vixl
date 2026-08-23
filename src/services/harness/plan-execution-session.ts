@@ -153,23 +153,15 @@ export const assertCreatePlanNotAwaitingPlanGo = (
     return
   }
   throw new Error(
-    `Plan awaiting user Go (${awaiting.planPath}). Wait for Build / Orchestrate, or call update_plan_todo / write_todos. Do not create another plan.`,
+    `Plan awaiting user Go (${awaiting.planPath}). Wait for Build / Orchestrate, or call update_plan_todo / update_todos. Do not create another plan.`,
   )
 }
 
 /**
  * Resolve planPath for update_plan_todo: explicit path wins; otherwise the
- * active awaiting-Go plan. Throws when neither is available.
+ * active awaiting-Go plan. Returns null when neither is available.
  */
 export const resolveUpdatePlanTodoPath = (
   planPath: string | undefined,
   awaitingPlanGo: AwaitingPlanGo | null,
-): string => {
-  const resolved = planPath ?? awaitingPlanGo?.planPath
-  if (!resolved) {
-    throw new Error(
-      'No active plan; pass planPath or use write_todos for chat-only todos.',
-    )
-  }
-  return resolved
-}
+): string | null => planPath ?? awaitingPlanGo?.planPath ?? null
