@@ -10,6 +10,7 @@ import WorkbenchWorkbenchShell from '@/components/workbench/WorkbenchShell.vue'
 import WorkbenchWorkbenchTabDuplicateDialog from '@/components/workbench/WorkbenchTabDuplicateDialog.vue'
 import WorkbenchHeader from '@/components/workbench/WorkbenchHeader.vue'
 import TitleBar from '@/components/navigation/header/TitleBar.vue'
+import WindowResizeHandles from '@/components/navigation/header/WindowResizeHandles.vue'
 import {
   ResizablePanel,
   ResizablePanelGroup,
@@ -153,4 +154,5 @@ watch(rightSidebarOpen, (open) => {
     <NavigationCommandPalette />
     <WorkbenchWorkbenchTabDuplicateDialog />
   </SidebarProvider>
+  <WindowResizeHandles />
 </template>

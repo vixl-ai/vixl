@@ -1,9 +1,37 @@
+import { detectSandboxRuntimeDenial } from '@/services/harness/shell/sandbox-denial-detectors'
+
+import type {
+  DetectSandboxRuntimeDenialOptions,
+  SandboxRuntimeDenialKind,
+} from '@/services/harness/shell/sandbox-denial-detectors'
+
 const isSandboxSpawnError = (message: string): boolean =>
   message.startsWith('SANDBOX_FAILED:') ||
-  message.startsWith('SANDBOX_UNAVAILABLE:') ||
-  message.startsWith('SANDBOX_RUNTIME_BLOCKED:')
+    message.startsWith('SANDBOX_UNAVAILABLE:') ||
+    message.startsWith('SANDBOX_RUNTIME_BLOCKED:')
+
+const parseSandboxRuntimeDenialKind = (
+  message: string,
+): SandboxRuntimeDenialKind | null => {
+  if (!message.includes('SANDBOX_RUNTIME_BLOCKED:')) {
+    return null
+  }
+  if (message.includes('(filesystem EPERM)')) {
+    return 'filesystem'
+  }
+  if (message.includes('(isolated devices)')) {
+    return 'devices'
+  }
+  if (message.includes('(network denied)')) {
+    return 'network'
+  }
+  return null
+}
 
 const SANDBOX_DENIAL_DETAIL_MAX = 500
+
+const SANDBOX_JAIL_RETRY_HINT =
+  'This is the OS jail (Seatbelt or bubblewrap), not a missing package. Approve an unsandboxed retry. Do not rewrite this as a Python script.'
 
 const trimSandboxDenialDetail = (detail: string): string => {
   const trimmed = detail.trim()
@@ -13,48 +41,46 @@ const trimSandboxDenialDetail = (detail: string): string => {
   return `${trimmed.slice(0, SANDBOX_DENIAL_DETAIL_MAX)}...`
 }
 
-/** Detect Seatbelt / sandbox runtime denials from command output (not spawn failures). */
-const detectSandboxRuntimeDenial = (
-  combinedOutput: string,
-): 'filesystem' | 'network' | null => {
-  const text = combinedOutput
+const isSandboxDeviceRuntimeDenial = (
+  kind: SandboxRuntimeDenialKind | null,
+): kind is 'devices' => kind === 'devices'
 
-  const hasNodeLstatEperm =
-    text.includes('EPERM') &&
-    text.includes('operation not permitted') &&
-    text.includes('lstat')
-  const hasGenericOperationNotPermitted = text.includes('Operation not permitted')
-  if (hasNodeLstatEperm || hasGenericOperationNotPermitted) {
-    return 'filesystem'
-  }
+const isSandboxNetworkRuntimeDenial = (
+  kind: SandboxRuntimeDenialKind | null,
+): kind is 'network' => kind === 'network'
 
-  const hasNetworkConnect = /error connecting to\s+\S+/i.test(text)
-  const hasCouldNotResolve = text.includes('Could not resolve host')
-  const hasNetworkUnreachable = text.includes('Network is unreachable')
-  if (hasNetworkConnect || hasCouldNotResolve || hasNetworkUnreachable) {
-    return 'network'
-  }
-
-  return null
-}
+const isSandboxFilesystemRuntimeDenial = (
+  kind: SandboxRuntimeDenialKind | null,
+): kind is 'filesystem' => kind === 'filesystem'
 
 const sandboxRuntimeDenialError = (
-  kind: 'filesystem' | 'network',
+  kind: SandboxRuntimeDenialKind,
   detail: string,
 ): Error => {
   const trimmed = trimSandboxDenialDetail(detail)
   if (kind === 'filesystem') {
     return new Error(
-      `SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (filesystem EPERM). The macOS Seatbelt profile denied a file read during command execution. Approve an unsandboxed retry, or use an MCP tool for network data. Detail: ${trimmed}`,
+      `SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (filesystem EPERM). ${SANDBOX_JAIL_RETRY_HINT} Detail: ${trimmed}`,
+    )
+  }
+  if (kind === 'devices') {
+    return new Error(
+      `SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (isolated devices). Isolated /dev has no block devices. ${SANDBOX_JAIL_RETRY_HINT} Detail: ${trimmed}`,
     )
   }
   return new Error(
-    `SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied). Sandboxed shell has no network by default. Use an MCP tool (e.g. brave) for network data, or approve an unsandboxed retry. Detail: ${trimmed}`,
+    `SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied). Sandboxed shell has no network by default. ${SANDBOX_JAIL_RETRY_HINT} Detail: ${trimmed}`,
   )
 }
 
 export {
   detectSandboxRuntimeDenial,
+  isSandboxDeviceRuntimeDenial,
+  isSandboxFilesystemRuntimeDenial,
+  isSandboxNetworkRuntimeDenial,
   isSandboxSpawnError,
+  parseSandboxRuntimeDenialKind,
   sandboxRuntimeDenialError,
 }
+
+export type { DetectSandboxRuntimeDenialOptions, SandboxRuntimeDenialKind }

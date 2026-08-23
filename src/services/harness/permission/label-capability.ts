@@ -4,6 +4,7 @@ const labelPermissionCapability = (
   capability: PermissionCapabilityKey,
 ): string => {
   if (capability === 'shell') return 'Shell'
+  if (capability === 'shell.network') return 'Shell (network)'
   if (capability === 'shell.unsandboxed') return 'Shell (unsandboxed)'
   if (capability === 'git.commit') return 'Commit'
   if (capability === 'git.checkout') return 'Checkout'

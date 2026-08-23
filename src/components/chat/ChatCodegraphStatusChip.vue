@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   CircleAlert,
   CircleCheck,
@@ -24,7 +24,9 @@ import {
 import useCodegraphStatus from '@/composables/use-codegraph-status'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import projectRouteFor from '@/utils/project-route-for'
+import { shouldShowChatCodegraphStatusChip } from './chat-codegraph-status-chip'
 
+const route = useRoute()
 const router = useRouter()
 const fleet = useFleetRegistry()
 const codegraph = useCodegraphStatus()
@@ -32,7 +34,13 @@ const open = ref(false)
 const navigating = ref(false)
 
 const projectSlug = computed(() => fleet.activeProject.value?.slug ?? null)
-const visible = computed(() => Boolean(projectSlug.value))
+const visible = computed(() =>
+  shouldShowChatCodegraphStatusChip({
+    routeName: route.name,
+    routeSlug: String(route.params.slug ?? ''),
+    activeProjectSlug: projectSlug.value,
+  }),
+)
 
 const statusClass = computed((): string => {
   if (codegraph.isBusy.value) {

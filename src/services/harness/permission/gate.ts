@@ -10,7 +10,10 @@ import {
   requestApproval,
   type ApprovalKind,
 } from '@/services/harness/permission/approval-gate'
-import { decidePermission } from '@/services/harness/permission/policy'
+import {
+  decidePermission,
+  isStickyShellElevation,
+} from '@/services/harness/permission/policy'
 
 export type PendingApprovalView = {
   toolCallId: string
@@ -105,11 +108,15 @@ export const gateToolPermission = async (args: {
     return false
   }
 
-  if (result.scope === 'session') {
+  if (
+    result.scope === 'session' ||
+    result.scope === 'workspace' ||
+    result.scope === 'always' ||
+    (result.scope === 'once' && isStickyShellElevation(args.capability))
+  ) {
     args.ctx.sessionAllows.add(args.capability)
   }
   if (result.scope === 'workspace' || result.scope === 'always') {
-    args.ctx.sessionAllows.add(args.capability)
     await args.ctx.persistPermission?.(
       args.capability,
       'allow',
