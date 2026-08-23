@@ -12,6 +12,7 @@ import {
 import type { ApprovalResolution } from '@/services/harness/permission/approval-gate'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import type { PermissionScope } from '@/types/harness/permission'
+import approvalActionClass from '@/components/chat/approval-action-class'
 import {
   approvalActionSpecs,
   type ApprovalActionKey,
@@ -70,24 +71,8 @@ const iconFor = (key: ApprovalActionKey) => {
   return XIcon
 }
 
-const actionClass = (key: ApprovalActionKey): string => {
-  if (props.tone !== 'terminal') {
-    if (key === 'never' || key === 'deny') {
-      return 'size-7 shrink-0 text-destructive hover:text-destructive'
-    }
-    return 'size-7 shrink-0 text-muted-foreground hover:text-foreground'
-  }
-  if (key === 'once') {
-    return 'size-7 shrink-0 text-emerald-400 hover:bg-zinc-800 hover:!text-emerald-300'
-  }
-  if (key === 'session') {
-    return 'size-7 shrink-0 text-amber-400 hover:bg-zinc-800 hover:!text-amber-300'
-  }
-  if (key === 'deny' || key === 'never') {
-    return 'size-7 shrink-0 text-red-400 hover:bg-zinc-800 hover:!text-red-300'
-  }
-  return 'size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
-}
+const actionClass = (key: ApprovalActionKey): string =>
+  approvalActionClass(key, props.tone)
 
 const handleAction = (key: ApprovalActionKey): void => {
   if (key === 'deny') {
