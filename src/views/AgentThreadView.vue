@@ -62,7 +62,6 @@ const {
   <ChatChatPanelContextMenu
     :project-slug="projectSlug"
     :chat-id="chatId"
-    :disabled="!threadReady"
   >
     <!--
       Always host the ring on the chat column titlebar band. Parent main uses
