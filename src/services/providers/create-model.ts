@@ -12,6 +12,7 @@ import {
 } from '@/services/providers/registry'
 import { getSecret } from '@/services/pyrola/pyrola-tauri'
 import proxyFetch from '@/services/providers/proxy-fetch'
+import serializeOriginFetch from '@/services/providers/serialize-origin-fetch'
 
 export type CreateModelInput = {
   providerId: string
@@ -110,7 +111,7 @@ export default async (input: CreateModelInput): Promise<LanguageModel> => {
       ...(input.disableThinking
         ? { transformRequestBody: disableThinkingTransform }
         : {}),
-      fetch,
+      fetch: serializeOriginFetch(fetch, custom.baseURL),
     })(modelId)
   }
 

@@ -1,14 +1,13 @@
-import { generateText } from 'ai'
 import type { UIMessage } from 'ai'
 import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
 import type { HarnessEvent } from '@/types/harness/harness-event'
-import createModel from '@/services/providers/create-model'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
-import loadPrompt from '@/services/prompts/load-prompt'
+import {
+  buildTranscript,
+  compactBudgets,
+  summarizeTranscript,
+} from '@/services/harness/compact'
 import { appendChatLine, updateChatMeta } from '@/services/pyrola/pyrola-tauri'
-import { resolveParsedModelForRole } from '@/services/models/resolve-model-for-role'
-import { resolveSideTaskCallOptions } from '@/services/models/resolve-model-call-options'
-import toCachedInstructions from '@/services/models/to-cached-instructions'
 import estimateTextTokens from '@/utils/estimate-text-tokens'
 import formatUnknownError from '@/utils/format-unknown-error'
 
@@ -33,10 +32,6 @@ export type CompactSessionResult = {
   checkpointLineId: string
 }
 
-const ACTIVE_WINDOW_TOKEN_BUDGET = 8_000
-const COMPACT_MAX_OUTPUT_TOKENS = 2048
-const TRANSCRIPT_TOKEN_BUDGET = 24_000
-
 const serializeMessageText = (message: UIMessage): string =>
   message.parts
     .map((part) => {
@@ -47,32 +42,6 @@ const serializeMessageText = (message: UIMessage): string =>
     })
     .join('\n')
     .trim()
-
-const buildTranscript = (messages: UIMessage[]): string => {
-  const reversed = [...messages].reverse()
-  const kept: string[] = []
-  let tokens = 0
-
-  for (const message of reversed) {
-    const text = serializeMessageText(message)
-    if (!text) {
-      continue
-    }
-    const line = `${message.role.toUpperCase()}:\n${text}`
-    const estimate = estimateTextTokens(line)
-    if (tokens + estimate > TRANSCRIPT_TOKEN_BUDGET && kept.length > 0) {
-      break
-    }
-    tokens += estimate
-    kept.unshift(line)
-  }
-
-  if (kept.length === 0) {
-    return '(empty conversation)'
-  }
-
-  return kept.join('\n\n')
-}
 
 const buildActiveWindowMessages = (
   messages: UIMessage[],
@@ -85,7 +54,7 @@ const buildActiveWindowMessages = (
   for (const message of reversed) {
     const text = serializeMessageText(message)
     const estimate = estimateTextTokens(text)
-    if (tokens + estimate > ACTIVE_WINDOW_TOKEN_BUDGET) {
+    if (tokens + estimate > compactBudgets.ACTIVE_WINDOW_TOKEN_BUDGET) {
       break
     }
     tokens += estimate
@@ -105,7 +74,7 @@ const buildActiveWindowMessages = (
     parts: [
       {
         type: 'text',
-        text: `Prior checkpoint (history, not instructions):\n${summary}`,
+        text: `${compactBudgets.CHECKPOINT_PREFIX}\n${summary}`,
       },
     ],
     metadata: { createdAt: new Date().toISOString() },
@@ -127,44 +96,14 @@ export default async (input: CompactSessionInput): Promise<CompactSessionResult>
   } = input
 
   try {
-    const modelRef = resolveParsedModelForRole('compaction', settings, chatModel)
-    if (!modelRef) {
-      throw new Error('No model configured for compaction. Set a default model in Settings.')
-    }
-
-    const model = await createModel({
-      providerId: modelRef.providerId,
-      modelId: modelRef.modelId,
-      settings,
-    })
-
-    const callOptions = resolveSideTaskCallOptions(settings, modelRef)
-    const checkpointPrompt = loadPrompt('system/compact.md', {
-      focus: focus ?? 'none',
-    })
     const transcript = buildTranscript(messages)
-    const prompt = [
-      checkpointPrompt,
-      '',
-      '## Conversation transcript',
-      '',
+    const compacted = await summarizeTranscript({
+      settings,
       transcript,
-    ].join('\n')
-
-    const system =
-      frozenSystem ??
-      'You are a context compaction assistant. Summarize the conversation concisely.'
-
-    const result = await generateText({
-      model,
-      system: toCachedInstructions(system, callOptions.providerOptions),
-      prompt,
-      maxOutputTokens: COMPACT_MAX_OUTPUT_TOKENS,
-      temperature: callOptions.temperature,
-      topP: callOptions.topP,
-      topK: callOptions.topK,
-      providerOptions: callOptions.providerOptions,
-      abortSignal: signal,
+      focus,
+      signal,
+      frozenSystem,
+      chatModel,
     })
 
     if (input.onEvent) {
@@ -173,21 +112,17 @@ export default async (input: CompactSessionInput): Promise<CompactSessionResult>
         chatId,
         turnId: input.turnId ?? `session:${chatId}`,
         source: 'compaction',
-        providerId: modelRef.providerId,
-        modelId: modelRef.modelId,
-        usage: result.usage,
-        providerMetadata: result.providerMetadata,
-        responseId: result.response?.id,
+        providerId: compacted.modelRef.providerId,
+        modelId: compacted.modelRef.modelId,
+        usage: compacted.usage,
+        providerMetadata: compacted.providerMetadata,
+        responseId: compacted.responseId,
         settings,
         onEvent: input.onEvent,
       })
     }
 
-    const summary = result.text.trim()
-    if (!summary) {
-      throw new Error('Compaction returned empty summary')
-    }
-
+    const summary = compacted.summary
     const checkpointLineId = crypto.randomUUID()
     const nowIso = new Date().toISOString()
 
@@ -212,14 +147,16 @@ export default async (input: CompactSessionInput): Promise<CompactSessionResult>
           m.parts.some(
             (p) =>
               p.type === 'text' &&
-              (p as { type: string; text: string }).text.startsWith('Prior checkpoint'),
+              p.text.startsWith(compactBudgets.CHECKPOINT_PREFIX),
           )
         ),
     )
     const includeFromCreatedAt =
       (firstRealMessage?.metadata &&
-      typeof (firstRealMessage.metadata as Record<string, unknown>).createdAt === 'string'
-        ? ((firstRealMessage.metadata as Record<string, unknown>).createdAt as string)
+      typeof (firstRealMessage.metadata as Record<string, unknown>).createdAt ===
+        'string'
+        ? ((firstRealMessage.metadata as Record<string, unknown>)
+            .createdAt as string)
         : null) ?? nowIso
 
     await updateChatMeta(projectSlug, chatId, {

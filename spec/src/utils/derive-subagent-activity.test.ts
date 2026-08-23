@@ -9,6 +9,7 @@ const base = (
   subagentId: 'sub-1',
   name: 'Exploring app',
   blocking: false,
+  compactions: [],
   ...partial,
 })
 

@@ -19,6 +19,7 @@ const subagent = (
   blocking: partial.blocking ?? true,
   status: partial.status ?? 'running',
   tools: partial.tools ?? [],
+  compactions: partial.compactions ?? [],
   toolCallId: partial.toolCallId,
   summary: partial.summary,
   prompt: partial.prompt,

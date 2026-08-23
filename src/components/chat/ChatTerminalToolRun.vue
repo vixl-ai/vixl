@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { CheckIcon, ChevronRightIcon, ExternalLinkIcon, LoaderCircleIcon, ShieldIcon, ShieldOffIcon, TerminalIcon, XIcon } from '@lucide/vue'
+import { CheckIcon, ChevronRightIcon, ExternalLinkIcon, ShieldIcon, ShieldOffIcon, TerminalIcon, XIcon } from '@lucide/vue'
+import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import { toast } from 'vue-sonner'
 import type { ApprovalResolution } from '@/services/harness/permission/approval-gate'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
@@ -78,13 +79,11 @@ const phaseStatus = (
     isError: isError.value,
   })
   const icon =
-    kind === 'running'
-      ? LoaderCircleIcon
-      : kind === 'ok'
-        ? CheckIcon
-        : kind === 'fail'
-          ? XIcon
-          : TerminalIcon
+    kind === 'ok'
+      ? CheckIcon
+      : kind === 'fail'
+        ? XIcon
+        : TerminalIcon
   return {
     icon,
     tooltip: terminalPhaseStatusTooltip(kind, phase.exitCode),
@@ -141,7 +140,14 @@ const handleShowTerminal = (): void => {
       >
         <ChevronRightIcon class="size-3.5 shrink-0" />
         <span class="min-w-0 truncate text-xs">
-          {{ headline }}
+          <AiElementsShimmerShimmer
+            v-if="isRunning"
+            :duration="1"
+            as="span"
+          >
+            {{ headline }}
+          </AiElementsShimmerShimmer>
+          <template v-else>{{ headline }}</template>
         </span>
       </CollapsibleTrigger>
       <div class="flex shrink-0 items-center gap-0">
@@ -207,7 +213,14 @@ const handleShowTerminal = (): void => {
                     </Tooltip>
                   </TooltipProvider>
                 </template>
-                {{ headline }}
+                <AiElementsShimmerShimmer
+                  v-if="isRunning"
+                  :duration="1"
+                  as="span"
+                >
+                  {{ headline }}
+                </AiElementsShimmerShimmer>
+                <template v-else>{{ headline }}</template>
               </TerminalTitle>
             </CollapsibleTrigger>
             <div class="flex shrink-0 items-center">

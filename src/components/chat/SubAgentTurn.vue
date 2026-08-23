@@ -108,15 +108,12 @@ const handleStop = (): void => {
           v-if="modelLabel"
           class="block truncate text-[10px] leading-tight text-muted-foreground/80"
         >{{ modelLabel }}</span>
-        <span
-          class="block truncate text-foreground/90"
-          :class="isRunning ? 'shimmer shimmer-duration-1500' : undefined"
-        >{{ displayName }}</span>
+        <span class="block truncate text-foreground/90">{{ displayName }}</span>
         <AiElementsShimmerShimmer
           v-if="activityLabel"
-          :duration="1.5"
+          :duration="1"
           as="span"
-          class="block truncate text-[10px] leading-tight text-muted-foreground"
+          class="block min-w-0 truncate text-[10px] leading-tight"
         >
           {{ activityLabel }}
         </AiElementsShimmerShimmer>
@@ -127,7 +124,7 @@ const handleStop = (): void => {
             type="button"
             variant="ghost"
             size="icon"
-            class="size-6 shrink-0 text-muted-foreground"
+            class="size-6 shrink-0 text-destructive hover:text-destructive"
             aria-label="Stop sub-agent"
             @click.stop="handleStop"
           >
