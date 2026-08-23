@@ -19,7 +19,13 @@ const GROUP_ORDER: { kind: ApprovalKind; label: string }[] = [
 const FS_SUBGROUP_ORDER = ['write', 'delete'] as const
 
 const kindFor = (capability: PermissionCapabilityKey): ApprovalKind => {
-  if (capability === 'shell' || capability === 'shell.unsandboxed') return 'shell'
+  if (
+    capability === 'shell' ||
+    capability === 'shell.network' ||
+    capability === 'shell.unsandboxed'
+  ) {
+    return 'shell'
+  }
   if (
     capability === 'git.commit' ||
     capability === 'git.checkout' ||

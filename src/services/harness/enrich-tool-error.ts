@@ -21,7 +21,7 @@ const ERROR_HINTS: Array<{ pattern: RegExp; hint: string }> = [
   },
   {
     pattern: /command failed/i,
-    hint: 'The shell command returned a non-zero exit code. Check stderr and prefer edit_file/write_file for file changes.',
+    hint: 'The shell command returned a non-zero exit code. Check stderr and the SANDBOXING footer before retrying.',
   },
   {
     pattern: /-32602|invalid_cdp_params|params\.expression/i,
@@ -29,9 +29,15 @@ const ERROR_HINTS: Array<{ pattern: RegExp; hint: string }> = [
   },
 ]
 
+const isSandboxJailMessage = (message: string): boolean =>
+  /SANDBOX_|isolated devices|isolated \/dev|Run outside sandbox/i.test(message)
+
 export default (message: string): string => {
   const hint = ERROR_HINTS.find((entry) => entry.pattern.test(message))?.hint
   if (!hint) {
+    return message
+  }
+  if (isSandboxJailMessage(message) && /edit_file/i.test(hint)) {
     return message
   }
   return `${message}\n\nHint: ${hint}`

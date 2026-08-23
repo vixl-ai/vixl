@@ -4,6 +4,7 @@ export type PermissionAction =
   | 'fs.write'
   | 'fs.delete'
   | 'shell'
+  | 'shell.network'
   | 'shell.unsandboxed'
   | 'git.write'
   | 'mcp.call'
@@ -22,6 +23,7 @@ export type PermissionCapabilityKey =
   | `fs.write:${string}`
   | `fs.delete:${string}`
   | 'shell'
+  | 'shell.network'
   | 'shell.unsandboxed'
   | 'git.commit'
   | 'git.checkout'

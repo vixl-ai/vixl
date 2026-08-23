@@ -12,10 +12,14 @@ const props = defineProps<Props>()
 
 <template>
   <div
-    :class="cn('flex items-center gap-2 text-sm text-zinc-400', props.class)"
+    :class="cn('flex min-w-0 items-center gap-2 text-sm text-zinc-400', props.class)"
     v-bind="$attrs"
   >
-    <TerminalIcon class="size-4" />
-    <slot>Terminal</slot>
+    <slot name="icon">
+      <TerminalIcon class="size-4 shrink-0" />
+    </slot>
+    <div class="min-w-0 truncate">
+      <slot>Terminal</slot>
+    </div>
   </div>
 </template>

@@ -3,6 +3,7 @@ import buildLineDiffHunks from '@/utils/build-line-diff-hunks'
 import countDiffLines from '@/utils/count-diff-lines'
 import filePathBasename from '@/utils/file-path-basename'
 import formatToolRunLabel from '@/utils/format-tool-run-label'
+import { parseTerminalToolView, stripSandboxingFooter } from '@/utils/parse-terminal-tool-view'
 import resolveFileDiffHunks from '@/utils/resolve-file-diff-hunks'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type { ToolRun } from '@/types/harness/tool-run'
@@ -81,12 +82,8 @@ describe('resolveFileDiffHunks', () => {
       ],
     }
     const hunks = resolveFileDiffHunks(diff)
-    const removes = hunks.flatMap((hunk) =>
-      hunk.lines.filter((line) => line.kind === 'remove'),
-    )
-    const adds = hunks.flatMap((hunk) =>
-      hunk.lines.filter((line) => line.kind === 'add'),
-    )
+    const removes = hunks.flatMap((hunk) => hunk.lines.filter((line) => line.kind === 'remove'))
+    const adds = hunks.flatMap((hunk) => hunk.lines.filter((line) => line.kind === 'add'))
     expect(removes).toEqual([{ kind: 'remove', content: 'b' }])
     expect(adds).toEqual([{ kind: 'add', content: 'B' }])
   })
@@ -281,6 +278,200 @@ describe('formatToolRunLabel', () => {
         }),
       ),
     ).toBe('Clicking…')
+  })
+
+  it('labels run_terminal with the short description, not the command', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'run_terminal',
+          args: { command: 'git status --short', description: 'Working tree status' },
+        }),
+      ),
+    ).toBe('Ran command Working tree status')
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'run_terminal',
+          args: { command: 'git status --short' },
+        }),
+      ),
+    ).toBe('Ran command')
+  })
+})
+
+describe('parseTerminalToolView', () => {
+  it('returns null for non-terminal tools', () => {
+    expect(
+      parseTerminalToolView(
+        toolRun({
+          name: 'read_file',
+          args: { path: 'a.ts' },
+        }),
+      ),
+    ).toBeNull()
+  })
+
+  it('reads command, exit code, and sandboxed badge fields', () => {
+    expect(
+      parseTerminalToolView(
+        toolRun({
+          name: 'run_terminal',
+          args: { command: 'git status --short' },
+          result: {
+            command: 'git status --short',
+            stdout: ' M src/a.ts',
+            stderr: '',
+            exitCode: 0,
+            sandboxed: true,
+            shellId: 'shell-1',
+          },
+        }),
+      ),
+    ).toEqual({
+      command: 'git status --short',
+      label: '',
+      shellId: 'shell-1',
+      phases: [
+        {
+          sandboxed: true,
+          exitCode: 0,
+          output: ' M src/a.ts',
+          title: 'Sandboxed',
+          badge: 'sandboxed',
+        },
+      ],
+    })
+  })
+
+  it('shows the final unsandboxed phase when priorPhase is absent', () => {
+    expect(
+      parseTerminalToolView(
+        toolRun({
+          name: 'run_terminal',
+          args: { command: 'ls /dev/disk' },
+          result: {
+            command: 'ls /dev/disk',
+            stdout: 'disk0',
+            exitCode: 0,
+            sandboxed: false,
+            shellId: 'shell-2',
+          },
+        }),
+      ),
+    ).toEqual({
+      command: 'ls /dev/disk',
+      label: '',
+      shellId: 'shell-2',
+      phases: [
+        {
+          sandboxed: false,
+          exitCode: 0,
+          output: 'disk0',
+          title: 'Unsandboxed',
+          badge: 'unsandboxed',
+        },
+      ],
+    })
+  })
+
+  it('keeps sandbox then unsandboxed phases from priorPhase', () => {
+    expect(
+      parseTerminalToolView(
+        toolRun({
+          name: 'run_terminal',
+          args: { command: 'ls /dev/disk' },
+          result: {
+            command: 'ls /dev/disk',
+            stdout: 'disk0',
+            exitCode: 0,
+            sandboxed: false,
+            shellId: 'shell-2',
+            priorPhase: {
+              sandboxed: true,
+              stdout: '',
+              error: 'Sandbox blocked: isolated devices',
+              exitCode: 1,
+            },
+          },
+        }),
+      ),
+    ).toEqual({
+      command: 'ls /dev/disk',
+      label: '',
+      shellId: 'shell-2',
+      phases: [
+        {
+          sandboxed: true,
+          exitCode: 1,
+          output: 'Sandbox blocked: isolated devices',
+          title: 'Sandboxed',
+          badge: 'sandboxed',
+        },
+        {
+          sandboxed: false,
+          exitCode: 0,
+          output: 'disk0',
+          title: 'Unsandboxed',
+          badge: 'unsandboxed',
+        },
+      ],
+    })
+  })
+
+  it('renders terminal_output stdout instead of a JSON blob', () => {
+    expect(
+      parseTerminalToolView(
+        toolRun({
+          name: 'terminal_output',
+          args: { shell_id: 'shell-3' },
+          result: {
+            shellId: 'shell-3',
+            status: 'running',
+            stdout: 'listening on 5173',
+            stderr: '',
+            exitCode: null,
+          },
+        }),
+      ),
+    ).toEqual({
+      command: '',
+      label: '',
+      shellId: 'shell-3',
+      phases: [
+        {
+          output: 'listening on 5173',
+          title: 'Terminal',
+        },
+      ],
+    })
+  })
+
+  it('prefers the short description as the terminal label', () => {
+    expect(
+      parseTerminalToolView(
+        toolRun({
+          name: 'run_terminal',
+          status: 'running',
+          args: {
+            command: 'find /var/lib/jellyfin -name jellyfin.db',
+            description: 'Find Jellyfin database',
+          },
+        }),
+      ),
+    ).toEqual({
+      command: 'find /var/lib/jellyfin -name jellyfin.db',
+      label: 'Find Jellyfin database',
+      phases: [{ output: '', title: 'Terminal' }],
+    })
+  })
+
+  it('strips SANDBOXING footers from error text', () => {
+    expect(
+      stripSandboxingFooter(
+        'Sandbox blocked: isolated devices\n\nSANDBOXING: This command ran in a sandbox',
+      ),
+    ).toBe('Sandbox blocked: isolated devices')
   })
 })
 

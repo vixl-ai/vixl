@@ -61,6 +61,28 @@ const approvalMap = computed(() => {
   return map
 })
 
+const leftoverApprovals = computed(() => {
+  if (props.readOnly) {
+    return []
+  }
+  const attached = new Set<string>()
+  for (const item of props.timeline) {
+    if (item.type === 'agent-turn') {
+      for (const step of item.turn.steps) {
+        for (const tool of step.tools) {
+          attached.add(tool.toolCallId)
+        }
+      }
+    }
+    if (item.type === 'subagent') {
+      for (const tool of item.tools) {
+        attached.add(tool.toolCallId)
+      }
+    }
+  }
+  return [...approvalMap.value.entries()].filter(([toolCallId]) => !attached.has(toolCallId))
+})
+
 const isLive = computed(() => props.status === 'streaming' || props.status === 'submitted')
 
 const runningSubagents = computed(() =>
@@ -348,9 +370,13 @@ watch(
             :subagents-by-tool-call-id="subagentsByToolCallId"
             :subagents-by-id="subagentsById"
             :restore-enabled="!readOnly && !isLive"
+            :pending-approvals="readOnly ? undefined : approvalMap"
             @retry="emit('retry')"
             @restore-files="emit('restoreFiles', item.turn.id)"
             @stop-subagent="emit('stopSubagent', $event)"
+            @resolve-approval="
+              (toolCallId, resolution) => emit('resolveApproval', toolCallId, resolution)
+            "
           />
         </MessageScrollerItem>
         <MessageScrollerItem
@@ -384,7 +410,7 @@ watch(
           @secrets-saved="(toolCallId, serverId) => emit('secretsSavedMcp', toolCallId, serverId)"
         />
         <ChatToolCard
-          v-for="[toolCallId, approval] in readOnly ? [] : approvalMap"
+          v-for="[toolCallId, approval] in leftoverApprovals"
           :key="toolCallId"
           :approval="approval"
           @resolve="(resolution) => emit('resolveApproval', toolCallId, resolution)"
