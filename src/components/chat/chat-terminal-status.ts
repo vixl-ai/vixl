@@ -41,7 +41,7 @@ export const terminalPhaseStatusTooltip = (
 
 export const terminalPhaseStatusColorClass = (kind: TerminalPhaseStatusKind): string => {
   if (kind === 'running') {
-    return 'shrink-0 animate-spin text-amber-400'
+    return 'shrink-0 text-amber-400'
   }
   if (kind === 'ok') {
     return 'shrink-0 text-emerald-400'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronRightIcon, LoaderCircleIcon, XIcon } from '@lucide/vue'
+import { ChevronRightIcon, XIcon } from '@lucide/vue'
 import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { FileDiff } from '@/types/harness/file-diff'
@@ -10,6 +10,7 @@ import countDiffLines from '@/utils/count-diff-lines'
 import formatToolRunLabel from '@/utils/format-tool-run-label'
 import { isTerminalToolName } from '@/utils/parse-terminal-tool-view'
 import resolveFileDiffHunks from '@/utils/resolve-file-diff-hunks'
+import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import ChatArtifactLink from '@/components/chat/ChatArtifactLink.vue'
 import ChatInlineFileDiff from '@/components/chat/InlineFileDiff.vue'
 import ChatApprovalActions from '@/components/chat/ChatApprovalActions.vue'
@@ -166,14 +167,21 @@ const diffCounts = computed(() => {
         class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm transition-colors hover:text-foreground"
         :class="isError ? 'text-destructive/90' : 'text-muted-foreground'"
       >
-        <LoaderCircleIcon v-if="isRunning" class="size-3.5 shrink-0 animate-spin" />
-        <XIcon v-else-if="isError" class="size-3.5 shrink-0 text-destructive" />
+        <XIcon v-if="isError" class="size-3.5 shrink-0 text-destructive" />
         <ChevronRightIcon
           v-else
           class="size-3.5 shrink-0 transition-transform"
           :class="open ? 'rotate-90' : ''"
         />
-        <span class="min-w-0 truncate">{{ label }}</span>
+        <AiElementsShimmerShimmer
+          v-if="isRunning"
+          :duration="1"
+          as="span"
+          class="min-w-0 truncate"
+        >
+          {{ label }}
+        </AiElementsShimmerShimmer>
+        <span v-else class="min-w-0 truncate">{{ label }}</span>
         <ChatArtifactLink v-if="run.artifact && hasArtifactChip" :artifact="run.artifact" />
         <span
           v-if="hasDiffs && (diffCounts.additions > 0 || diffCounts.deletions > 0)"
@@ -198,7 +206,14 @@ const diffCounts = computed(() => {
     <CollapsibleContent
       class="mt-1 space-y-2 border-l border-border/60 pl-5 text-xs text-muted-foreground"
     >
-      <p v-if="isRunning && !hasDetails" class="text-muted-foreground">Running…</p>
+      <AiElementsShimmerShimmer
+        v-if="isRunning && !hasDetails"
+        :duration="1.5"
+        as="p"
+        class="text-muted-foreground"
+      >
+        Running…
+      </AiElementsShimmerShimmer>
       <p v-if="ownerTitle" class="text-muted-foreground">Held by {{ ownerTitle }}</p>
       <div v-if="argsText">
         <p class="mb-1 font-medium text-foreground/80">Input</p>

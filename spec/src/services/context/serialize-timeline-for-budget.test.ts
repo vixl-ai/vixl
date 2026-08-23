@@ -142,6 +142,7 @@ describe('serializeTimelineForBudget', () => {
         blocking: true,
         status: 'done',
         summary: 'found things',
+        compactions: [],
         tools: [
           {
             toolCallId: 'nested-1',

@@ -11,6 +11,7 @@ import {
   TerminalStatus,
   TerminalTitle,
 } from '@/components/ai-elements/terminal'
+import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   Tooltip,
@@ -76,7 +77,14 @@ const handleStop = async (): Promise<void> => {
     >
       <TerminalHeader>
         <TerminalTitle class="min-w-0 truncate">
-          {{ title }}
+          <AiElementsShimmerShimmer
+            v-if="isStreaming"
+            :duration="1"
+            as="span"
+          >
+            {{ title }}
+          </AiElementsShimmerShimmer>
+          <template v-else>{{ title }}</template>
         </TerminalTitle>
         <div class="flex shrink-0 items-center gap-1">
           <TerminalStatus />
