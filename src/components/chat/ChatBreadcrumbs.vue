@@ -126,7 +126,7 @@ const projectTo = computed(() =>
           >
             <RouterLink
               :to="parentChatTo"
-              class="block max-w-[10rem] truncate text-muted-foreground sm:max-w-[14rem]"
+              class="block min-w-0 max-w-[10rem] truncate text-muted-foreground sm:max-w-[14rem]"
               :title="chatTitle"
             >
               {{ chatTitle }}
@@ -134,7 +134,7 @@ const projectTo = computed(() =>
           </BreadcrumbLink>
           <BreadcrumbPage
             v-else
-            class="block max-w-[14rem] truncate text-muted-foreground sm:max-w-[22rem]"
+            class="block min-w-0 max-w-[14rem] truncate text-muted-foreground sm:max-w-[22rem]"
             :title="chatTitle"
           >
             {{ chatTitle }}
@@ -144,7 +144,7 @@ const projectTo = computed(() =>
           <BreadcrumbSeparator class="shrink-0" />
           <BreadcrumbItem class="min-w-0 overflow-hidden">
             <BreadcrumbPage
-              class="block max-w-[14rem] truncate text-muted-foreground sm:max-w-[22rem]"
+              class="block min-w-0 max-w-[14rem] truncate text-muted-foreground sm:max-w-[22rem]"
               :title="subagentTitle"
             >
               {{ subagentTitle }}

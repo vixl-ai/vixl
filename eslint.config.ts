@@ -29,6 +29,7 @@ export default defineConfigWithVueTs(
     'docs/.vuepress/.temp/**',
     'docs/.vuepress/.cache/**',
     'docs/.vuepress/dist/**',
+    'docs/.vuepress/components/ui/**',
   ]),
 
   ...pluginVue.configs['flat/essential'],

@@ -61,10 +61,6 @@ const {
   >
     <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-xl">
       <div class="space-y-4">
-        <p class="text-sm text-muted-foreground">
-          Enter each API key once below. Values go to your OS keychain; mcp.json only stores the env or header name.
-        </p>
-
         <div class="space-y-2">
           <Label>Server ID</Label>
           <Input

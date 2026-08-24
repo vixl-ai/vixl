@@ -1,6 +1,9 @@
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+
+@source '../layouts/**/*.vue';
+@source '../components/**/*.vue';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -43,41 +46,12 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-  --animate-sidebar-collapsible-down: sidebar-collapsible-down 150ms ease-out;
-  --animate-sidebar-collapsible-up: sidebar-collapsible-up 150ms ease-out;
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
-@keyframes sidebar-collapsible-down {
-  from {
-    height: 0;
-    opacity: 0;
-  }
-
-  to {
-    height: var(--reka-collapsible-content-height);
-    opacity: 1;
-  }
-}
-
-@keyframes sidebar-collapsible-up {
-  from {
-    height: var(--reka-collapsible-content-height);
-    opacity: 1;
-  }
-
-  to {
-    height: 0;
-    opacity: 0;
-  }
-}
-
 :root {
   --radius: 0.625rem;
-  /* Width of the title bar control clusters; keeps title content clear of them */
-  --titlebar-safe-left: 8.75rem;
-  --titlebar-safe-right: 6rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -146,15 +120,83 @@
 }
 
 @layer base {
-  * {
+  .marketing-home * {
     @apply border-border outline-ring/50;
   }
 
-  html {
-    @apply font-sans;
+  .marketing-home {
+    @apply bg-background text-foreground font-sans antialiased;
   }
+}
 
-  body {
-    @apply bg-background text-foreground font-sans text-[13px] antialiased tracking-[0.01em];
-  }
+.marketing-home h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  line-height: 1.05;
+  font-weight: 600;
+}
+
+.marketing-home h2 {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.marketing-home p {
+  margin: 0;
+}
+
+.marketing-home a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.marketing-home svg {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.marketing-home [data-slot='button'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  box-sizing: border-box;
+  line-height: 1;
+  background-image: none;
+}
+
+.marketing-home [data-slot='button'][data-size='sm'] {
+  height: 2rem;
+  padding-inline: 0.75rem;
+}
+
+.marketing-home [data-slot='button'][data-size='lg'] {
+  height: 3rem;
+  padding-inline: 2rem;
+}
+
+.marketing-home header a,
+.marketing-home header button {
+  display: inline-flex;
+  align-items: center;
+}
+
+.marketing-home header [data-slot='button'][data-size='sm'] {
+  height: 2.5rem;
+}
+
+.marketing-home [data-slot='button'][data-size='icon-sm'] {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+}
+
+.marketing-home [data-slot='button'][data-variant='default'] {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.marketing-home [data-slot='button'][data-variant='ghost'] {
+  background-color: transparent;
 }

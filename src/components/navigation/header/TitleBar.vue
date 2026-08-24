@@ -108,7 +108,6 @@ watch(
 
     <!-- Leave room for the chat-column context ring when the workbench owns the right edge. -->
     <div
-      v-if="workbench.rightSidebarOpen.value"
       class="h-full shrink-0"
       :style="{ width: 'var(--titlebar-safe-right)' }"
       data-tauri-drag-region
