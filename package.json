@@ -4,10 +4,10 @@
   "private": true,
   "description": "Local-first BYOK Agents UI",
   "license": "MIT",
-  "homepage": "https://aidanhibbard.github.io/pyrola/",
+  "homepage": "https://vixl.app/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aidanhibbard/pyrola.git"
+    "url": "git+https://github.com/vixl-ai/vixl.git"
   },
   "type": "module",
   "scripts": {
