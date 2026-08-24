@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getPendingApproval,
+  listPendingApprovalsForChat,
   resetApprovalGateForTests,
   resolveApproval,
 } from '@/services/harness/permission/approval-gate'
@@ -95,5 +96,60 @@ describe('gateToolPermission sticky shell elevation', () => {
     resolveApproval('tc-shell-session', { approved: true, scope: 'session' })
     await expect(pending).resolves.toBe(true)
     expect(ctx.sessionAllows.has('shell')).toBe(true)
+  })
+
+  it('calls onPendingApproval with the view payload', async () => {
+    const ctx = makeCtx()
+    const pending = gateToolPermission({
+      ctx,
+      toolCallId: 'tc-edit',
+      name: 'edit_file',
+      kind: 'fs',
+      action: 'fs.write',
+      capability: 'fs.write:src/a.ts',
+      title: 'Edit file',
+    })
+    await waitForPending('tc-edit')
+    expect(ctx.onPendingApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCallId: 'tc-edit',
+        name: 'edit_file',
+        kind: 'fs',
+        title: 'Edit file',
+      }),
+    )
+    resolveApproval('tc-edit', { approved: true, scope: 'once' })
+    await expect(pending).resolves.toBe(true)
+  })
+
+  it('stores subagent attribution on the pending approval', async () => {
+    const ctx = {
+      ...makeCtx(),
+      subagentId: 'sa-1',
+      subagentLabel: 'Explorer',
+    }
+    const pending = gateToolPermission({
+      ctx,
+      toolCallId: 'tc-sub',
+      name: 'edit_file',
+      kind: 'fs',
+      action: 'fs.write',
+      capability: 'fs.write:src/a.ts',
+      title: 'Edit file',
+    })
+    await waitForPending('tc-sub')
+    expect(ctx.onPendingApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCallId: 'tc-sub',
+        subagentId: 'sa-1',
+        subagentLabel: 'Explorer',
+      }),
+    )
+    const listed = listPendingApprovalsForChat('chat-1')
+    expect(listed).toHaveLength(1)
+    expect(listed[0]?.subagentId).toBe('sa-1')
+    expect(listed[0]?.subagentLabel).toBe('Explorer')
+    resolveApproval('tc-sub', { approved: true, scope: 'once' })
+    await expect(pending).resolves.toBe(true)
   })
 })

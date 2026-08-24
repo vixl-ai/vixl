@@ -86,6 +86,7 @@ declare module 'vue' {
     ChatMessageQueue: typeof import('./components/chat/ChatMessageQueue.vue')['default']
     ChatMessageTurn: typeof import('./components/chat/ChatMessageTurn.vue')['default']
     ChatPanelContextMenu: typeof import('./components/chat/ChatPanelContextMenu.vue')['default']
+    ChatPendingApprovals: typeof import('./components/chat/ChatPendingApprovals.vue')['default']
     ChatPermissionDial: typeof import('./components/chat/ChatPermissionDial.vue')['default']
     ChatPromptAttachments: typeof import('./components/chat/ChatPromptAttachments.vue')['default']
     ChatPromptBrowserElementSync: typeof import('./components/chat/ChatPromptBrowserElementSync.vue')['default']

@@ -5,8 +5,6 @@ import { RotateCcwIcon } from '@lucide/vue'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { ToolRun } from '@/types/harness/tool-run'
-import type { ApprovalResolution } from '@/services/harness/permission/approval-gate'
-import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import AiElementsChainOfThoughtChainOfThought from '@/components/ai-elements/chain-of-thought/ChainOfThought.vue'
 import AiElementsChainOfThoughtChainOfThoughtContent from '@/components/ai-elements/chain-of-thought/ChainOfThoughtContent.vue'
 import AiElementsChainOfThoughtChainOfThoughtHeader from '@/components/ai-elements/chain-of-thought/ChainOfThoughtHeader.vue'
@@ -37,14 +35,12 @@ const props = defineProps<{
   subagentsByToolCallId?: Map<string, SubagentTimelineItem>
   subagentsById?: Map<string, SubagentTimelineItem>
   restoreEnabled?: boolean
-  pendingApprovals?: Map<string, PendingApprovalView>
 }>()
 
 const emit = defineEmits<{
   retry: []
   restoreFiles: []
   stopSubagent: [subagentId: string]
-  resolveApproval: [toolCallId: string, resolution: ApprovalResolution]
 }>()
 
 const isStreaming = computed(
@@ -70,6 +66,14 @@ const stepEntries = computed(() =>
   })),
 )
 
+const errorTitle = computed(() => {
+  const kind = props.turn.error?.kind
+  if (kind === 'timeout') {
+    return 'Timed out'
+  }
+  return 'Something went wrong'
+})
+
 const isStepStreaming = (index: number): boolean => {
   if (!isStreaming.value) {
     return false
@@ -84,23 +88,12 @@ const toolHeaderLabel = (count: number, index: number): string => {
   return `Used ${count} tools`
 }
 
-const approvalFor = (run: ToolRun): PendingApprovalView | undefined =>
-  props.pendingApprovals?.get(run.toolCallId)
-
 const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
   resolveSpawnSubagent(
     run,
     props.subagentsByToolCallId ?? new Map(),
     props.subagentsById ?? new Map(),
   )
-
-const errorTitle = computed(() => {
-  const kind = props.turn.error?.kind
-  if (kind === 'timeout') {
-    return 'Timed out'
-  }
-  return 'Something went wrong'
-})
 </script>
 
 <template>
@@ -154,10 +147,6 @@ const errorTitle = computed(() => {
         <ChatToolRun
           v-else-if="segment.tools.length === 1"
           :run="segment.tools[0]!"
-          :approval="approvalFor(segment.tools[0]!)"
-          @resolve-approval="
-            (resolution) => emit('resolveApproval', segment.tools[0]!.toolCallId, resolution)
-          "
         />
         <AiElementsChainOfThoughtChainOfThought
           v-else
@@ -181,10 +170,6 @@ const errorTitle = computed(() => {
                 v-for="tool in segment.tools"
                 :key="tool.toolCallId"
                 :run="tool"
-                :approval="approvalFor(tool)"
-                @resolve-approval="
-                  (resolution) => emit('resolveApproval', tool.toolCallId, resolution)
-                "
               />
             </div>
           </AiElementsChainOfThoughtChainOfThoughtContent>

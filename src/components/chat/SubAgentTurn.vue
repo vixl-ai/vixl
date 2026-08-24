@@ -3,8 +3,8 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   CheckCircle2Icon,
-  ChevronRightIcon,
   CircleAlertIcon,
+  ExternalLinkIcon,
   OctagonXIcon,
   SquareIcon,
 } from '@lucide/vue'
@@ -89,51 +89,67 @@ const handleStop = (): void => {
 </script>
 
 <template>
-  <div class="flex w-full max-w-full items-center gap-1">
-    <button
-      type="button"
-      class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
-      @click="openSubagentChat"
-    >
-      <NavigationAsideLeftChatRunningDots
-        v-if="isRunning"
-      />
-      <component
-        :is="statusIcon"
-        v-else
-        :class="statusIconClass"
-      />
-      <span class="min-w-0 flex-1">
-        <span
-          v-if="modelLabel"
-          class="block truncate text-[10px] leading-tight text-muted-foreground/80"
-        >{{ modelLabel }}</span>
-        <span class="block truncate text-foreground/90">{{ displayName }}</span>
-        <AiElementsShimmerShimmer
-          v-if="activityLabel"
-          :duration="1"
-          as="span"
-          class="block min-w-0 truncate text-[10px] leading-tight"
-        >
-          {{ activityLabel }}
-        </AiElementsShimmerShimmer>
-      </span>
-      <Tooltip v-if="isRunning">
-        <TooltipTrigger as-child>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            class="size-6 shrink-0 text-destructive hover:text-destructive"
-            aria-label="Stop sub-agent"
-            @click.stop="handleStop"
+  <div class="flex w-full max-w-full flex-col">
+    <div class="flex w-full max-w-full items-center gap-1">
+      <button
+        type="button"
+        class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
+        @click="openSubagentChat"
+      >
+        <NavigationAsideLeftChatRunningDots
+          v-if="isRunning"
+        />
+        <component
+          :is="statusIcon"
+          v-else
+          :class="statusIconClass"
+        />
+        <span class="min-w-0 flex-1">
+          <span
+            v-if="modelLabel"
+            class="block truncate text-[10px] leading-tight text-muted-foreground/80"
+          >{{ modelLabel }}</span>
+          <span class="block truncate text-foreground/90">{{ displayName }}</span>
+          <AiElementsShimmerShimmer
+            v-if="activityLabel"
+            :duration="1"
+            as="span"
+            class="block min-w-0 truncate text-[10px] leading-tight"
           >
-            <SquareIcon class="size-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Stop sub-agent</TooltipContent>
-      </Tooltip>
-      <ChevronRightIcon class="size-3.5 shrink-0 opacity-60" />
-    </button>
+            {{ activityLabel }}
+          </AiElementsShimmerShimmer>
+        </span>
+        <Tooltip v-if="isRunning">
+          <TooltipTrigger as-child>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="size-6 shrink-0 text-destructive hover:text-destructive"
+              aria-label="Stop sub-agent"
+              @click.stop="handleStop"
+            >
+              <SquareIcon class="size-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stop sub-agent</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="size-6 shrink-0"
+              aria-label="Open sub-agent"
+              @click.stop="openSubagentChat"
+            >
+              <ExternalLinkIcon class="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Open sub-agent</TooltipContent>
+        </Tooltip>
+      </button>
+    </div>
   </div>
 </template>

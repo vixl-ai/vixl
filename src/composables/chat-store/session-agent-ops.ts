@@ -1,3 +1,4 @@
+import type { AgentStep } from '@/types/chat/agent-step'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { ChatSession } from './types'
@@ -164,7 +165,30 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     )
   }
 
+  const findTurnWithTool = (
+    toolCallId: string,
+  ): { turn: AgentTurn; step: AgentStep } | null => {
+    for (const item of session.timeline.value) {
+      if (item.type !== 'agent-turn') {
+        continue
+      }
+      for (const step of item.turn.steps) {
+        if (step.tools.some((tool) => tool.toolCallId === toolCallId)) {
+          return { turn: item.turn, step }
+        }
+      }
+    }
+    return null
+  }
+
   const upsertLocalToolRun = (run: ToolRun): void => {
+    const existing = findTurnWithTool(run.toolCallId)
+    if (existing && existing.turn.id !== session.activeTurnId.value) {
+      const updatedStep = upsertToolInStep(existing.step, run)
+      const updatedTurn = patchStep(existing.turn, existing.step.id, updatedStep)
+      updateTimelineTurn(session, updatedTurn)
+      return
+    }
     const current = getActiveTurn()
     if (!current) {
       return

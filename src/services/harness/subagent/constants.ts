@@ -22,6 +22,21 @@ export const SUBAGENT_READ_ONLY_TOOLS = [
   'get_mcp_prompt',
 ] as const
 
+export const SUBAGENT_WRITE_TOOLS = [
+  ...SUBAGENT_READ_ONLY_TOOLS,
+  'write_file',
+  'edit_file',
+  'apply_patch',
+  'delete_file',
+  'move_file',
+  'run_terminal',
+  'terminal_output',
+  'stop_terminal',
+  'git_commit',
+  'git_checkout',
+  'git_branch_create',
+] as const
+
 export const SUBAGENT_MCP_TOOLS = [
   'get_mcp_tools',
   'call_mcp_tool',

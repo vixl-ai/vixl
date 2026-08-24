@@ -173,6 +173,8 @@ export default (
         unsandboxed: event.unsandboxed,
         allowedScopes: event.allowedScopes,
         diff: event.diff,
+        subagentId: event.subagentId,
+        subagentLabel: event.subagentLabel,
       }
       pendingApprovals.value = [...pendingApprovals.value, view]
       attention.setChatAttention('needs_approval')

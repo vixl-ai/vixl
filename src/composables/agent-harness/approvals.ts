@@ -188,6 +188,8 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
       unsandboxed: entry.unsandboxed,
       allowedScopes: entry.allowedScopes,
       diff: entry.diff,
+      subagentId: entry.subagentId,
+      subagentLabel: entry.subagentLabel,
     }))
     syncPendingMcpAuth()
     if (pendingMcpAuth.value.length > 0) {

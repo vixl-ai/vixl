@@ -19,7 +19,7 @@ const MODES: PyrolaChatMode[] = ['ask', 'plan', 'studio', 'agent', 'orchestrator
 /**
  * Empty-project (standalone, no rules, no MCP) ceilings after Slice 1 trims.
  * Measured totals (system join + builtin tool defs, chars/4):
- * ask 2368, plan 2916, studio 4329, agent 10292, orchestrator 8740.
+ * ask 2368, plan 2916, studio 4329, agent 10532, orchestrator 8937.
  * Headroom is about 3 percent so waste cannot return unnoticed.
  */
 const TOTAL_CEILINGS: Record<PyrolaChatMode, number> = {

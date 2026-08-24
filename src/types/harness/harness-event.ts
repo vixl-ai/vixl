@@ -28,6 +28,8 @@ export type HarnessEvent =
       unsandboxed?: boolean
       allowedScopes: PermissionScope[]
       diff: FileDiff[]
+      subagentId?: string
+      subagentLabel?: string
     }
   | {
       type: 'tool-result'
@@ -50,6 +52,7 @@ export type HarnessEvent =
       blocking: boolean
       prompt?: string
       model?: string
+      capabilities?: 'read-only' | 'write'
     }
   | {
       type: 'subagent-event'

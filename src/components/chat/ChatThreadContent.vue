@@ -6,7 +6,6 @@ import type { ChatTimelineItem, SubagentTimelineItem } from '@/types/chat/chat-t
 import type { PendingQuestionState } from '@/types/chat/pending-question'
 import type { PendingMcpAuthView } from '@/types/chat/pending-mcp-auth'
 import type { McpConfig } from '@/types/pyrola/mcp-config'
-import type { ApprovalResolution } from '@/services/harness/permission/approval-gate'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import ChatAgentTurn from '@/components/chat/ChatAgentTurn.vue'
@@ -15,7 +14,6 @@ import ChatMessageTurn from '@/components/chat/ChatMessageTurn.vue'
 import ChatMcpAuthCard from '@/components/chat/ChatMcpAuthCard.vue'
 import ChatQuestionCard from '@/components/chat/ChatQuestionCard.vue'
 import ChatSubAgentTurn from '@/components/chat/SubAgentTurn.vue'
-import ChatToolCard from '@/components/chat/ChatToolCard.vue'
 import useChatBrowserLock from '@/composables/use-chat-browser-lock'
 import {
   MessageScroller,
@@ -39,7 +37,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  resolveApproval: [toolCallId: string, resolution: ApprovalResolution]
   submitAnswer: [toolCallId: string, answer: string]
   authenticateMcp: [toolCallId: string]
   skipMcpAuth: [toolCallId: string]
@@ -52,36 +49,6 @@ const emit = defineEmits<{
 
 const { scrollToEnd } = useMessageScroller()
 const { handleContentChange } = useMessageScrollerContext()
-
-const approvalMap = computed(() => {
-  const map = new Map<string, PendingApprovalView>()
-  for (const item of props.pendingApprovals) {
-    map.set(item.toolCallId, item)
-  }
-  return map
-})
-
-const leftoverApprovals = computed(() => {
-  if (props.readOnly) {
-    return []
-  }
-  const attached = new Set<string>()
-  for (const item of props.timeline) {
-    if (item.type === 'agent-turn') {
-      for (const step of item.turn.steps) {
-        for (const tool of step.tools) {
-          attached.add(tool.toolCallId)
-        }
-      }
-    }
-    if (item.type === 'subagent') {
-      for (const tool of item.tools) {
-        attached.add(tool.toolCallId)
-      }
-    }
-  }
-  return [...approvalMap.value.entries()].filter(([toolCallId]) => !attached.has(toolCallId))
-})
 
 const isLive = computed(() => props.status === 'streaming' || props.status === 'submitted')
 
@@ -370,13 +337,9 @@ watch(
             :subagents-by-tool-call-id="subagentsByToolCallId"
             :subagents-by-id="subagentsById"
             :restore-enabled="!readOnly && !isLive"
-            :pending-approvals="readOnly ? undefined : approvalMap"
             @retry="emit('retry')"
             @restore-files="emit('restoreFiles', item.turn.id)"
             @stop-subagent="emit('stopSubagent', $event)"
-            @resolve-approval="
-              (toolCallId, resolution) => emit('resolveApproval', toolCallId, resolution)
-            "
           />
         </MessageScrollerItem>
         <MessageScrollerItem
@@ -408,12 +371,6 @@ watch(
           @skip="(toolCallId) => emit('skipMcpAuth', toolCallId)"
           @open-settings="(serverId) => emit('openMcpSettings', serverId)"
           @secrets-saved="(toolCallId, serverId) => emit('secretsSavedMcp', toolCallId, serverId)"
-        />
-        <ChatToolCard
-          v-for="[toolCallId, approval] in leftoverApprovals"
-          :key="toolCallId"
-          :approval="approval"
-          @resolve="(resolution) => emit('resolveApproval', toolCallId, resolution)"
         />
       </MessageScrollerContent>
     </MessageScrollerViewport>

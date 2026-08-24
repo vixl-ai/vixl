@@ -4,8 +4,6 @@ import { ChevronRightIcon, XIcon } from '@lucide/vue'
 import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { FileDiff } from '@/types/harness/file-diff'
-import type { ApprovalResolution } from '@/services/harness/permission/approval-gate'
-import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import countDiffLines from '@/utils/count-diff-lines'
 import formatToolRunLabel from '@/utils/format-tool-run-label'
 import { isTerminalToolName } from '@/utils/parse-terminal-tool-view'
@@ -13,7 +11,6 @@ import resolveFileDiffHunks from '@/utils/resolve-file-diff-hunks'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import ChatArtifactLink from '@/components/chat/ChatArtifactLink.vue'
 import ChatInlineFileDiff from '@/components/chat/InlineFileDiff.vue'
-import ChatApprovalActions from '@/components/chat/ChatApprovalActions.vue'
 import ChatTerminalToolRun from '@/components/chat/ChatTerminalToolRun.vue'
 import { CommitFileAdditions, CommitFileDeletions } from '@/components/ai-elements/commit'
 import {
@@ -28,11 +25,6 @@ const MAX_CODEBASE_LINKS = 25
 
 const props = defineProps<{
   run: ToolRun
-  approval?: PendingApprovalView
-}>()
-
-const emit = defineEmits<{
-  resolveApproval: [resolution: ApprovalResolution]
 }>()
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -142,6 +134,15 @@ const showRawOutput = computed(
     diffs.value.length === 0 &&
     codebaseArtifacts.value.length === 0,
 )
+const hasCollapsibleContent = computed(
+  () =>
+    hasDetails.value ||
+    hasDiffs.value ||
+    codebaseArtifacts.value.length > 0 ||
+    showRawOutput.value ||
+    Boolean(ownerTitle.value) ||
+    hasArtifactChip.value,
+)
 const diffCounts = computed(() => {
   let additions = 0
   let deletions = 0
@@ -158,10 +159,8 @@ const diffCounts = computed(() => {
   <ChatTerminalToolRun
     v-if="isTerminalRun"
     :run="run"
-    :approval="approval"
-    @resolve-approval="emit('resolveApproval', $event)"
   />
-  <Collapsible v-else v-model:open="open" class="w-full min-w-0 max-w-full">
+  <Collapsible v-else-if="hasCollapsibleContent" v-model:open="open" class="w-full min-w-0 max-w-full">
     <div class="flex w-full min-w-0 items-center gap-1">
       <CollapsibleTrigger
         class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm transition-colors hover:text-foreground"
@@ -197,11 +196,6 @@ const diffCounts = computed(() => {
           />
         </span>
       </CollapsibleTrigger>
-      <ChatApprovalActions
-        v-if="approval"
-        :approval="approval"
-        @resolve="emit('resolveApproval', $event)"
-      />
     </div>
     <CollapsibleContent
       class="mt-1 space-y-2 border-l border-border/60 pl-5 text-xs text-muted-foreground"
@@ -241,4 +235,20 @@ const diffCounts = computed(() => {
       </div>
     </CollapsibleContent>
   </Collapsible>
+  <div
+    v-else
+    class="flex w-full min-w-0 items-center gap-2 py-0.5 text-left text-sm"
+    :class="isError ? 'text-destructive/90' : 'text-muted-foreground'"
+  >
+    <XIcon v-if="isError" class="size-3.5 shrink-0 text-destructive" />
+    <AiElementsShimmerShimmer
+      v-if="isRunning"
+      :duration="1"
+      as="span"
+      class="min-w-0 truncate"
+    >
+      {{ label }}
+    </AiElementsShimmerShimmer>
+    <span v-else class="min-w-0 truncate">{{ label }}</span>
+  </div>
 </template>

@@ -25,6 +25,8 @@ export type PendingApprovalView = {
   allowedScopes: PermissionScope[]
   diff?: FileDiff[]
   serverId?: string
+  subagentId?: string
+  subagentLabel?: string
 }
 
 export type PermissionGateContext = {
@@ -40,6 +42,8 @@ export type PermissionGateContext = {
     verdict: 'allow' | 'deny',
     scope: 'workspace' | 'always',
   ) => Promise<void>
+  subagentId?: string
+  subagentLabel?: string
 }
 
 export const gateToolPermission = async (args: {
@@ -84,6 +88,8 @@ export const gateToolPermission = async (args: {
     allowedScopes: decision.allowedScopes,
     diff: args.diff,
     serverId: args.serverId,
+    subagentId: args.ctx.subagentId,
+    subagentLabel: args.ctx.subagentLabel,
   })
 
   const result = await requestApproval({
@@ -98,6 +104,8 @@ export const gateToolPermission = async (args: {
     unsandboxed: args.unsandboxed,
     allowedScopes: decision.allowedScopes,
     diff: args.diff,
+    subagentId: args.ctx.subagentId,
+    subagentLabel: args.ctx.subagentLabel,
   })
 
   if (!result.approved) {

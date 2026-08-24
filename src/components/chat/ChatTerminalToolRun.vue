@@ -4,12 +4,9 @@ import { useRoute } from 'vue-router'
 import { CheckIcon, ChevronRightIcon, ExternalLinkIcon, ShieldIcon, ShieldOffIcon, TerminalIcon, XIcon } from '@lucide/vue'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import { toast } from 'vue-sonner'
-import type { ApprovalResolution } from '@/services/harness/permission/approval-gate'
-import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import type { ToolRun } from '@/types/harness/tool-run'
 import formatToolRunLabel from '@/utils/format-tool-run-label'
 import { parseTerminalToolView, type TerminalToolPhaseView } from '@/utils/parse-terminal-tool-view'
-import ChatApprovalActions from '@/components/chat/ChatApprovalActions.vue'
 import ChatTipIcon from '@/components/chat/ChatTipIcon.vue'
 import {
   terminalPhaseStatusColorClass,
@@ -43,11 +40,6 @@ import { HOME_WORKSPACE_ID, isHomeChatSlug } from '@/constants/home-chat'
 
 const props = defineProps<{
   run: ToolRun
-  approval?: PendingApprovalView
-}>()
-
-const emit = defineEmits<{
-  resolveApproval: [resolution: ApprovalResolution]
 }>()
 
 const route = useRoute()
@@ -92,9 +84,9 @@ const phaseStatus = (
 }
 
 watch(
-  [isRunning, () => props.approval],
-  ([running, approval]) => {
-    if (running || approval) {
+  [isRunning],
+  ([running]) => {
+    if (running) {
       open.value = true
     }
   },
@@ -171,11 +163,6 @@ const handleShowTerminal = (): void => {
           />
         </template>
       </div>
-      <ChatApprovalActions
-        v-if="approval"
-        :approval="approval"
-        @resolve="emit('resolveApproval', $event)"
-      />
     </div>
     <CollapsibleContent
       class="space-y-2 text-xs text-muted-foreground"
@@ -239,12 +226,6 @@ const handleShowTerminal = (): void => {
                   :icon="ShieldOffIcon"
                   tooltip="Unsandboxed"
                   icon-class="size-3.5 text-red-400"
-                />
-                <ChatApprovalActions
-                  v-if="approval && phaseIndex === view.phases.length - 1"
-                  :approval="approval"
-                  tone="terminal"
-                  @resolve="emit('resolveApproval', $event)"
                 />
                 <TerminalCopyButton />
                 <TooltipProvider v-if="view.shellId">
