@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { LanguageModelUsage } from 'ai'
 import type { JSONObject } from '@ai-sdk/provider'
 import recordBillableUsage from '@/services/billing/record-billable-usage'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const settingsWithRates = {
   version: 1,
@@ -22,7 +22,7 @@ const settingsWithRates = {
       },
     ],
   },
-} as PyrolaSettings
+} as VixlSettings
 
 const usageWithTokens = (
   patch?: Partial<LanguageModelUsage> & { raw?: JSONObject },

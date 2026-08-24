@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HarnessEvent } from '@/types/harness/harness-event'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 import { mockTauriEvent } from '../../test-utils/mocks/tauri-event'
 
 const shellSpawnTracked = vi.fn<() => Promise<void>>()
@@ -8,8 +8,8 @@ const shellKillTracked = vi.fn<() => Promise<{ exitCode: number; signal?: number
 
 vi.mock('@tauri-apps/api/event', () => mockTauriEvent())
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     shellSpawnTracked,
     shellKillTracked,
   }),

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 const { metaFor } = vi.hoisted(() => {
   const metaFor = (id: string) => ({
@@ -20,8 +20,8 @@ const { metaFor } = vi.hoisted(() => {
   return { metaFor }
 })
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     createChat: vi.fn<() => Promise<unknown>>(),
     listChats: vi.fn<() => Promise<unknown>>(),
     readChatMeta: vi.fn<

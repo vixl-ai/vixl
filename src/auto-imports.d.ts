@@ -61,7 +61,7 @@ declare global {
   const isReadonly: typeof import('vue').isReadonly
   const isRef: typeof import('vue').isRef
   const isShallow: typeof import('vue').isShallow
-  const lastPyrolaFileChange: typeof import('./composables/use-pyrola-live-sync').lastPyrolaFileChange
+  const lastVixlFileChange: typeof import('./composables/use-vixl-live-sync').lastVixlFileChange
   const makeDestructurable: typeof import('@vueuse/core').makeDestructurable
   const markRaw: typeof import('vue').markRaw
   const nextTick: typeof import('vue').nextTick
@@ -87,7 +87,6 @@ declare global {
   const pausableWatch: typeof import('@vueuse/core').pausableWatch
   const provide: typeof import('vue').provide
   const provideLocal: typeof import('@vueuse/core').provideLocal
-  const pyrolaFileChangeToken: typeof import('./composables/use-pyrola-live-sync').pyrolaFileChangeToken
   const reactify: typeof import('@vueuse/core').reactify
   const reactifyObject: typeof import('@vueuse/core').reactifyObject
   const reactive: typeof import('vue').reactive
@@ -281,9 +280,6 @@ declare global {
   const useProjectsExpansion: typeof import('./composables/use-projects-expansion').default
   const useProjectsSection: typeof import('./composables/use-projects-section').default
   const useProviderModelsCatalog: typeof import('./composables/use-provider-models-catalog').default
-  const usePyrolaConfig: typeof import('./composables/use-pyrola-config').default
-  const usePyrolaConfigHydration: typeof import('./composables/use-pyrola-config').usePyrolaConfigHydration
-  const usePyrolaLiveSync: typeof import('./composables/use-pyrola-live-sync').default
   const useQueueHydrate: typeof import('./composables/use-queue-hydrate').default
   const useRafFn: typeof import('@vueuse/core').useRafFn
   const useRefHistory: typeof import('@vueuse/core').useRefHistory
@@ -301,7 +297,7 @@ declare global {
   const useSpeechRecognition: typeof import('@vueuse/core').useSpeechRecognition
   const useSpeechSynthesis: typeof import('@vueuse/core').useSpeechSynthesis
   const useStartPlanBuild: typeof import('./composables/use-start-plan-build').default
-  const useStartPyrolaFilesChat: typeof import('./composables/use-start-pyrola-files-chat').default
+  const useStartVixlFilesChat: typeof import('./composables/use-start-vixl-files-chat').default
   const useStepper: typeof import('@vueuse/core').useStepper
   const useStorage: typeof import('@vueuse/core').useStorage
   const useStorageAsync: typeof import('@vueuse/core').useStorageAsync
@@ -334,6 +330,9 @@ declare global {
   const useVModels: typeof import('@vueuse/core').useVModels
   const useVibrate: typeof import('@vueuse/core').useVibrate
   const useVirtualList: typeof import('@vueuse/core').useVirtualList
+  const useVixlConfig: typeof import('./composables/use-vixl-config').default
+  const useVixlConfigHydration: typeof import('./composables/use-vixl-config').useVixlConfigHydration
+  const useVixlLiveSync: typeof import('./composables/use-vixl-live-sync').default
   const useWakeLock: typeof import('@vueuse/core').useWakeLock
   const useWebNotification: typeof import('@vueuse/core').useWebNotification
   const useWebSocket: typeof import('@vueuse/core').useWebSocket
@@ -343,6 +342,7 @@ declare global {
   const useWindowScroll: typeof import('@vueuse/core').useWindowScroll
   const useWindowSize: typeof import('@vueuse/core').useWindowSize
   const useWorkbenchStore: typeof import('./composables/use-workbench-store').default
+  const vixlFileChangeToken: typeof import('./composables/use-vixl-live-sync').vixlFileChangeToken
   const watch: typeof import('vue').watch
   const watchArray: typeof import('@vueuse/core').watchArray
   const watchAtMost: typeof import('@vueuse/core').watchAtMost
@@ -387,17 +387,17 @@ declare global {
   export type { UseProviderModelsCatalogOptions } from './composables/use-provider-models-catalog'
   import('./composables/use-provider-models-catalog')
   // @ts-ignore
-  export type { SettingsTab } from './composables/use-pyrola-config'
-  import('./composables/use-pyrola-config')
-  // @ts-ignore
-  export type { PyrolaFileKind, PyrolaFileChange } from './composables/use-pyrola-live-sync'
-  import('./composables/use-pyrola-live-sync')
-  // @ts-ignore
   export type { PlanExecutionMode, StartPlanBuildInput } from './composables/use-start-plan-build'
   import('./composables/use-start-plan-build')
   // @ts-ignore
   export type { StudioRendererState } from './composables/use-studio-renderer'
   import('./composables/use-studio-renderer')
+  // @ts-ignore
+  export type { SettingsTab } from './composables/use-vixl-config'
+  import('./composables/use-vixl-config')
+  // @ts-ignore
+  export type { VixlFileKind, VixlFileChange } from './composables/use-vixl-live-sync'
+  import('./composables/use-vixl-live-sync')
 }
 
 // for vue template auto import
@@ -458,7 +458,7 @@ declare module 'vue' {
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
     readonly isShallow: UnwrapRef<typeof import('vue')['isShallow']>
-    readonly lastPyrolaFileChange: UnwrapRef<typeof import('./composables/use-pyrola-live-sync')['lastPyrolaFileChange']>
+    readonly lastVixlFileChange: UnwrapRef<typeof import('./composables/use-vixl-live-sync')['lastVixlFileChange']>
     readonly makeDestructurable: UnwrapRef<typeof import('@vueuse/core')['makeDestructurable']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
@@ -484,7 +484,6 @@ declare module 'vue' {
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
-    readonly pyrolaFileChangeToken: UnwrapRef<typeof import('./composables/use-pyrola-live-sync')['pyrolaFileChangeToken']>
     readonly reactify: UnwrapRef<typeof import('@vueuse/core')['reactify']>
     readonly reactifyObject: UnwrapRef<typeof import('@vueuse/core')['reactifyObject']>
     readonly reactive: UnwrapRef<typeof import('vue')['reactive']>
@@ -678,9 +677,6 @@ declare module 'vue' {
     readonly useProjectsExpansion: UnwrapRef<typeof import('./composables/use-projects-expansion')['default']>
     readonly useProjectsSection: UnwrapRef<typeof import('./composables/use-projects-section')['default']>
     readonly useProviderModelsCatalog: UnwrapRef<typeof import('./composables/use-provider-models-catalog')['default']>
-    readonly usePyrolaConfig: UnwrapRef<typeof import('./composables/use-pyrola-config')['default']>
-    readonly usePyrolaConfigHydration: UnwrapRef<typeof import('./composables/use-pyrola-config')['usePyrolaConfigHydration']>
-    readonly usePyrolaLiveSync: UnwrapRef<typeof import('./composables/use-pyrola-live-sync')['default']>
     readonly useQueueHydrate: UnwrapRef<typeof import('./composables/use-queue-hydrate')['default']>
     readonly useRafFn: UnwrapRef<typeof import('@vueuse/core')['useRafFn']>
     readonly useRefHistory: UnwrapRef<typeof import('@vueuse/core')['useRefHistory']>
@@ -698,7 +694,7 @@ declare module 'vue' {
     readonly useSpeechRecognition: UnwrapRef<typeof import('@vueuse/core')['useSpeechRecognition']>
     readonly useSpeechSynthesis: UnwrapRef<typeof import('@vueuse/core')['useSpeechSynthesis']>
     readonly useStartPlanBuild: UnwrapRef<typeof import('./composables/use-start-plan-build')['default']>
-    readonly useStartPyrolaFilesChat: UnwrapRef<typeof import('./composables/use-start-pyrola-files-chat')['default']>
+    readonly useStartVixlFilesChat: UnwrapRef<typeof import('./composables/use-start-vixl-files-chat')['default']>
     readonly useStepper: UnwrapRef<typeof import('@vueuse/core')['useStepper']>
     readonly useStorage: UnwrapRef<typeof import('@vueuse/core')['useStorage']>
     readonly useStorageAsync: UnwrapRef<typeof import('@vueuse/core')['useStorageAsync']>
@@ -731,6 +727,9 @@ declare module 'vue' {
     readonly useVModels: UnwrapRef<typeof import('@vueuse/core')['useVModels']>
     readonly useVibrate: UnwrapRef<typeof import('@vueuse/core')['useVibrate']>
     readonly useVirtualList: UnwrapRef<typeof import('@vueuse/core')['useVirtualList']>
+    readonly useVixlConfig: UnwrapRef<typeof import('./composables/use-vixl-config')['default']>
+    readonly useVixlConfigHydration: UnwrapRef<typeof import('./composables/use-vixl-config')['useVixlConfigHydration']>
+    readonly useVixlLiveSync: UnwrapRef<typeof import('./composables/use-vixl-live-sync')['default']>
     readonly useWakeLock: UnwrapRef<typeof import('@vueuse/core')['useWakeLock']>
     readonly useWebNotification: UnwrapRef<typeof import('@vueuse/core')['useWebNotification']>
     readonly useWebSocket: UnwrapRef<typeof import('@vueuse/core')['useWebSocket']>
@@ -740,6 +739,7 @@ declare module 'vue' {
     readonly useWindowScroll: UnwrapRef<typeof import('@vueuse/core')['useWindowScroll']>
     readonly useWindowSize: UnwrapRef<typeof import('@vueuse/core')['useWindowSize']>
     readonly useWorkbenchStore: UnwrapRef<typeof import('./composables/use-workbench-store')['default']>
+    readonly vixlFileChangeToken: UnwrapRef<typeof import('./composables/use-vixl-live-sync')['vixlFileChangeToken']>
     readonly watch: UnwrapRef<typeof import('vue')['watch']>
     readonly watchArray: UnwrapRef<typeof import('@vueuse/core')['watchArray']>
     readonly watchAtMost: UnwrapRef<typeof import('@vueuse/core')['watchAtMost']>

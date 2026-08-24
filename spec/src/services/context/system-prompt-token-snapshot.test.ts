@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
-vi.mock('@/services/pyrola/pyrola-tauri', () => mockPyrolaTauri())
+vi.mock('@/services/vixl/vixl-tauri', () => mockVixlTauri())
 
 import assembleSystemPromptParts, {
   joinSystemPromptParts,
@@ -9,12 +9,12 @@ import assembleSystemPromptParts, {
 } from '@/services/context/system-prompt-parts'
 import estimateBuiltinToolDefinitionTokens from '@/services/context/estimate-builtin-tool-definition-tokens'
 import estimateTextTokens from '@/utils/estimate-text-tokens'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 
 const TOOLS_HINT =
   'Tools are provided as function calls; do not grep the repo for them.'
 
-const MODES: PyrolaChatMode[] = ['ask', 'plan', 'studio', 'agent', 'orchestrator']
+const MODES: VixlChatMode[] = ['ask', 'plan', 'studio', 'agent', 'orchestrator']
 
 /**
  * Empty-project (standalone, no rules, no MCP) ceilings after Slice 1 trims.
@@ -22,7 +22,7 @@ const MODES: PyrolaChatMode[] = ['ask', 'plan', 'studio', 'agent', 'orchestrator
  * ask 2368, plan 2916, studio 4329, agent 10532, orchestrator 8937.
  * Headroom is about 3 percent so waste cannot return unnoticed.
  */
-const TOTAL_CEILINGS: Record<PyrolaChatMode, number> = {
+const TOTAL_CEILINGS: Record<VixlChatMode, number> = {
   ask: 2450,
   plan: 3000,
   studio: 4450,
@@ -30,7 +30,7 @@ const TOTAL_CEILINGS: Record<PyrolaChatMode, number> = {
   orchestrator: 9000,
 }
 
-const BASE_CEILINGS: Record<PyrolaChatMode, number> = {
+const BASE_CEILINGS: Record<VixlChatMode, number> = {
   ask: 610,
   plan: 680,
   studio: 780,
@@ -38,7 +38,7 @@ const BASE_CEILINGS: Record<PyrolaChatMode, number> = {
   orchestrator: 1320,
 }
 
-const SKILLS_CEILINGS: Record<PyrolaChatMode, number> = {
+const SKILLS_CEILINGS: Record<VixlChatMode, number> = {
   ask: 40,
   plan: 30,
   studio: 90,
@@ -46,7 +46,7 @@ const SKILLS_CEILINGS: Record<PyrolaChatMode, number> = {
   orchestrator: 35,
 }
 
-const TOOL_DEF_CEILINGS: Record<PyrolaChatMode, number> = {
+const TOOL_DEF_CEILINGS: Record<VixlChatMode, number> = {
   ask: 1800,
   plan: 2300,
   studio: 3600,
@@ -55,7 +55,7 @@ const TOOL_DEF_CEILINGS: Record<PyrolaChatMode, number> = {
 }
 
 type ModeSnapshot = {
-  mode: PyrolaChatMode
+  mode: VixlChatMode
   parts: SystemPromptParts
   systemString: string
   base: number
@@ -66,11 +66,11 @@ type ModeSnapshot = {
   total: number
 }
 
-const measureMode = async (mode: PyrolaChatMode): Promise<ModeSnapshot> => {
+const measureMode = async (mode: VixlChatMode): Promise<ModeSnapshot> => {
   const parts = await assembleSystemPromptParts({
     mode,
     projectName: 'empty',
-    projectRoot: '/tmp/empty-pyrola',
+    projectRoot: '/tmp/empty-vixl',
     mentions: [],
     agentCatalog: [],
     standalone: true,

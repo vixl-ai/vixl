@@ -1,7 +1,7 @@
 import { useDebounceFn } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 import * as monaco from 'monaco-editor'
-import { lspEnsureServer, lspRequest } from '@/services/pyrola/pyrola-tauri'
+import { lspEnsureServer, lspRequest } from '@/services/vixl/vixl-tauri'
 import formatMonacoError from '@/utils/format-monaco-error'
 import {
   fileExtension,

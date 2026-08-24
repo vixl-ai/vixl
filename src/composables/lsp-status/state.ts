@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { LspCatalogEntry } from '@/services/pyrola/pyrola-tauri'
+import type { LspCatalogEntry } from '@/services/vixl/vixl-tauri'
 import type { LspDiagnostic } from '@/utils/monaco-lsp'
 
 export const servers = ref<LspCatalogEntry[]>([])

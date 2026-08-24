@@ -1,9 +1,9 @@
 import { homeDir } from '@tauri-apps/api/path'
 import { lspConfigSchema } from '@/schemas/lsp-config'
 import { call, isTauri } from './helpers'
-import type { ConfigScope, ProjectFileEntry, PyrolaFilesKind } from './types'
+import type { ConfigScope, ProjectFileEntry, VixlFilesKind } from './types'
 
-export const getUserPyrolaDir = (): Promise<string> => call('get_user_pyrola_dir')
+export const getUserVixlDir = (): Promise<string> => call('get_user_vixl_dir')
 
 export const readJsonFile = (path: string): Promise<unknown> =>
   call('read_json_file', { path })
@@ -11,8 +11,8 @@ export const readJsonFile = (path: string): Promise<unknown> =>
 export const writeJsonFile = (path: string, value: unknown): Promise<void> =>
   call('write_json_file', { path, value })
 
-export const hasProjectPyrola = (rootPath: string): Promise<boolean> =>
-  call('has_project_pyrola', { rootPath })
+export const hasProjectVixl = (rootPath: string): Promise<boolean> =>
+  call('has_project_vixl', { rootPath })
 
 export const readSettings = (
   scope: ConfigScope,
@@ -59,8 +59,8 @@ export const writeLspConfig = async (
   await call('write_lsp_config', { config: parsed.data })
 }
 
-export const watchPyrolaPaths = (projectRoot?: string | null): Promise<void> =>
-  call('watch_pyrola_paths', { projectRoot: projectRoot ?? null })
+export const watchVixlPaths = (projectRoot?: string | null): Promise<void> =>
+  call('watch_vixl_paths', { projectRoot: projectRoot ?? null })
 
 export const getSecret = (key: string): Promise<string | null> =>
   call('get_secret', { key })
@@ -129,7 +129,7 @@ export const getDefaultWorkspaceRoot = (): Promise<string> =>
 export const getUserHomeDir = (): Promise<string> => {
   if (!isTauri()) {
     return Promise.reject(
-      new Error('Pyrola desktop APIs are only available in the Tauri app'),
+      new Error('Vixl desktop APIs are only available in the Tauri app'),
     )
   }
   return homeDir()
@@ -137,17 +137,17 @@ export const getUserHomeDir = (): Promise<string> => {
 
 export const getActiveProjectId = (): Promise<string | null> => call('get_active_project')
 
-export const getPyrolaDir = (
+export const getVixlDir = (
   scope: ConfigScope,
   rootPath?: string | null,
-): Promise<string> => call('get_pyrola_dir', { scope, rootPath: rootPath ?? null })
+): Promise<string> => call('get_vixl_dir', { scope, rootPath: rootPath ?? null })
 
-export const listPyrolaFiles = (
+export const listVixlFiles = (
   scope: ConfigScope,
-  kind: PyrolaFilesKind,
+  kind: VixlFilesKind,
   rootPath?: string | null,
 ): Promise<ProjectFileEntry[]> =>
-  call('list_pyrola_files', { scope, kind, rootPath: rootPath ?? null })
+  call('list_vixl_files', { scope, kind, rootPath: rootPath ?? null })
 
 export const listProjectFiles = (
   rootPath: string,

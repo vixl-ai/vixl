@@ -1,5 +1,5 @@
 import type { ModelRef } from '@/types/models/model-ref'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { getModelCatalogOption } from '@/services/models/model-catalog-options'
 import resolveSupportsFast from '@/services/models/resolve-fast-capability'
 import {
@@ -35,7 +35,7 @@ export const canonicalizeModelRef = (ref: ModelRef): ModelRef => {
 }
 
 export const resolveModelRefForCall = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
   fastOverride?: boolean,
 ): ResolvedCallModelRef => {

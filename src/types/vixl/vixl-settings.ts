@@ -6,13 +6,13 @@ import type {
 import type { ModelCatalogOptionsMap } from '@/types/models/model-catalog-option'
 import type { ModelPricingRates } from '@/types/billing/model-pricing-rates'
 
-export type PyrolaTheme = 'light' | 'dark' | 'system'
+export type VixlTheme = 'light' | 'dark' | 'system'
 
-export type PyrolaChatMode = 'ask' | 'plan' | 'studio' | 'agent' | 'orchestrator'
+export type VixlChatMode = 'ask' | 'plan' | 'studio' | 'agent' | 'orchestrator'
 
-export type PyrolaDuplicateTabBehavior = 'ask' | 'open-existing' | 'open-new'
+export type VixlDuplicateTabBehavior = 'ask' | 'open-existing' | 'open-new'
 
-export type PyrolaCustomProviderModel = {
+export type VixlCustomProviderModel = {
   id: string
   name?: string
   maxInputTokens?: number
@@ -35,7 +35,7 @@ export type PyrolaCustomProviderModel = {
   pricing?: ModelPricingRates
 }
 
-export type PyrolaCustomProvider = {
+export type VixlCustomProvider = {
   type: 'openai-compatible'
   baseURL: string
   apiKeyRef?: string
@@ -44,23 +44,22 @@ export type PyrolaCustomProvider = {
   queryParams?: Record<string, string>
   includeUsage?: boolean
   supportsStructuredOutputs?: boolean
-  models?: PyrolaCustomProviderModel[]
+  models?: VixlCustomProviderModel[]
 }
 
-export type PyrolaSettings = {
+export type VixlSettings = {
   version: 1
-  'appearance.theme'?: PyrolaTheme
+  'appearance.theme'?: VixlTheme
   'agent.autoApproveGlobs'?: string[]
   'agent.permissionLevel'?: PermissionLevel
   'agent.permissions'?: PermissionRecord[]
   'agent.mcp.trust'?: McpTrustRecord[]
   'agent.sandbox.enabled'?: boolean
   'agent.sandbox.network'?: 'deny' | 'allow'
-  'general.machineLabel'?: string
   'lsp.autoDownload'?: boolean
   'workspace.trust'?: Array<{ rootPath: string; trusted: boolean }>
   'chat.autoTitle'?: boolean
-  'workbench.duplicateTabBehavior'?: PyrolaDuplicateTabBehavior
+  'workbench.duplicateTabBehavior'?: VixlDuplicateTabBehavior
   'models.default'?: string
   'models.ask'?: string
   'models.plan'?: string
@@ -81,7 +80,7 @@ export type PyrolaSettings = {
   'models.compactionReasoning'?: string
   'models.catalogOptions'?: ModelCatalogOptionsMap
   [key: `providers.${string}.apiKeyRef`]: string | undefined
-  [key: `providers.custom.${string}`]: PyrolaCustomProvider | undefined
+  [key: `providers.custom.${string}`]: VixlCustomProvider | undefined
   // String model refs and reasoning levels. catalogOptions is declared above and
   // must stay compatible with this index (object values allowed for that key only).
   [key: `models.${string}`]: string | ModelCatalogOptionsMap | undefined

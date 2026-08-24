@@ -1,5 +1,5 @@
 import { toast } from 'vue-sonner'
-import type { McpConfig } from '@/types/pyrola/mcp-config'
+import type { McpConfig } from '@/types/vixl/mcp-config'
 import { migrateMcpConfig } from '@/schemas/mcp-config'
 import stripCodegraphMcpServer from '@/services/codegraph/strip-codegraph-mcp-server'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
@@ -9,8 +9,8 @@ import {
   readMcpConfig,
   writeMcpConfig,
   type McpServerState,
-} from '@/services/pyrola/pyrola-tauri'
-import type { SettingsTab } from '@/composables/use-pyrola-config'
+} from '@/services/vixl/vixl-tauri'
+import type { SettingsTab } from '@/composables/use-vixl-config'
 import { mergeServerState } from './helpers'
 import {
   bumpRefreshGeneration,

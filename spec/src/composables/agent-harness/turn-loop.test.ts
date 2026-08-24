@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref, shallowRef } from 'vue'
 import type { AgentHarnessState, AttentionHelpers } from '@/composables/agent-harness/types'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 const releaseLocksForChat = vi.hoisted(() =>
   vi.fn<(chatId: string, cancelled?: string) => void>(),
@@ -19,8 +19,8 @@ const updateChatMeta = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue(undefined),
 )
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     updateChatMeta: (...args: unknown[]) => updateChatMeta(...args),
   }),
 )

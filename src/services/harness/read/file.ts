@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { fsReadFile } from '@/services/pyrola/pyrola-tauri'
+import { fsReadFile } from '@/services/vixl/vixl-tauri'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const readFile = (ctx: HarnessToolContext) =>

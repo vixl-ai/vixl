@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { gitLog as gitLogCommand } from '@/services/pyrola/pyrola-tauri'
+import { gitLog as gitLogCommand } from '@/services/vixl/vixl-tauri'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const gitLog = (ctx: HarnessToolContext) =>

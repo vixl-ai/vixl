@@ -1,11 +1,11 @@
-import { fsReadFile, listPyrolaFiles } from '@/services/pyrola/pyrola-tauri'
+import { fsReadFile, listVixlFiles } from '@/services/vixl/vixl-tauri'
 import type { SkillIndexEntry } from '@/types/skills/skill'
 import parseSkillFrontmatter from '@/services/skills/strip-skill-frontmatter'
 
 export const discoverProjectSkillIndex = async (
   projectRoot: string,
 ): Promise<SkillIndexEntry[]> => {
-  const files = await listPyrolaFiles('project', 'skills', projectRoot).catch(() => [])
+  const files = await listVixlFiles('project', 'skills', projectRoot).catch(() => [])
   return files.map((file) => ({
     name: file.name,
     description: file.description ?? '',
@@ -17,13 +17,13 @@ export const loadProjectSkill = async (
   projectRoot: string,
   name: string,
 ): Promise<{ skillDirectory: string; content: string; description: string } | null> => {
-  const files = await listPyrolaFiles('project', 'skills', projectRoot).catch(() => [])
+  const files = await listVixlFiles('project', 'skills', projectRoot).catch(() => [])
   const match = files.find((file) => file.name.toLowerCase() === name.toLowerCase())
   if (!match) {
     return null
   }
 
-  const relativePath = `.pyrola/skills/${match.name}/SKILL.md`
+  const relativePath = `.vixl/skills/${match.name}/SKILL.md`
 
   const result = await fsReadFile({ projectRoot, path: relativePath })
   const { frontmatter, body } = parseSkillFrontmatter(result.content)

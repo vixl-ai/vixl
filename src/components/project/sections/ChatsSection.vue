@@ -50,7 +50,7 @@ import { dropAgentHarness } from '@/composables/use-agent-harness'
 import useChatStore from '@/composables/use-chat-store'
 import useFleetSidebar, { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import { killShellsForChat } from '@/services/harness/shell/registry'
-import { deleteChat, updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { deleteChat, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import chatRouteFor from '@/utils/chat-route-for'
 import projectRouteFor from '@/utils/project-route-for'
 

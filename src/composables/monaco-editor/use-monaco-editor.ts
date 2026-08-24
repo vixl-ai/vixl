@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import type * as monaco from 'monaco-editor'
-import { isTauri } from '@/services/pyrola/pyrola-tauri'
+import { isTauri } from '@/services/vixl/vixl-tauri'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import useLspStatus from '@/composables/use-lsp-status'
 import { createHelpers } from './helpers'

@@ -17,7 +17,7 @@ describe('assertCreatePlanNotAwaitingPlanGo', () => {
   })
 
   it('throws with the named planPath when awaitingPlanGo is set', () => {
-    const planPath = '.pyrola/plans/example-2026-08-09/PLAN.md'
+    const planPath = '.vixl/plans/example-2026-08-09/PLAN.md'
     markCreatedPlanThisTurn(projectSlug, chatId, {
       planPath,
       planId: 'example-2026-08-09',
@@ -33,7 +33,7 @@ describe('assertCreatePlanNotAwaitingPlanGo', () => {
   })
 
   it('throws after hydratePlanExecutionSession sets awaitingPlanGo', () => {
-    const planPath = '.pyrola/plans/hydrated/PLAN.md'
+    const planPath = '.vixl/plans/hydrated/PLAN.md'
     hydratePlanExecutionSession(projectSlug, chatId, {
       awaitingPlanGo: { planPath, planId: 'hydrated' },
     })
@@ -50,7 +50,7 @@ describe('resolveUpdatePlanTodoPath', () => {
   })
 
   it('resolves to the active awaiting plan when planPath is omitted', () => {
-    const planPath = '.pyrola/plans/active/PLAN.md'
+    const planPath = '.vixl/plans/active/PLAN.md'
     markCreatedPlanThisTurn(projectSlug, chatId, {
       planPath,
       planId: 'active',
@@ -62,11 +62,11 @@ describe('resolveUpdatePlanTodoPath', () => {
 
   it('prefers an explicit planPath over the awaiting plan', () => {
     markCreatedPlanThisTurn(projectSlug, chatId, {
-      planPath: '.pyrola/plans/awaiting/PLAN.md',
+      planPath: '.vixl/plans/awaiting/PLAN.md',
       planId: 'awaiting',
     })
     const session = getPlanExecutionSession(projectSlug, chatId)
-    const explicit = '.pyrola/plans/explicit/PLAN.md'
+    const explicit = '.vixl/plans/explicit/PLAN.md'
 
     expect(resolveUpdatePlanTodoPath(explicit, session.awaitingPlanGo)).toBe(explicit)
   })

@@ -6,7 +6,7 @@ import {
   fsMkdir,
   fsRename,
   fsWriteFile,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import {
   CODEGRAPH_DIR_NAME,
   CODEGRAPH_SERVER_ID,

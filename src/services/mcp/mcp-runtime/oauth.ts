@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event'
 import type { OAuthClientProvider } from '@ai-sdk/mcp'
-import type { McpHttpServer } from '@/types/pyrola/mcp-config'
-import { createPyrolaOAuthProvider } from '@/services/mcp/pyrola-oauth-provider'
+import type { McpHttpServer } from '@/types/vixl/mcp-config'
+import { createVixlOAuthProvider } from '@/services/mcp/vixl-oauth-provider'
 import {
   OAUTH_CALLBACK_TIMEOUT_MS,
   type OAuthCallbackPayload,
@@ -14,7 +14,7 @@ export const createTokenProvider = (
   openUrl: (url: string, allowedOrigin: string) => Promise<void>,
   confirmAuthorizationServerOrigin?: (origin: string) => Promise<boolean>,
 ): OAuthClientProvider =>
-  createPyrolaOAuthProvider({
+  createVixlOAuthProvider({
     serverId,
     serverUrl: config.url,
     clientId: config.oauth?.clientId,

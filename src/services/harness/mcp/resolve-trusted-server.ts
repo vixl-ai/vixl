@@ -2,7 +2,7 @@ import { migrateMcpConfig } from '@/schemas/mcp-config'
 import { listEffectiveMcpServers } from '@/services/mcp/merge-mcp-config'
 import { isMcpTrusted, sessionTrusts } from '@/services/mcp/mcp-trust'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
-import { readMcpConfig } from '@/services/pyrola/pyrola-tauri'
+import { readMcpConfig } from '@/services/vixl/vixl-tauri'
 import {
   buildCodegraphServer,
   isInternalMcpServer,
@@ -14,7 +14,7 @@ const resolveTrustedMcpServer = async (
   serverId: string,
 ): Promise<{
   trusted: boolean
-  config?: import('@/types/pyrola/mcp-config').McpServerConfig
+  config?: import('@/types/vixl/mcp-config').McpServerConfig
 }> => {
   // First-party CodeGraph is in-memory only (stripped from user mcp.json).
   if (isInternalMcpServer(serverId)) {

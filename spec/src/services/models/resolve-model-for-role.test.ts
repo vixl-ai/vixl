@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const settings = {
   version: 1,
   'models.default': 'anthropic::claude-sonnet-4-5',
   'models.agent': 'openai::gpt-4o',
   'models.title': 'google::gemini-2.0-flash',
-} as PyrolaSettings
+} as VixlSettings
 
 describe('resolveModelForRole', () => {
   it('prefers chat override', () => {

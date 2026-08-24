@@ -57,7 +57,7 @@ vi.mock('@/services/browser/registry', async () => {
   }
 })
 
-vi.mock('@/services/pyrola/pyrola-tauri', () => ({
+vi.mock('@/services/vixl/vixl-tauri', () => ({
   listChats: (projectSlug: string) => listChats(projectSlug),
 }))
 

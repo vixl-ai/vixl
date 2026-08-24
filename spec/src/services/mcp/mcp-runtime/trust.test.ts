@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { McpStdioServer } from '@/types/pyrola/mcp-config'
-import { mockPyrolaTauri } from '../../../test-utils/mocks/pyrola-tauri'
+import type { McpStdioServer } from '@/types/vixl/mcp-config'
+import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
 const deleteSecret = vi.hoisted(() =>
   vi.fn<(key: string) => Promise<void>>(async () => undefined),
 )
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     deleteSecret,
   }),
 )

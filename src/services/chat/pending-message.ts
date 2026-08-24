@@ -1,14 +1,14 @@
 import type { FileUIPart } from 'ai'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { PermissionLevel } from '@/types/harness/permission'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 
-const PENDING_MESSAGE_KEY = 'pyrola:pending-chat-message'
-export const PENDING_CHAT_MESSAGE_EVENT = 'pyrola:pending-chat-message'
+const PENDING_MESSAGE_KEY = 'vixl:pending-chat-message'
+export const PENDING_CHAT_MESSAGE_EVENT = 'vixl:pending-chat-message'
 
 export type PendingChatMessage = {
   text: string
-  mode: PyrolaChatMode
+  mode: VixlChatMode
   model: string
   permissionLevel?: PermissionLevel
   subagentModel?: string

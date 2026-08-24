@@ -1,5 +1,5 @@
 import { computed, watch } from 'vue'
-import { pyrolaFileChangeToken } from '@/composables/use-pyrola-live-sync'
+import { vixlFileChangeToken } from '@/composables/use-vixl-live-sync'
 import {
   cancelDuplicateTabDialog,
   confirmDuplicateTabChoice,
@@ -63,7 +63,7 @@ const hasMultipleProjects = computed(() => {
   return ids.size > 1
 })
 
-watch(pyrolaFileChangeToken, () => {
+watch(vixlFileChangeToken, () => {
   refreshPlanStudioTabs()
 })
 

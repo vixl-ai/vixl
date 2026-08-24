@@ -1,4 +1,4 @@
-import { fsReadFile } from '@/services/pyrola/pyrola-tauri'
+import { fsReadFile } from '@/services/vixl/vixl-tauri'
 import getWorkingModel from './get-working-model'
 
 export default async (args: {

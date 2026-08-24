@@ -44,11 +44,11 @@ import {
 import SettingsSectionScroll from '@/components/settings/SettingsSectionScroll.vue'
 import SettingsMcpManageMcpServerDialog from '@/components/settings/mcp/ManageMcpServerDialog.vue'
 import ChatMcpSecretsForm from '@/components/chat/ChatMcpSecretsForm.vue'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import useMcpServers from '@/composables/use-mcp-servers'
-import type { SettingsTab } from '@/composables/use-pyrola-config'
-import type { McpConfig, McpInputDefinition, McpServerConfig } from '@/types/pyrola/mcp-config'
-import { isMcpHttpServer } from '@/types/pyrola/mcp-config'
+import type { SettingsTab } from '@/composables/use-vixl-config'
+import type { McpConfig, McpInputDefinition, McpServerConfig } from '@/types/vixl/mcp-config'
+import { isMcpHttpServer } from '@/types/vixl/mcp-config'
 import type { McpTrustScope } from '@/types/harness/permission'
 import { isMcpServerEnabled } from '@/schemas/mcp-config'
 import {
@@ -69,7 +69,7 @@ const props = defineProps<{
   tab: SettingsTab
 }>()
 
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const {
   personalMcp,
   projectMcp,

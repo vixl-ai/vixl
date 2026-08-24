@@ -11,7 +11,7 @@ fn temp_dir(label: &str) -> std::path::PathBuf {
     .duration_since(UNIX_EPOCH)
     .map(|d| d.as_nanos())
     .unwrap_or(0);
-  let dir = std::env::temp_dir().join(format!("pyrola-lsp-registry-{label}-{nanos}"));
+  let dir = std::env::temp_dir().join(format!("vixl-lsp-registry-{label}-{nanos}"));
   fs::create_dir_all(&dir).unwrap();
   dir
 }

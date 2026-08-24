@@ -1,5 +1,5 @@
 import { toast } from 'vue-sonner'
-import { browserCefSetPassthroughRects } from '@/services/pyrola/pyrola-tauri/browser'
+import { browserCefSetPassthroughRects } from '@/services/vixl/vixl-tauri/browser'
 import type { CefBounds } from '@/types/browser/cef-bounds'
 import readBrowserHostBounds from '@/utils/browser-host-bounds'
 

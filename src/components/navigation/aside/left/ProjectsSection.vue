@@ -14,7 +14,7 @@ import useProjectsSection from '@/composables/use-projects-section'
 import useAddProject from '@/composables/use-add-project'
 import useProjectsExpansion from '@/composables/use-projects-expansion'
 import useChatStore from '@/composables/use-chat-store'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   Tooltip,
@@ -38,7 +38,7 @@ import NavigationAsideLeftProjectRow from '@/components/navigation/aside/left/Pr
 import NavigationAsideLeftChatListItem from '@/components/navigation/aside/left/ChatListItem.vue'
 import NavigationAsideLeftProjectsSectionHeader from '@/components/navigation/aside/left/ProjectsSectionHeader.vue'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
-import { getUserHomeDir } from '@/services/pyrola/pyrola-tauri'
+import { getUserHomeDir } from '@/services/vixl/vixl-tauri'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
 import chatRouteFor from '@/utils/chat-route-for'
 
@@ -46,7 +46,7 @@ const router = useRouter()
 const { refreshAll } = useFleetSidebar()
 const fleet = useFleetRegistry()
 const chatStore = useChatStore()
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const { addingProject, addProjectFromPicker } = useAddProject()
 const { expansionMode, toggleCollapseAll } = useProjectsExpansion()
 const {

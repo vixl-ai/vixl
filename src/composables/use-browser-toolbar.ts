@@ -11,7 +11,7 @@ import {
   clearCookiesForActiveOrigin,
 } from '@/services/browser/cdp-storage'
 import saveScreenshot from '@/services/browser/screenshot-store'
-import { revealInFolder } from '@/services/pyrola/pyrola-tauri'
+import { revealInFolder } from '@/services/vixl/vixl-tauri'
 
 type ToolbarArgs = {
   currentUrl: Ref<string>

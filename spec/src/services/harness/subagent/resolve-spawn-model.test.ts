@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderModelGroup } from '@/types/models/provider-model-group'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const { loadProviderModelsCatalog, listConfiguredProviders } = vi.hoisted(() => ({
   loadProviderModelsCatalog: vi.fn<() => Promise<ProviderModelGroup[]>>(),
@@ -36,7 +36,7 @@ const catalog: ProviderModelGroup[] = [
 const settings = {
   version: 1,
   'models.subagent': 'anthropic::claude-sonnet-4',
-} as PyrolaSettings
+} as VixlSettings
 
 describe('resolveSpawnModel', () => {
   beforeEach(() => {
@@ -73,7 +73,7 @@ describe('resolveSpawnModel', () => {
       'models.catalogOptions': {
         'anthropic::claude-sonnet-4': { allowed: false },
       },
-    } as PyrolaSettings
+    } as VixlSettings
 
     await expect(
       resolveSpawnModel({

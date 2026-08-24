@@ -73,7 +73,7 @@ export default defineConfigWithVueTs(
       'src/components/chat/ChatThreadContent.vue',
       'src/components/chat/ContextUsageBar.vue',
       'src/components/project/sections/ChatsSection.vue',
-      'src/components/ai-elements/code-block/pyrola-code-theme.ts',
+      'src/components/ai-elements/code-block/vixl-code-theme.ts',
       'src/components/workbench/tabs/PlanTab.vue',
       'src/components/navigation/aside/left/ChatListItem.vue',
       'src/components/workbench/WorkbenchLspStatus.vue',

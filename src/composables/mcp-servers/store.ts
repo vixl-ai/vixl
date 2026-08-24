@@ -3,7 +3,7 @@ import {
   listScopedMcpServers,
   listUserMcpServers,
 } from '@/services/mcp/merge-mcp-config'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import { loadConfigs, refreshStates } from './config'
 import {
   addServer,
@@ -32,7 +32,7 @@ import {
 } from './state'
 
 const useMcpServers = () => {
-  const config = usePyrolaConfig()
+  const config = useVixlConfig()
   const runtimeOptions = createRuntimeOptions(config)
   const assertTrustedOrThrow = createAssertTrustedOrThrow(config)
   const startServer = createStartServer(assertTrustedOrThrow, runtimeOptions)

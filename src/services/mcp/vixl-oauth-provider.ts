@@ -11,9 +11,9 @@ import {
   mcpOAuthTokensKey,
   mcpOAuthVerifierKey,
 } from '@/services/mcp/mcp-keychain-keys'
-import { deleteSecret, getSecret, setSecret } from '@/services/pyrola/pyrola-tauri'
+import { deleteSecret, getSecret, setSecret } from '@/services/vixl/vixl-tauri'
 
-type CreatePyrolaOAuthProviderArgs = {
+type CreateVixlOAuthProviderArgs = {
   serverId: string
   serverUrl: string
   clientId?: string
@@ -46,8 +46,8 @@ const randomHex = (bytes: number): string => {
   return Array.from(buffer, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-export const createPyrolaOAuthProvider = (
-  args: CreatePyrolaOAuthProviderArgs,
+export const createVixlOAuthProvider = (
+  args: CreateVixlOAuthProviderArgs,
 ): OAuthClientProvider => {
   const {
     serverId,
@@ -65,7 +65,7 @@ export const createPyrolaOAuthProvider = (
 
     get clientMetadata() {
       return {
-        client_name: 'Pyrola',
+        client_name: 'Vixl',
         redirect_uris: [redirectUrl],
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],

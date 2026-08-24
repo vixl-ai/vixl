@@ -5,7 +5,7 @@ const browserCefSetPassthroughRects = vi.hoisted(() =>
   vi.fn<(rects: CefBounds[]) => Promise<void>>(),
 )
 
-vi.mock('@/services/pyrola/pyrola-tauri/browser', () => ({
+vi.mock('@/services/vixl/vixl-tauri/browser', () => ({
   browserCefSetPassthroughRects,
 }))
 

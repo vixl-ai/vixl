@@ -2,11 +2,11 @@ import { computed, ref, watch } from 'vue'
 
 import { toast } from 'vue-sonner'
 
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 
-import type { SettingsTab } from '@/composables/use-pyrola-config'
+import type { SettingsTab } from '@/composables/use-vixl-config'
 
-import type { PyrolaCustomProvider } from '@/types/pyrola/pyrola-settings'
+import type { VixlCustomProvider } from '@/types/vixl/vixl-settings'
 
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
 
@@ -19,13 +19,13 @@ import {
   providerKeyRef,
   providerRequiresApiKey,
 } from '@/services/providers/registry'
-import { getSecret } from '@/services/pyrola/pyrola-tauri'
+import { getSecret } from '@/services/vixl/vixl-tauri'
 import { createProviderActions } from './provider-actions'
 
 export default (props: {
   tab: SettingsTab
 }) => {
-  const config = usePyrolaConfig()
+  const config = useVixlConfig()
   const testingProviderId = ref<string | null>(null)
   const apiKeyConfigured = ref<Record<string, boolean>>({})
   const addDialogOpen = ref(false)
@@ -77,7 +77,7 @@ export default (props: {
       filteredOpenAiCompatibleProviders.value.length > 0,
   )
 
-  const manageInitialProvider = computed((): PyrolaCustomProvider | null => {
+  const manageInitialProvider = computed((): VixlCustomProvider | null => {
     if (!manageProviderId.value) {
       return null
     }

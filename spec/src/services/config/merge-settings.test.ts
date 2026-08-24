@@ -5,13 +5,13 @@ import {
   mergeSettings,
   stripPersonalOnlyProjectOverrides,
 } from '@/services/config/merge-settings'
-import { parseProjectOverrides } from '@/services/config/pyrola-config'
-import { defaultPyrolaSettings } from '@/schemas/pyrola-settings'
+import { parseProjectOverrides } from '@/services/config/vixl-config'
+import { defaultVixlSettings } from '@/schemas/vixl-settings'
 import type {
   McpTrustRecord,
   PermissionRecord,
 } from '@/types/harness/permission'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 describe('isPersonalOnlyProjectKey', () => {
   it('matches providers, models, and lsp prefixes', () => {
@@ -30,7 +30,7 @@ describe('isPersonalOnlyProjectKey', () => {
 
 describe('stripPersonalOnlyProjectOverrides', () => {
   it('removes providers, models, and lsp keys while keeping other overrides', () => {
-    const project: PyrolaSettings = {
+    const project: VixlSettings = {
       version: 1,
       'lsp.autoDownload': false,
       'appearance.theme': 'dark',
@@ -76,8 +76,8 @@ describe('parseProjectOverrides', () => {
 
 describe('mergeSettings with stripped project overrides', () => {
   it('does not let project providers, models, or lsp override personal', () => {
-    const personal: PyrolaSettings = {
-      ...defaultPyrolaSettings(),
+    const personal: VixlSettings = {
+      ...defaultVixlSettings(),
       'models.default': 'anthropic::claude-sonnet-4-5',
       'providers.openai.apiKeyRef': 'openai',
       'lsp.autoDownload': true,
@@ -101,8 +101,8 @@ describe('mergeSettings with stripped project overrides', () => {
 
 describe('mergeSettings keyed grant arrays', () => {
   it('unions personal Always MCP trust with project CodeGraph leftover', () => {
-    const personal: PyrolaSettings = {
-      ...defaultPyrolaSettings(),
+    const personal: VixlSettings = {
+      ...defaultVixlSettings(),
       'agent.mcp.trust': [
         {
           serverId: 'brave',
@@ -111,7 +111,7 @@ describe('mergeSettings keyed grant arrays', () => {
         },
       ],
     }
-    const project: PyrolaSettings = {
+    const project: VixlSettings = {
       version: 1,
       'agent.mcp.trust': [
         {
@@ -135,14 +135,14 @@ describe('mergeSettings keyed grant arrays', () => {
   })
 
   it('lets project MCP trust win for the same serverId unless personal is never', () => {
-    const personal: PyrolaSettings = {
-      ...defaultPyrolaSettings(),
+    const personal: VixlSettings = {
+      ...defaultVixlSettings(),
       'agent.mcp.trust': [
         { serverId: 'brave', scope: 'always', fingerprint: 'fp-old' },
         { serverId: 'blocked', scope: 'never', fingerprint: 'fp-blocked' },
       ],
     }
-    const project: PyrolaSettings = {
+    const project: VixlSettings = {
       version: 1,
       'agent.mcp.trust': [
         { serverId: 'brave', scope: 'workspace', fingerprint: 'fp-new' },
@@ -168,8 +168,8 @@ describe('mergeSettings keyed grant arrays', () => {
   })
 
   it('unions personal Always permissions with project workspace grants', () => {
-    const personal: PyrolaSettings = {
-      ...defaultPyrolaSettings(),
+    const personal: VixlSettings = {
+      ...defaultVixlSettings(),
       'agent.permissions': [
         {
           capability: 'fs.write:src/a.ts',
@@ -178,7 +178,7 @@ describe('mergeSettings keyed grant arrays', () => {
         },
       ],
     }
-    const project: PyrolaSettings = {
+    const project: VixlSettings = {
       version: 1,
       'agent.permissions': [
         {
@@ -202,8 +202,8 @@ describe('mergeSettings keyed grant arrays', () => {
   })
 
   it('lets deny win over allow for the same capability', () => {
-    const personal: PyrolaSettings = {
-      ...defaultPyrolaSettings(),
+    const personal: VixlSettings = {
+      ...defaultVixlSettings(),
       'agent.permissions': [
         {
           capability: 'fs.write:src/secret.ts',
@@ -212,7 +212,7 @@ describe('mergeSettings keyed grant arrays', () => {
         },
       ],
     }
-    const project: PyrolaSettings = {
+    const project: VixlSettings = {
       version: 1,
       'agent.permissions': [
         {
@@ -234,11 +234,11 @@ describe('mergeSettings keyed grant arrays', () => {
   })
 
   it('unions autoApproveGlobs without dropping personal entries', () => {
-    const personal: PyrolaSettings = {
-      ...defaultPyrolaSettings(),
+    const personal: VixlSettings = {
+      ...defaultVixlSettings(),
       'agent.autoApproveGlobs': ['src/**', 'docs/**'],
     }
-    const project: PyrolaSettings = {
+    const project: VixlSettings = {
       version: 1,
       'agent.autoApproveGlobs': ['docs/**', 'tmp/**'],
     }
@@ -298,9 +298,9 @@ describe('mergeKeyedSettingRecords', () => {
   })
 })
 
-describe('defaultPyrolaSettings', () => {
+describe('defaultVixlSettings', () => {
   it('does not include appearance.fontSize', () => {
-    const defaults = defaultPyrolaSettings()
+    const defaults = defaultVixlSettings()
     expect('appearance.fontSize' in defaults).toBe(false)
     expect(defaults['appearance.theme']).toBe('system')
   })

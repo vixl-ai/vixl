@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import type { PyrolaCustomProvider } from '@/types/pyrola/pyrola-settings'
+import type { VixlCustomProvider } from '@/types/vixl/vixl-settings'
 import {
   customProviderSchema,
   formatCustomProviderSchemaError,
@@ -156,7 +156,7 @@ export default (props: ManageProviderDialogProps, emit: ManageProviderDialogEmit
     }
   }
 
-  const buildProvider = (): { providerId: string; provider: PyrolaCustomProvider } => {
+  const buildProvider = (): { providerId: string; provider: VixlCustomProvider } => {
     const trimmedName = name.value.trim()
     const trimmedBaseUrl = baseURL.value.trim()
     const providerId =
@@ -168,7 +168,7 @@ export default (props: ManageProviderDialogProps, emit: ManageProviderDialogEmit
       .filter((draft) => draft.id.trim().length > 0)
       .map(draftToModel)
 
-    const provider: PyrolaCustomProvider = {
+    const provider: VixlCustomProvider = {
       type: 'openai-compatible',
       name: trimmedName,
       baseURL: trimmedBaseUrl,

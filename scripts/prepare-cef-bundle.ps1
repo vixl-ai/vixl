@@ -27,18 +27,18 @@ Get-ChildItem -Path $CefPath -Force | Where-Object {
 $TargetTriple = (rustc -vV | Select-String "^host:").ToString().Split(" ")[1]
 $Manifest = Join-Path $SrcTauri "Cargo.toml"
 if ($Profile -eq "release") {
-  cargo build --release --features cef --bin pyrola_cef_helper --manifest-path $Manifest
-  $HelperSrc = Join-Path $SrcTauri "target\release\pyrola_cef_helper.exe"
+  cargo build --release --features cef --bin vixl_cef_helper --manifest-path $Manifest
+  $HelperSrc = Join-Path $SrcTauri "target\release\vixl_cef_helper.exe"
 } else {
-  cargo build --features cef --bin pyrola_cef_helper --manifest-path $Manifest
-  $HelperSrc = Join-Path $SrcTauri "target\debug\pyrola_cef_helper.exe"
+  cargo build --features cef --bin vixl_cef_helper --manifest-path $Manifest
+  $HelperSrc = Join-Path $SrcTauri "target\debug\vixl_cef_helper.exe"
 }
 
 if (-not (Test-Path $HelperSrc)) {
   Write-Error "Helper binary missing at $HelperSrc"
 }
 
-$HelperDest = Join-Path $Binaries "pyrola_cef_helper-$TargetTriple.exe"
+$HelperDest = Join-Path $Binaries "vixl_cef_helper-$TargetTriple.exe"
 Copy-Item -Path $HelperSrc -Destination $HelperDest -Force
 
 Write-Host "Staged CEF runtime at $Dest"

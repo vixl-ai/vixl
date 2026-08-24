@@ -1,5 +1,5 @@
 import type { ToolImagePart } from '@/types/harness/tool-image-part'
-import { writeTempBytes } from '@/services/pyrola/pyrola-tauri'
+import { writeTempBytes } from '@/services/vixl/vixl-tauri'
 
 const bytesToBase64 = (bytes: Uint8Array): string => {
   let binary = ''

@@ -5,7 +5,7 @@ export type BrowserBookmark = {
 }
 
 const storageKey = (workspaceId: string): string =>
-  `pyrola:browser:bookmarks:${workspaceId}`
+  `vixl:browser:bookmarks:${workspaceId}`
 
 const listeners = new Map<string, Set<() => void>>()
 

@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { fsEditFile, fsStagePreviewEdit } from '@/services/pyrola/pyrola-tauri'
+import { fsEditFile, fsStagePreviewEdit } from '@/services/vixl/vixl-tauri'
 import { gateToolPermission } from '@/services/harness/permission/gate'
 import { fsWriteCapability } from '@/services/harness/permission/policy'
 import captureBaselinesBeforeMutate from '@/services/harness/capture-baselines-before-mutate'

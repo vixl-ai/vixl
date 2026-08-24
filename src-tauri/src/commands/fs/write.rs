@@ -208,7 +208,7 @@ pub fn write_temp_handoff(content: String) -> Result<WriteTempHandoffResult, Str
     .format("%Y-%m-%dT%H-%M-%S")
     .to_string();
   let filename = format!("handoff-{timestamp}.md");
-  let dir = std::env::temp_dir().join("pyrola").join("handoffs");
+  let dir = std::env::temp_dir().join("vixl").join("handoffs");
   fs::create_dir_all(&dir).map_err(|error| format!("Failed to create temp handoffs dir: {error}"))?;
   let absolute = dir.join(&filename);
   fs::write(&absolute, content).map_err(|error| format!("Failed to write temp handoff: {error}"))?;
@@ -232,7 +232,7 @@ pub fn write_temp_bytes(
     .format("%Y-%m-%dT%H-%M-%S-%3f")
     .to_string();
   let filename = format!("{kind}-{timestamp}.{extension}");
-  let dir = std::env::temp_dir().join("pyrola").join(&kind);
+  let dir = std::env::temp_dir().join("vixl").join(&kind);
   fs::create_dir_all(&dir).map_err(|error| format!("Failed to create temp dir: {error}"))?;
   let absolute = dir.join(&filename);
   fs::write(&absolute, bytes).map_err(|error| format!("Failed to write temp bytes: {error}"))?;
@@ -257,7 +257,7 @@ pub fn append_temp_log(
       .format("%Y-%m-%dT%H-%M-%S-%3f")
       .to_string();
     let filename = format!("{kind}-{timestamp}.log");
-    let dir = std::env::temp_dir().join("pyrola").join(&kind);
+    let dir = std::env::temp_dir().join("vixl").join(&kind);
     fs::create_dir_all(&dir).map_err(|error| format!("Failed to create temp log dir: {error}"))?;
     dir.join(filename)
   };

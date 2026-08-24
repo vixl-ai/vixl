@@ -9,7 +9,7 @@ vi.mock('@/composables/use-agent-harness', () => ({
   default: vi.fn<() => unknown>(),
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri', () => ({
+vi.mock('@/services/vixl/vixl-tauri', () => ({
   getUserHomeDir: vi.fn<() => Promise<string>>(),
   updateChatMeta: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }))

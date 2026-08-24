@@ -1,4 +1,4 @@
-import { getUserPyrolaDir, readJsonFile, writeJsonFile } from '@/services/pyrola/pyrola-tauri'
+import { getUserVixlDir, readJsonFile, writeJsonFile } from '@/services/vixl/vixl-tauri'
 
 export type McpToolFingerprintSource = {
   name: string
@@ -14,7 +14,7 @@ export type McpToolBaseline = {
 }
 
 const baselinePath = async (serverId: string): Promise<string> => {
-  const root = await getUserPyrolaDir()
+  const root = await getUserVixlDir()
   return `${root}/mcp-trust-baselines/${encodeURIComponent(serverId)}.json`
 }
 

@@ -1,5 +1,5 @@
 import type { SkillIndexEntry } from '@/types/skills/skill'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import parseSkillFrontmatter from '@/services/skills/strip-skill-frontmatter'
 
 const skillModules = import.meta.glob('../../skills/**/SKILL.md', {
@@ -8,7 +8,7 @@ const skillModules = import.meta.glob('../../skills/**/SKILL.md', {
   eager: true,
 }) as Record<string, string>
 
-const INTERNAL_SKILL_MODE_GATES: Record<string, PyrolaChatMode[]> = {
+const INTERNAL_SKILL_MODE_GATES: Record<string, VixlChatMode[]> = {
   ask: ['ask'],
   plan: ['plan'],
   agent: ['agent'],
@@ -39,7 +39,7 @@ const internalSkills: SkillIndexEntry[] = Object.entries(skillModules).map(([pat
 export default (): SkillIndexEntry[] => internalSkills
 
 export const listInternalSkillIndex = (
-  mode: PyrolaChatMode,
+  mode: VixlChatMode,
 ): SkillIndexEntry[] =>
   internalSkills.filter((skill) => {
     const modes = INTERNAL_SKILL_MODE_GATES[skill.name]

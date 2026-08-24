@@ -1,7 +1,7 @@
 import { computed, onMounted, ref, shallowRef } from 'vue'
 import { toast } from 'vue-sonner'
-import type { PyrolaSettings, PyrolaTheme } from '@/types/pyrola/pyrola-settings'
-import { defaultPyrolaSettings } from '@/schemas/pyrola-settings'
+import type { VixlSettings, VixlTheme } from '@/types/vixl/vixl-settings'
+import { defaultVixlSettings } from '@/schemas/vixl-settings'
 import { stripPersonalOnlyProjectOverrides } from '@/services/config/merge-settings'
 import {
   isProjectOverride,
@@ -11,22 +11,22 @@ import {
   resetSettingsKeys,
   resetSettingsSection,
   saveSettings,
-} from '@/services/config/pyrola-config'
+} from '@/services/config/vixl-config'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 
 export type SettingsTab = 'personal' | 'project'
 
 const hydrated = ref(false)
-const personalSettings = shallowRef<PyrolaSettings>(defaultPyrolaSettings())
-const projectSettings = shallowRef<PyrolaSettings>({ version: 1 })
-const effectiveSettings = shallowRef<PyrolaSettings>(defaultPyrolaSettings())
+const personalSettings = shallowRef<VixlSettings>(defaultVixlSettings())
+const projectSettings = shallowRef<VixlSettings>({ version: 1 })
+const effectiveSettings = shallowRef<VixlSettings>(defaultVixlSettings())
 
 export default () => {
   const fleet = useFleetRegistry()
 
   const activeRootPath = computed(() => fleet.activeProject.value?.rootPath ?? null)
   const showProjectTab = computed(
-    () => activeRootPath.value !== null && fleet.hasProjectPyrola.value,
+    () => activeRootPath.value !== null && fleet.hasProjectVixl.value,
   )
 
   const refreshAll = async (): Promise<void> => {
@@ -41,13 +41,13 @@ export default () => {
     hydrated.value = true
   }
 
-  const getScopeSettings = (tab: SettingsTab): PyrolaSettings =>
+  const getScopeSettings = (tab: SettingsTab): VixlSettings =>
     tab === 'personal' ? personalSettings.value : projectSettings.value
 
-  const updateSetting = async <K extends keyof PyrolaSettings>(
+  const updateSetting = async <K extends keyof VixlSettings>(
     tab: SettingsTab,
     key: K,
-    value: PyrolaSettings[K],
+    value: VixlSettings[K],
   ): Promise<void> => {
     const current = { ...getScopeSettings(tab), [key]: value, version: 1 as const }
 
@@ -133,11 +133,9 @@ export default () => {
     removeSettings,
     resetSectionToPersonal,
     usingPersonalDefault,
-    setTheme: (tab: SettingsTab, theme: PyrolaTheme) =>
+    setTheme: (tab: SettingsTab, theme: VixlTheme) =>
       updateSetting(tab, 'appearance.theme', theme),
-    setMachineLabel: (label: string) =>
-      updateSetting('personal', 'general.machineLabel', label),
   }
 }
 
-export const usePyrolaConfigHydration = () => hydrated
+export const useVixlConfigHydration = () => hydrated

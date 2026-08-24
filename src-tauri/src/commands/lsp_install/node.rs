@@ -102,7 +102,7 @@ pub async fn ensure_portable_node(app: &AppHandle) -> Result<PathBuf, String> {
 
 pub(crate) async fn download_bytes(url: &str) -> Result<Vec<u8>, String> {
   let client = reqwest::Client::builder()
-    .user_agent("pyrola-lsp-installer")
+    .user_agent("vixl-lsp-installer")
     .build()
     .map_err(|e| e.to_string())?;
   let response = client

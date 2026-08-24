@@ -7,7 +7,7 @@ import StudioRenderer from '@/components/studio/StudioRenderer.vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/shadcn/ui/alert'
 import isStudioHtmlContent from '@/services/studio/is-studio-html-content'
 import parseStudioArtifact from '@/services/studio/parse-studio-artifact'
-import { fsReadFile } from '@/services/pyrola/pyrola-tauri'
+import { fsReadFile } from '@/services/vixl/vixl-tauri'
 
 const props = defineProps<{
   path: string
@@ -18,7 +18,7 @@ const props = defineProps<{
 const studioData = ref<Record<string, unknown>>({})
 const studioParseError = ref<string | null>(null)
 
-const isStudioPath = computed(() => props.path.startsWith('.pyrola/studio/'))
+const isStudioPath = computed(() => props.path.startsWith('.vixl/studio/'))
 
 const studioRenderMarkdown = computed(() => {
   if (!isStudioPath.value || studioParseError.value) {

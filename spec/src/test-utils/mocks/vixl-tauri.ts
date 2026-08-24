@@ -1,16 +1,16 @@
 import { vi } from 'vitest'
 
 /**
- * Complete mock of `@/services/pyrola/pyrola-tauri` exports used across tests.
+ * Complete mock of `@/services/vixl/vixl-tauri` exports used across tests.
  * Union of every export any test currently stubs.
  *
  * Vitest only hoists `vi.mock` from the test file itself, so call this from a
  * mock factory in the test file:
  *
- *   import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
- *   vi.mock('@/services/pyrola/pyrola-tauri', () => mockPyrolaTauri({ ... }))
+ *   import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
+ *   vi.mock('@/services/vixl/vixl-tauri', () => mockVixlTauri({ ... }))
  */
-export function createPyrolaTauriMock(overrides: Record<string, unknown> = {}) {
+export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
   return {
     isTauri: vi.fn<() => boolean>(() => true),
     getSecret: vi.fn<(key: string) => Promise<string | null>>(async () => null),
@@ -19,7 +19,7 @@ export function createPyrolaTauriMock(overrides: Record<string, unknown> = {}) {
     readMcpConfig: vi.fn<() => Promise<{ servers: Record<string, unknown> }>>(async () => ({
       servers: {},
     })),
-    listPyrolaFiles: vi.fn<() => Promise<unknown[]>>(async () => []),
+    listVixlFiles: vi.fn<() => Promise<unknown[]>>(async () => []),
     mcpListStatuses: vi.fn<() => Promise<Record<string, unknown>>>(async () => ({})),
     fsReadFile: vi.fn<() => Promise<{ content: string }>>(async () => ({ content: '' })),
     fsListDir: vi.fn<() => Promise<unknown>>(),
@@ -58,14 +58,14 @@ export function createPyrolaTauriMock(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * Alias for createPyrolaTauriMock. Name starts with `mock` so Vitest allows
+ * Alias for createVixlTauriMock. Name starts with `mock` so Vitest allows
  * referencing it inside `vi.mock` factories without `vi.hoisted`.
  *
  * Does not call `vi.mock` itself (Vitest only hoists mocks declared in the
  * test file). Use:
  *
- *   vi.mock('@/services/pyrola/pyrola-tauri', () => mockPyrolaTauri(overrides))
+ *   vi.mock('@/services/vixl/vixl-tauri', () => mockVixlTauri(overrides))
  */
-export function mockPyrolaTauri(overrides: Record<string, unknown> = {}) {
-  return createPyrolaTauriMock(overrides)
+export function mockVixlTauri(overrides: Record<string, unknown> = {}) {
+  return createVixlTauriMock(overrides)
 }

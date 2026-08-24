@@ -224,7 +224,7 @@ fn cdp_target_get_targets(ws_url: &str) -> Result<String, String> {
   stream
     .set_read_timeout(Some(Duration::from_secs(5)))
     .map_err(|e| e.to_string())?;
-  let key = Engine::encode(&base64::engine::general_purpose::STANDARD, b"pyrolacefspike1234");
+  let key = Engine::encode(&base64::engine::general_purpose::STANDARD, b"vixlcefspike1234");
   let handshake = format!(
     "GET {path} HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n"
   );

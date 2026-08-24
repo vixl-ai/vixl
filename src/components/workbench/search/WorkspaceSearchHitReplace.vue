@@ -6,7 +6,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
-import type { GrepMatch } from '@/services/pyrola/pyrola-tauri'
+import type { GrepMatch } from '@/services/vixl/vixl-tauri'
 
 const props = defineProps<{
   hit: GrepMatch

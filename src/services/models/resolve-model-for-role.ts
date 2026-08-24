@@ -1,8 +1,8 @@
 import type { ModelRoleId } from '@/data/model-role-registry'
-import type { PyrolaChatMode, PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 import parseModelRef from '@/utils/parse-model-ref'
 
-const isChatMode = (role: ModelRoleId): role is PyrolaChatMode =>
+const isChatMode = (role: ModelRoleId): role is VixlChatMode =>
   role === 'ask' ||
   role === 'plan' ||
   role === 'studio' ||
@@ -10,7 +10,7 @@ const isChatMode = (role: ModelRoleId): role is PyrolaChatMode =>
   role === 'orchestrator'
 
 const readSettingsModel = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   key: `models.${string}`,
 ): string | undefined => {
   const value = settings[key]
@@ -19,7 +19,7 @@ const readSettingsModel = (
 
 export const resolveModelForRole = (
   role: ModelRoleId,
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   chatOverride?: string,
 ): string | undefined => {
   if (chatOverride?.trim()) {
@@ -54,7 +54,7 @@ export default resolveModelForRole
 
 export const resolveParsedModelForRole = (
   role: ModelRoleId,
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   chatOverride?: string,
 ): ReturnType<typeof parseModelRef> => {
   const serialized = resolveModelForRole(role, settings, chatOverride)

@@ -1,6 +1,6 @@
 import { listen } from '@tauri-apps/api/event'
 import { ref } from 'vue'
-import { shellKillTracked, shellSpawnTracked } from '@/services/pyrola/pyrola-tauri'
+import { shellKillTracked, shellSpawnTracked } from '@/services/vixl/vixl-tauri'
 import type { AgentShellRecord, AgentShellStatus } from '@/types/harness/agent-shell'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { ShellExitResult } from '@/types/harness/shell-exit'

@@ -3,7 +3,7 @@ import useFleetRegistry from '@/composables/use-fleet-registry'
 import useChatStore from '@/composables/use-chat-store'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
 import type { ChatMeta } from '@/types/chat/chat-meta'
-import { listPinnedChats } from '@/services/pyrola/pyrola-tauri'
+import { listPinnedChats } from '@/services/vixl/vixl-tauri'
 import type { FleetPinnedChat } from '@/types/fleet/fleet-pinned-chat'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 

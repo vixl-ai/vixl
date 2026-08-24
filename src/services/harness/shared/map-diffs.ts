@@ -1,4 +1,4 @@
-import type { FileDiffRecord } from '@/services/pyrola/pyrola-tauri'
+import type { FileDiffRecord } from '@/services/vixl/vixl-tauri'
 import type { FileDiff } from '@/types/harness/file-diff'
 
 const mapDiffs = (raw: FileDiffRecord[]): FileDiff[] =>

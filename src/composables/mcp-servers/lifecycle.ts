@@ -1,13 +1,13 @@
 import { toast } from 'vue-sonner'
-import type { McpServerConfig } from '@/types/pyrola/mcp-config'
+import type { McpServerConfig } from '@/types/vixl/mcp-config'
 import { listEffectiveMcpServers } from '@/services/mcp/merge-mcp-config'
 import mcpRuntime, { type McpRuntimeOptions } from '@/services/mcp/mcp-runtime'
 import { resolveMcpAuthForServer } from '@/services/mcp/mcp-auth-gate'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
 import { isMcpTrusted, sessionTrusts } from '@/services/mcp/mcp-trust'
 import { isInternalMcpServer } from '@/types/codegraph/managed-codegraph'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import useVixlConfig from '@/composables/use-vixl-config'
 import { patchServerState, withServerLoading } from './helpers'
 import {
   authenticatingServers,
@@ -18,16 +18,16 @@ import {
 } from './state'
 
 export const createRuntimeOptions = (
-  config: ReturnType<typeof usePyrolaConfig>,
+  config: ReturnType<typeof useVixlConfig>,
 ) => (
   extras?: Pick<McpRuntimeOptions, 'confirmAuthorizationServerOrigin' | 'skipTrustCheck'>,
 ): McpRuntimeOptions => ({
-  settings: config.effectiveSettings.value as PyrolaSettings,
+  settings: config.effectiveSettings.value as VixlSettings,
   ...extras,
 })
 
 export const createAssertTrustedOrThrow = (
-  config: ReturnType<typeof usePyrolaConfig>,
+  config: ReturnType<typeof useVixlConfig>,
 ) => (serverId: string, serverConfig: McpServerConfig): void => {
   if (isInternalMcpServer(serverId)) {
     return

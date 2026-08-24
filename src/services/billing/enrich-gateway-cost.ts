@@ -6,10 +6,10 @@ import computeChatUsageTotals from '@/services/billing/compute-chat-usage-totals
 import isGatewayGenerationPending from '@/services/billing/is-gateway-generation-pending'
 import readUsageLedger from '@/services/billing/read-usage-ledger'
 import {
-  getUserPyrolaDir,
+  getUserVixlDir,
   updateChatMeta,
   writeJsonFile,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 
 /** Waits between getGenerationInfo attempts when the usage event is still pending. */
 const RETRY_DELAYS_MS = [2000, 2000, 4000] as const
@@ -23,7 +23,7 @@ const ledgerPath = async (
   projectSlug: string,
   chatId: string,
 ): Promise<string> => {
-  const root = await getUserPyrolaDir()
+  const root = await getUserVixlDir()
   return `${root}/chats/${projectSlug}/${chatId}/usage-ledger.json`
 }
 

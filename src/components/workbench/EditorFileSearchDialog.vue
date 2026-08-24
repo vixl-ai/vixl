@@ -10,7 +10,7 @@ import {
   CommandList,
 } from '@/components/shadcn/ui/command'
 import WorkbenchFileEntryIcon from '@/components/workbench/FileEntryIcon.vue'
-import { workspaceGlob } from '@/services/pyrola/pyrola-tauri'
+import { workspaceGlob } from '@/services/vixl/vixl-tauri'
 
 const FILE_SEARCH_LIMIT = 100
 const SEARCH_DEBOUNCE_MS = 200

@@ -15,7 +15,7 @@ const toError = (reason: unknown): Error => {
 
 export const call = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
   if (!isTauri()) {
-    throw new Error('Pyrola desktop APIs are only available in the Tauri app')
+    throw new Error('Vixl desktop APIs are only available in the Tauri app')
   }
   try {
     return await invoke<T>(command, args)

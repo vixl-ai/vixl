@@ -2,7 +2,7 @@ import {
   isTauri,
   lspCatalog,
   lspEnsureServer,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import { scheduleAwaitingClear } from './helpers'
 import {
   awaitingProjectLoad,

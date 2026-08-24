@@ -1,6 +1,6 @@
 import { toast } from 'vue-sonner'
 import type { TerminalPayload } from '@/types/workbench/workbench-tab'
-import { shellKillPty, shellWritePty } from '@/services/pyrola/pyrola-tauri'
+import { shellKillPty, shellWritePty } from '@/services/vixl/vixl-tauri'
 import { focusTab, updateTab } from './helpers'
 import {
   activeTabId,

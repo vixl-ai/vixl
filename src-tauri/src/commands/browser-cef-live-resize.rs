@@ -25,7 +25,7 @@ static OBSERVER: OnceLock<Retained<LiveResizeObserver>> = OnceLock::new();
 
 define_class!(
   #[unsafe(super = NSObject)]
-  #[name = "PyrolaCefLiveResizeObserver"]
+  #[name = "VixlCefLiveResizeObserver"]
   struct LiveResizeObserver;
 
   unsafe impl NSObjectProtocol for LiveResizeObserver {}

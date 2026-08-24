@@ -1,6 +1,6 @@
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
 import type { ModelRef } from '@/types/models/model-ref'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import resolveReasoningCapability from '@/services/models/resolve-reasoning-capability'
 import resolveSupportsFast from '@/services/models/resolve-fast-capability'
 
@@ -10,7 +10,7 @@ import resolveSupportsFast from '@/services/models/resolve-fast-capability'
  * do not use on save paths that should preserve raw user intent.
  */
 export const clampModelCatalogOption = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
   option: ModelCatalogOption,
 ): ModelCatalogOption => {

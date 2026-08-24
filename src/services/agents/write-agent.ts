@@ -1,7 +1,7 @@
 import createAgentInputSchema, {
   type CreateAgentInput,
 } from '@/schemas/agents/create-agent-input'
-import { fsWriteFile, getPyrolaDir } from '@/services/pyrola/pyrola-tauri'
+import { fsWriteFile, getVixlDir } from '@/services/vixl/vixl-tauri'
 import slugifyName from '@/utils/slugify-name'
 
 type WriteAgentArgs = CreateAgentInput & {
@@ -59,7 +59,7 @@ export default async (input: WriteAgentArgs): Promise<WriteAgentResult> => {
     if (!input.projectRoot) {
       throw new Error('projectRoot is required for project-scoped agents')
     }
-    const path = `.pyrola/agents/${slug}.md`
+    const path = `.vixl/agents/${slug}.md`
     await fsWriteFile({
       projectRoot: input.projectRoot,
       path,
@@ -68,7 +68,7 @@ export default async (input: WriteAgentArgs): Promise<WriteAgentResult> => {
     return { slug, path }
   }
 
-  const personalDir = await getPyrolaDir('personal')
+  const personalDir = await getVixlDir('personal')
   const path = `agents/${slug}.md`
   await fsWriteFile({
     projectRoot: personalDir,

@@ -34,7 +34,7 @@ import useChatStore from '@/composables/use-chat-store'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import useProjectsExpansion from '@/composables/use-projects-expansion'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
 import projectRouteFor from '@/utils/project-route-for'
@@ -48,7 +48,7 @@ const router = useRouter()
 const fleet = useFleetRegistry()
 const workbench = useWorkbenchStore()
 const chatStore = useChatStore()
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const expansion = useProjectsExpansion()
 const startingChat = ref(false)
 const removingProject = ref(false)

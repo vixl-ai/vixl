@@ -1,6 +1,6 @@
 import type { ChatAttention } from '@/types/chat/chat-attention'
 import type { AwaitingPlanGo } from '@/types/plans/awaiting-plan-go'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { PrefixSnapshot } from '@/types/harness/prefix-snapshot'
 
 export type ChatStatus = 'idle' | 'running'
@@ -20,7 +20,7 @@ export type ChatMeta = {
   title: string
   projectSlug: string
   projectRoot: string
-  mode: PyrolaChatMode
+  mode: VixlChatMode
   model: string
   status: ChatStatus
   attention?: ChatAttention

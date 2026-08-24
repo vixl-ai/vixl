@@ -1,8 +1,8 @@
 import type { LanguageModel } from 'ai'
 import type {
-  PyrolaCustomProviderModel,
-  PyrolaSettings,
-} from '@/types/pyrola/pyrola-settings'
+  VixlCustomProviderModel,
+  VixlSettings,
+} from '@/types/vixl/vixl-settings'
 import { getCustomProvider } from '@/services/providers/registry'
 
 const hasImageSupportedUrls = async (model: LanguageModel): Promise<boolean> => {
@@ -22,8 +22,8 @@ const hasImageSupportedUrls = async (model: LanguageModel): Promise<boolean> => 
 const findCustomModel = (
   providerId: string,
   modelId: string,
-  settings: PyrolaSettings,
-): PyrolaCustomProviderModel | undefined => {
+  settings: VixlSettings,
+): VixlCustomProviderModel | undefined => {
   const provider = getCustomProvider(settings, providerId)
   return provider?.models?.find((model) => model.id === modelId)
 }
@@ -39,7 +39,7 @@ export default async (args: {
   model: LanguageModel
   providerId: string
   modelId: string
-  settings: PyrolaSettings
+  settings: VixlSettings
 }): Promise<boolean> => {
   const custom = findCustomModel(args.providerId, args.modelId, args.settings)
   if (custom) {

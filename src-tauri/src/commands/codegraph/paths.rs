@@ -4,14 +4,14 @@ use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 
 use super::id::graph_id_for_root;
-use crate::commands::paths::user_pyrola_dir;
+use crate::commands::paths::user_vixl_dir;
 
 pub const PRELOAD_FILE_NAME: &str = "_preload.cjs";
 pub const GRAPH_DB_NAME: &str = "codegraph.db";
 pub const INPLACE_DIR_NAME: &str = ".codegraph";
 
 pub fn graph_store_dir(app: &AppHandle) -> Result<PathBuf, String> {
-  let dir = user_pyrola_dir(app)?.join("graphs");
+  let dir = user_vixl_dir(app)?.join("graphs");
   fs::create_dir_all(&dir).map_err(|error| format!("Failed to create graph store: {error}"))?;
   Ok(dir)
 }

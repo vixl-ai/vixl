@@ -4,7 +4,7 @@ import browserBookmarks, {
   type BrowserBookmark,
 } from '@/services/browser/bookmarks'
 
-const SHOW_BOOKMARK_BAR_KEY = 'pyrola:browser:showBookmarkBar'
+const SHOW_BOOKMARK_BAR_KEY = 'vixl:browser:showBookmarkBar'
 
 const readShowBookmarkBar = (): boolean => {
   try {

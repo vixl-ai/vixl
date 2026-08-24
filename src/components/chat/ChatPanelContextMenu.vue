@@ -31,7 +31,7 @@ import {
   pinChat,
   saveTextFileWithDialog,
   updateChatMeta,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import buildChatTranscript from '@/utils/build-chat-transcript'
 import sanitizeExportFilename from '@/utils/sanitize-export-filename'
 

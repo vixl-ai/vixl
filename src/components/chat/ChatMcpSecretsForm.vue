@@ -5,15 +5,15 @@ import { Button } from '@/components/shadcn/ui/button'
 import { Label } from '@/components/shadcn/ui/label'
 import { Badge } from '@/components/shadcn/ui/badge'
 import SettingsInputPasswordInput from '@/components/settings/input/PasswordInput.vue'
-import type { McpConfig, McpInputDefinition, McpServerConfig } from '@/types/pyrola/mcp-config'
-import { isMcpHttpServer } from '@/types/pyrola/mcp-config'
+import type { McpConfig, McpInputDefinition, McpServerConfig } from '@/types/vixl/mcp-config'
+import { isMcpHttpServer } from '@/types/vixl/mcp-config'
 import {
   clearMcpInputValues,
   listRequiredInputIdsForServer,
   loadMcpInputValues,
   saveMcpInputValues,
 } from '@/services/mcp/resolve-mcp-inputs'
-import { getSecret } from '@/services/pyrola/pyrola-tauri'
+import { getSecret } from '@/services/vixl/vixl-tauri'
 import { mcpInputKey } from '@/services/mcp/mcp-keychain-keys'
 
 const props = defineProps<{

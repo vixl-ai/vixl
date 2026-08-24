@@ -1,5 +1,5 @@
 import { registerCefSession } from '@/services/browser/registry'
-import { browserCefCreate } from '@/services/pyrola/pyrola-tauri/browser'
+import { browserCefCreate } from '@/services/vixl/vixl-tauri/browser'
 import { BROWSER_HIDDEN_BOUNDS } from '@/utils/browser-session-storage'
 
 const createCefSession = async (workspaceId: string): Promise<string> => {

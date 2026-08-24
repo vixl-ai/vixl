@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use tauri::AppHandle;
 use uuid::Uuid;
 
-use super::paths::user_pyrola_dir;
+use super::paths::user_vixl_dir;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct FleetProject {
@@ -27,11 +27,11 @@ struct ActiveProject {
 }
 
 fn projects_path(app: &AppHandle) -> Result<PathBuf, String> {
-  Ok(user_pyrola_dir(app)?.join("projects.json"))
+  Ok(user_vixl_dir(app)?.join("projects.json"))
 }
 
 fn active_path(app: &AppHandle) -> Result<PathBuf, String> {
-  Ok(user_pyrola_dir(app)?.join("active-project.json"))
+  Ok(user_vixl_dir(app)?.join("active-project.json"))
 }
 
 fn read_registry(app: &AppHandle) -> Result<ProjectsRegistry, String> {

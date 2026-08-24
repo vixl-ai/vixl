@@ -17,7 +17,7 @@ import {
   browserCefGetTitle,
   browserCefGetUrl,
   browserCefResize,
-} from '@/services/pyrola/pyrola-tauri/browser'
+} from '@/services/vixl/vixl-tauri/browser'
 import type { BrowserTabSessionArgs } from '@/types/browser/browser-tab-session-args'
 import type { CefBounds } from '@/types/browser/cef-bounds'
 import readBrowserHostBounds from '@/utils/browser-host-bounds'

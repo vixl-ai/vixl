@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { gitBranchCreate as gitBranchCreateCommand } from '@/services/pyrola/pyrola-tauri'
+import { gitBranchCreate as gitBranchCreateCommand } from '@/services/vixl/vixl-tauri'
 import { gateToolPermission } from '@/services/harness/permission/gate'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
 import type { HarnessToolContext } from '@/types/harness/tool-context'

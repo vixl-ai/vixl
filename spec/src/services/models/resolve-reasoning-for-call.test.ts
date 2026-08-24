@@ -8,7 +8,7 @@ import {
 import { resolveModelCallOptions } from '@/services/models/resolve-model-call-options'
 import clampModelCatalogOption from '@/services/models/clamp-model-catalog-option'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const baseSettings = {
   version: 1,
@@ -17,7 +17,7 @@ const baseSettings = {
   'models.subagent': 'google::gemini-2.0-flash',
   'models.defaultReasoning': 'low',
   'models.agentReasoning': 'high',
-} as PyrolaSettings
+} as VixlSettings
 
 describe('resolveReasoningCapability', () => {
   it('supports native anthropic models with family effort subsets', () => {
@@ -118,7 +118,7 @@ describe('resolveReasoningCapability', () => {
         baseURL: 'http://127.0.0.1:11434/v1',
         models: [{ id: 'llama' }],
       },
-    } as PyrolaSettings
+    } as VixlSettings
     const capability = resolveReasoningCapability(settings, {
       providerId: 'local',
       modelId: 'llama',
@@ -135,7 +135,7 @@ describe('resolveReasoningCapability', () => {
         baseURL: 'http://127.0.0.1:11434/v1',
         models: [{ id: 'qwen', thinking: true }],
       },
-    } as PyrolaSettings
+    } as VixlSettings
     const capability = resolveReasoningCapability(settings, {
       providerId: 'local',
       modelId: 'qwen',
@@ -156,7 +156,7 @@ describe('resolveReasoningCapability', () => {
           supportsReasoningEffort: ['low', 'high'],
         }],
       },
-    } as PyrolaSettings
+    } as VixlSettings
     const capability = resolveReasoningCapability(settings, {
       providerId: 'local',
       modelId: 'qwen',
@@ -176,7 +176,7 @@ describe('clampModelCatalogOption', () => {
           fast: true,
         },
       },
-    } as PyrolaSettings
+    } as VixlSettings
     const ref = {
       providerId: 'anthropic',
       modelId: 'claude-sonnet-4-5',
@@ -289,7 +289,7 @@ describe('resolveModelForRole subagent', () => {
       version: 1,
       'models.default': 'anthropic::claude-sonnet-4-5',
       'models.agent': 'openai::gpt-4o',
-    } as PyrolaSettings
+    } as VixlSettings
     expect(resolveModelForRole('subagent', settings)).toBe('openai::gpt-4o')
   })
 })

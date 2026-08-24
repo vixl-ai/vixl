@@ -1,5 +1,5 @@
 import type { HarnessStreamInput } from '@/types/harness/harness-stream-input'
-import { updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import { releaseLocksForChat } from '@/services/browser/registry'
 import { rejectPendingForChat } from '@/services/harness/permission/approval-gate'
 import { rejectPendingQuestionsForChat } from '@/services/harness/permission/question-gate'

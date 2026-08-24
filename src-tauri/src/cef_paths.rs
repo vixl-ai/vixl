@@ -2,7 +2,7 @@
 //!
 //! Order: `CEF_PATH` env, bundled app locations, then the export-cef-dir
 //! default (`~/.local/share/cef`). Shared by the main app and
-//! `pyrola_cef_helper` (via `#[path]` include) so both stay in sync.
+//! `vixl_cef_helper` (via `#[path]` include) so both stay in sync.
 
 use std::path::{Path, PathBuf};
 
@@ -11,11 +11,11 @@ pub const MACOS_FRAMEWORK_NAME: &str = "Chromium Embedded Framework.framework";
 /// Binary inside the macOS framework bundle.
 pub const MACOS_FRAMEWORK_BINARY: &str = "Chromium Embedded Framework";
 /// Helper executable name (Tauri externalBin / cargo bin).
-pub const HELPER_NAME: &str = "pyrola_cef_helper";
+pub const HELPER_NAME: &str = "vixl_cef_helper";
 /// Nested helper app name under Contents/Frameworks (macOS packaged).
-pub const BUNDLED_HELPER_APP_NAME: &str = "pyrola Helper.app";
+pub const BUNDLED_HELPER_APP_NAME: &str = "vixl Helper.app";
 /// Executable file name inside the nested helper app (macOS packaged).
-pub const BUNDLED_HELPER_EXE_NAME: &str = "pyrola Helper";
+pub const BUNDLED_HELPER_EXE_NAME: &str = "vixl Helper";
 
 #[derive(Clone, Debug)]
 pub struct CefPaths {
@@ -130,7 +130,7 @@ fn resolve_helper() -> Result<PathBuf, String> {
 
 #[cfg(target_os = "macos")]
 fn bundled_macos_helper_exe(main_exe: &Path) -> Option<PathBuf> {
-  // App.app/Contents/MacOS/<bin> -> Frameworks/pyrola Helper.app/Contents/MacOS/pyrola Helper
+  // App.app/Contents/MacOS/<bin> -> Frameworks/vixl Helper.app/Contents/MacOS/vixl Helper
   let contents = main_exe.parent()?.parent()?;
   let helper = contents
     .join("Frameworks")
@@ -148,7 +148,7 @@ fn bundled_macos_framework_dir() -> Option<PathBuf> {
 }
 
 /// Framework from the main exe (`.../Contents/Frameworks/CEF.framework`) or a
-/// nested helper (`.../Frameworks/pyrola Helper.app/Contents/MacOS/...`).
+/// nested helper (`.../Frameworks/vixl Helper.app/Contents/MacOS/...`).
 #[cfg(target_os = "macos")]
 fn macos_framework_dir_from_exe(exe: &Path) -> Option<PathBuf> {
   for ancestor in exe.ancestors() {
@@ -230,11 +230,11 @@ mod tests {
 
   #[test]
   fn helper_self_names() {
-    assert!(current_exe_is_helper(Path::new("pyrola_cef_helper")));
-    assert!(current_exe_is_helper(Path::new("pyrola Helper")));
+    assert!(current_exe_is_helper(Path::new("vixl_cef_helper")));
+    assert!(current_exe_is_helper(Path::new("vixl Helper")));
     assert!(current_exe_is_helper(Path::new(
-      "pyrola Helper (Renderer)"
+      "vixl Helper (Renderer)"
     )));
-    assert!(!current_exe_is_helper(Path::new("pyrola")));
+    assert!(!current_exe_is_helper(Path::new("not-the-helper")));
   }
 }

@@ -1,5 +1,5 @@
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
-import { readChatMeta, readChatMessages } from '@/services/pyrola/pyrola-tauri'
+import { readChatMeta, readChatMessages } from '@/services/vixl/vixl-tauri'
 import { mapMeta } from './helpers'
 import { applyHydrateLine, createFlushTurn, type HydrateAccumulator } from './hydrate-lines'
 import type { ChatSession } from './types'

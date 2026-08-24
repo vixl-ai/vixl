@@ -7,7 +7,7 @@ export const BROWSER_HIDDEN_BOUNDS: CefBounds = {
   height: 0,
 }
 
-const LAST_URL_PREFIX = 'pyrola:browser:lastUrl:'
+const LAST_URL_PREFIX = 'vixl:browser:lastUrl:'
 
 export const writeBrowserLastUrl = (workspaceId: string, url: string): void => {
   try {

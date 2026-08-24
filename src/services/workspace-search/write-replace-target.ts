@@ -1,4 +1,4 @@
-import { fsWriteFile } from '@/services/pyrola/pyrola-tauri'
+import { fsWriteFile } from '@/services/vixl/vixl-tauri'
 import getWorkingModel from './get-working-model'
 
 export default async (args: {

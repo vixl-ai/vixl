@@ -5,7 +5,7 @@ import type {
   PermissionLevel,
   PermissionScope,
 } from '@/types/harness/permission'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import {
   requestApproval,
   type ApprovalKind,
@@ -31,7 +31,7 @@ export type PendingApprovalView = {
 
 export type PermissionGateContext = {
   chatId: string
-  settings: PyrolaSettings
+  settings: VixlSettings
   permissionLevel: PermissionLevel
   sessionAllows: Set<string>
   sessionDenies: Set<string>

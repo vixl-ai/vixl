@@ -5,9 +5,9 @@ import type {
   OAuthClientProvider,
 } from '@ai-sdk/mcp'
 import { UnauthorizedError } from '@ai-sdk/mcp'
-import type { McpHttpServer } from '@/types/pyrola/mcp-config'
+import type { McpHttpServer } from '@/types/vixl/mcp-config'
 import parseMcpIcons from '@/services/mcp/parse-mcp-icons'
-import type { McpServerState, McpToolInfo } from '@/services/pyrola/pyrola-tauri'
+import type { McpServerState, McpToolInfo } from '@/services/vixl/vixl-tauri'
 import type { McpIcon } from '@/types/mcp/mcp-icon'
 
 type McpElicitationHandler = (

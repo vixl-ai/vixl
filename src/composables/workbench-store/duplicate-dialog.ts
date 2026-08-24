@@ -1,6 +1,6 @@
 import { toast } from 'vue-sonner'
-import type { PyrolaDuplicateTabBehavior } from '@/types/pyrola/pyrola-settings'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import type { VixlDuplicateTabBehavior } from '@/types/vixl/vixl-settings'
+import useVixlConfig from '@/composables/use-vixl-config'
 import { findTab } from './helpers'
 import {
   duplicateDialog,
@@ -18,7 +18,7 @@ export const resolveWorkbenchTabOpen = async (
     return 'new'
   }
 
-  const config = usePyrolaConfig()
+  const config = useVixlConfig()
   const behavior =
     config.effectiveSettings.value['workbench.duplicateTabBehavior'] ?? 'ask'
 
@@ -58,11 +58,11 @@ export const confirmDuplicateTabChoice = async (
     return
   }
 
-  const behavior: PyrolaDuplicateTabBehavior =
+  const behavior: VixlDuplicateTabBehavior =
     choice === 'existing' ? 'open-existing' : 'open-new'
 
   try {
-    const config = usePyrolaConfig()
+    const config = useVixlConfig()
     await config.updateSetting('personal', 'workbench.duplicateTabBehavior', behavior)
   } catch (error) {
     toast.error('Failed to save preference', {

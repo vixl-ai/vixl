@@ -1,5 +1,5 @@
 import parsePlan from '@/services/plans/parse-plan'
-import { fsReadFile, fsWriteFile } from '@/services/pyrola/pyrola-tauri'
+import { fsReadFile, fsWriteFile } from '@/services/vixl/vixl-tauri'
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/
 

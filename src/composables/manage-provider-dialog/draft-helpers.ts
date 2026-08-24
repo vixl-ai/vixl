@@ -3,7 +3,7 @@ import type {
   KeyValueRow,
   ModelDraft,
   PricingDraft,
-  PyrolaCustomProviderModel,
+  VixlCustomProviderModel,
 } from './types'
 
 export const createEmptyPricing = (): PricingDraft => ({
@@ -137,7 +137,7 @@ export const rowsToRecord = (rows: KeyValueRow[]): Record<string, string> | unde
   return Object.keys(next).length > 0 ? next : undefined
 }
 
-export const modelToDraft = (model: PyrolaCustomProviderModel): ModelDraft => ({
+export const modelToDraft = (model: VixlCustomProviderModel): ModelDraft => ({
   id: model.id,
   name: model.name ?? '',
   maxInputTokens: model.maxInputTokens?.toString() ?? '',
@@ -161,8 +161,8 @@ export const modelToDraft = (model: PyrolaCustomProviderModel): ModelDraft => ({
   advancedOpen: false,
 })
 
-export const draftToModel = (draft: ModelDraft): PyrolaCustomProviderModel => {
-  const model: PyrolaCustomProviderModel = {
+export const draftToModel = (draft: ModelDraft): VixlCustomProviderModel => {
+  const model: VixlCustomProviderModel = {
     id: draft.id.trim(),
   }
   if (draft.name.trim()) {

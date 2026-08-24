@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { workspaceGlob } from '@/services/pyrola/pyrola-tauri'
+import { workspaceGlob } from '@/services/vixl/vixl-tauri'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const globFiles = (ctx: HarnessToolContext) =>

@@ -4,7 +4,7 @@ import {
   formatStudioSchemaError,
   type CreateStudioInput,
 } from '@/schemas/studio-document'
-import { fsWriteFile, getPyrolaDir } from '@/services/pyrola/pyrola-tauri'
+import { fsWriteFile, getVixlDir } from '@/services/vixl/vixl-tauri'
 import validateStudioSlug from '@/services/studio/validate-studio-slug'
 
 type WriteStudioArgs = CreateStudioInput & {
@@ -61,12 +61,12 @@ export default async (input: WriteStudioArgs): Promise<WriteStudioResult> => {
     createdAt,
   })
 
-  // Nested index.md so list_pyrola_files (studio) can discover the artifact.
+  // Nested index.md so list_vixl_files (studio) can discover the artifact.
   if (input.scope === 'project') {
     if (!input.projectRoot) {
       throw new Error('projectRoot is required for project-scoped studio documents')
     }
-    const path = `.pyrola/studio/${slug}/index.md`
+    const path = `.vixl/studio/${slug}/index.md`
     await fsWriteFile({
       projectRoot: input.projectRoot,
       path,
@@ -75,7 +75,7 @@ export default async (input: WriteStudioArgs): Promise<WriteStudioResult> => {
     return { slug, path }
   }
 
-  const personalDir = await getPyrolaDir('personal')
+  const personalDir = await getVixlDir('personal')
   const path = `studio/${slug}/index.md`
   await fsWriteFile({
     projectRoot: personalDir,

@@ -66,8 +66,8 @@ pub use mcp::{
 };
 pub use oauth::{oauth_begin_loopback, oauth_cancel_loopback, open_external_url, OAuthLoopbackState};
 pub use paths::{
-  get_default_workspace_root, get_pyrola_dir, get_user_pyrola_dir, has_project_pyrola,
-  list_project_files, list_pyrola_files,
+  get_default_workspace_root, get_vixl_dir, get_user_vixl_dir, has_project_vixl,
+  list_project_files, list_vixl_files,
 };
 pub use registry::{
   get_active_project, open_project_at_path, open_project_at_path_command, registry_add_project,
@@ -79,4 +79,4 @@ pub use shell::{
   reveal_in_folder, shell_kill_pty, shell_kill_tracked, shell_resize_pty, shell_spawn_pty,
   shell_spawn_tracked, shell_write_pty,
 };
-pub use watch::{watch_pyrola_paths, WatchState};
+pub use watch::{watch_vixl_paths, WatchState};

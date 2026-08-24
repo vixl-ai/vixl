@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { fsListDir } from '@/services/pyrola/pyrola-tauri'
+import { fsListDir } from '@/services/vixl/vixl-tauri'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const listDir = (ctx: HarnessToolContext) =>

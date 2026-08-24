@@ -11,7 +11,7 @@ import {
 } from '@/services/harness/permission/question-gate'
 import { chatMetaSchema } from '@/schemas/chat-meta'
 import { fileDiffListSchema } from '@/schemas/file-diff'
-import { updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import type { ChatSession } from './types'
 
 export const sessions = new Map<string, ChatSession>()

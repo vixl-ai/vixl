@@ -3,7 +3,7 @@ import type {
   McpInputDefinition,
   McpServerConfig,
   McpServerScope,
-} from '@/types/pyrola/mcp-config'
+} from '@/types/vixl/mcp-config'
 import { defaultMcpConfig } from '@/schemas/mcp-config'
 import { isInternalMcpServer } from '@/types/codegraph/managed-codegraph'
 

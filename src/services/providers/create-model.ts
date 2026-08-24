@@ -4,20 +4,20 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { createGateway } from '@ai-sdk/gateway'
 import type { LanguageModel } from 'ai'
-import type { PyrolaCustomProvider, PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlCustomProvider, VixlSettings } from '@/types/vixl/vixl-settings'
 import {
   getCustomProvider,
   getProviderCatalogEntry,
   keychainKeyForProvider,
 } from '@/services/providers/registry'
-import { getSecret } from '@/services/pyrola/pyrola-tauri'
+import { getSecret } from '@/services/vixl/vixl-tauri'
 import proxyFetch from '@/services/providers/proxy-fetch'
 import serializeOriginFetch from '@/services/providers/serialize-origin-fetch'
 
 export type CreateModelInput = {
   providerId: string
   modelId: string
-  settings: PyrolaSettings
+  settings: VixlSettings
   apiKey?: string
   /** Disable native thinking/reasoning for short side tasks (titles, etc.). */
   disableThinking?: boolean
@@ -43,7 +43,7 @@ const disableThinkingTransform = (
 
 const resolveApiKey = async (
   providerId: string,
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   override?: string,
 ): Promise<string> => {
   if (override) {
@@ -52,7 +52,7 @@ const resolveApiKey = async (
   const custom = getCustomProvider(settings, providerId)
   const ref =
     custom?.apiKeyRef ??
-    (settings[`providers.${providerId}.apiKeyRef` as keyof PyrolaSettings] as string | undefined)
+    (settings[`providers.${providerId}.apiKeyRef` as keyof VixlSettings] as string | undefined)
   if (!ref) {
     return ''
   }
@@ -60,7 +60,7 @@ const resolveApiKey = async (
 }
 
 const mergeHeaders = (
-  custom: PyrolaCustomProvider,
+  custom: VixlCustomProvider,
   modelId: string,
 ): Record<string, string> | undefined => {
   const modelHeaders = custom.models?.find((model) => model.id === modelId)?.headers

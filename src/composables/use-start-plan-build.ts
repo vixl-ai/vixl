@@ -3,7 +3,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import useChatStore from '@/composables/use-chat-store'
 import useFleetRegistry from '@/composables/use-fleet-registry'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
 import { resolveReasoningForRole } from '@/services/models/resolve-reasoning-for-call'
@@ -14,8 +14,8 @@ import {
   clearAwaitingPlanGo,
   setSubagentModelLock,
 } from '@/services/harness/plan-execution-session'
-import { readChatMeta, updateChatMeta } from '@/services/pyrola/pyrola-tauri'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import { readChatMeta, updateChatMeta } from '@/services/vixl/vixl-tauri'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 
 export type PlanExecutionMode = 'agent' | 'orchestrator'
@@ -36,7 +36,7 @@ export default () => {
   const router = useRouter()
   const fleet = useFleetRegistry()
   const chatStore = useChatStore()
-  const config = usePyrolaConfig()
+  const config = useVixlConfig()
   const building = ref(false)
 
   const resolveExistingChatId = async (
@@ -68,7 +68,7 @@ export default () => {
 
     const executionMode = input.executionMode ?? 'agent'
     const modelRole = executionMode === 'orchestrator' ? 'orchestrator' : 'agent'
-    const chatMode: PyrolaChatMode =
+    const chatMode: VixlChatMode =
       executionMode === 'orchestrator' ? 'orchestrator' : 'agent'
     const model =
       input.model?.trim() ||

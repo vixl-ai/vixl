@@ -1,7 +1,7 @@
 import type { ChatStatus, ModelMessage } from 'ai'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type { SubagentResult } from '@/types/harness/subagent-record'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import { fileDiffListSchema } from '@/schemas/file-diff'
 import buildTools from '@/services/harness/build-tools'
 import formatToolValidationError from '@/services/harness/format-tool-validation-error'
@@ -32,7 +32,7 @@ export const deriveToolDiffs = (result: unknown): FileDiff[] | undefined => {
 }
 
 export const filterToolsForMode = (
-  mode: PyrolaChatMode,
+  mode: VixlChatMode,
   tools: ReturnType<typeof buildTools>,
   options?: { awaitingPlanGo?: boolean },
 ): Partial<ReturnType<typeof buildTools>> => {

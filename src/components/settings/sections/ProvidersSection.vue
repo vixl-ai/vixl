@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SettingsTab } from '@/composables/use-pyrola-config'
+import type { SettingsTab } from '@/composables/use-vixl-config'
 import { KeyRound, Loader2, Pencil, Plus, RefreshCw, Settings2, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import {

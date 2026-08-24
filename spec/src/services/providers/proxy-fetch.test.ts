@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 import { mockTauriCore } from '../../test-utils/mocks/tauri-core'
 
 const { httpProxyRequest, invoke, isTauri } = vi.hoisted(() => {
@@ -18,8 +18,8 @@ vi.mock('@tauri-apps/api/core', () =>
   }),
 )
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     httpProxyRequest,
     isTauri,
   }),

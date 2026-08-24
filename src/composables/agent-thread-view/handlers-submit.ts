@@ -1,6 +1,6 @@
 import { toast } from 'vue-sonner'
 import type { PermissionLevel } from '@/types/harness/permission'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { FileCheckpointFilePolicy } from '@/types/harness/file-checkpoint'
@@ -10,7 +10,7 @@ import type { AgentThreadViewState } from './types'
 export const createSubmitHandlers = (state: AgentThreadViewState) => {
   const handleSubmit = async (payload: {
     text: string
-    mode: PyrolaChatMode
+    mode: VixlChatMode
     model: string
     reasoning?: ReasoningLevel
     files?: FileUIPart[]
@@ -42,7 +42,7 @@ export const createSubmitHandlers = (state: AgentThreadViewState) => {
 
   const handleSubmitEdit = async (payload: {
     text: string
-    mode: PyrolaChatMode
+    mode: VixlChatMode
     model: string
     reasoning?: ReasoningLevel
   }): Promise<void> => {

@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import { pyrolaFileChangeToken } from '@/composables/use-pyrola-live-sync'
+import { vixlFileChangeToken } from '@/composables/use-vixl-live-sync'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import { listUserAndProjectSkillIndex } from '@/services/skills/skill-registry'
 import formatUnknownError from '@/utils/format-unknown-error'
@@ -31,7 +31,7 @@ export default () => {
   }
 
   watch(
-    [() => fleet.activeProject.value?.id, pyrolaFileChangeToken],
+    [() => fleet.activeProject.value?.id, vixlFileChangeToken],
     () => {
       refresh().catch((error) => {
         toast.error('Failed to load skills', {

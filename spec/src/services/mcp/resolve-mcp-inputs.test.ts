@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { McpHttpServer, McpStdioServer } from '@/types/pyrola/mcp-config'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import type { McpHttpServer, McpStdioServer } from '@/types/vixl/mcp-config'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 const { getSecret, setSecret, deleteSecret } = vi.hoisted(() => ({
   getSecret: vi.fn<(key: string) => Promise<string | null>>(),
@@ -8,8 +8,8 @@ const { getSecret, setSecret, deleteSecret } = vi.hoisted(() => ({
   deleteSecret: vi.fn<(key: string) => Promise<void>>(),
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     getSecret,
     setSecret,
     deleteSecret,
@@ -58,7 +58,7 @@ describe('resolve-mcp-inputs', () => {
 
   it('loads and saves input values via keychain', async () => {
     getSecret.mockImplementation(async (key) => {
-      if (key === 'pyrola:mcp:github:input:token') {
+      if (key === 'vixl:mcp:github:input:token') {
         return 'stored'
       }
       return null
@@ -70,10 +70,10 @@ describe('resolve-mcp-inputs', () => {
       values: { token: 'stored' },
       missing: ['missing'],
     })
-    expect(getSecret).toHaveBeenCalledWith('pyrola:mcp:github:input:token')
-    expect(getSecret).toHaveBeenCalledWith('pyrola:mcp:github:input:missing')
+    expect(getSecret).toHaveBeenCalledWith('vixl:mcp:github:input:token')
+    expect(getSecret).toHaveBeenCalledWith('vixl:mcp:github:input:missing')
 
     await saveMcpInputValues('github', { token: 'next' })
-    expect(setSecret).toHaveBeenCalledWith('pyrola:mcp:github:input:token', 'next')
+    expect(setSecret).toHaveBeenCalledWith('vixl:mcp:github:input:token', 'next')
   })
 })

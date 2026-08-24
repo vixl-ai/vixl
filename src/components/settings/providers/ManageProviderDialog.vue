@@ -25,14 +25,14 @@ import {
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
 import SettingsInputPasswordInput from '@/components/settings/input/PasswordInput.vue'
-import type { PyrolaCustomProvider } from '@/types/pyrola/pyrola-settings'
+import type { VixlCustomProvider } from '@/types/vixl/vixl-settings'
 import useManageProviderDialog from '@/composables/manage-provider-dialog'
 
 const props = defineProps<{
   open: boolean
   mode: 'create' | 'edit'
   providerId?: string | null
-  initialProvider?: PyrolaCustomProvider | null
+  initialProvider?: VixlCustomProvider | null
   initialApiKeyConfigured?: boolean
   resolveStoredApiKey?: () => Promise<string>
 }>()
@@ -42,7 +42,7 @@ const emit = defineEmits<{
   save: [
     payload: {
       providerId: string
-      provider: PyrolaCustomProvider
+      provider: VixlCustomProvider
       apiKey: string | null
       clearApiKey: boolean
     },

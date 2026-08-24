@@ -8,7 +8,7 @@ import wrapUntrustedWebContent from '@/services/harness/web/wrap-untrusted'
 import { gateToolPermission } from '@/services/harness/permission/gate'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
 import withToolExamples from '@/services/harness/with-tool-examples'
-import webFetch from '@/services/pyrola/pyrola-tauri/web-fetch'
+import webFetch from '@/services/vixl/vixl-tauri/web-fetch'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { WebFetchFormat } from '@/types/harness/web-content'
 

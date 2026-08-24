@@ -1,4 +1,4 @@
-import { truncateChatLog } from '@/services/pyrola/pyrola-tauri'
+import { truncateChatLog } from '@/services/vixl/vixl-tauri'
 
 export const truncateChatLogBeforeMessage = async (
   projectSlug: string,

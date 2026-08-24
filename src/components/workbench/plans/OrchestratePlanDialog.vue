@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/shadcn/ui/dialog'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
 
@@ -28,7 +28,7 @@ const emit = defineEmits<{
   }]
 }>()
 
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const parentModel = ref('')
 const subagentModel = ref('')
 

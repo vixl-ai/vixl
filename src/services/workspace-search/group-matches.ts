@@ -1,4 +1,4 @@
-import type { GrepMatch } from '@/services/pyrola/pyrola-tauri'
+import type { GrepMatch } from '@/services/vixl/vixl-tauri'
 import type { SearchFileGroup } from '@/types/workbench/search-file-group'
 
 export default (matches: GrepMatch[]): SearchFileGroup[] => {

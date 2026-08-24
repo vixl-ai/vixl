@@ -1,7 +1,7 @@
 //! CEF Client + LifeSpanHandler for Alloy child browsers.
 //!
 //! Child NSViews must not propagate OS close to the parent NSWindow. Default
-//! `DoClose` returns 0, so CEF calls `performClose:` on the main Pyrola window
+//! `DoClose` returns 0, so CEF calls `performClose:` on the main Vixl window
 //! when `close_browser` runs. Returning 1 treats close as handled and skips
 //! that parent-window notification.
 

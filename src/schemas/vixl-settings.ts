@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { PermissionCapabilityKey } from '@/types/harness/permission'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import serializeModelRef from '@/utils/serialize-model-ref'
 import parseModelRef from '@/utils/parse-model-ref'
 import { MODEL_REF_SEPARATOR } from '@/types/models/model-ref'
@@ -22,7 +22,7 @@ const permissionCapabilitySchema = z.custom<PermissionCapabilityKey>(
   (value): value is PermissionCapabilityKey => typeof value === 'string' && value.length > 0,
 )
 
-export const pyrolaSettingsSchema = z
+export const vixlSettingsSchema = z
   .object({
     version: z.literal(1),
     'appearance.theme': themeSchema.optional(),
@@ -48,7 +48,6 @@ export const pyrolaSettingsSchema = z
       .optional(),
     'agent.sandbox.enabled': z.boolean().optional(),
     'agent.sandbox.network': z.enum(['deny', 'allow']).optional(),
-    'general.machineLabel': z.string().optional(),
     'lsp.autoDownload': z.boolean().optional(),
     'workspace.trust': z
       .array(
@@ -91,19 +90,19 @@ export const pyrolaSettingsSchema = z
     ]),
   )
 
-export const validatePyrolaSettings = (
+export const validateVixlSettings = (
   settings: unknown,
-): { success: true; data: PyrolaSettings } | { success: false; error: string } => {
-  const parsed = pyrolaSettingsSchema.safeParse(settings)
+): { success: true; data: VixlSettings } | { success: false; error: string } => {
+  const parsed = vixlSettingsSchema.safeParse(settings)
   if (!parsed.success) {
     return {
       success: false,
       error: formatCustomProviderSchemaError(parsed.error),
     }
   }
-  return { success: true, data: parsed.data as PyrolaSettings }
+  return { success: true, data: parsed.data as VixlSettings }
 }
-export const defaultPyrolaSettings = (): PyrolaSettings => ({
+export const defaultVixlSettings = (): VixlSettings => ({
   version: 1,
   'appearance.theme': 'system',
   'agent.autoApproveGlobs': [],
@@ -167,13 +166,14 @@ const migrateDeprecatedModelKeys = (record: Record<string, unknown>): Record<str
   delete next['agent.defaultMode']
   delete next['fleet.maxConcurrentAgents']
   delete next['fleet.trayBackground']
+  delete next['general.machineLabel']
 
   return next
 }
 
-export const migratePyrolaSettings = (raw: unknown): PyrolaSettings => {
+export const migrateVixlSettings = (raw: unknown): VixlSettings => {
   if (typeof raw !== 'object' || raw === null) {
-    return defaultPyrolaSettings()
+    return defaultVixlSettings()
   }
 
   const record = raw as Record<string, unknown>
@@ -181,13 +181,13 @@ export const migratePyrolaSettings = (raw: unknown): PyrolaSettings => {
 
   if (version === 1) {
     const migratedRecord = migrateDeprecatedModelKeys(record)
-    const parsed = pyrolaSettingsSchema.safeParse(migratedRecord)
+    const parsed = vixlSettingsSchema.safeParse(migratedRecord)
     if (parsed.success) {
-      return { ...defaultPyrolaSettings(), ...parsed.data }
+      return { ...defaultVixlSettings(), ...parsed.data }
     }
   }
 
-  return defaultPyrolaSettings()
+  return defaultVixlSettings()
 }
 
 export const normalizeStoredModelRef = (

@@ -7,7 +7,7 @@ import type { ContextMention } from '@/types/harness/context-mention'
 
 const browserElementMention: ContextMention = {
   type: 'browser-element',
-  screenshotPath: '/tmp/pyrola/screenshots/element.png',
+  screenshotPath: '/tmp/vixl/screenshots/element.png',
   detail: {
     xpath: '/html[1]/body[1]/button[1]',
     cssSelector: 'button.submit',
@@ -20,7 +20,7 @@ const browserElementMention: ContextMention = {
       color: 'rgb(0, 0, 0)',
     },
     componentHint: null,
-    screenshotPath: '/tmp/pyrola/screenshots/element.png',
+    screenshotPath: '/tmp/vixl/screenshots/element.png',
     outerHTML: null,
     innerText: null,
     pageUrl: null,
@@ -39,7 +39,7 @@ describe('format-mentions browser-element', () => {
     expect(text).toContain('attributes: type=submit; class=primary')
     expect(text).toContain('boundingBox: 10,20 100,40')
     expect(text).toContain('computedStyles: display: inline-block; color: rgb(0, 0, 0)')
-    expect(text).toContain('screenshot: /tmp/pyrola/screenshots/element.png')
+    expect(text).toContain('screenshot: /tmp/vixl/screenshots/element.png')
   })
 
   it('includes browser-element in formatMentionBlocks mentions', () => {
@@ -50,6 +50,6 @@ describe('format-mentions browser-element', () => {
 
     expect(blocks.skills).toBe('Skill ask')
     expect(blocks.mentions).toContain('Browser element button')
-    expect(blocks.mentions).toContain('screenshot: /tmp/pyrola/screenshots/element.png')
+    expect(blocks.mentions).toContain('screenshot: /tmp/vixl/screenshots/element.png')
   })
 })

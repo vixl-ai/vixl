@@ -35,7 +35,7 @@ describe('mcp-trust fingerprint', () => {
     const settings = {
       version: 1,
       'agent.mcp.trust': upsertMcpTrustRecord([], 'brave', 'always', 'fp-a'),
-    } as import('@/types/pyrola/pyrola-settings').PyrolaSettings
+    } as import('@/types/vixl/vixl-settings').VixlSettings
     expect(isMcpTrusted(settings, 'brave', 'fp-a')).toBe(true)
     expect(isMcpTrusted(settings, 'brave', 'fp-b')).toBe(false)
   })

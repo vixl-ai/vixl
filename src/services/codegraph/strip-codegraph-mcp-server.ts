@@ -1,4 +1,4 @@
-import type { McpConfig } from '@/types/pyrola/mcp-config'
+import type { McpConfig } from '@/types/vixl/mcp-config'
 import { CODEGRAPH_SERVER_ID } from '@/types/codegraph/managed-codegraph'
 
 /** Remove the reserved internal CodeGraph id from persisted MCP config. */

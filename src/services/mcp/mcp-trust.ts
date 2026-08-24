@@ -1,17 +1,17 @@
 import type { McpTrustRecord, McpTrustScope } from '@/types/harness/permission'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 /** sessionId -> fingerprint trusted for this app session */
 export const sessionTrusts = new Map<string, string>()
 
 export const getMcpTrust = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   serverId: string,
 ): McpTrustRecord | undefined =>
   (settings['agent.mcp.trust'] ?? []).find((record) => record.serverId === serverId)
 
 export const isMcpTrusted = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   serverId: string,
   fingerprint: string,
   trustedInSession: Map<string, string> = sessionTrusts,

@@ -21,9 +21,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
-import PyrolaFileCreateSheet from '@/components/settings/pyrola-files/PyrolaFileCreateSheet.vue'
+import VixlFileCreateSheet from '@/components/settings/vixl-files/VixlFileCreateSheet.vue'
 import createPlan from '@/services/plans/write-plan'
-import { fsWriteFile, getPyrolaDir } from '@/services/pyrola/pyrola-tauri'
+import { fsWriteFile, getVixlDir } from '@/services/vixl/vixl-tauri'
 import type { PlanTodoItem } from '@/types/plans/plan-document'
 
 const planFormSchema = toTypedSchema(
@@ -89,8 +89,8 @@ const onSubmit = handleSubmit(async (values) => {
     })
 
     if (props.scope === 'personal') {
-      const personalDir = await getPyrolaDir('personal')
-      const path = plan.path.replace(/^\.pyrola\//, '')
+      const personalDir = await getVixlDir('personal')
+      const path = plan.path.replace(/^\.vixl\//, '')
       await fsWriteFile({
         projectRoot: personalDir,
         path,
@@ -121,7 +121,7 @@ const onSubmit = handleSubmit(async (values) => {
 </script>
 
 <template>
-  <PyrolaFileCreateSheet
+  <VixlFileCreateSheet
     :open="open"
     @update:open="emit('update:open', $event)"
   >
@@ -199,5 +199,5 @@ const onSubmit = handleSubmit(async (values) => {
         {{ saving ? 'Creating...' : 'Create plan' }}
       </Button>
     </form>
-  </PyrolaFileCreateSheet>
+  </VixlFileCreateSheet>
 </template>

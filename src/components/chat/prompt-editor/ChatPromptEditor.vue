@@ -16,7 +16,7 @@ import ChatMentionSuggestionList from '@/components/chat/prompt-editor/ChatMenti
 import ChatSkillSuggestionList from '@/components/chat/prompt-editor/ChatSkillSuggestionList.vue'
 import useChatContextBudgetSync from '@/composables/use-chat-context-budget-sync'
 import useChatPromptEditor from '@/composables/use-chat-prompt-editor'
-import { pyrolaFileChangeToken } from '@/composables/use-pyrola-live-sync'
+import { vixlFileChangeToken } from '@/composables/use-vixl-live-sync'
 import createChatMentionExtension from '@/utils/chat-mention-extension'
 import contextMentionFromNode from '@/utils/context-mention-from-node'
 import searchWorkspaceFiles from '@/utils/search-workspace-files'
@@ -54,7 +54,7 @@ const refreshSlashSkills = async (): Promise<void> => {
 }
 
 watch(
-  [() => props.projectRoot, pyrolaFileChangeToken],
+  [() => props.projectRoot, vixlFileChangeToken],
   () => {
     refreshSlashSkills().catch((error) => {
       toast.error('Failed to load skills', {

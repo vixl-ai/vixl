@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 import type { FleetProject } from '@/types/fleet/fleet-project'
 import type { BrowserPayload } from '@/types/workbench/workbench-tab'
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     registryListProjects: vi.fn<() => Promise<unknown[]>>(async () => []),
     getActiveProjectId: vi.fn<() => Promise<string | null>>(async () => null),
     getUserHomeDir: vi.fn<() => Promise<string>>(async () => '/home/test'),

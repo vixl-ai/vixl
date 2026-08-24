@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { gitStatus as gitStatusCommand } from '@/services/pyrola/pyrola-tauri'
+import { gitStatus as gitStatusCommand } from '@/services/vixl/vixl-tauri'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const gitStatus = (ctx: HarnessToolContext) =>

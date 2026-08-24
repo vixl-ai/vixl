@@ -1,11 +1,11 @@
 import { computed } from 'vue'
 import type { ChatMeta } from '@/types/chat/chat-meta'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import {
   createChat,
   listChats,
   readChatMeta,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import {
   activeKey,
   clearCompletedOrErrorAttention,
@@ -122,7 +122,7 @@ const useChatStore = () => {
   const createNewChat = async (args: {
     projectSlug: string
     projectRoot: string
-    mode: PyrolaChatMode
+    mode: VixlChatMode
     model: string
     title?: string
   }): Promise<ChatMeta> => {

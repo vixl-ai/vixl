@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelMessage } from 'ai'
 import type { ModelRef } from '@/types/models/model-ref'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import { compactBudgets } from '@/services/harness/compact'
 
@@ -43,7 +43,7 @@ const settings = {
     baseURL: 'http://127.0.0.1:11434/v1',
     models: [{ id: 'qwen', contextWindow: 262144 }],
   },
-} as PyrolaSettings
+} as VixlSettings
 
 const hugeContent = 'x'.repeat(800_000)
 

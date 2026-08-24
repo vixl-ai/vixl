@@ -3,15 +3,15 @@ import {
   decidePermission,
   isStickyShellElevation,
 } from '@/services/harness/permission/policy'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const baseSettings = (
-  permissions: PyrolaSettings['agent.permissions'] = [],
-): PyrolaSettings =>
+  permissions: VixlSettings['agent.permissions'] = [],
+): VixlSettings =>
   ({
     version: 1,
     'agent.permissions': permissions,
-  }) as PyrolaSettings
+  }) as VixlSettings
 
 describe('decidePermission web.fetch', () => {
   it('asks by default', () => {

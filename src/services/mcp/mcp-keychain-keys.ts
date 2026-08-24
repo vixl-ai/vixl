@@ -1,4 +1,4 @@
-const PREFIX = 'pyrola:mcp:'
+const PREFIX = 'vixl:mcp:'
 
 export const mcpOAuthTokensKey = (serverId: string): string =>
   `${PREFIX}${serverId}:oauth:tokens`

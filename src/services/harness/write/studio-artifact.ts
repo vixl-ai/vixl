@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { fsWriteFile } from '@/services/pyrola/pyrola-tauri'
+import { fsWriteFile } from '@/services/vixl/vixl-tauri'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import isStudioHtmlContent from '@/services/studio/is-studio-html-content'
 import parseStudioArtifact from '@/services/studio/parse-studio-artifact'
@@ -13,7 +13,7 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 const writeStudioArtifact = (ctx: HarnessToolContext) =>
   tool({
     description: withToolExamples(
-      'Publish a Comark studio artifact to .pyrola/studio/<slug>/index.md. Call load_skill("studio-blocks") for the block catalog. Optional data sidecar writes data.json. Never use HTML.',
+      'Publish a Comark studio artifact to .vixl/studio/<slug>/index.md. Call load_skill("studio-blocks") for the block catalog. Optional data sidecar writes data.json. Never use HTML.',
       [
         {
           slug: 'launch-brief',
@@ -62,12 +62,12 @@ const writeStudioArtifact = (ctx: HarnessToolContext) =>
         }
       }
 
-      const path = `.pyrola/studio/${slug}/index.md`
+      const path = `.vixl/studio/${slug}/index.md`
       await fsWriteFile({ projectRoot: ctx.projectRoot, path, content })
       if (sidecar) {
         await fsWriteFile({
           projectRoot: ctx.projectRoot,
-          path: `.pyrola/studio/${slug}/data.json`,
+          path: `.vixl/studio/${slug}/data.json`,
           content: `${JSON.stringify(sidecar, null, 2)}\n`,
         })
       }
@@ -81,7 +81,7 @@ const writeStudioArtifact = (ctx: HarnessToolContext) =>
       return {
         slug,
         path,
-        dataPath: sidecar ? `.pyrola/studio/${slug}/data.json` : null,
+        dataPath: sidecar ? `.vixl/studio/${slug}/data.json` : null,
       }
     },
   })

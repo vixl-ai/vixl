@@ -5,7 +5,7 @@ import type {
   ResolveCatalogMatchesOptions,
   ResolveCatalogMatchesResult,
 } from '@/types/models/resolve-catalog-matches-result'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { isModelAllowed } from '@/services/models/model-catalog-options'
 import { resolveModelForRole } from '@/services/models/resolve-model-for-role'
 import humanizeModelId from '@/utils/humanize-model-id'
@@ -29,7 +29,7 @@ const modelDisplayName = (model: ModelRef): string => {
 
 const filterAllowedGroups = (
   groups: ProviderModelGroup[],
-  settings: PyrolaSettings,
+  settings: VixlSettings,
 ): ProviderModelGroup[] => {
   const next: ProviderModelGroup[] = []
   for (const group of groups) {
@@ -86,7 +86,7 @@ const pickBest = (matches: CatalogMatch[]): string | undefined => {
 }
 
 const resolveSuggestedForProvider = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   providerId: string,
 ): string | undefined => {
   const serialized = resolveModelForRole('subagent', settings)
@@ -105,7 +105,7 @@ const resolveSuggestedForProvider = (
 
 const resolveCatalogMatches = (
   groups: ProviderModelGroup[],
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   options: ResolveCatalogMatchesOptions,
 ): ResolveCatalogMatchesResult => {
   const query = options.query?.trim() ?? ''

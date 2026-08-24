@@ -1,5 +1,5 @@
-import type { McpServerConfig } from '@/types/pyrola/mcp-config'
-import { isMcpHttpServer, isMcpStdioServer } from '@/types/pyrola/mcp-config'
+import type { McpServerConfig } from '@/types/vixl/mcp-config'
+import { isMcpHttpServer, isMcpStdioServer } from '@/types/vixl/mcp-config'
 
 const normalizeArgs = (args: string[] | undefined): string[] =>
   (args ?? []).map((arg) => arg.trim())

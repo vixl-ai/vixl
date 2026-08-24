@@ -4,7 +4,7 @@ import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { HarnessStreamInput } from '@/types/harness/harness-stream-input'
 import { isReasoningLevel } from '@/types/models/reasoning-level'
 import createModel from '@/services/providers/create-model'
-import { readChatMeta, updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { readChatMeta, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import assembleSystemPromptParts, {
   formatMentionsAsText,
   joinSystemPromptParts,

@@ -1,7 +1,7 @@
 import type { ModelRef } from '@/types/models/model-ref'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import { isReasoningLevel } from '@/types/models/reasoning-level'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { getCustomProvider } from '@/services/providers/registry'
 import resolveBuiltinReasoningCapability from '@/services/models/resolve-builtin-model-capabilities'
 
@@ -49,7 +49,7 @@ const fromLiveMetadata = (ref: ModelRef): ReasoningCapability | null => {
 }
 
 export const resolveReasoningCapability = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef | null | undefined,
 ): ReasoningCapability => {
   if (!ref) {

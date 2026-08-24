@@ -3,33 +3,33 @@ use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Manager};
 
-const PYROLA_DIR: &str = ".pyrola";
+const VIXL_DIR: &str = ".vixl";
 
-pub fn user_pyrola_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub fn user_vixl_dir(app: &AppHandle) -> Result<PathBuf, String> {
   let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
-  let dir = app_data.join(PYROLA_DIR);
+  let dir = app_data.join(VIXL_DIR);
   fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
   Ok(dir)
 }
 
-pub fn project_pyrola_dir(root_path: &str) -> PathBuf {
-  Path::new(root_path).join(PYROLA_DIR)
+pub fn project_vixl_dir(root_path: &str) -> PathBuf {
+  Path::new(root_path).join(VIXL_DIR)
 }
 
-fn pyrola_dir_has_config(pyrola_dir: &Path) -> bool {
-  pyrola_dir.join("mcp.json").exists() || pyrola_dir.join("settings.json").exists()
+fn vixl_dir_has_config(vixl_dir: &Path) -> bool {
+  vixl_dir.join("mcp.json").exists() || vixl_dir.join("settings.json").exists()
 }
 
-pub fn resolve_project_pyrola_dir(root_path: &str) -> PathBuf {
+pub fn resolve_project_vixl_dir(root_path: &str) -> PathBuf {
   let mut current = PathBuf::from(root_path);
-  let mut fallback = project_pyrola_dir(root_path);
+  let mut fallback = project_vixl_dir(root_path);
 
   for _ in 0..8 {
-    let pyrola_dir = current.join(PYROLA_DIR);
-    if pyrola_dir.is_dir() {
-      fallback = pyrola_dir.clone();
-      if pyrola_dir_has_config(&pyrola_dir) {
-        return pyrola_dir;
+    let vixl_dir = current.join(VIXL_DIR);
+    if vixl_dir.is_dir() {
+      fallback = vixl_dir.clone();
+      if vixl_dir_has_config(&vixl_dir) {
+        return vixl_dir;
       }
     }
     if !current.pop() {
@@ -43,7 +43,7 @@ pub fn resolve_project_pyrola_dir(root_path: &str) -> PathBuf {
 fn find_workspace_root(mut dir: PathBuf) -> PathBuf {
   for _ in 0..8 {
     if dir.join("package.json").exists()
-      && (dir.join("src-tauri").exists() || dir.join(PYROLA_DIR).exists())
+      && (dir.join("src-tauri").exists() || dir.join(VIXL_DIR).exists())
     {
       return dir;
     }
@@ -56,14 +56,14 @@ fn find_workspace_root(mut dir: PathBuf) -> PathBuf {
 }
 
 #[tauri::command]
-pub fn get_user_pyrola_dir(app: AppHandle) -> Result<String, String> {
-  user_pyrola_dir(&app).map(|p| p.to_string_lossy().to_string())
+pub fn get_user_vixl_dir(app: AppHandle) -> Result<String, String> {
+  user_vixl_dir(&app).map(|p| p.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-pub fn has_project_pyrola(root_path: String) -> Result<bool, String> {
-  let pyrola_dir = resolve_project_pyrola_dir(&root_path);
-  Ok(pyrola_dir.is_dir() && pyrola_dir_has_config(&pyrola_dir))
+pub fn has_project_vixl(root_path: String) -> Result<bool, String> {
+  let vixl_dir = resolve_project_vixl_dir(&root_path);
+  Ok(vixl_dir.is_dir() && vixl_dir_has_config(&vixl_dir))
 }
 
 #[tauri::command]
@@ -82,37 +82,37 @@ pub struct ProjectFileEntry {
 }
 
 #[tauri::command]
-pub fn get_pyrola_dir(
+pub fn get_vixl_dir(
   app: AppHandle,
   scope: String,
   root_path: Option<String>,
 ) -> Result<String, String> {
-  pyrola_base_dir(&app, &scope, root_path).map(|path| path.to_string_lossy().to_string())
+  vixl_base_dir(&app, &scope, root_path).map(|path| path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-pub fn list_pyrola_files(
+pub fn list_vixl_files(
   app: AppHandle,
   scope: String,
   kind: String,
   root_path: Option<String>,
 ) -> Result<Vec<ProjectFileEntry>, String> {
-  let base = pyrola_base_dir(&app, &scope, root_path)?;
+  let base = vixl_base_dir(&app, &scope, root_path)?;
   list_files_for_kind(&base, &kind)
 }
 
 #[tauri::command]
 pub fn list_project_files(root_path: String, kind: String) -> Result<Vec<ProjectFileEntry>, String> {
-  let base = resolve_project_pyrola_dir(&root_path);
+  let base = resolve_project_vixl_dir(&root_path);
   list_files_for_kind(&base, &kind)
 }
 
-fn pyrola_base_dir(app: &AppHandle, scope: &str, root_path: Option<String>) -> Result<PathBuf, String> {
+fn vixl_base_dir(app: &AppHandle, scope: &str, root_path: Option<String>) -> Result<PathBuf, String> {
   match scope {
-    "personal" => user_pyrola_dir(app),
+    "personal" => user_vixl_dir(app),
     "project" => {
       let root = root_path.ok_or_else(|| "root_path required for project scope".to_string())?;
-      Ok(resolve_project_pyrola_dir(&root))
+      Ok(resolve_project_vixl_dir(&root))
     }
     other => Err(format!("unknown scope: {other}")),
   }

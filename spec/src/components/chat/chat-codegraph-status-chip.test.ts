@@ -7,7 +7,7 @@ describe('shouldShowChatCodegraphStatusChip', () => {
       shouldShowChatCodegraphStatusChip({
         routeName: 'home-chat',
         routeSlug: '',
-        activeProjectSlug: 'pyrola',
+        activeProjectSlug: 'vixl',
       }),
     ).toBe(false)
   })
@@ -17,7 +17,7 @@ describe('shouldShowChatCodegraphStatusChip', () => {
       shouldShowChatCodegraphStatusChip({
         routeName: 'home-chat-subagent',
         routeSlug: '',
-        activeProjectSlug: 'pyrola',
+        activeProjectSlug: 'vixl',
       }),
     ).toBe(false)
   })
@@ -27,7 +27,7 @@ describe('shouldShowChatCodegraphStatusChip', () => {
       shouldShowChatCodegraphStatusChip({
         routeName: 'chat',
         routeSlug: '_home_',
-        activeProjectSlug: 'pyrola',
+        activeProjectSlug: 'vixl',
       }),
     ).toBe(false)
   })
@@ -36,8 +36,8 @@ describe('shouldShowChatCodegraphStatusChip', () => {
     expect(
       shouldShowChatCodegraphStatusChip({
         routeName: 'chat',
-        routeSlug: 'pyrola',
-        activeProjectSlug: 'pyrola',
+        routeSlug: 'vixl',
+        activeProjectSlug: 'vixl',
       }),
     ).toBe(true)
   })
@@ -46,7 +46,7 @@ describe('shouldShowChatCodegraphStatusChip', () => {
     expect(
       shouldShowChatCodegraphStatusChip({
         routeName: 'chat',
-        routeSlug: 'pyrola',
+        routeSlug: 'vixl',
         activeProjectSlug: null,
       }),
     ).toBe(false)

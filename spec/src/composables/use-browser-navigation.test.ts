@@ -21,7 +21,7 @@ vi.mock('vue-sonner', () => ({
   },
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri/browser', () => ({
+vi.mock('@/services/vixl/vixl-tauri/browser', () => ({
   browserCefNavigate: (sessionId: string, url: string) =>
     browserCefNavigate(sessionId, url),
   browserCefGoBack: (sessionId: string) => browserCefGoBack(sessionId),

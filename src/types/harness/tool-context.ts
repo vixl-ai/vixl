@@ -1,7 +1,7 @@
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { PermissionCapabilityKey, PermissionLevel } from '@/types/harness/permission'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 type HarnessToolContext = {
   projectRoot: string
@@ -11,7 +11,7 @@ type HarnessToolContext = {
   userMessageId?: string
   /** AgentTurn.id for the parent turn (billable usage attribution). */
   turnId?: string
-  settings: PyrolaSettings
+  settings: VixlSettings
   permissionLevel: PermissionLevel
   sessionAllows: Set<string>
   sessionDenies: Set<string>

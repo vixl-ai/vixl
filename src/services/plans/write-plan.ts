@@ -54,7 +54,7 @@ const validatePlanDocument = (frontmatter: unknown, body: string): void => {
 export default (input: CreatePlanInput): CreatePlanResult => {
   const now = new Date()
   const planId = `${slugify(input.title, { lower: true, strict: true }).slice(0, 48) || 'plan'}-${formatTimestamp(now)}`
-  const path = `.pyrola/plans/${planId}/PLAN.md`
+  const path = `.vixl/plans/${planId}/PLAN.md`
   const todos = input.todos ?? []
   const body = input.body.trim()
   const frontmatter = {

@@ -1,5 +1,5 @@
 import * as monaco from 'monaco-editor'
-import { lspRequest } from '@/services/pyrola/pyrola-tauri'
+import { lspRequest } from '@/services/vixl/vixl-tauri'
 import {
   parseLspCompletionItems,
   parseLspHoverContents,

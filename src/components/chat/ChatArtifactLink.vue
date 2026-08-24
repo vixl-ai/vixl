@@ -40,13 +40,13 @@ const displayLabel = computed(() => {
     return props.artifact.label
   }
   if (props.artifact.kind === 'studio') {
-    const match = props.artifact.path.match(/^\.pyrola\/studio\/([^/]+)\//)
+    const match = props.artifact.path.match(/^\.vixl\/studio\/([^/]+)\//)
     if (match?.[1]) {
       return match[1]
     }
   }
   if (props.artifact.kind === 'plan') {
-    const match = props.artifact.path.match(/^\.pyrola\/plans\/([^/]+)\//)
+    const match = props.artifact.path.match(/^\.vixl\/plans\/([^/]+)\//)
     if (match?.[1]) {
       return match[1]
     }
@@ -81,7 +81,7 @@ const handleOpen = async (event: MouseEvent): Promise<void> => {
   try {
     if (props.artifact.kind === 'plan') {
       const planId =
-        props.artifact.path.match(/^\.pyrola\/plans\/([^/]+)\//)?.[1] ??
+        props.artifact.path.match(/^\.vixl\/plans\/([^/]+)\//)?.[1] ??
         displayLabel.value
       workbench.openPlan(id, planId, props.artifact.path, props.artifact.label)
       return
@@ -89,7 +89,7 @@ const handleOpen = async (event: MouseEvent): Promise<void> => {
 
     if (props.artifact.kind === 'studio') {
       const slug =
-        props.artifact.path.match(/^\.pyrola\/studio\/([^/]+)\//)?.[1] ??
+        props.artifact.path.match(/^\.vixl\/studio\/([^/]+)\//)?.[1] ??
         displayLabel.value
       workbench.openStudio(id, slug, props.artifact.path, props.artifact.label)
       return

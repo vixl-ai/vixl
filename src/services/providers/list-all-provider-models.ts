@@ -1,4 +1,4 @@
-import type { PyrolaCustomProvider, PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlCustomProvider, VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ProviderModelGroup } from '@/types/models/provider-model-group'
 import type { ModelRef } from '@/types/models/model-ref'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
@@ -8,7 +8,7 @@ import {
   keychainKeyForProvider,
   providerRequiresApiKey,
 } from '@/services/providers/registry'
-import { getSecret } from '@/services/pyrola/pyrola-tauri'
+import { getSecret } from '@/services/vixl/vixl-tauri'
 import {
   listProviderModels,
   type ParsedModelRow,
@@ -16,7 +16,7 @@ import {
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 
 const getApiKeyRef = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   providerId: string,
 ): string | undefined => {
   const custom = getCustomProvider(settings, providerId)
@@ -28,7 +28,7 @@ const getApiKeyRef = (
 }
 
 const getProviderDisplayName = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   providerId: string,
 ): string => {
   const custom = getCustomProvider(settings, providerId)
@@ -38,7 +38,7 @@ const getProviderDisplayName = (
   return getProviderCatalogEntry(providerId)?.name ?? providerId
 }
 
-const configuredModelIds = (custom: PyrolaCustomProvider | undefined): string[] =>
+const configuredModelIds = (custom: VixlCustomProvider | undefined): string[] =>
   custom?.models?.map((model) => model.id).filter(Boolean) ?? []
 
 const catalogRows = (providerId: string): ParsedModelRow[] =>
@@ -141,7 +141,7 @@ const mergeModelRows = (
 const toModelRefs = (
   providerId: string,
   rows: ParsedModelRow[],
-  custom: PyrolaCustomProvider | undefined,
+  custom: VixlCustomProvider | undefined,
 ): ModelRef[] =>
   rows.map((row) => {
     const configured = custom?.models?.find((model) => model.id === row.id)
@@ -160,7 +160,7 @@ const toModelRefs = (
   })
 
 const loadProviderModelGroup = async (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   providerId: string,
 ): Promise<ProviderModelGroup> => {
   const custom = getCustomProvider(settings, providerId)
@@ -206,7 +206,7 @@ const loadProviderModelGroup = async (
   }
 }
 
-export default async (settings: PyrolaSettings): Promise<ProviderModelGroup[]> => {
+export default async (settings: VixlSettings): Promise<ProviderModelGroup[]> => {
   const providerIds = listConfiguredProviders(settings)
 
   if (providerIds.length === 0) {

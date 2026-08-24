@@ -34,7 +34,7 @@ fn graph_id_for_root_is_stable_sha256_hex() {
 
 #[test]
 fn resolve_graph_delete_dir_rejects_escape() {
-  let store = Path::new("/tmp/pyrola-graphs");
+  let store = Path::new("/tmp/vixl-graphs");
   let valid = "176f69c2e4ca958e8765d14d55f883f62138281d1ac9f3e8545a15b64fdcca1c";
   let resolved = resolve_graph_delete_dir(store, valid).expect("valid id");
   assert_eq!(resolved, store.join(valid));
@@ -50,7 +50,7 @@ fn resolve_graph_delete_dir_rejects_escape() {
 #[test]
 fn rewrite_codegraph_path_maps_project_dir_onto_store() {
   let project = "/Users/aidan/Projects/demo";
-  let store = "/Users/aidan/Library/Application Support/pyrola/.pyrola/graphs/abc";
+  let store = "/Users/aidan/Library/Application Support/vixl/.vixl/graphs/abc";
   assert_eq!(
     rewrite_codegraph_path(
       "/Users/aidan/Projects/demo/.codegraph",
@@ -75,8 +75,8 @@ fn rewrite_codegraph_path_maps_project_dir_onto_store() {
     rewrite_codegraph_path(
       r"C:\work\demo\.codegraph\codegraph.db",
       r"C:\work\demo",
-      r"C:\Users\aidan\pyrola\graphs\abc"
+      r"C:\Users\aidan\vixl\graphs\abc"
     ),
-    r"C:\Users\aidan\pyrola\graphs\abc\codegraph.db"
+    r"C:\Users\aidan\vixl\graphs\abc\codegraph.db"
   );
 }

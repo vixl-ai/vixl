@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import ModelsSearchModelSearchPicker from '@/components/models/search/ModelSearchPicker.vue'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
-import type { SettingsTab } from '@/composables/use-pyrola-config'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import type { SettingsTab } from '@/composables/use-vixl-config'
 
 withDefaults(
   defineProps<{
     modelValue: string
     disabled?: boolean
     compact?: boolean
-    scopeSettings?: PyrolaSettings
+    scopeSettings?: VixlSettings
     placeholder?: string
     hideDisallowed?: boolean
     optionsTab?: SettingsTab

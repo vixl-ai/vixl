@@ -1,4 +1,4 @@
-import { workspaceGlob } from '@/services/pyrola/pyrola-tauri'
+import { workspaceGlob } from '@/services/vixl/vixl-tauri'
 
 const DEFAULT_LIMIT = 40
 

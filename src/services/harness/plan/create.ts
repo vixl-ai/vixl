@@ -1,7 +1,7 @@
 import { tool } from 'ai'
 import createPlan from '@/services/plans/write-plan'
 import createPlanInputSchema from '@/schemas/plans/create-plan-input'
-import { fsWriteFile, updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { fsWriteFile, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import {
   assertCreatePlanNotAwaitingPlanGo,
@@ -13,7 +13,7 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 const createPlanTool = (ctx: HarnessToolContext) =>
   tool({
     description: withToolExamples(
-      'Create a plan file under .pyrola/plans/. After success, stop and wait for the user to click Build now or Orchestrate.',
+      'Create a plan file under .vixl/plans/. After success, stop and wait for the user to click Build now or Orchestrate.',
       [
         {
           title: 'Add harness tool examples',

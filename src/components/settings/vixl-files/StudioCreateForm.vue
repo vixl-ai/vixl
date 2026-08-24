@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import { toast } from 'vue-sonner'
+import { z } from 'zod'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   FormControl,
@@ -13,9 +14,16 @@ import {
 } from '@/components/shadcn/ui/form'
 import { Input } from '@/components/shadcn/ui/input'
 import { Textarea } from '@/components/shadcn/ui/textarea'
-import PyrolaFileCreateSheet from '@/components/settings/pyrola-files/PyrolaFileCreateSheet.vue'
-import { createSkillInputSchema } from '@/schemas/skills/skill-document'
-import writeSkill from '@/services/skills/write-skill'
+import VixlFileCreateSheet from '@/components/settings/vixl-files/VixlFileCreateSheet.vue'
+import writeStudio from '@/services/studio/write-studio'
+
+const studioFormSchema = toTypedSchema(
+  z.object({
+    title: z.string().min(1),
+    slug: z.string().optional(),
+    content: z.string(),
+  }),
+)
 
 const props = defineProps<{
   open: boolean
@@ -31,29 +39,29 @@ const emit = defineEmits<{
 const saving = ref(false)
 
 const { handleSubmit } = useForm({
-  validationSchema: toTypedSchema(createSkillInputSchema),
+  validationSchema: studioFormSchema,
   initialValues: {
-    name: '',
-    description: '',
-    body: '',
+    title: '',
+    slug: undefined as string | undefined,
+    content: '',
   },
 })
 
 const onSubmit = handleSubmit(async (values) => {
   saving.value = true
   try {
-    await writeSkill({
+    await writeStudio({
       scope: props.scope,
       projectRoot: props.projectRoot,
-      name: values.name,
-      description: values.description,
-      body: values.body,
+      title: values.title,
+      slug: values.slug?.trim() || undefined,
+      content: values.content,
     })
-    toast.success('Skill created')
+    toast.success('Studio created')
     emit('submitted')
     emit('update:open', false)
   } catch (error) {
-    toast.error('Failed to create skill', {
+    toast.error('Failed to create studio', {
       description: error instanceof Error ? error.message : 'Unknown error',
     })
   } finally {
@@ -63,28 +71,28 @@ const onSubmit = handleSubmit(async (values) => {
 </script>
 
 <template>
-  <PyrolaFileCreateSheet
+  <VixlFileCreateSheet
     :open="open"
     @update:open="emit('update:open', $event)"
   >
     <form class="space-y-4" @submit="onSubmit">
-      <FormField v-slot="{ componentField }" name="name">
+      <FormField v-slot="{ componentField }" name="title">
         <FormItem>
-          <FormLabel>Name</FormLabel>
+          <FormLabel>Title</FormLabel>
           <FormControl>
-            <Input type="text" placeholder="Skill name" v-bind="componentField" />
+            <Input type="text" placeholder="Studio title" v-bind="componentField" />
           </FormControl>
           <FormMessage />
         </FormItem>
       </FormField>
 
-      <FormField v-slot="{ componentField }" name="description">
+      <FormField v-slot="{ componentField }" name="slug">
         <FormItem>
-          <FormLabel>Description</FormLabel>
+          <FormLabel>Slug (optional)</FormLabel>
           <FormControl>
             <Input
               type="text"
-              placeholder="Short description"
+              placeholder="kebab-case-slug"
               v-bind="componentField"
             />
           </FormControl>
@@ -92,12 +100,12 @@ const onSubmit = handleSubmit(async (values) => {
         </FormItem>
       </FormField>
 
-      <FormField v-slot="{ componentField }" name="body">
+      <FormField v-slot="{ componentField }" name="content">
         <FormItem>
-          <FormLabel>Body</FormLabel>
+          <FormLabel>Content</FormLabel>
           <FormControl>
             <Textarea
-              placeholder="Skill instructions"
+              placeholder="Studio markdown content"
               class="min-h-40"
               v-bind="componentField"
             />
@@ -107,8 +115,8 @@ const onSubmit = handleSubmit(async (values) => {
       </FormField>
 
       <Button type="submit" class="w-full" :disabled="saving">
-        {{ saving ? 'Creating...' : 'Create skill' }}
+        {{ saving ? 'Creating...' : 'Create studio' }}
       </Button>
     </form>
-  </PyrolaFileCreateSheet>
+  </VixlFileCreateSheet>
 </template>

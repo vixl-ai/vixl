@@ -1,11 +1,11 @@
 import { generateText } from 'ai'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import { MODEL_REF_SEPARATOR, type ModelRef } from '@/types/models/model-ref'
 import createModel from '@/services/providers/create-model'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import loadPrompt from '@/services/prompts/load-prompt'
-import { updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import { resolveParsedModelForRole } from '@/services/models/resolve-model-for-role'
 import { resolveSideTaskCallOptions } from '@/services/models/resolve-model-call-options'
@@ -22,7 +22,7 @@ export type ChatTitleTaskInput = {
   projectSlug: string
   chatId: string
   prompt: string
-  settings: PyrolaSettings
+  settings: VixlSettings
   /** Used when models.title and models.default are unset (per-chat model pick). */
   fallbackProviderId?: string
   fallbackModelId?: string

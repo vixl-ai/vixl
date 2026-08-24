@@ -242,7 +242,7 @@ fn cache_path(app: Option<&AppHandle>) -> PathBuf {
   let home = std::env::var("HOME")
     .or_else(|_| std::env::var("USERPROFILE"))
     .unwrap_or_else(|_| ".".into());
-  PathBuf::from(home).join(".pyrola").join("cef-cache")
+  PathBuf::from(home).join(".vixl").join("cef-cache")
 }
 
 /// Symlink GPU libs beside the exe for unpaid-dev loads. Skip inside a signed

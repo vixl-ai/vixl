@@ -1,5 +1,5 @@
 import type { ProviderModelGroup } from '@/types/models/provider-model-group'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import collapseProviderModelGroups from '@/services/models/collapse-provider-model-groups'
 import listAllProviderModels from '@/services/providers/list-all-provider-models'
 
@@ -11,7 +11,7 @@ type CacheEntry = {
 let cache: CacheEntry | null = null
 
 /** Same fingerprint idea as use-provider-models-catalog (apiKeyRef + custom providers). */
-const settingsFingerprint = (settings: PyrolaSettings): string => {
+const settingsFingerprint = (settings: VixlSettings): string => {
   const providerKeys = Object.keys(settings)
     .filter(
       (key) =>
@@ -31,7 +31,7 @@ const settingsFingerprint = (settings: PyrolaSettings): string => {
  * On miss, calls listAllProviderModels once then collapses variants.
  */
 const loadProviderModelsCatalog = async (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
 ): Promise<ProviderModelGroup[]> => {
   const fingerprint = settingsFingerprint(settings)
   if (cache && cache.fingerprint === fingerprint) {

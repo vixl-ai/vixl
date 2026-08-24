@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 const generateText = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{ text: string; usage?: unknown }>>(),
@@ -38,8 +38,8 @@ vi.mock('@/services/prompts/load-prompt', () => ({
   default: (...args: unknown[]) => loadPrompt(...args),
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     updateChatMeta: (...args: unknown[]) => updateChatMeta(...args),
   }),
 )
@@ -56,12 +56,12 @@ vi.mock('vue-sonner', () => ({
 
 import runSideTask from '@/services/harness/run-side-task'
 
-const baseSettings = (): PyrolaSettings =>
+const baseSettings = (): VixlSettings =>
   ({
     version: 1,
     'models.title': 'ollama::qwen',
     'chat.autoTitle': true,
-  }) as PyrolaSettings
+  }) as VixlSettings
 
 const baseInput = () => ({
   projectSlug: 'proj',

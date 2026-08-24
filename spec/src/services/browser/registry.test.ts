@@ -15,7 +15,7 @@ vi.mock('@/services/browser/cdp-client', () => ({
   },
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri/browser', () => ({
+vi.mock('@/services/vixl/vixl-tauri/browser', () => ({
   browserCefGetCdpWsUrl,
 }))
 

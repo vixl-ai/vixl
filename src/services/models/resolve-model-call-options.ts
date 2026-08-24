@@ -1,10 +1,10 @@
 import type { ModelRef } from '@/types/models/model-ref'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import type {
-  PyrolaCustomProvider,
-  PyrolaCustomProviderModel,
-  PyrolaSettings,
-} from '@/types/pyrola/pyrola-settings'
+  VixlCustomProvider,
+  VixlCustomProviderModel,
+  VixlSettings,
+} from '@/types/vixl/vixl-settings'
 import { getCustomProvider } from '@/services/providers/registry'
 import {
   mapReasoningToCallOptions,
@@ -68,9 +68,9 @@ const applyFastOption = (
 }
 
 export const getCustomProviderModel = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
-): { provider: PyrolaCustomProvider; model: PyrolaCustomProviderModel } | null => {
+): { provider: VixlCustomProvider; model: VixlCustomProviderModel } | null => {
   const provider = getCustomProvider(settings, ref.providerId)
   if (!provider?.models?.length) {
     return null
@@ -83,7 +83,7 @@ export const getCustomProviderModel = (
 }
 
 export const resolveContextWindow = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
 ): number | undefined => {
   const matched = getCustomProviderModel(settings, ref)
@@ -101,7 +101,7 @@ export const resolveContextWindow = (
 }
 
 export const resolveMaxInputTokens = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
 ): number | undefined => {
   const matched = getCustomProviderModel(settings, ref)
@@ -121,7 +121,7 @@ export const resolveMaxInputTokens = (
 }
 
 export const resolveModelCallOptions = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
   defaults?: { maxOutputTokens?: number; reasoning?: ReasoningLevel },
 ): ResolvedModelCallOptions => {
@@ -218,7 +218,7 @@ export const resolveModelCallOptions = (
 }
 
 export const resolveSideTaskCallOptions = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
 ): ResolvedModelCallOptions =>
   resolveModelCallOptions(settings, ref, {

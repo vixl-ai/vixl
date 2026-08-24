@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ProviderModelGroup } from '@/types/models/provider-model-group'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { resolveCatalogMatches } from '@/services/models/search'
 import serializeModelRef from '@/utils/serialize-model-ref'
 
@@ -45,7 +45,7 @@ const catalog: ProviderModelGroup[] = [
 
 const baseSettings = {
   version: 1,
-} as PyrolaSettings
+} as VixlSettings
 
 describe('resolveCatalogMatches', () => {
   it('rejects empty query and provider', () => {
@@ -105,7 +105,7 @@ describe('resolveCatalogMatches', () => {
     const settings = {
       version: 1,
       'models.subagent': 'openai::gpt-4o',
-    } as PyrolaSettings
+    } as VixlSettings
     const result = resolveCatalogMatches(catalog, settings, {
       provider: 'OpenAI',
     })
@@ -121,7 +121,7 @@ describe('resolveCatalogMatches', () => {
     const settings = {
       version: 1,
       'models.subagent': 'anthropic::claude-sonnet-4',
-    } as PyrolaSettings
+    } as VixlSettings
     const result = resolveCatalogMatches(catalog, settings, {
       provider: 'openai',
     })
@@ -206,7 +206,7 @@ describe('resolveCatalogMatches', () => {
           modelId: 'claude-sonnet-4',
         })]: { allowed: false },
       },
-    } as PyrolaSettings
+    } as VixlSettings
 
     const byName = resolveCatalogMatches(catalog, settings, {
       query: 'Disabled Top Hit',
@@ -244,7 +244,7 @@ describe('resolveCatalogMatches', () => {
       'models.catalogOptions': {
         'openai::gpt-4o': { allowed: false },
       },
-    } as PyrolaSettings
+    } as VixlSettings
     const needsQuery = resolveCatalogMatches(openaiCatalog, openaiSettings, {
       provider: 'openai',
     })

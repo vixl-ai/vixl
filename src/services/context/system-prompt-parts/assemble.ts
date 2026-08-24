@@ -1,5 +1,5 @@
-import { listPyrolaFiles } from '@/services/pyrola/pyrola-tauri'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import { listVixlFiles } from '@/services/vixl/vixl-tauri'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import { MODE_TOOL_ALLOWLIST } from '@/services/harness/mode-allowlists'
 import loadPrompt from '@/services/prompts/load-prompt'
 import {
@@ -17,7 +17,7 @@ import type { SystemPromptInput, SystemPromptParts } from './types'
 const TOOLS_HINT =
   'Tools are provided as function calls; do not grep the repo for them.'
 
-const resolveModeSkillBlock = (mode: PyrolaChatMode): string => {
+const resolveModeSkillBlock = (mode: VixlChatMode): string => {
   const loaded = loadInternalSkill(mode)
   return loaded?.content ?? ''
 }
@@ -41,10 +41,10 @@ export default async (input: SystemPromptInput): Promise<SystemPromptParts> => {
 
   const rules = input.standalone
     ? []
-    : await listPyrolaFiles('project', 'rules', input.projectRoot).catch(() => [])
+    : await listVixlFiles('project', 'rules', input.projectRoot).catch(() => [])
   const agents = input.standalone
     ? []
-    : await listPyrolaFiles('project', 'agents', input.projectRoot).catch(() => [])
+    : await listVixlFiles('project', 'agents', input.projectRoot).catch(() => [])
 
   let agentCatalog = input.agentCatalog
   if (agents.length > 0) {

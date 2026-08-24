@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use uuid::Uuid;
 
-use super::paths::user_pyrola_dir;
+use super::paths::user_vixl_dir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,7 +42,7 @@ pub struct ChatMeta {
 }
 
 fn chats_dir(app: &AppHandle, project_slug: &str) -> Result<PathBuf, String> {
-  let base = user_pyrola_dir(app)?;
+  let base = user_vixl_dir(app)?;
   let dir = base.join("chats").join(project_slug);
   fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
   Ok(dir)
@@ -343,7 +343,7 @@ pub fn pin_chat(
 
 #[tauri::command]
 pub fn list_pinned_chats(app: AppHandle) -> Result<Vec<ChatMeta>, String> {
-  let base = user_pyrola_dir(&app)?.join("chats");
+  let base = user_vixl_dir(&app)?.join("chats");
   let mut pinned = Vec::new();
   if !base.exists() {
     return Ok(pinned);

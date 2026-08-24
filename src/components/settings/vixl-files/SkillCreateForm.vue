@@ -13,9 +13,9 @@ import {
 } from '@/components/shadcn/ui/form'
 import { Input } from '@/components/shadcn/ui/input'
 import { Textarea } from '@/components/shadcn/ui/textarea'
-import PyrolaFileCreateSheet from '@/components/settings/pyrola-files/PyrolaFileCreateSheet.vue'
-import { createRuleInputSchema } from '@/schemas/rules/rule-document'
-import writeRule from '@/services/rules/write-rule'
+import VixlFileCreateSheet from '@/components/settings/vixl-files/VixlFileCreateSheet.vue'
+import { createSkillInputSchema } from '@/schemas/skills/skill-document'
+import writeSkill from '@/services/skills/write-skill'
 
 const props = defineProps<{
   open: boolean
@@ -31,9 +31,10 @@ const emit = defineEmits<{
 const saving = ref(false)
 
 const { handleSubmit } = useForm({
-  validationSchema: toTypedSchema(createRuleInputSchema),
+  validationSchema: toTypedSchema(createSkillInputSchema),
   initialValues: {
     name: '',
+    description: '',
     body: '',
   },
 })
@@ -41,17 +42,18 @@ const { handleSubmit } = useForm({
 const onSubmit = handleSubmit(async (values) => {
   saving.value = true
   try {
-    await writeRule({
+    await writeSkill({
       scope: props.scope,
       projectRoot: props.projectRoot,
       name: values.name,
+      description: values.description,
       body: values.body,
     })
-    toast.success('Rule created')
+    toast.success('Skill created')
     emit('submitted')
     emit('update:open', false)
   } catch (error) {
-    toast.error('Failed to create rule', {
+    toast.error('Failed to create skill', {
       description: error instanceof Error ? error.message : 'Unknown error',
     })
   } finally {
@@ -61,7 +63,7 @@ const onSubmit = handleSubmit(async (values) => {
 </script>
 
 <template>
-  <PyrolaFileCreateSheet
+  <VixlFileCreateSheet
     :open="open"
     @update:open="emit('update:open', $event)"
   >
@@ -70,7 +72,21 @@ const onSubmit = handleSubmit(async (values) => {
         <FormItem>
           <FormLabel>Name</FormLabel>
           <FormControl>
-            <Input type="text" placeholder="Rule name" v-bind="componentField" />
+            <Input type="text" placeholder="Skill name" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="description">
+        <FormItem>
+          <FormLabel>Description</FormLabel>
+          <FormControl>
+            <Input
+              type="text"
+              placeholder="Short description"
+              v-bind="componentField"
+            />
           </FormControl>
           <FormMessage />
         </FormItem>
@@ -81,7 +97,7 @@ const onSubmit = handleSubmit(async (values) => {
           <FormLabel>Body</FormLabel>
           <FormControl>
             <Textarea
-              placeholder="Rule markdown"
+              placeholder="Skill instructions"
               class="min-h-40"
               v-bind="componentField"
             />
@@ -91,8 +107,8 @@ const onSubmit = handleSubmit(async (values) => {
       </FormField>
 
       <Button type="submit" class="w-full" :disabled="saving">
-        {{ saving ? 'Creating...' : 'Create rule' }}
+        {{ saving ? 'Creating...' : 'Create skill' }}
       </Button>
     </form>
-  </PyrolaFileCreateSheet>
+  </VixlFileCreateSheet>
 </template>

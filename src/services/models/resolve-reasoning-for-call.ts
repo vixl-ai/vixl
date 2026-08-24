@@ -1,7 +1,7 @@
 import type { ModelRef } from '@/types/models/model-ref'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import { isReasoningLevel } from '@/types/models/reasoning-level'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ModelRoleId } from '@/data/model-role-registry'
 import { MODEL_ROLE_REGISTRY } from '@/data/model-role-registry'
 import {
@@ -42,7 +42,7 @@ const toSdkPortableReasoning = (
 ): SdkPortableReasoningLevel => (level === 'max' ? 'xhigh' : level)
 
 const clampEffortForCapability = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
   effort: ReasoningLevel | undefined,
 ): ReasoningLevel | undefined => {
@@ -64,7 +64,7 @@ const clampEffortForCapability = (
 
 export const resolveReasoningForRole = (
   role: ModelRoleId,
-  settings: PyrolaSettings,
+  settings: VixlSettings,
 ): ReasoningLevel | undefined => {
   const definition = MODEL_ROLE_REGISTRY.find((entry) => entry.id === role)
   if (!definition?.reasoningSettingsKey) {
@@ -85,7 +85,7 @@ export const resolveReasoningForRole = (
 }
 
 export const resolveCatalogReasoning = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
 ): ReasoningLevel | undefined => {
   const clamped = clampModelCatalogOption(
@@ -109,7 +109,7 @@ export const pickResolvedReasoning = (
 }
 
 export const mapReasoningToCallOptions = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
   reasoning: ReasoningLevel | undefined,
 ): ReasoningCallMapping => {

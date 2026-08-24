@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import resolveModelVision from '@/services/harness/resolve-model-vision'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 
-const baseSettings = (): PyrolaSettings => ({
+const baseSettings = (): VixlSettings => ({
   version: 1,
 })
 
@@ -23,7 +23,7 @@ const stubModel = (supportedUrls: Record<string, RegExp[]>): LanguageModelV3 =>
 
 describe('resolveModelVision', () => {
   it('trusts custom model vision flag when true', async () => {
-    const settings: PyrolaSettings = {
+    const settings: VixlSettings = {
       ...baseSettings(),
       'providers.custom.local': {
         type: 'openai-compatible',
@@ -43,7 +43,7 @@ describe('resolveModelVision', () => {
   })
 
   it('treats custom model without vision as text-only even if supportedUrls has images', async () => {
-    const settings: PyrolaSettings = {
+    const settings: VixlSettings = {
       ...baseSettings(),
       'providers.custom.local': {
         type: 'openai-compatible',

@@ -1,6 +1,6 @@
 import { toast } from 'vue-sonner'
 import * as monaco from 'monaco-editor'
-import { fsReadFile, fsWriteFile, gitShowFile } from '@/services/pyrola/pyrola-tauri'
+import { fsReadFile, fsWriteFile, gitShowFile } from '@/services/vixl/vixl-tauri'
 import formatMonacoError from '@/utils/format-monaco-error'
 import { detectMonacoLanguage } from '@/utils/monaco-language'
 import { ensureMonacoLanguage } from '@/utils/monaco-shiki'

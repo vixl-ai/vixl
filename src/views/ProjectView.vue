@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import ProjectLayout from '@/components/project/ProjectLayout.vue'
 import useFleetRegistry from '@/composables/use-fleet-registry'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import {
   PROJECT_SECTIONS,
   type ProjectSectionId,
@@ -14,7 +14,7 @@ import projectRouteFor from '@/utils/project-route-for'
 const route = useRoute()
 const router = useRouter()
 const fleet = useFleetRegistry()
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const activating = ref(false)
 
 const projectSlug = computed(() => String(route.params.slug ?? ''))

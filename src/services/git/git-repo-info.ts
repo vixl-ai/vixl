@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { isTauri } from '@/services/pyrola/pyrola-tauri'
+import { isTauri } from '@/services/vixl/vixl-tauri'
 import type { GitRepoInfo } from '@/types/git/git-repo-info'
 
 export default async (rootPath: string): Promise<GitRepoInfo> => {

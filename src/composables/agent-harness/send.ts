@@ -4,10 +4,10 @@ import type { ContextMention } from '@/types/harness/context-mention'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { PermissionCapabilityKey } from '@/types/harness/permission'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import runOrchestrator from '@/services/harness/orchestrator'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
-import { updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import parseModelRef from '@/utils/parse-model-ref'
 import { listSlashSkillIndex } from '@/services/skills/skill-registry'
 import buildMentionHighlights from '@/utils/build-mention-highlights'
@@ -15,7 +15,7 @@ import type { AgentHarnessState, AttentionHelpers } from './types'
 
 export type SendArgs = {
   text: string
-  mode: PyrolaChatMode
+  mode: VixlChatMode
   model: string
   reasoning?: ReasoningLevel
   mentions?: ContextMention[]

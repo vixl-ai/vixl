@@ -2,8 +2,8 @@
 
 const path = require('path')
 
-const projectRaw = process.env.PYROLA_CODEGRAPH_PROJECT
-const storeRaw = process.env.PYROLA_CODEGRAPH_STORE
+const projectRaw = process.env.VIXL_CODEGRAPH_PROJECT
+const storeRaw = process.env.VIXL_CODEGRAPH_STORE
 
 if (!projectRaw || !storeRaw) {
   module.exports = {}

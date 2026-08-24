@@ -60,8 +60,8 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at
-**https://github.com/aidanhibbard/pyrola/issues** (or contact a
-[maintainer](https://github.com/aidanhibbard/pyrola/graphs/contributors)
+**https://github.com/vixl-ai/vixl/issues** (or contact a
+[maintainer](https://github.com/vixl-ai/vixl/graphs/contributors)
 privately if you prefer). All complaints will be reviewed and investigated
 promptly and fairly.
 

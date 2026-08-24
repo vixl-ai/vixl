@@ -2,13 +2,13 @@ import type {
   ModelCatalogOption,
   ModelCatalogOptionsMap,
 } from '@/types/models/model-catalog-option'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import serializeModelRef from '@/utils/serialize-model-ref'
 import type { ModelRef } from '@/types/models/model-ref'
 import clampModelCatalogOption from '@/services/models/clamp-model-catalog-option'
 
 export const getModelCatalogOptionsMap = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
 ): ModelCatalogOptionsMap => {
   const raw = settings['models.catalogOptions']
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -18,7 +18,7 @@ export const getModelCatalogOptionsMap = (
 }
 
 export const getModelCatalogOption = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef | string,
 ): ModelCatalogOption => {
   const key =
@@ -34,18 +34,18 @@ export const getModelCatalogOption = (
  * Saves still go through mergeModelCatalogOption with the raw patch.
  */
 export const getClampedModelCatalogOption = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef,
 ): ModelCatalogOption =>
   clampModelCatalogOption(settings, ref, getModelCatalogOption(settings, ref))
 
 export const isModelAllowed = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef | string,
 ): boolean => getModelCatalogOption(settings, ref).allowed !== false
 
 export const mergeModelCatalogOption = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   ref: ModelRef | string,
   patch: ModelCatalogOption,
 ): ModelCatalogOptionsMap => {

@@ -1,4 +1,4 @@
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import createModel from '@/services/providers/create-model'
 import resolveModelVision from '@/services/harness/resolve-model-vision'
 import parseModelRef from '@/utils/parse-model-ref'
@@ -13,7 +13,7 @@ import parseModelRef from '@/utils/parse-model-ref'
  */
 export default async (args: {
   modelRef: string
-  settings: PyrolaSettings
+  settings: VixlSettings
 }): Promise<boolean> => {
   const parsed = parseModelRef(args.modelRef)
   if (!parsed) {

@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { UIMessage } from 'ai'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 vi.mock('@/services/context/estimate-builtin-tool-definition-tokens', () => ({
   default: () => 100,
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri', () => mockPyrolaTauri())
+vi.mock('@/services/vixl/vixl-tauri', () => mockVixlTauri())
 
 vi.mock('tokenlens', () => ({
   getContext: () => ({ maxInput: 100_000, maxTotal: 100_000 }),

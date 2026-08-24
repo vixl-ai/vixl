@@ -1,5 +1,5 @@
 import type { UIMessage } from 'ai'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import {
@@ -7,7 +7,7 @@ import {
   compactBudgets,
   summarizeTranscript,
 } from '@/services/harness/compact'
-import { appendChatLine, updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { appendChatLine, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import estimateTextTokens from '@/utils/estimate-text-tokens'
 import formatUnknownError from '@/utils/format-unknown-error'
 
@@ -15,7 +15,7 @@ export type CompactSessionInput = {
   projectSlug: string
   chatId: string
   projectRoot: string
-  settings: PyrolaSettings
+  settings: VixlSettings
   messages: UIMessage[]
   focus?: string
   signal?: AbortSignal

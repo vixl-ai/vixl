@@ -62,7 +62,7 @@ vi.mock('@/services/browser/screenshot-store', () => ({
   default: (...args: [Uint8Array]) => saveScreenshot(...args),
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri', () => ({
+vi.mock('@/services/vixl/vixl-tauri', () => ({
   revealInFolder: (...args: [string]) => revealInFolder(...args),
 }))
 
@@ -95,7 +95,7 @@ describe('use-browser-toolbar', () => {
     clearCacheForActiveOrigin.mockResolvedValue(undefined)
     saveScreenshot.mockResolvedValue({
       mimeType: 'image/png',
-      path: '/tmp/pyrola/screenshots/shot.png',
+      path: '/tmp/vixl/screenshots/shot.png',
     })
     revealInFolder.mockResolvedValue(undefined)
     clipboardWriteText.mockResolvedValue(undefined)
@@ -125,10 +125,10 @@ describe('use-browser-toolbar', () => {
     expect(takeScreenshot).toHaveBeenCalledWith(client, '')
     expect(saveScreenshot).toHaveBeenCalledWith(pngBytes)
     expect(revealInFolder).toHaveBeenCalledWith(
-      '/tmp/pyrola/screenshots/shot.png',
+      '/tmp/vixl/screenshots/shot.png',
     )
     expect(toast.success).toHaveBeenCalledWith('Screenshot saved', {
-      description: '/tmp/pyrola/screenshots/shot.png',
+      description: '/tmp/vixl/screenshots/shot.png',
     })
   })
 

@@ -42,7 +42,7 @@ import {
   forkChat,
   pinChat,
   updateChatMeta,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import chatRouteFor from '@/utils/chat-route-for'
 
 const props = defineProps<{

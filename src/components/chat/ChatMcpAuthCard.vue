@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import type { PendingMcpAuthView } from '@/types/chat/pending-mcp-auth'
-import type { McpConfig, McpServerConfig } from '@/types/pyrola/mcp-config'
+import type { McpConfig, McpServerConfig } from '@/types/vixl/mcp-config'
 import { Button } from '@/components/shadcn/ui/button'
 import { Marker, MarkerContent } from '@/components/shadcn/ui/marker'
 import ChatMcpSecretsForm from '@/components/chat/ChatMcpSecretsForm.vue'

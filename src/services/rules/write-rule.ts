@@ -1,5 +1,5 @@
 import { createRuleInputSchema, type CreateRuleInput } from '@/schemas/rules/rule-document'
-import { fsWriteFile, getPyrolaDir } from '@/services/pyrola/pyrola-tauri'
+import { fsWriteFile, getVixlDir } from '@/services/vixl/vixl-tauri'
 import slugifyName from '@/utils/slugify-name'
 
 type WriteRuleArgs = CreateRuleInput & {
@@ -31,7 +31,7 @@ export default async (input: WriteRuleArgs): Promise<WriteRuleResult> => {
     if (!input.projectRoot) {
       throw new Error('projectRoot is required for project-scoped rules')
     }
-    const path = `.pyrola/rules/${slug}.md`
+    const path = `.vixl/rules/${slug}.md`
     await fsWriteFile({
       projectRoot: input.projectRoot,
       path,
@@ -40,7 +40,7 @@ export default async (input: WriteRuleArgs): Promise<WriteRuleResult> => {
     return { slug, path }
   }
 
-  const personalDir = await getPyrolaDir('personal')
+  const personalDir = await getVixlDir('personal')
   const path = `rules/${slug}.md`
   await fsWriteFile({
     projectRoot: personalDir,

@@ -11,12 +11,12 @@ import type { PermissionLevel } from '@/types/harness/permission'
 import type { SubagentEntry } from '@/types/harness/subagent-entry'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
-import type { PyrolaChatMode, PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import type useChatStore from '@/composables/use-chat-store'
 import type useContextUsage from '@/composables/use-context-usage'
 import type useChatContextBudgetSync from '@/composables/use-chat-context-budget-sync'
-import type usePyrolaConfig from '@/composables/use-pyrola-config'
+import type useVixlConfig from '@/composables/use-vixl-config'
 import type useFleetSidebar from '@/composables/use-fleet-sidebar'
 import type useWorkbenchStore from '@/composables/use-workbench-store'
 import type useMcpServers from '@/composables/use-mcp-servers'
@@ -27,17 +27,17 @@ export type AgentHarnessSession = ReturnType<
 >
 
 export type LastRunConfig = {
-  mode: PyrolaChatMode
+  mode: VixlChatMode
   model: string
   reasoning?: ReasoningLevel
   mentions: ContextMention[]
-  effectiveSettings: PyrolaSettings
+  effectiveSettings: VixlSettings
 }
 
 export type AgentHarnessState = {
   options: AgentHarnessOptions
   session: AgentHarnessSession
-  config: ReturnType<typeof usePyrolaConfig>
+  config: ReturnType<typeof useVixlConfig>
   contextUsage: ReturnType<typeof useContextUsage>
   contextBudgetSync: ReturnType<typeof useChatContextBudgetSync>
   fleetSidebar: ReturnType<typeof useFleetSidebar>

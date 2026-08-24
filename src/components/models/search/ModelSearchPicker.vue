@@ -7,14 +7,14 @@ import { Button } from '@/components/shadcn/ui/button'
 import ModelsSearchModelSelector from '@/components/ai-elements/model-selector/ModelSelector.vue'
 import ModelsSearchModelSelectorContent from '@/components/ai-elements/model-selector/ModelSelectorContent.vue'
 import ModelsSearchModelSelectorTrigger from '@/components/ai-elements/model-selector/ModelSelectorTrigger.vue'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import useProviderModelsCatalog from '@/composables/use-provider-models-catalog'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
 import type { ModelRef } from '@/types/models/model-ref'
 import type { ScoredVendorGroup } from '@/types/models/scored-vendor-group'
 import type { ScoredVendorModelEntry } from '@/types/models/scored-vendor-model-entry'
-import type { SettingsTab } from '@/composables/use-pyrola-config'
+import type { SettingsTab } from '@/composables/use-vixl-config'
 import serializeModelRef from '@/utils/serialize-model-ref'
 import parseModelRef from '@/utils/parse-model-ref'
 import humanizeModelId from '@/utils/humanize-model-id'
@@ -40,7 +40,7 @@ const props = withDefaults(
     disabled?: boolean
     placeholder?: string
     compact?: boolean
-    scopeSettings?: PyrolaSettings
+    scopeSettings?: VixlSettings
     /** Hide models marked allowed:false (chat pickers). */
     hideDisallowed?: boolean
     /** Persist catalog option edits to this settings scope. */
@@ -60,7 +60,7 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const open = ref(false)
 const searchQuery = ref('')
 const optionsOpenFor = ref<string | null>(null)

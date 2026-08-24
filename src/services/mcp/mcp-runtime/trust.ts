@@ -1,10 +1,10 @@
-import type { McpServerConfig } from '@/types/pyrola/mcp-config'
+import type { McpServerConfig } from '@/types/vixl/mcp-config'
 import { mcpKnownSecretKeys } from '@/services/mcp/mcp-keychain-keys'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
 import { listRequiredInputIdsForServer } from '@/services/mcp/resolve-mcp-inputs'
 import { isMcpTrusted, sessionTrusts } from '@/services/mcp/mcp-trust'
 import { isInternalMcpServer } from '@/types/codegraph/managed-codegraph'
-import { deleteSecret } from '@/services/pyrola/pyrola-tauri'
+import { deleteSecret } from '@/services/vixl/vixl-tauri'
 import type { McpRuntimeOptions } from './types'
 
 export const clearServerSecrets = async (

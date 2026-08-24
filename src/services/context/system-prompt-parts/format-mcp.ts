@@ -1,6 +1,6 @@
 import { migrateMcpConfig, isMcpServerEnabled } from '@/schemas/mcp-config'
 import { listUserMcpServers } from '@/services/mcp/merge-mcp-config'
-import { mcpListStatuses, readMcpConfig } from '@/services/pyrola/pyrola-tauri'
+import { mcpListStatuses, readMcpConfig } from '@/services/vixl/vixl-tauri'
 
 export default async (
   projectRoot: string,

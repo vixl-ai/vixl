@@ -5,7 +5,7 @@ import {
   replaceHit,
   replaceInFile,
 } from '@/services/workspace-search'
-import type { GrepMatch } from '@/services/pyrola/pyrola-tauri'
+import type { GrepMatch } from '@/services/vixl/vixl-tauri'
 import type { SearchFileGroup } from '@/types/workbench/search-file-group'
 import type { SearchReplaceOptions } from '@/types/workbench/search-replace-options'
 

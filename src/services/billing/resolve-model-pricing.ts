@@ -1,8 +1,8 @@
 import type { ModelPricingRates } from '@/types/billing/model-pricing-rates'
 import type {
-  PyrolaCustomProviderModel,
-  PyrolaSettings,
-} from '@/types/pyrola/pyrola-settings'
+  VixlCustomProviderModel,
+  VixlSettings,
+} from '@/types/vixl/vixl-settings'
 import { getCustomProvider } from '@/services/providers/registry'
 
 /**
@@ -12,8 +12,8 @@ import { getCustomProvider } from '@/services/providers/registry'
 export default (input: {
   providerId: string
   modelId: string
-  settings: PyrolaSettings
-  customModel?: PyrolaCustomProviderModel
+  settings: VixlSettings
+  customModel?: VixlCustomProviderModel
 }): ModelPricingRates | null => {
   const model =
     input.customModel ??

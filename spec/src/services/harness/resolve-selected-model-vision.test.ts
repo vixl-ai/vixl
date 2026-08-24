@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { LanguageModelV3 } from '@ai-sdk/provider'
 
 const createModel = vi.hoisted(() =>
@@ -33,7 +33,7 @@ const stubModel = (): LanguageModelV3 =>
     },
   }) as LanguageModelV3
 
-const settings = (): PyrolaSettings => ({ version: 1 })
+const settings = (): VixlSettings => ({ version: 1 })
 
 describe('resolveSelectedModelVision', () => {
   beforeEach(() => {

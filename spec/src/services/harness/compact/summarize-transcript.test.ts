@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const generateText = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{ text: string; usage?: unknown }>>(),
@@ -28,11 +28,11 @@ import {
   summarizeTranscript,
 } from '@/services/harness/compact'
 
-const baseSettings = (): PyrolaSettings =>
+const baseSettings = (): VixlSettings =>
   ({
     version: 1,
     'models.default': 'ollama::qwen',
-  }) as PyrolaSettings
+  }) as VixlSettings
 
 describe('summarizeTranscript', () => {
   beforeEach(() => {

@@ -22,7 +22,7 @@ export type ProjectFileEntry = {
   description?: string | null
 }
 
-export type PyrolaFilesKind = 'agents' | 'rules' | 'skills' | 'plans' | 'studio'
+export type VixlFilesKind = 'agents' | 'rules' | 'skills' | 'plans' | 'studio'
 
 export type McpToolInfo = {
   name: string

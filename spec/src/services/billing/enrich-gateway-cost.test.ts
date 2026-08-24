@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'vue-sonner'
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 type GenerationInfo = {
   totalCost: number
@@ -26,9 +26,9 @@ vi.mock('@/services/billing/read-usage-ledger', () => ({
   default: (...args: [string, string]) => readUsageLedger(...args),
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
-    getUserPyrolaDir: vi.fn<() => Promise<string>>(async () => '/tmp/pyrola'),
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
+    getUserVixlDir: vi.fn<() => Promise<string>>(async () => '/tmp/vixl'),
     writeJsonFile: vi.fn<(path: string, value: unknown) => Promise<void>>(
       async () => undefined,
     ),
@@ -67,7 +67,7 @@ describe('enrichGatewayCost', () => {
     const enrichGatewayCost = (
       await import('@/services/billing/enrich-gateway-cost')
     ).default
-    const pyrola = await import('@/services/pyrola/pyrola-tauri')
+    const vixl = await import('@/services/vixl/vixl-tauri')
     const delay = vi.fn<(ms: number) => Promise<void>>(async () => undefined)
     const getGenerationInfo = vi.fn<
       (params: { id: string }) => Promise<GenerationInfo>
@@ -94,8 +94,8 @@ describe('enrichGatewayCost', () => {
     expect(delay).toHaveBeenCalledTimes(3)
     expect(delay.mock.calls.map((call) => call[0])).toEqual([2000, 2000, 4000])
     expect(toast.error).not.toHaveBeenCalled()
-    expect(pyrola.writeJsonFile).not.toHaveBeenCalled()
-    expect(pyrola.updateChatMeta).not.toHaveBeenCalled()
+    expect(vixl.writeJsonFile).not.toHaveBeenCalled()
+    expect(vixl.updateChatMeta).not.toHaveBeenCalled()
     expect(result.record).toBeNull()
     expect(result.usageTotals).toBeNull()
     expect(result.records[0]?.costUSD).toBeNull()
@@ -106,7 +106,7 @@ describe('enrichGatewayCost', () => {
     const enrichGatewayCost = (
       await import('@/services/billing/enrich-gateway-cost')
     ).default
-    const pyrola = await import('@/services/pyrola/pyrola-tauri')
+    const vixl = await import('@/services/vixl/vixl-tauri')
     const delay = vi.fn<(ms: number) => Promise<void>>(async () => undefined)
     const getGenerationInfo = vi
       .fn<(params: { id: string }) => Promise<GenerationInfo>>()
@@ -132,8 +132,8 @@ describe('enrichGatewayCost', () => {
     expect(delay).toHaveBeenCalledTimes(1)
     expect(delay).toHaveBeenCalledWith(2000)
     expect(toast.error).not.toHaveBeenCalled()
-    expect(pyrola.writeJsonFile).toHaveBeenCalledTimes(1)
-    expect(pyrola.updateChatMeta).toHaveBeenCalledTimes(1)
+    expect(vixl.writeJsonFile).toHaveBeenCalledTimes(1)
+    expect(vixl.updateChatMeta).toHaveBeenCalledTimes(1)
     expect(result.record?.costUSD).toBe(0.012)
     expect(result.record?.pricingSource).toBe('provider_reported')
     expect(result.usageTotals?.costUSD).toBe(0.012)
@@ -143,7 +143,7 @@ describe('enrichGatewayCost', () => {
     const enrichGatewayCost = (
       await import('@/services/billing/enrich-gateway-cost')
     ).default
-    const pyrola = await import('@/services/pyrola/pyrola-tauri')
+    const vixl = await import('@/services/vixl/vixl-tauri')
     const delay = vi.fn<(ms: number) => Promise<void>>(async () => undefined)
     const getGenerationInfo = vi.fn<
       (params: { id: string }) => Promise<GenerationInfo>
@@ -165,8 +165,8 @@ describe('enrichGatewayCost', () => {
     expect(toast.error).toHaveBeenCalledWith('Failed to load gateway cost', {
       description: 'Unauthorized',
     })
-    expect(pyrola.writeJsonFile).not.toHaveBeenCalled()
-    expect(pyrola.updateChatMeta).not.toHaveBeenCalled()
+    expect(vixl.writeJsonFile).not.toHaveBeenCalled()
+    expect(vixl.updateChatMeta).not.toHaveBeenCalled()
     expect(result.record?.costUSD).toBeNull()
     expect(result.record?.pricingSource).toBe('none')
     expect(result.records[0]?.costUSD).toBeNull()

@@ -1,4 +1,4 @@
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import { MODE_TOOL_ALLOWLIST } from '@/services/harness/mode-allowlists'
 import loadPrompt from '@/services/prompts/load-prompt'
 
@@ -9,7 +9,7 @@ const SNIPPETS: Array<{ tools: readonly string[]; path: string }> = [
   { tools: ['apply_patch'], path: 'system/tool-guidance-patch.md' },
 ]
 
-export default (mode: PyrolaChatMode): string => {
+export default (mode: VixlChatMode): string => {
   const allow = new Set(MODE_TOOL_ALLOWLIST[mode])
   const parts = [loadPrompt('system/tool-guidance.md')]
   for (const snippet of SNIPPETS) {

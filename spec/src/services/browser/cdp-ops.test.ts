@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 import type CdpClient from '@/services/browser/cdp-client'
 
 const writeTempBytes = vi.hoisted(() =>
@@ -18,8 +18,8 @@ const appendTempLog = vi.hoisted(() =>
   }) => Promise<{ path: string; filename: string }>>(),
 )
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     writeTempBytes,
     appendTempLog,
   }),
@@ -74,11 +74,11 @@ describe('cdp-ops', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     writeTempBytes.mockResolvedValue({
-      path: '/tmp/pyrola/screenshots/shot.png',
+      path: '/tmp/vixl/screenshots/shot.png',
       filename: 'shot.png',
     })
     appendTempLog.mockImplementation(async (args) => ({
-      path: args.path ?? `/tmp/pyrola/${args.kind}/capture.log`,
+      path: args.path ?? `/tmp/vixl/${args.kind}/capture.log`,
       filename: 'capture.log',
     }))
 
@@ -332,7 +332,7 @@ describe('screenshot-store', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     writeTempBytes.mockResolvedValue({
-      path: '/tmp/pyrola/screenshots/shot.png',
+      path: '/tmp/vixl/screenshots/shot.png',
       filename: 'shot.png',
     })
   })
@@ -344,7 +344,7 @@ describe('screenshot-store', () => {
 
     expect(part).toEqual({
       mimeType: 'image/png',
-      path: '/tmp/pyrola/screenshots/shot.png',
+      path: '/tmp/vixl/screenshots/shot.png',
     })
     expect(writeTempBytes).toHaveBeenCalledOnce()
     expect(writeTempBytes.mock.calls[0]?.[0]).toMatchObject({
@@ -359,7 +359,7 @@ describe('console-log-store', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     appendTempLog.mockImplementation(async (args) => ({
-      path: args.path ?? `/tmp/pyrola/${args.kind}/capture.log`,
+      path: args.path ?? `/tmp/vixl/${args.kind}/capture.log`,
       filename: 'capture.log',
     }))
   })

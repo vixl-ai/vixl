@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref, shallowRef } from 'vue'
 import type { AgentHarnessState, AttentionHelpers } from '@/composables/agent-harness/types'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 const updateChatMeta = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>(),
@@ -15,8 +15,8 @@ const listConfiguredProviders = vi.hoisted(() =>
 )
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     updateChatMeta: (...args: unknown[]) => updateChatMeta(...args),
   }),
 )
@@ -41,7 +41,7 @@ vi.mock('vue-sonner', () => ({
 
 import createSend from '@/composables/agent-harness/send'
 
-const settings = (): PyrolaSettings => ({ version: 1 })
+const settings = (): VixlSettings => ({ version: 1 })
 
 const buildState = (): AgentHarnessState => {
   const patchMeta = vi.fn<(patch: unknown) => void>()

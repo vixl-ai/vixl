@@ -3,7 +3,6 @@ import { ref } from 'vue'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import { toast } from 'vue-sonner'
-import { z } from 'zod'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   FormControl,
@@ -14,16 +13,9 @@ import {
 } from '@/components/shadcn/ui/form'
 import { Input } from '@/components/shadcn/ui/input'
 import { Textarea } from '@/components/shadcn/ui/textarea'
-import PyrolaFileCreateSheet from '@/components/settings/pyrola-files/PyrolaFileCreateSheet.vue'
-import writeStudio from '@/services/studio/write-studio'
-
-const studioFormSchema = toTypedSchema(
-  z.object({
-    title: z.string().min(1),
-    slug: z.string().optional(),
-    content: z.string(),
-  }),
-)
+import VixlFileCreateSheet from '@/components/settings/vixl-files/VixlFileCreateSheet.vue'
+import { createRuleInputSchema } from '@/schemas/rules/rule-document'
+import writeRule from '@/services/rules/write-rule'
 
 const props = defineProps<{
   open: boolean
@@ -39,29 +31,27 @@ const emit = defineEmits<{
 const saving = ref(false)
 
 const { handleSubmit } = useForm({
-  validationSchema: studioFormSchema,
+  validationSchema: toTypedSchema(createRuleInputSchema),
   initialValues: {
-    title: '',
-    slug: undefined as string | undefined,
-    content: '',
+    name: '',
+    body: '',
   },
 })
 
 const onSubmit = handleSubmit(async (values) => {
   saving.value = true
   try {
-    await writeStudio({
+    await writeRule({
       scope: props.scope,
       projectRoot: props.projectRoot,
-      title: values.title,
-      slug: values.slug?.trim() || undefined,
-      content: values.content,
+      name: values.name,
+      body: values.body,
     })
-    toast.success('Studio created')
+    toast.success('Rule created')
     emit('submitted')
     emit('update:open', false)
   } catch (error) {
-    toast.error('Failed to create studio', {
+    toast.error('Failed to create rule', {
       description: error instanceof Error ? error.message : 'Unknown error',
     })
   } finally {
@@ -71,41 +61,27 @@ const onSubmit = handleSubmit(async (values) => {
 </script>
 
 <template>
-  <PyrolaFileCreateSheet
+  <VixlFileCreateSheet
     :open="open"
     @update:open="emit('update:open', $event)"
   >
     <form class="space-y-4" @submit="onSubmit">
-      <FormField v-slot="{ componentField }" name="title">
+      <FormField v-slot="{ componentField }" name="name">
         <FormItem>
-          <FormLabel>Title</FormLabel>
+          <FormLabel>Name</FormLabel>
           <FormControl>
-            <Input type="text" placeholder="Studio title" v-bind="componentField" />
+            <Input type="text" placeholder="Rule name" v-bind="componentField" />
           </FormControl>
           <FormMessage />
         </FormItem>
       </FormField>
 
-      <FormField v-slot="{ componentField }" name="slug">
+      <FormField v-slot="{ componentField }" name="body">
         <FormItem>
-          <FormLabel>Slug (optional)</FormLabel>
-          <FormControl>
-            <Input
-              type="text"
-              placeholder="kebab-case-slug"
-              v-bind="componentField"
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField }" name="content">
-        <FormItem>
-          <FormLabel>Content</FormLabel>
+          <FormLabel>Body</FormLabel>
           <FormControl>
             <Textarea
-              placeholder="Studio markdown content"
+              placeholder="Rule markdown"
               class="min-h-40"
               v-bind="componentField"
             />
@@ -115,8 +91,8 @@ const onSubmit = handleSubmit(async (values) => {
       </FormField>
 
       <Button type="submit" class="w-full" :disabled="saving">
-        {{ saving ? 'Creating...' : 'Create studio' }}
+        {{ saving ? 'Creating...' : 'Create rule' }}
       </Button>
     </form>
-  </PyrolaFileCreateSheet>
+  </VixlFileCreateSheet>
 </template>

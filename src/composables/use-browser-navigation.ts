@@ -5,7 +5,7 @@ import {
   browserCefGoForward,
   browserCefNavigate,
   browserCefReload,
-} from '@/services/pyrola/pyrola-tauri/browser'
+} from '@/services/vixl/vixl-tauri/browser'
 import type { CefBounds } from '@/types/browser/cef-bounds'
 import { normalizeBrowserUrl } from '@/utils/browser-tab-url'
 

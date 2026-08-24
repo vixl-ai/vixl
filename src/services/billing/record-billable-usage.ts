@@ -2,9 +2,9 @@ import type { LanguageModelUsage } from 'ai'
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
 import type { PricingSource } from '@/types/billing/pricing-source'
 import type {
-  PyrolaCustomProviderModel,
-  PyrolaSettings,
-} from '@/types/pyrola/pyrola-settings'
+  VixlCustomProviderModel,
+  VixlSettings,
+} from '@/types/vixl/vixl-settings'
 import normalizeLanguageModelUsage from '@/services/billing/normalize-language-model-usage'
 import extractCacheWriteFromRaw from '@/services/billing/extract-cache-write-from-raw'
 import extractOpenaiCompatibleCost from '@/services/billing/extract-openai-compatible-cost'
@@ -24,8 +24,8 @@ type RecordBillableUsageInput = {
   responseId?: string
   generationId?: string
   subagentId?: string
-  settings: PyrolaSettings
-  customModel?: PyrolaCustomProviderModel
+  settings: VixlSettings
+  customModel?: VixlCustomProviderModel
   at?: string
 }
 

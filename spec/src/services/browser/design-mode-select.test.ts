@@ -124,7 +124,7 @@ describe('design-mode-select', () => {
     })
     saveScreenshot.mockResolvedValue({
       mimeType: 'image/png',
-      path: '/tmp/pyrola/screenshots/element.png',
+      path: '/tmp/vixl/screenshots/element.png',
     })
     matchedStylesForNode.mockResolvedValue('button.submit { color: navy; }')
 
@@ -174,7 +174,7 @@ describe('design-mode-select', () => {
     expect(saveScreenshot).toHaveBeenCalledWith(screenshotBytes)
     expect(matchedStylesForNode).toHaveBeenCalledWith(client, '', 'obj-1')
 
-    expect(selection.screenshotPath).toBe('/tmp/pyrola/screenshots/element.png')
+    expect(selection.screenshotPath).toBe('/tmp/vixl/screenshots/element.png')
     expect(selection.screenshotBytes).toEqual(screenshotBytes)
     expect(selection.detail).toEqual({
       xpath: '/html[1]/body[1]/button[1]',
@@ -196,7 +196,7 @@ describe('design-mode-select', () => {
         padding: '8px',
       },
       componentHint: null,
-      screenshotPath: '/tmp/pyrola/screenshots/element.png',
+      screenshotPath: '/tmp/vixl/screenshots/element.png',
       outerHTML: '<button class="submit" type="submit">Submit</button>',
       innerText: 'Submit',
       pageUrl: 'https://example.com/form',

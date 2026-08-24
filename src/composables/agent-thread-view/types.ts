@@ -2,7 +2,7 @@ import type { ComputedRef, Ref, ShallowRef } from 'vue'
 import type { Router, RouteLocationNormalizedLoaded } from 'vue-router'
 import type { ChatStatus } from 'ai'
 import type { PermissionLevel } from '@/types/harness/permission'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import type { AggregatedTurnFileChange } from '@/types/harness/file-checkpoint'
 import type { QueuedChatMessage } from '@/types/chat/queued-chat-message'
@@ -10,7 +10,7 @@ import type useAgentHarness from '@/composables/use-agent-harness'
 import type useChatStore from '@/composables/use-chat-store'
 import type useFleetRegistry from '@/composables/use-fleet-registry'
 import type useFleetSidebar from '@/composables/use-fleet-sidebar'
-import type usePyrolaConfig from '@/composables/use-pyrola-config'
+import type useVixlConfig from '@/composables/use-vixl-config'
 import type useChatContextActions from '@/composables/use-chat-context-actions'
 import type useWorkbenchStore from '@/composables/use-workbench-store'
 import type useChatContextBudgetSync from '@/composables/use-chat-context-budget-sync'
@@ -20,13 +20,13 @@ export type PendingFilePolicyAction =
   | {
       kind: 'edit'
       text: string
-      mode: PyrolaChatMode
+      mode: VixlChatMode
       model: string
       reasoning?: ReasoningLevel
     }
   | {
       kind: 'retry'
-      mode: PyrolaChatMode
+      mode: VixlChatMode
       model: string
     }
 
@@ -40,7 +40,7 @@ export type AgentThreadViewState = {
   fleet: ReturnType<typeof useFleetRegistry>
   fleetSidebar: ReturnType<typeof useFleetSidebar>
   chatStore: ReturnType<typeof useChatStore>
-  config: ReturnType<typeof usePyrolaConfig>
+  config: ReturnType<typeof useVixlConfig>
   mcpPersonalConfig: ReturnType<typeof useMcpServers>['personalMcp']
   mcpProjectConfig: ReturnType<typeof useMcpServers>['projectMcp']
   contextActions: ReturnType<typeof useChatContextActions>

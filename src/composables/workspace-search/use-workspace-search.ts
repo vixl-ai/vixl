@@ -1,6 +1,6 @@
 import { toast } from 'vue-sonner'
 import type { Ref } from 'vue'
-import { workspaceGrep } from '@/services/pyrola/pyrola-tauri'
+import { workspaceGrep } from '@/services/vixl/vixl-tauri'
 import { groupMatches } from '@/services/workspace-search'
 import type { SearchFileGroup } from '@/types/workbench/search-file-group'
 import type { SearchReplaceOptions } from '@/types/workbench/search-replace-options'

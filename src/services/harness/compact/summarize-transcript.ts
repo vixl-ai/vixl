@@ -1,7 +1,7 @@
 import { generateText } from 'ai'
 import type { LanguageModelUsage } from 'ai'
 import type { ModelRef } from '@/types/models/model-ref'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import createModel from '@/services/providers/create-model'
 import loadPrompt from '@/services/prompts/load-prompt'
 import { resolveParsedModelForRole } from '@/services/models/resolve-model-for-role'
@@ -11,7 +11,7 @@ import formatUnknownError from '@/utils/format-unknown-error'
 import compactBudgets from './budgets'
 
 type SummarizeTranscriptInput = {
-  settings: PyrolaSettings
+  settings: VixlSettings
   transcript: string
   focus?: string
   signal?: AbortSignal

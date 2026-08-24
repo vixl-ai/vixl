@@ -1,4 +1,4 @@
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { LoadedSkill, SkillIndexEntry } from '@/types/skills/skill'
 import listAllInternalSkills, {
   listInternalSkillIndex,
@@ -48,7 +48,7 @@ export const listSlashSkillIndex = async (
 }
 
 export const listSkillIndex = async (
-  mode: PyrolaChatMode,
+  mode: VixlChatMode,
   projectRoot: string,
 ): Promise<SkillIndexEntry[]> => {
   const internal = listInternalSkillIndex(mode)

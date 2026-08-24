@@ -1,6 +1,6 @@
 import countDiffLines from '@/utils/count-diff-lines'
 import resolveFileDiffHunks from '@/utils/resolve-file-diff-hunks'
-import { fileCheckpointRestore } from '@/services/pyrola/pyrola-tauri'
+import { fileCheckpointRestore } from '@/services/vixl/vixl-tauri'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { FileDiff } from '@/types/harness/file-diff'

@@ -130,7 +130,7 @@ pub async fn mcp_start(
     serde_json::json!({
       "protocolVersion": "2024-11-05",
       "capabilities": {},
-      "clientInfo": { "name": "pyrola", "version": "0.1.0" }
+      "clientInfo": { "name": "vixl", "version": "0.1.0" }
     }),
   )
   .await

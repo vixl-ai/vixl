@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 const { httpProxyRequest, getSecret } = vi.hoisted(() => ({
   httpProxyRequest: vi.fn<
@@ -12,8 +12,8 @@ const { httpProxyRequest, getSecret } = vi.hoisted(() => ({
   getSecret: vi.fn<(key: string) => Promise<string | null>>(async () => 'test-key'),
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     httpProxyRequest,
     getSecret,
   }),
@@ -41,7 +41,7 @@ describe('listAllProviderModels', () => {
           { id: 'kat-coder-lite' },
         ],
       },
-    } satisfies PyrolaSettings
+    } satisfies VixlSettings
 
     const groups = await listAllProviderModels(settings)
     expect(httpProxyRequest).toHaveBeenCalled()
@@ -69,7 +69,7 @@ describe('listAllProviderModels', () => {
         baseURL: 'http://localhost:1234/v1',
         models: [{ id: 'kat-coder-2.5', name: 'Configured' }],
       },
-    } satisfies PyrolaSettings
+    } satisfies VixlSettings
 
     const groups = await listAllProviderModels(settings)
     expect(groups[0]?.models.map((model) => model.modelId)).toEqual([
@@ -98,7 +98,7 @@ describe('listAllProviderModels', () => {
     const settings = {
       version: 1 as const,
       'providers.openrouter.apiKeyRef': 'openrouter',
-    } satisfies PyrolaSettings
+    } satisfies VixlSettings
 
     const groups = await listAllProviderModels(settings)
     expect(groups).toHaveLength(1)
@@ -129,7 +129,7 @@ describe('listAllProviderModels', () => {
     const settings = {
       version: 1 as const,
       'providers.gateway.apiKeyRef': 'gateway',
-    } satisfies PyrolaSettings
+    } satisfies VixlSettings
 
     const groups = await listAllProviderModels(settings)
     expect(groups).toHaveLength(1)
@@ -155,7 +155,7 @@ describe('listAllProviderModels', () => {
     const settings = {
       version: 1 as const,
       'providers.openrouter.apiKeyRef': 'openrouter',
-    } satisfies PyrolaSettings
+    } satisfies VixlSettings
 
     const groups = await listAllProviderModels(settings)
     expect(groups[0]?.models).toEqual([

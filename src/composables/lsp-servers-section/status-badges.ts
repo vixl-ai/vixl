@@ -10,7 +10,7 @@ import {
   ShieldAlert,
   Wrench,
 } from '@lucide/vue'
-import type { LspCatalogEntry } from '@/services/pyrola/pyrola-tauri'
+import type { LspCatalogEntry } from '@/services/vixl/vixl-tauri'
 
 export type LspStatusBadge = {
   key: string

@@ -10,18 +10,18 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
-import type { PyrolaTheme } from '@/types/pyrola/pyrola-settings'
+import useVixlConfig from '@/composables/use-vixl-config'
+import type { VixlTheme } from '@/types/vixl/vixl-settings'
 
 defineProps<{
   class?: HTMLAttributes['class']
 }>()
 
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const colorMode = useColorMode()
 
 const toggleMode = async (): Promise<void> => {
-  const theme: PyrolaTheme = colorMode.state.value === 'dark' ? 'light' : 'dark'
+  const theme: VixlTheme = colorMode.state.value === 'dark' ? 'light' : 'dark'
 
   try {
     await config.setTheme('personal', theme)

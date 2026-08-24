@@ -1,4 +1,4 @@
-# Contributing to pyrola
+# Contributing to vixl
 
 Thank you for your interest in contributing! This document explains how to get
 involved. By participating, you agree to abide by our
@@ -30,7 +30,7 @@ Requirements: **Node.js** matching `.nvmrc` (currently 26.7.0; CI reads the same
 
 ```bash
 git clone https://github.com/vixl-ai/vixl.git
-cd pyrola
+cd vixl
 npm ci
 ```
 
@@ -40,9 +40,11 @@ npm ci
 # Vite frontend
 npm run dev
 
-# Tauri desktop shell
-npm run tauri dev
+# Tauri desktop shell with CEF/browser (recommended)
+npm run tauri:dev
 ```
+
+One-time CEF prerequisite: `cargo install export-cef-dir`, then `export-cef-dir ~/.local/share/cef` (or set `CEF_PATH`).
 
 ### Quality checks
 
@@ -130,7 +132,7 @@ When a real Developer ID certificate exists, add these env vars to the tauri-act
 
 ### OTA updates
 
-The Release workflow signs updater artifacts and uploads a static `latest.json` to each GitHub Release (via tauri-action defaults). The app's updater checks `https://github.com/aidanhibbard/pyrola/releases/download/v{{current_version}}/latest.json` (Tauri substitutes the running app version).
+The Release workflow signs updater artifacts and uploads a static `latest.json` to each GitHub Release (via tauri-action defaults). The app's updater checks `https://github.com/vixl-ai/vixl/releases/download/v{{current_version}}/latest.json` (Tauri substitutes the running app version).
 
 Required repo secret for OTA: `TAURI_SIGNING_PRIVATE_KEY` (minisign key, passwordless). Optional: `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if a password-protected key is used.
 

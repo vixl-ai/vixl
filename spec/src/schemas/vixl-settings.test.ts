@@ -4,21 +4,21 @@ import {
   customProviderSchema,
 } from '@/schemas/providers/custom-provider'
 import {
-  migratePyrolaSettings,
+  migrateVixlSettings,
   normalizeStoredModelRef,
-  validatePyrolaSettings,
-} from '@/schemas/pyrola-settings'
+  validateVixlSettings,
+} from '@/schemas/vixl-settings'
 import { providerRequiresApiKey } from '@/services/providers/registry'
 import {
   resolveMaxInputTokens,
   resolveModelCallOptions,
   resolveSideTaskCallOptions,
 } from '@/services/models/resolve-model-call-options'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
-describe('migratePyrolaSettings', () => {
+describe('migrateVixlSettings', () => {
   it('migrates deprecated provider and model keys', () => {
-    const migrated = migratePyrolaSettings({
+    const migrated = migrateVixlSettings({
       version: 1,
       'agent.defaultProvider': 'anthropic',
       'agent.defaultModel': 'claude-sonnet-4-5',
@@ -33,7 +33,7 @@ describe('migratePyrolaSettings', () => {
   })
 
   it('strips removed fleet and default mode keys', () => {
-    const migrated = migratePyrolaSettings({
+    const migrated = migrateVixlSettings({
       version: 1,
       'agent.defaultMode': 'plan',
       'fleet.maxConcurrentAgents': 4,
@@ -45,21 +45,30 @@ describe('migratePyrolaSettings', () => {
     expect('fleet.trayBackground' in migrated).toBe(false)
   })
 
+  it('strips general.machineLabel', () => {
+    const migrated = migrateVixlSettings({
+      version: 1,
+      'general.machineLabel': 'Office laptop',
+    })
+
+    expect('general.machineLabel' in migrated).toBe(false)
+  })
+
   it('defaults duplicate tab behavior to ask', () => {
-    const migrated = migratePyrolaSettings({ version: 1 })
+    const migrated = migrateVixlSettings({ version: 1 })
 
     expect(migrated['workbench.duplicateTabBehavior']).toBe('ask')
   })
 
   it('defaults sandbox enabled with network deny', () => {
-    const migrated = migratePyrolaSettings({ version: 1 })
+    const migrated = migrateVixlSettings({ version: 1 })
 
     expect(migrated['agent.sandbox.enabled']).toBe(true)
     expect(migrated['agent.sandbox.network']).toBe('deny')
   })
 
   it('accepts custom providers with models', () => {
-    const migrated = migratePyrolaSettings({
+    const migrated = migrateVixlSettings({
       version: 1,
       'providers.custom.kat': {
         type: 'openai-compatible',
@@ -123,9 +132,9 @@ describe('customProviderSchema', () => {
   })
 })
 
-describe('validatePyrolaSettings', () => {
+describe('validateVixlSettings', () => {
   it('accepts valid settings', () => {
-    const result = validatePyrolaSettings({
+    const result = validateVixlSettings({
       version: 1,
       'appearance.theme': 'dark',
       'providers.custom.local': {
@@ -138,7 +147,7 @@ describe('validatePyrolaSettings', () => {
   })
 
   it('rejects invalid custom provider base URL', () => {
-    const result = validatePyrolaSettings({
+    const result = validateVixlSettings({
       version: 1,
       'providers.custom.local': {
         type: 'openai-compatible',
@@ -159,7 +168,7 @@ describe('providerRequiresApiKey', () => {
         name: 'Kat',
         baseURL: 'http://localhost:1234/v1',
       },
-    } satisfies PyrolaSettings
+    } satisfies VixlSettings
 
     expect(providerRequiresApiKey('kat', settings)).toBe(false)
   })
@@ -192,7 +201,7 @@ describe('resolveModelCallOptions', () => {
         },
       ],
     },
-  } satisfies PyrolaSettings
+  } satisfies VixlSettings
 
   it('resolves call options from custom model config', () => {
     const options = resolveModelCallOptions(settings, {
@@ -224,7 +233,7 @@ describe('resolveModelCallOptions', () => {
           },
         ],
       },
-    } satisfies PyrolaSettings
+    } satisfies VixlSettings
 
     expect(
       resolveMaxInputTokens(derivedSettings, {

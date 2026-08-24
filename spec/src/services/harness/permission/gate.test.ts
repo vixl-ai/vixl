@@ -6,7 +6,7 @@ import {
   resolveApproval,
 } from '@/services/harness/permission/approval-gate'
 import { gateToolPermission } from '@/services/harness/permission/gate'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 describe('gateToolPermission sticky shell elevation', () => {
   beforeEach(() => {
@@ -15,7 +15,7 @@ describe('gateToolPermission sticky shell elevation', () => {
 
   const makeCtx = () => ({
     chatId: 'chat-1',
-    settings: { version: 1 } as PyrolaSettings,
+    settings: { version: 1 } as VixlSettings,
     permissionLevel: 'ask' as const,
     sessionAllows: new Set<string>(),
     sessionDenies: new Set<string>(),

@@ -2,7 +2,7 @@ import type {
   LspServerDisplayState,
   LspStatusServerRow,
 } from '@/types/lsp/lsp-status'
-import type { LspCatalogEntry } from '@/services/pyrola/pyrola-tauri'
+import type { LspCatalogEntry } from '@/services/vixl/vixl-tauri'
 import { normalizeFileUri } from '@/utils/monaco-lsp'
 import { awaitingProjectLoad, diagnosticsByUri, warmState } from './state'
 

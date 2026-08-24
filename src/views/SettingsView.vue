@@ -4,14 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import SettingsLayout from '@/components/settings/SettingsLayout.vue'
 import useFleetRegistry from '@/composables/use-fleet-registry'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import type { SettingsSectionId } from '@/types/settings/settings-section'
 import { PERSONAL_SECTIONS } from '@/types/settings/settings-section'
 import projectRouteFor from '@/utils/project-route-for'
 
 const route = useRoute()
 const router = useRouter()
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const fleet = useFleetRegistry()
 
 const resolveSection = (section: SettingsSectionId): SettingsSectionId =>

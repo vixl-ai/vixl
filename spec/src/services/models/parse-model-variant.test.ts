@@ -8,7 +8,7 @@ import resolveModelRefForCall, {
   canonicalizeModelRef,
 } from '@/services/models/resolve-model-ref-for-call'
 import { resolveModelCallOptions } from '@/services/models/resolve-model-call-options'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 describe('parseModelVariant', () => {
   it('detects -fast siblings', () => {
@@ -60,7 +60,7 @@ describe('resolveModelRefForCall', () => {
       'models.catalogOptions': {
         'gateway::moonshotai/kimi-k3': { fast: true },
       },
-    } as PyrolaSettings
+    } as VixlSettings
     const resolved = resolveModelRefForCall(settings, {
       providerId: 'gateway',
       modelId: 'moonshotai/kimi-k3',
@@ -88,7 +88,7 @@ describe('resolveModelRefForCall', () => {
       'models.catalogOptions': {
         'openrouter::moonshotai/kimi-k3': { fast: true },
       },
-    } as PyrolaSettings
+    } as VixlSettings
     const resolved = resolveModelRefForCall(settings, {
       providerId: 'openrouter',
       modelId: 'moonshotai/kimi-k3',

@@ -1,6 +1,6 @@
 import { ref, watch, type Ref } from 'vue'
 import studioDataSchema from '@/schemas/studio/studio-data'
-import { fsReadFile } from '@/services/pyrola/pyrola-tauri'
+import { fsReadFile } from '@/services/vixl/vixl-tauri'
 import isStudioHtmlContent from '@/services/studio/is-studio-html-content'
 import parseStudioArtifact from '@/services/studio/parse-studio-artifact'
 import validateStudioBlocks from '@/services/studio/validate-studio-blocks'

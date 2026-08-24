@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { lspEnsureServer, lspRequest } from '@/services/pyrola/pyrola-tauri'
+import { lspEnsureServer, lspRequest } from '@/services/vixl/vixl-tauri'
 import { parseLspDiagnosticItems } from '@/services/harness/lsp/parse-diagnostics'
 const diagnostics = () =>
   tool({

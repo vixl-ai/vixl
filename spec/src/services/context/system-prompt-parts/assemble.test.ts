@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mockPyrolaTauri } from '../../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
-vi.mock('@/services/pyrola/pyrola-tauri', () => mockPyrolaTauri())
+vi.mock('@/services/vixl/vixl-tauri', () => mockVixlTauri())
 
 import assembleSystemPromptParts from '@/services/context/system-prompt-parts/assemble'
 
 const input = (mode: 'ask' | 'plan' | 'agent' | 'studio' | 'orchestrator') => ({
   mode,
-  projectName: 'pyrola',
-  projectRoot: '/tmp/pyrola',
+  projectName: 'vixl',
+  projectRoot: '/tmp/vixl',
   mentions: [],
   agentCatalog: [],
   standalone: true,

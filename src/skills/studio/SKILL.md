@@ -7,7 +7,7 @@ description: Publish Comark studio artifacts with write_studio_artifact. Use blo
 
 Studio publishing rules are auto-injected in studio mode.
 
-Publish durable pages to `.pyrola/studio/<slug>/index.md`. Optional `data.json` sidecar for large structured payloads.
+Publish durable pages to `.vixl/studio/<slug>/index.md`. Optional `data.json` sidecar for large structured payloads.
 
 ## Publishing
 

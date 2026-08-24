@@ -1,7 +1,7 @@
 import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import type { GraphListItem } from '@/types/codegraph/graph-list-item'
-import { deleteGraph, listGraphs } from '@/services/pyrola/pyrola-tauri'
+import { deleteGraph, listGraphs } from '@/services/vixl/vixl-tauri'
 
 type GraphListRecord = GraphListItem & {
   project_root?: string

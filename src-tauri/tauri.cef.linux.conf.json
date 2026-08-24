@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "externalBin": [
-      "binaries/pyrola_cef_helper"
+      "binaries/vixl_cef_helper"
     ],
     "resources": {
       "cef-runtime/**/*": "./"

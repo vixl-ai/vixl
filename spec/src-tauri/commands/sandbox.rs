@@ -13,7 +13,7 @@ fn path_ancestors_home() {
 #[test]
 fn path_ancestors_project_root() {
   assert_eq!(
-    path_ancestors("/Users/aidanhibbard/Documents/GitHub/pyrola"),
+    path_ancestors("/Users/aidanhibbard/Documents/GitHub/vixl"),
     vec![
       "/Users/aidanhibbard/Documents/GitHub".to_string(),
       "/Users/aidanhibbard/Documents".to_string(),
@@ -76,7 +76,7 @@ fn profile_allows_project_root_ancestors_read() {
   let profile = generate_seatbelt_profile(
     false,
     "/Users/aidanhibbard",
-    "/Users/aidanhibbard/Documents/GitHub/pyrola",
+    "/Users/aidanhibbard/Documents/GitHub/vixl",
   );
   for ancestor in [
     "/Users",

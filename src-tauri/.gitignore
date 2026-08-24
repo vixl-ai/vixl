@@ -6,4 +6,4 @@
 # Staged CEF runtime for tauri.cef.*.conf.json bundling (see scripts/prepare-cef-bundle*)
 /cef-runtime/
 /cef-helpers/
-/binaries/pyrola_cef_helper-*
+/binaries/vixl_cef_helper-*

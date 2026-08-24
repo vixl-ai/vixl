@@ -236,7 +236,7 @@ LISTEN 0 128 0.0.0.0:22 0.0.0.0:*`,
     expect(
       detectSandboxRuntimeDenial('', {
         command: 'find /srv/jellyfin -name "*.xml"',
-        projectRoot: '/home/aidan/pyrola',
+        projectRoot: '/home/aidan/vixl',
       }),
     ).toBe('filesystem')
     expect(
@@ -265,8 +265,8 @@ LISTEN 0 128 0.0.0.0:22 0.0.0.0:*`,
   it('does not treat in-project /opt paths or fstab as out-of-workspace', () => {
     expect(
       detectSandboxRuntimeDenial('', {
-        command: 'find /opt/pyrola -name src',
-        projectRoot: '/opt/pyrola',
+        command: 'find /opt/vixl -name src',
+        projectRoot: '/opt/vixl',
       }),
     ).toBeNull()
     expect(

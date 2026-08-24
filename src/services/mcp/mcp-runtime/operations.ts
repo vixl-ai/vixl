@@ -1,6 +1,6 @@
 import { auth } from '@ai-sdk/mcp'
-import type { McpHttpServer, McpServerConfig } from '@/types/pyrola/mcp-config'
-import { isMcpHttpServer } from '@/types/pyrola/mcp-config'
+import type { McpHttpServer, McpServerConfig } from '@/types/vixl/mcp-config'
+import { isMcpHttpServer } from '@/types/vixl/mcp-config'
 import {
   callHttpTool,
   getHttpPrompt,
@@ -21,7 +21,7 @@ import {
   oauthCancelLoopback,
   openExternalUrl,
   type McpServerState,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import { assertServerTrusted } from './trust'
 import { createTokenProvider, waitForOAuthCallback } from './oauth'
 import { start, startHttp } from './lifecycle'

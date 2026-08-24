@@ -18,7 +18,7 @@ import {
 } from '@/components/shadcn/ui/tooltip'
 import useCodegraphStatus from '@/composables/use-codegraph-status'
 import useFleetRegistry from '@/composables/use-fleet-registry'
-import { isTauri, codegraphCli } from '@/services/pyrola/pyrola-tauri'
+import { isTauri, codegraphCli } from '@/services/vixl/vixl-tauri'
 import invokeErrorMessage from '@/utils/invoke-error-message'
 import lspServerIconName from '@/utils/lsp-server-icon-name'
 

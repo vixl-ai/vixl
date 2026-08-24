@@ -1,6 +1,6 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
 import { toast } from 'vue-sonner'
-import { httpProxyRequest, isTauri } from '@/services/pyrola/pyrola-tauri'
+import { httpProxyRequest, isTauri } from '@/services/vixl/vixl-tauri'
 
 type HttpProxyStreamEvent =
   | { kind: 'headers'; status: number; headers: Record<string, string> }

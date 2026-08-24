@@ -2,7 +2,7 @@ import {
   createSkillInputSchema,
   type CreateSkillInput,
 } from '@/schemas/skills/skill-document'
-import { fsWriteFile, getPyrolaDir } from '@/services/pyrola/pyrola-tauri'
+import { fsWriteFile, getVixlDir } from '@/services/vixl/vixl-tauri'
 import slugifyName from '@/utils/slugify-name'
 
 type WriteSkillArgs = CreateSkillInput & {
@@ -45,7 +45,7 @@ export default async (input: WriteSkillArgs): Promise<WriteSkillResult> => {
     if (!input.projectRoot) {
       throw new Error('projectRoot is required for project-scoped skills')
     }
-    const path = `.pyrola/skills/${slug}/SKILL.md`
+    const path = `.vixl/skills/${slug}/SKILL.md`
     await fsWriteFile({
       projectRoot: input.projectRoot,
       path,
@@ -54,7 +54,7 @@ export default async (input: WriteSkillArgs): Promise<WriteSkillResult> => {
     return { slug, path }
   }
 
-  const personalDir = await getPyrolaDir('personal')
+  const personalDir = await getVixlDir('personal')
   const path = `skills/${slug}/SKILL.md`
   await fsWriteFile({
     projectRoot: personalDir,

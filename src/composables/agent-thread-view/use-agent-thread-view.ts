@@ -9,7 +9,7 @@ import useChatContextActions from '@/composables/use-chat-context-actions'
 import useChatContextBudgetSync from '@/composables/use-chat-context-budget-sync'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useFleetSidebar from '@/composables/use-fleet-sidebar'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import useMcpServers from '@/composables/use-mcp-servers'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { HOME_CHAT_SLUG, isHomeChatSlug } from '@/constants/home-chat'
@@ -26,7 +26,7 @@ export default () => {
   const fleet = useFleetRegistry()
   const fleetSidebar = useFleetSidebar()
   const chatStore = useChatStore()
-  const config = usePyrolaConfig()
+  const config = useVixlConfig()
   const {
     personalMcp: mcpPersonalConfig,
     projectMcp: mcpProjectConfig,

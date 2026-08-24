@@ -1,4 +1,4 @@
-import type { GrepMatch } from '@/services/pyrola/pyrola-tauri'
+import type { GrepMatch } from '@/services/vixl/vixl-tauri'
 import type { SearchReplaceOptions } from '@/types/workbench/search-replace-options'
 import { applyReplaceAt } from './apply-replace'
 import readReplaceTarget from './read-replace-target'

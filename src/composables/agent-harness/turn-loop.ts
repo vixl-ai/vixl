@@ -10,7 +10,7 @@ import {
   hasRunningSubagentsForChat,
   listDeliverableBackgroundResults,
 } from '@/services/harness/subagent/registry'
-import { updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import parseModelRef from '@/utils/parse-model-ref'
 import shouldFlushBackgroundSubagentResume from '@/utils/should-flush-background-subagent-resume'
 import createSend, { type SendArgs } from './send'

@@ -10,7 +10,7 @@ import {
   shellResizePty,
   shellSpawnPty,
   shellWritePty,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import observeDocumentTheme from '@/utils/observe-document-theme'

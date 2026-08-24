@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stage CEF binaries for Tauri bundling (macOS / Linux).
 # Requires CEF_PATH (or ~/.local/share/cef from export-cef-dir).
-# Builds pyrola_cef_helper: Linux/Windows use bundle.externalBin; macOS
+# Builds vixl_cef_helper: Linux/Windows use bundle.externalBin; macOS
 # stages nested Helper.app trees under src-tauri/cef-helpers/.
 set -euo pipefail
 
@@ -55,7 +55,7 @@ case "$OS" in
 esac
 
 TARGET_TRIPLE="${CARGO_BUILD_TARGET:-$(rustc -vV | awk '/^host:/{print $2}')}"
-FEATURES=(--features cef --bin pyrola_cef_helper --manifest-path "$SRC_TAURI/Cargo.toml")
+FEATURES=(--features cef --bin vixl_cef_helper --manifest-path "$SRC_TAURI/Cargo.toml")
 BUILD_ARGS=()
 if [[ -n "${CARGO_BUILD_TARGET:-}" ]]; then
   BUILD_ARGS+=(--target "$CARGO_BUILD_TARGET")
@@ -64,16 +64,16 @@ BUILD_ARGS+=("${FEATURES[@]}")
 if [[ "$PROFILE" == "release" ]]; then
   cargo build --release "${BUILD_ARGS[@]}"
   if [[ -n "${CARGO_BUILD_TARGET:-}" ]]; then
-    HELPER_SRC="$SRC_TAURI/target/${CARGO_BUILD_TARGET}/release/pyrola_cef_helper"
+    HELPER_SRC="$SRC_TAURI/target/${CARGO_BUILD_TARGET}/release/vixl_cef_helper"
   else
-    HELPER_SRC="$SRC_TAURI/target/release/pyrola_cef_helper"
+    HELPER_SRC="$SRC_TAURI/target/release/vixl_cef_helper"
   fi
 else
   cargo build "${BUILD_ARGS[@]}"
   if [[ -n "${CARGO_BUILD_TARGET:-}" ]]; then
-    HELPER_SRC="$SRC_TAURI/target/${CARGO_BUILD_TARGET}/debug/pyrola_cef_helper"
+    HELPER_SRC="$SRC_TAURI/target/${CARGO_BUILD_TARGET}/debug/vixl_cef_helper"
   else
-    HELPER_SRC="$SRC_TAURI/target/debug/pyrola_cef_helper"
+    HELPER_SRC="$SRC_TAURI/target/debug/vixl_cef_helper"
   fi
 fi
 
@@ -82,8 +82,8 @@ if [[ ! -f "$HELPER_SRC" ]]; then
   exit 1
 fi
 
-cp "$HELPER_SRC" "$BINARIES/pyrola_cef_helper-${TARGET_TRIPLE}"
-chmod +x "$BINARIES/pyrola_cef_helper-${TARGET_TRIPLE}"
+cp "$HELPER_SRC" "$BINARIES/vixl_cef_helper-${TARGET_TRIPLE}"
+chmod +x "$BINARIES/vixl_cef_helper-${TARGET_TRIPLE}"
 
 if [[ "$OS" == "Darwin" ]]; then
   rm -rf "$HELPERS_DEST"
@@ -132,15 +132,15 @@ PLIST
     codesign --force --sign - "$macos_dir/$exe_name"
     codesign --force --sign - "$app_dir"
   }
-  stage_macos_helper_app "pyrola Helper.app" "app.pyrola.helper" "pyrola Helper"
-  stage_macos_helper_app "pyrola Helper (GPU).app" "app.pyrola.helper.gpu" "pyrola Helper (GPU)"
-  stage_macos_helper_app "pyrola Helper (Plugin).app" "app.pyrola.helper.plugin" "pyrola Helper (Plugin)"
-  stage_macos_helper_app "pyrola Helper (Renderer).app" "app.pyrola.helper.renderer" "pyrola Helper (Renderer)"
-  stage_macos_helper_app "pyrola Helper (Alerts).app" "app.pyrola.helper.alerts" "pyrola Helper (Alerts)"
+  stage_macos_helper_app "vixl Helper.app" "app.vixl.helper" "vixl Helper"
+  stage_macos_helper_app "vixl Helper (GPU).app" "app.vixl.helper.gpu" "vixl Helper (GPU)"
+  stage_macos_helper_app "vixl Helper (Plugin).app" "app.vixl.helper.plugin" "vixl Helper (Plugin)"
+  stage_macos_helper_app "vixl Helper (Renderer).app" "app.vixl.helper.renderer" "vixl Helper (Renderer)"
+  stage_macos_helper_app "vixl Helper (Alerts).app" "app.vixl.helper.alerts" "vixl Helper (Alerts)"
   echo "Staged nested helper apps at $HELPERS_DEST"
 fi
 
 echo "Staged CEF runtime at $DEST"
-echo "Staged helper as $BINARIES/pyrola_cef_helper-${TARGET_TRIPLE}"
+echo "Staged helper as $BINARIES/vixl_cef_helper-${TARGET_TRIPLE}"
 echo "Use: npm run tauri build -- --features cef --config src-tauri/tauri.cef.macos.conf.json"
 # (Linux / Windows overlays: src-tauri/tauri.cef.linux.conf.json / tauri.cef.windows.conf.json)

@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
-import { isTauri } from '@/services/pyrola/pyrola-tauri'
+import { isTauri } from '@/services/vixl/vixl-tauri'
 import formatUnknownError from '@/utils/format-unknown-error'
 
 type UpdateProgress = {

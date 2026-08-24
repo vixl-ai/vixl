@@ -7,17 +7,17 @@ import { sessionTrusts } from '@/services/mcp/mcp-trust'
 import { CODEGRAPH_SERVER_ID } from '@/types/codegraph/managed-codegraph'
 import {
   getActiveProjectId,
-  hasProjectPyrola,
+  hasProjectVixl,
   isTauri,
   lspPrefetchDefaults,
   registryListProjects,
   registryRemoveProject,
   registrySetActiveProject,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 
 const projects = ref<FleetProject[]>([])
 const activeProjectId = ref<string | null>(null)
-const hasProjectPyrolaFlag = ref(false)
+const hasProjectVixlFlag = ref(false)
 const loaded = ref(false)
 let bootstrapPromise: Promise<void> | null = null
 
@@ -40,12 +40,12 @@ export default () => {
     () => projects.value.find((p) => p.id === activeProjectId.value) ?? null,
   )
 
-  const refreshHasPyrola = async (): Promise<void> => {
+  const refreshHasVixl = async (): Promise<void> => {
     if (!activeProject.value) {
-      hasProjectPyrolaFlag.value = false
+      hasProjectVixlFlag.value = false
       return
     }
-    hasProjectPyrolaFlag.value = await hasProjectPyrola(activeProject.value.rootPath)
+    hasProjectVixlFlag.value = await hasProjectVixl(activeProject.value.rootPath)
   }
 
   const refresh = async (): Promise<void> => {
@@ -56,7 +56,7 @@ export default () => {
       persistedActiveId && projects.value.some((project) => project.id === persistedActiveId)
         ? persistedActiveId
         : null
-    await refreshHasPyrola()
+    await refreshHasVixl()
     loaded.value = true
   }
 
@@ -67,7 +67,7 @@ export default () => {
     } catch {
       return
     } finally {
-      await refreshHasPyrola()
+      await refreshHasVixl()
     }
   }
 
@@ -104,7 +104,7 @@ export default () => {
 
     await registrySetActiveProject(projectId)
     activeProjectId.value = projectId
-    await refreshHasPyrola()
+    await refreshHasVixl()
     if (projectId && isTauri()) {
       try {
         await lspPrefetchDefaults()
@@ -181,7 +181,7 @@ export default () => {
     projects,
     activeProject,
     activeProjectId,
-    hasProjectPyrola: hasProjectPyrolaFlag,
+    hasProjectVixl: hasProjectVixlFlag,
     loaded,
     refresh,
     setActiveProject,

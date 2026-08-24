@@ -1,4 +1,4 @@
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 export type OAuthCallbackPayload = {
   code: string
@@ -7,7 +7,7 @@ export type OAuthCallbackPayload = {
 }
 
 export type McpRuntimeOptions = {
-  settings?: PyrolaSettings
+  settings?: VixlSettings
   confirmAuthorizationServerOrigin?: (origin: string) => Promise<boolean>
   skipTrustCheck?: boolean
 }

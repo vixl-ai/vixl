@@ -1,9 +1,9 @@
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { PrefixSnapshot } from '@/types/harness/prefix-snapshot'
 
 export type SystemPromptInput = {
-  mode: PyrolaChatMode
+  mode: VixlChatMode
   projectName: string
   projectRoot: string
   mentions: ContextMention[]

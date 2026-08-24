@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { toast } from 'vue-sonner'
-import { mockPyrolaTauri } from '../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../test-utils/mocks/vixl-tauri'
 import type { GraphListItem } from '@/types/codegraph/graph-list-item'
 import useGraphs from '@/composables/use-graphs'
 
@@ -19,8 +19,8 @@ vi.mock('vue-sonner', () => ({
   },
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     listGraphs: () => listGraphs(),
     deleteGraph: (id: string) => deleteGraph(id),
   }),
@@ -36,7 +36,7 @@ const graphA: GraphListItem = {
   id: 'a'.repeat(64),
   name: 'alpha',
   projectRoot: '/tmp/alpha',
-  storeDir: '/tmp/pyrola/graphs/aa',
+  storeDir: '/tmp/vixl/graphs/aa',
   bytes: 2048,
   missing: false,
 }

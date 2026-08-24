@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 const writeTempHandoff = vi.hoisted(() =>
   vi.fn<(args: { content: string }) => Promise<{ path: string; filename: string }>>(),
 )
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     writeTempHandoff,
   }),
 )
@@ -22,7 +22,7 @@ describe('write-handoff', () => {
     })
   })
 
-  it('writes a markdown handoff via pyrola-tauri', async () => {
+  it('writes a markdown handoff via vixl-tauri', async () => {
     const result = await writeHandoff({
       summary: 'Finished the refactor',
       chatId: 'chat-1',

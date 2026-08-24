@@ -1,6 +1,6 @@
 import { ref } from 'vue'
-import type { McpConfig } from '@/types/pyrola/mcp-config'
-import type { McpServerState } from '@/services/pyrola/pyrola-tauri'
+import type { McpConfig } from '@/types/vixl/mcp-config'
+import type { McpServerState } from '@/services/vixl/vixl-tauri'
 
 export const personalMcp = ref<McpConfig>({ servers: {} })
 export const projectMcp = ref<McpConfig>({ servers: {} })

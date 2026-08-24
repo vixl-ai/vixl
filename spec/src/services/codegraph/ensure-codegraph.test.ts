@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 import type { CodegraphStoreStat } from '@/types/codegraph/store-stat'
 
 const codegraphStoreStat = vi.fn<(projectRoot: string) => Promise<CodegraphStoreStat>>()
@@ -10,8 +10,8 @@ const readMcpConfig = vi.fn<() => Promise<{ servers: Record<string, unknown> }>>
 )
 const writeMcpConfig = vi.fn<() => Promise<void>>(async () => {})
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     isTauri: vi.fn<() => boolean>(() => true),
     codegraphStoreStat,
     codegraphCli,
@@ -41,7 +41,7 @@ vi.mock('@/services/mcp/mcp-runtime', () => ({
   },
 }))
 
-vi.mock('@/services/config/pyrola-config', () => ({
+vi.mock('@/services/config/vixl-config', () => ({
   loadProjectSettings: vi.fn<() => Promise<Record<string, unknown>>>(async () => ({})),
   saveSettings: vi.fn<() => Promise<void>>(async () => {}),
 }))
@@ -51,7 +51,7 @@ vi.mock('@/services/mcp/mcp-trust', () => ({
 }))
 
 const storeStat = (dbExists: boolean): CodegraphStoreStat => ({
-  storeDir: '/Users/aidan/Library/Application Support/pyrola/graphs/abc',
+  storeDir: '/Users/aidan/Library/Application Support/vixl/graphs/abc',
   dbExists,
   graphId: 'a'.repeat(64),
 })

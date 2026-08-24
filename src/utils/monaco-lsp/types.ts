@@ -1,4 +1,4 @@
-export const LSP_MARKER_OWNER = 'pyrola-lsp'
+export const LSP_MARKER_OWNER = 'vixl-lsp'
 
 export type LspPosition = {
   line: number

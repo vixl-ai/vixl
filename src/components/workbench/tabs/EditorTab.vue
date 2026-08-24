@@ -42,7 +42,7 @@ import WorkbenchEditorMarkdownPreview from '@/components/workbench/EditorMarkdow
 import WorkbenchEditorSidePane from '@/components/workbench/EditorSidePane.vue'
 import WorkbenchMonacoEditor from '@/components/workbench/MonacoEditor.vue'
 import useWorkbenchStore from '@/composables/use-workbench-store'
-import { fsReadFile, revealInFolder } from '@/services/pyrola/pyrola-tauri'
+import { fsReadFile, revealInFolder } from '@/services/vixl/vixl-tauri'
 import type { EditorPayload, WorkbenchTab } from '@/types/workbench/workbench-tab'
 
 type EditorMode = 'edit' | 'preview'

@@ -6,10 +6,10 @@ import type {
   McpInputDefinition,
   McpServerConfig,
   McpStdioServer,
-} from '@/types/pyrola/mcp-config'
-import { isMcpHttpServer, isMcpStdioServer } from '@/types/pyrola/mcp-config'
+} from '@/types/vixl/mcp-config'
+import { isMcpHttpServer, isMcpStdioServer } from '@/types/vixl/mcp-config'
 import { mcpInputKey } from '@/services/mcp/mcp-keychain-keys'
-import { getSecret } from '@/services/pyrola/pyrola-tauri'
+import { getSecret } from '@/services/vixl/vixl-tauri'
 
 type SecretRow = {
   key: string

@@ -15,7 +15,7 @@ import {
   getSessionWaiters,
   takeControl,
 } from '@/services/browser/registry'
-import { listChats } from '@/services/pyrola/pyrola-tauri'
+import { listChats } from '@/services/vixl/vixl-tauri'
 import type { BrowserLock } from '@/types/browser/browser-lock'
 import chatRouteFor from '@/utils/chat-route-for'
 

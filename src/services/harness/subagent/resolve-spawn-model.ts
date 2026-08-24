@@ -1,5 +1,5 @@
 import type { ProviderModelGroup } from '@/types/models/provider-model-group'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { isModelAllowed } from '@/services/models/model-catalog-options'
 import loadProviderModelsCatalog from '@/services/models/catalog-cache'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
@@ -11,7 +11,7 @@ type ResolveSpawnModelArgs = {
   callModel?: string
   lockedModel?: string | null
   frontmatterModel?: string
-  settings: PyrolaSettings
+  settings: VixlSettings
 }
 
 const pickChosenModel = (args: ResolveSpawnModelArgs): string | undefined => {

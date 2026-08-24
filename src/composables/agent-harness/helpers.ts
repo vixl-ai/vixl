@@ -1,6 +1,6 @@
 import { toast } from 'vue-sonner'
 import type { ChatAttention } from '@/types/chat/chat-attention'
-import { updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import {
   hasPendingBackgroundResume,
   hasRunningSubagentsForChat,

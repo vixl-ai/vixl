@@ -25,7 +25,7 @@ import {
   type SandboxNetwork,
 } from '@/components/settings/sections/sandbox-settings'
 import useMcpServers from '@/composables/use-mcp-servers'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import groupPersistedPermissionRecords from '@/services/harness/permission/group-persisted-records'
 import labelPermissionCapability from '@/services/harness/permission/label-capability'
 import { parsePermissionRecords } from '@/services/harness/permission/policy'
@@ -34,7 +34,7 @@ import type { PermissionRecord } from '@/types/harness/permission'
 import type { PermissionGroup } from '@/types/harness/permission-group'
 import formatUnknownError from '@/utils/format-unknown-error'
 
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const { refreshStates } = useMcpServers()
 
 const clearing = ref(false)

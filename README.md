@@ -1,4 +1,4 @@
-# Pyrola
+# Vixl
 
 <p align="center">
   <a href="https://github.com/vixl-ai/vixl/actions/workflows/ci.yml"><img src="https://github.com/vixl-ai/vixl/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -23,7 +23,7 @@
   <a href="https://vixl.app/"><img src="https://img.shields.io/badge/Agents%20UI-desktop-8b5cf6" alt="Agents UI" /></a>
 </p>
 
-Pyrola is a local-first BYOK desktop Agents UI (Tauri, Vue, AI SDK).
+Vixl is a local-first BYOK desktop Agents UI (Tauri, Vue, AI SDK).
 
 This project is in alpha. Download a build from [GitHub Releases](https://github.com/vixl-ai/vixl/releases).
 

@@ -1,5 +1,5 @@
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
-import { listPyrolaFiles, fsReadFile } from '@/services/pyrola/pyrola-tauri'
+import { listVixlFiles, fsReadFile } from '@/services/vixl/vixl-tauri'
 import parseAgentMarkdown from '@/services/agents/parse-agent-markdown'
 
 export type ResolvedAgentDefinition = {
@@ -24,13 +24,13 @@ const relativeAgentPath = (projectRoot: string, absolutePath: string, name: stri
     return absolutePath.slice(prefix.length)
   }
   const filename = name.endsWith('.md') ? name : `${name}.md`
-  return `.pyrola/agents/${filename}`
+  return `.vixl/agents/${filename}`
 }
 
 export const listAgentDefinitions = async (
   projectRoot: string,
 ): Promise<ResolvedAgentDefinition[]> => {
-  const entries = await listPyrolaFiles('project', 'agents', projectRoot).catch(() => [])
+  const entries = await listVixlFiles('project', 'agents', projectRoot).catch(() => [])
   const definitions: ResolvedAgentDefinition[] = []
 
   for (const entry of entries) {

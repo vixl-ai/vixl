@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
-import { mockPyrolaTauri } from '../../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 import type { FileDiff } from '@/types/harness/file-diff'
 
 const fsStagePreviewWrite = vi.fn<
@@ -48,8 +48,8 @@ const readMcpConfig = vi.fn<
   (scope: string, projectRoot: string | null) => Promise<unknown>
 >()
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     fsWriteFile,
     fsEditFile,
     fsApplyPatch,
@@ -194,7 +194,7 @@ describe('build-tools call_mcp_tool args normalization', () => {
     projectSlug: 'project',
     chatId: 'chat-1',
     userMessageId: 'user-1',
-    settings: { version: 1 } as PyrolaSettings,
+    settings: { version: 1 } as VixlSettings,
     permissionLevel: 'ask' as const,
     sessionAllows: new Set<string>(),
     sessionDenies: new Set<string>(),

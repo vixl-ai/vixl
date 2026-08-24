@@ -1,4 +1,4 @@
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type {
   PermissionAction,
   PermissionCapabilityKey,
@@ -16,7 +16,7 @@ export type PermissionDecisionInput = {
   action: PermissionAction
   capability: PermissionCapabilityKey
   paths?: string[]
-  settings: PyrolaSettings
+  settings: VixlSettings
   permissionLevel: PermissionLevel
   sessionAllows: Set<string>
   sessionDenies: Set<string>
@@ -89,7 +89,7 @@ export const parsePermissionRecords = (
 
 const findPersisted = (
   capability: PermissionCapabilityKey,
-  settings: PyrolaSettings,
+  settings: VixlSettings,
 ): PermissionRecord | undefined => {
   const records = parsePermissionRecords(settings['agent.permissions'])
   return records.find((record) => record.capability === capability)

@@ -5,11 +5,11 @@ use std::time::Duration;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tauri::{AppHandle, Emitter, Manager};
 
-use super::paths::{resolve_project_pyrola_dir, user_pyrola_dir};
+use super::paths::{resolve_project_vixl_dir, user_vixl_dir};
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PyrolaFileChange {
+pub struct VixlFileChange {
   pub scope: String,
   pub root_path: Option<String>,
   pub kind: String,
@@ -32,7 +32,7 @@ fn classify_change(
   personal_dir: &Path,
   project_dir: Option<&Path>,
   project_root: Option<&str>,
-) -> Option<PyrolaFileChange> {
+) -> Option<VixlFileChange> {
   let in_personal = path.starts_with(personal_dir);
   let in_project = project_dir.is_some_and(|dir| path.starts_with(dir));
 
@@ -74,7 +74,7 @@ fn classify_change(
     return None;
   };
 
-  Some(PyrolaFileChange {
+  Some(VixlFileChange {
     scope: scope.to_string(),
     root_path,
     kind: kind.to_string(),
@@ -88,11 +88,11 @@ fn has_path_segment(path: &Path, segment: &str) -> bool {
 }
 
 #[tauri::command]
-pub fn watch_pyrola_paths(app: AppHandle, project_root: Option<String>) -> Result<(), String> {
-  let personal_dir = user_pyrola_dir(&app)?;
+pub fn watch_vixl_paths(app: AppHandle, project_root: Option<String>) -> Result<(), String> {
+  let personal_dir = user_vixl_dir(&app)?;
   let project_dir = project_root
     .as_ref()
-    .map(|root| resolve_project_pyrola_dir(root));
+    .map(|root| resolve_project_vixl_dir(root));
 
   let state = app.state::<WatchState>();
   let mut guard = state.inner.lock().map_err(|e| e.to_string())?;
@@ -114,7 +114,7 @@ pub fn watch_pyrola_paths(app: AppHandle, project_root: Option<String>) -> Resul
         _ => return,
       }
 
-      let mut latest_change: Option<PyrolaFileChange> = None;
+      let mut latest_change: Option<VixlFileChange> = None;
 
       for path in event.paths {
         if let Some(change) = classify_change(
@@ -134,7 +134,7 @@ pub fn watch_pyrola_paths(app: AppHandle, project_root: Option<String>) -> Resul
       let emit_app = app_handle.clone();
       tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_millis(350)).await;
-        let _ = emit_app.emit("pyrola-file-changed", change);
+        let _ = emit_app.emit("vixl-file-changed", change);
       });
     },
     Config::default(),

@@ -43,10 +43,10 @@ import type { GraphListItem } from '@/types/codegraph/graph-list-item'
 import type { FleetProject } from '@/types/fleet/fleet-project'
 import {
   fsMkdir,
-  getUserPyrolaDir,
+  getUserVixlDir,
   openProjectAtPath,
   revealInFolder,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import formatBytes from '@/utils/format-bytes'
 import projectRouteFor from '@/utils/project-route-for'
 
@@ -85,7 +85,7 @@ const mapOpenedProject = (record: {
 const revealGraphsFolder = async (): Promise<void> => {
   revealingRoot.value = true
   try {
-    const userDir = await getUserPyrolaDir()
+    const userDir = await getUserVixlDir()
     try {
       await fsMkdir({ projectRoot: userDir, path: 'graphs' })
     } catch (mkdirError) {
@@ -184,7 +184,7 @@ const handleConfirmDelete = async (): Promise<void> => {
     </template>
 
     <p class="mb-4 text-sm text-muted-foreground">
-      Indexes live in the pyrola user folder, not in project repos.
+      Indexes live in the vixl user folder, not in project repos.
     </p>
 
     <Empty

@@ -4,9 +4,9 @@ import type { LanguageModelUsage } from 'ai'
 import type { JSONObject } from '@ai-sdk/provider'
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
 import type { ChatUsageTotals } from '@/types/chat/chat-meta'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessEvent } from '@/types/harness/harness-event'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 type EnrichGatewayCostResult = {
   record: BillableUsageRecord | null
@@ -86,8 +86,8 @@ vi.mock('@/services/billing/append-usage-ledger', () => ({
   ) => appendUsageLedger(...args),
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     getSecret: vi.fn<(key: string) => Promise<string | null>>(async () => 'test-key'),
   }),
 )
@@ -169,7 +169,7 @@ describe('captureBillableUsage gateway enrich gate', () => {
           baseURL: 'https://ai-gateway.vercel.sh/v1',
           apiKeyRef: 'gateway',
         },
-      } as PyrolaSettings,
+      } as VixlSettings,
       onEvent: vi.fn<(event: HarnessEvent) => void>(),
     })
 
@@ -238,7 +238,7 @@ describe('captureBillableUsage gateway enrich gate', () => {
           baseURL: 'https://ai-gateway.vercel.sh/v1',
           apiKeyRef: 'gateway',
         },
-      } as PyrolaSettings,
+      } as VixlSettings,
       onEvent,
     })
 
@@ -301,7 +301,7 @@ describe('captureBillableUsage gateway enrich gate', () => {
           baseURL: 'https://ai-gateway.vercel.sh/v1',
           apiKeyRef: 'gateway',
         },
-      } as PyrolaSettings,
+      } as VixlSettings,
       onEvent: vi.fn<(event: HarnessEvent) => void>(),
     })
 
@@ -340,7 +340,7 @@ describe('captureBillableUsage gateway enrich gate', () => {
           baseURL: 'https://ai-gateway.vercel.sh/v1',
           apiKeyRef: 'gateway',
         },
-      } as PyrolaSettings,
+      } as VixlSettings,
       onEvent: vi.fn<(event: HarnessEvent) => void>(),
     })
 

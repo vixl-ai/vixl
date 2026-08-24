@@ -1,8 +1,8 @@
 import { toast } from 'vue-sonner'
 import type { ComputedRef, Ref } from 'vue'
-import type { SettingsTab } from '@/composables/use-pyrola-config'
-import type usePyrolaConfig from '@/composables/use-pyrola-config'
-import type { PyrolaCustomProvider } from '@/types/pyrola/pyrola-settings'
+import type { SettingsTab } from '@/composables/use-vixl-config'
+import type useVixlConfig from '@/composables/use-vixl-config'
+import type { VixlCustomProvider } from '@/types/vixl/vixl-settings'
 import {
   getCustomProvider,
   getProviderCatalogEntry,
@@ -10,14 +10,14 @@ import {
   providerKeyRef,
   providerRequiresApiKey,
 } from '@/services/providers/registry'
-import { deleteSecret, getSecret, setSecret } from '@/services/pyrola/pyrola-tauri'
+import { deleteSecret, getSecret, setSecret } from '@/services/vixl/vixl-tauri'
 import { testProviderConnection } from '@/services/providers/test-connection'
 
-type Settings = ReturnType<ReturnType<typeof usePyrolaConfig>['getScopeSettings']>
+type Settings = ReturnType<ReturnType<typeof useVixlConfig>['getScopeSettings']>
 
 export type ProviderActionsDeps = {
   props: { tab: SettingsTab }
-  config: ReturnType<typeof usePyrolaConfig>
+  config: ReturnType<typeof useVixlConfig>
   testingProviderId: Ref<string | null>
   manageDialogOpen: Ref<boolean>
   manageMode: Ref<'create' | 'edit'>
@@ -34,7 +34,7 @@ export type ProviderActionsDeps = {
 export const createProviderActions = (deps: ProviderActionsDeps) => {
   const handleManageSave = async (payload: {
     providerId: string
-    provider: PyrolaCustomProvider
+    provider: VixlCustomProvider
     apiKey: string | null
     clearApiKey: boolean
   }): Promise<void> => {

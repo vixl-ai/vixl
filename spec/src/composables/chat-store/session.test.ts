@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockPyrolaTauri } from '../../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 const { metaFor } = vi.hoisted(() => {
   const metaFor = (id: string) => ({
@@ -20,8 +20,8 @@ const { metaFor } = vi.hoisted(() => {
   return { metaFor }
 })
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     createChat: vi.fn<() => Promise<unknown>>(),
     listChats: vi.fn<() => Promise<unknown>>(),
     readChatMeta: vi.fn<
@@ -115,7 +115,7 @@ describe('chat session registry isolation', () => {
   })
 
   it('selectChat flips focus sync and warm idle skips message hydrate', async () => {
-    const pyrola = await import('@/services/pyrola/pyrola-tauri')
+    const vixl = await import('@/services/vixl/vixl-tauri')
     const { default: useChatStore, resetChatSessionsForTests } = await import(
       '@/composables/use-chat-store'
     )
@@ -129,8 +129,8 @@ describe('chat session registry isolation', () => {
     warm.finishAgentTurn()
     expect(store.isSessionWarm('proj', 'chat-a')).toBe(true)
 
-    vi.mocked(pyrola.readChatMessages).mockClear()
-    vi.mocked(pyrola.readChatMeta).mockClear()
+    vi.mocked(vixl.readChatMessages).mockClear()
+    vi.mocked(vixl.readChatMeta).mockClear()
 
     store.selectChat('proj', 'chat-b')
     expect(store.activeKey.value).toBe('proj::chat-b')
@@ -138,7 +138,7 @@ describe('chat session registry isolation', () => {
     store.selectChat('proj', 'chat-a')
     const path = await store.ensureChatHydrated('proj', 'chat-a')
     expect(path).toBe('warmIdle')
-    expect(pyrola.readChatMessages).not.toHaveBeenCalled()
+    expect(vixl.readChatMessages).not.toHaveBeenCalled()
     expect(
       store.forChat('proj', 'chat-a').timeline.value.some(
         (item) => item.type === 'agent-turn' && item.turn.id === 'turn-a',

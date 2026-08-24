@@ -1,4 +1,4 @@
-import type { McpServerState } from '@/services/pyrola/pyrola-tauri'
+import type { McpServerState } from '@/services/vixl/vixl-tauri'
 import { httpServers, isUnauthorized, setEntryState } from './store'
 
 export const listHttpResources = async (serverId: string): Promise<unknown> => {

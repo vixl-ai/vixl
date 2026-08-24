@@ -1,7 +1,7 @@
 import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { toast } from 'vue-sonner'
-import { isTauri } from '@/services/pyrola/pyrola-tauri'
+import { isTauri } from '@/services/vixl/vixl-tauri'
 import formatMonacoError from '@/utils/format-monaco-error'
 import type { MonacoHelpers } from './helpers'
 import type { MonacoLsp } from './lsp'

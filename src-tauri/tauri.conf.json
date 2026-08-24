@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "pyrola",
+  "productName": "vixl",
   "version": "0.1.0-alpha.2",
-  "identifier": "app.pyrola",
+  "identifier": "app.vixl",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "pyrola",
+        "title": "vixl",
         "width": 1200,
         "height": 600,
         "minHeight": 480,
@@ -49,7 +49,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM4MjYzODA3MDI2MDY0QzcKUldUSFpHQUNCemdteVB5a3RtL1hTTlRlRWZ4b3RYWjJiSkZML0MxNFFQUm5ISHp4Nkc4bUFQVTAK",
       "endpoints": [
-        "https://github.com/aidanhibbard/pyrola/releases/download/v{{current_version}}/latest.json"
+        "https://github.com/vixl-ai/vixl/releases/download/v{{current_version}}/latest.json"
       ],
       "windows": {
         "installMode": "passive"

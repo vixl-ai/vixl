@@ -1,5 +1,5 @@
-import type { McpConfig, McpInputDefinition, McpServerConfig } from '@/types/pyrola/mcp-config'
-import { isMcpHttpServer, isMcpStdioServer } from '@/types/pyrola/mcp-config'
+import type { McpConfig, McpInputDefinition, McpServerConfig } from '@/types/vixl/mcp-config'
+import { isMcpHttpServer, isMcpStdioServer } from '@/types/vixl/mcp-config'
 import { mcpInputKey } from '@/services/mcp/mcp-keychain-keys'
 import {
   collectRecordInputIds,
@@ -8,7 +8,7 @@ import {
   substituteMcpTemplate,
   type McpTemplateContext,
 } from '@/services/mcp/substitute-mcp-templates'
-import { deleteSecret, getSecret, setSecret } from '@/services/pyrola/pyrola-tauri'
+import { deleteSecret, getSecret, setSecret } from '@/services/vixl/vixl-tauri'
 
 export type MissingMcpInput = McpInputDefinition & {
   serverId: string

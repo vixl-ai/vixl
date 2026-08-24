@@ -4,7 +4,7 @@ import stripCodegraphMcpServer from '@/services/codegraph/strip-codegraph-mcp-se
 import {
   loadProjectSettings,
   saveSettings,
-} from '@/services/config/pyrola-config'
+} from '@/services/config/vixl-config'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
 import { sessionTrusts } from '@/services/mcp/mcp-trust'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
@@ -18,7 +18,7 @@ import {
   isTauri,
   readMcpConfig,
   writeMcpConfig,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import invokeErrorMessage from '@/utils/invoke-error-message'
 
 const inFlightByRoot = new Map<string, Promise<void>>()

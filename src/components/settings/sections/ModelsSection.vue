@@ -13,8 +13,8 @@ import {
 } from '@/components/shadcn/ui/tooltip'
 import SettingsSectionScroll from '@/components/settings/SettingsSectionScroll.vue'
 import ModelsOptionsModelOptionsRow from '@/components/models/options/ModelOptionsRow.vue'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
-import type { SettingsTab } from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
+import type { SettingsTab } from '@/composables/use-vixl-config'
 import {
   MODEL_ROLE_REGISTRY,
   type ModelRoleDefinition,
@@ -25,7 +25,7 @@ const props = defineProps<{
   tab: SettingsTab
 }>()
 
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 
 const settings = computed(() => config.getScopeSettings(props.tab))
 

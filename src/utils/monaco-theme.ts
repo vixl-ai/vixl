@@ -1,8 +1,8 @@
 import type * as monaco from 'monaco-editor'
 import {
-  PYROLA_CODE_THEME_DARK,
-  PYROLA_CODE_THEME_LIGHT,
-} from '@/components/ai-elements/code-block/pyrola-code-theme'
+  VIXL_CODE_THEME_DARK,
+  VIXL_CODE_THEME_LIGHT,
+} from '@/components/ai-elements/code-block/vixl-code-theme'
 
 export const MONACO_EDITOR_FONT_SIZE_DEFAULT = 13
 
@@ -27,19 +27,19 @@ export const MONACO_EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionO
   },
 }
 
-let pyrolaThemesRegistered = false
+let vixlThemesRegistered = false
 
 const isDarkMode = (): boolean =>
   typeof document !== 'undefined' &&
   document.documentElement.classList.contains('dark')
 
-/** Register solid pyrola chrome themes before Shiki loads so the first paint matches. */
+/** Register solid vixl chrome themes before Shiki loads so the first paint matches. */
 export const ensureMonacoBaseThemes = (monacoApi: typeof monaco): void => {
-  if (pyrolaThemesRegistered) {
+  if (vixlThemesRegistered) {
     return
   }
 
-  monacoApi.editor.defineTheme(PYROLA_CODE_THEME_DARK, {
+  monacoApi.editor.defineTheme(VIXL_CODE_THEME_DARK, {
     base: 'vs-dark',
     inherit: true,
     rules: [],
@@ -55,7 +55,7 @@ export const ensureMonacoBaseThemes = (monacoApi: typeof monaco): void => {
     },
   })
 
-  monacoApi.editor.defineTheme(PYROLA_CODE_THEME_LIGHT, {
+  monacoApi.editor.defineTheme(VIXL_CODE_THEME_LIGHT, {
     base: 'vs',
     inherit: true,
     rules: [],
@@ -71,15 +71,15 @@ export const ensureMonacoBaseThemes = (monacoApi: typeof monaco): void => {
     },
   })
 
-  pyrolaThemesRegistered = true
+  vixlThemesRegistered = true
 }
 
-export const markPyrolaMonacoThemesRegistered = (): void => {
-  pyrolaThemesRegistered = true
+export const markVixlMonacoThemesRegistered = (): void => {
+  vixlThemesRegistered = true
 }
 
 export const resolveMonacoThemeId = (): string =>
-  isDarkMode() ? PYROLA_CODE_THEME_DARK : PYROLA_CODE_THEME_LIGHT
+  isDarkMode() ? VIXL_CODE_THEME_DARK : VIXL_CODE_THEME_LIGHT
 
 export const resolveMonacoEditorOptions = (
   fontSize: number = MONACO_EDITOR_FONT_SIZE_DEFAULT,

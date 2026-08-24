@@ -15,7 +15,7 @@ import useBrowserNavigation from '@/composables/use-browser-navigation'
 import useBrowserPassthroughSuspend from '@/composables/use-browser-passthrough-suspend'
 import useBrowserToolbar from '@/composables/use-browser-toolbar'
 import useWorkbenchStore from '@/composables/use-workbench-store'
-import { browserCefLastWarmInitError } from '@/services/pyrola/pyrola-tauri/browser'
+import { browserCefLastWarmInitError } from '@/services/vixl/vixl-tauri/browser'
 import formatUnknownError from '@/utils/format-unknown-error'
 
 export default (workspaceId: string, tabId: string) => {

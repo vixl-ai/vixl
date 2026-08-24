@@ -1,15 +1,15 @@
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
 import billableUsageRecordSchema from '@/schemas/billing/billable-usage-record-schema'
 import {
-  getUserPyrolaDir,
+  getUserVixlDir,
   readJsonFile,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 
 const ledgerPath = async (
   projectSlug: string,
   chatId: string,
 ): Promise<string> => {
-  const root = await getUserPyrolaDir()
+  const root = await getUserVixlDir()
   return `${root}/chats/${projectSlug}/${chatId}/usage-ledger.json`
 }
 

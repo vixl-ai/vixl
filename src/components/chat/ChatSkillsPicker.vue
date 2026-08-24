@@ -12,11 +12,11 @@ import {
 } from '@/components/shadcn/ui/dropdown-menu'
 import useChatSkills from '@/composables/use-chat-skills'
 import useChatPromptBridge from '@/composables/use-chat-prompt-bridge'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { SkillIndexEntry } from '@/types/skills/skill'
 
 defineProps<{
-  mode?: PyrolaChatMode
+  mode?: VixlChatMode
 }>()
 
 const menuOpen = ref(false)

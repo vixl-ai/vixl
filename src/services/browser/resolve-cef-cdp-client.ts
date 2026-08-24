@@ -1,5 +1,5 @@
 import CdpClient from '@/services/browser/cdp-client'
-import { browserCefGetCdpWsUrl } from '@/services/pyrola/pyrola-tauri/browser'
+import { browserCefGetCdpWsUrl } from '@/services/vixl/vixl-tauri/browser'
 
 const clients = new Map<string, CdpClient>()
 const inflight = new Map<string, Promise<CdpClient>>()

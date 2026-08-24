@@ -16,7 +16,7 @@ fn write_fake_bin(dir: &Path, name: &str) -> PathBuf {
 #[cfg(unix)]
 fn unique_dir(label: &str) -> PathBuf {
   env::temp_dir().join(format!(
-    "pyrola-resolve-{label}-{}",
+    "vixl-resolve-{label}-{}",
     uuid::Uuid::new_v4()
   ))
 }
@@ -27,12 +27,12 @@ fn current_path_wins_over_login_and_dirs() {
   let current_dir = unique_dir("current");
   let login_dir = unique_dir("login");
   let extra_dir = unique_dir("extra");
-  let current_bin = write_fake_bin(&current_dir, "pyrola-npx");
-  write_fake_bin(&login_dir, "pyrola-npx");
-  write_fake_bin(&extra_dir, "pyrola-npx");
+  let current_bin = write_fake_bin(&current_dir, "vixl-npx");
+  write_fake_bin(&login_dir, "vixl-npx");
+  write_fake_bin(&extra_dir, "vixl-npx");
 
   let found = resolve_on_sources(
-    "pyrola-npx",
+    "vixl-npx",
     Some(current_dir.as_os_str()),
     Some(login_dir.as_os_str()),
     &[extra_dir.clone()],
@@ -51,11 +51,11 @@ fn current_path_wins_over_login_and_dirs() {
 fn login_path_used_when_current_path_misses() {
   let login_dir = unique_dir("login-only");
   let extra_dir = unique_dir("extra-unused");
-  let login_bin = write_fake_bin(&login_dir, "pyrola-npx");
-  write_fake_bin(&extra_dir, "pyrola-npx");
+  let login_bin = write_fake_bin(&login_dir, "vixl-npx");
+  write_fake_bin(&extra_dir, "vixl-npx");
 
   let found = resolve_on_sources(
-    "pyrola-npx",
+    "vixl-npx",
     Some(OsStr::new("")),
     Some(login_dir.as_os_str()),
     &[extra_dir.clone()],
@@ -72,10 +72,10 @@ fn login_path_used_when_current_path_misses() {
 #[test]
 fn common_dirs_used_when_path_vars_miss() {
   let extra_dir = unique_dir("dirs");
-  let extra_bin = write_fake_bin(&extra_dir, "pyrola-npx");
+  let extra_bin = write_fake_bin(&extra_dir, "vixl-npx");
 
   let found = resolve_on_sources(
-    "pyrola-npx",
+    "vixl-npx",
     Some(OsStr::new("")),
     Some(OsStr::new("")),
     &[extra_dir.clone()],
@@ -91,10 +91,10 @@ fn common_dirs_used_when_path_vars_miss() {
 #[test]
 fn portable_sibling_is_last_fallback() {
   let portable_dir = unique_dir("portable");
-  let portable_bin = write_fake_bin(&portable_dir, "pyrola-npx");
+  let portable_bin = write_fake_bin(&portable_dir, "vixl-npx");
 
   let found = resolve_on_sources(
-    "pyrola-npx",
+    "vixl-npx",
     Some(OsStr::new("")),
     Some(OsStr::new("")),
     &[],
@@ -109,12 +109,12 @@ fn portable_sibling_is_last_fallback() {
 #[test]
 fn missing_command_error_names_basename() {
   let error = resolve_on_sources(
-    "pyrola-missing-npx",
+    "vixl-missing-npx",
     Some(OsStr::new("")),
     Some(OsStr::new("")),
     &[],
     None,
   )
   .expect_err("missing");
-  assert!(error.contains("pyrola-missing-npx"));
+  assert!(error.contains("vixl-missing-npx"));
 }

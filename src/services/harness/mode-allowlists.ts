@@ -1,4 +1,4 @@
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 
 const ASK_TOOLS = [
   'read_file',
@@ -76,7 +76,7 @@ const ORCHESTRATOR_TOOLS = [
   ...BROWSER_TOOLS,
 ] as const
 
-export const MODE_TOOL_ALLOWLIST: Record<PyrolaChatMode, string[]> = {
+export const MODE_TOOL_ALLOWLIST: Record<VixlChatMode, string[]> = {
   ask: [...ASK_TOOLS],
   plan: [...PLAN_TOOLS],
   studio: [
@@ -137,7 +137,7 @@ export const MODE_TOOL_ALLOWLIST: Record<PyrolaChatMode, string[]> = {
 }
 
 export const filterToolsByMode = <T extends { name: string }>(
-  mode: PyrolaChatMode,
+  mode: VixlChatMode,
   tools: T[],
 ): T[] => {
   const allow = new Set(MODE_TOOL_ALLOWLIST[mode])

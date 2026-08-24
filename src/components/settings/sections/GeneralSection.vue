@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { Keyboard, Loader2, Monitor, Moon, RefreshCw, Sun } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
-import { Input } from '@/components/shadcn/ui/input'
 import { Label } from '@/components/shadcn/ui/label'
 import { Progress } from '@/components/shadcn/ui/progress'
 import {
@@ -19,10 +18,10 @@ import {
 } from '@/components/shadcn/ui/tooltip'
 import SettingsSectionScroll from '@/components/settings/SettingsSectionScroll.vue'
 import useAppUpdater from '@/composables/use-app-updater'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import { appShortcutHelp } from '@/utils/keyboard'
 import formatUnknownError from '@/utils/format-unknown-error'
-import type { PyrolaTheme } from '@/types/pyrola/pyrola-settings'
+import type { VixlTheme } from '@/types/vixl/vixl-settings'
 
 const themeOptions = [
   { value: 'light', label: 'Light', icon: Sun },
@@ -30,13 +29,9 @@ const themeOptions = [
   { value: 'system', label: 'System', icon: Monitor },
 ] as const
 
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const updater = useAppUpdater()
 const shortcutsOpen = ref(false)
-
-const machineLabel = computed(
-  () => config.personalSettings.value['general.machineLabel'] ?? 'This machine',
-)
 
 const theme = computed(
   () => config.effectiveSettings.value['appearance.theme'] ?? 'system',
@@ -69,17 +64,7 @@ const downloadProgressLabel = computed(() => {
   return `${current.downloaded} / ${current.contentLength} bytes`
 })
 
-const updateMachineLabel = async (value: string | number): Promise<void> => {
-  try {
-    await config.setMachineLabel(String(value))
-  } catch (error) {
-    toast.error('Failed to save machine label', {
-      description: formatUnknownError(error),
-    })
-  }
-}
-
-const setTheme = async (value: PyrolaTheme): Promise<void> => {
+const setTheme = async (value: VixlTheme): Promise<void> => {
   try {
     await config.setTheme('personal', value)
   } catch (error) {
@@ -113,15 +98,6 @@ const handleDownloadAndRestart = async (): Promise<void> => {
 <template>
   <SettingsSectionScroll title="General">
     <div class="space-y-6">
-      <div class="space-y-2">
-        <Label>Machine label</Label>
-        <p class="text-sm text-muted-foreground">Shown in chat context bar</p>
-        <Input
-          :model-value="machineLabel"
-          @update:model-value="updateMachineLabel"
-        />
-      </div>
-
       <div class="flex items-center gap-1">
         <Label>Theme</Label>
         <Tooltip

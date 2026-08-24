@@ -1,6 +1,6 @@
 import { toast } from 'vue-sonner'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { FileCheckpointFilePolicy } from '@/types/harness/file-checkpoint'
 import type { FileUIPart } from 'ai'
 import type { ContextMention } from '@/types/harness/context-mention'
@@ -15,7 +15,7 @@ import type { AgentHarnessState } from './types'
 type PersistenceDeps = {
   send: (args: {
     text: string
-    mode: PyrolaChatMode
+    mode: VixlChatMode
     model: string
     reasoning?: ReasoningLevel
     mentions?: ContextMention[]
@@ -67,7 +67,7 @@ export default (state: AgentHarnessState, deps: PersistenceDeps) => {
 
   const submitEditMessage = async (args: {
     newContent: string
-    mode: PyrolaChatMode
+    mode: VixlChatMode
     model: string
     reasoning?: ReasoningLevel
     filePolicy?: FileCheckpointFilePolicy
@@ -111,7 +111,7 @@ export default (state: AgentHarnessState, deps: PersistenceDeps) => {
   }
 
   const retryLastTurn = async (args: {
-    mode: PyrolaChatMode
+    mode: VixlChatMode
     model: string
     reasoning?: ReasoningLevel
     filePolicy?: FileCheckpointFilePolicy

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultMcpConfig, migrateMcpConfig } from '@/schemas/mcp-config'
-import { isMcpHttpServer, isMcpStdioServer } from '@/types/pyrola/mcp-config'
+import { isMcpHttpServer, isMcpStdioServer } from '@/types/vixl/mcp-config'
 
 describe('migrateMcpConfig', () => {
   it('returns default for non-objects', () => {

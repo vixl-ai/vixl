@@ -1,19 +1,19 @@
 import { ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import { getFrozenPrefix } from '@/services/harness/prefix-contract'
-import { normalizeStoredModelRef } from '@/schemas/pyrola-settings'
+import { normalizeStoredModelRef } from '@/schemas/vixl-settings'
 import useChatStore from '@/composables/use-chat-store'
 import useContextUsage from '@/composables/use-context-usage'
 import useFleetRegistry from '@/composables/use-fleet-registry'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import useMcpServers from '@/composables/use-mcp-servers'
 
 const draftModelRef = ref('')
-const draftMode = ref<PyrolaChatMode>('agent')
+const draftMode = ref<VixlChatMode>('agent')
 const draftMentions = ref<ContextMention[]>([])
 
 let watchStarted = false
@@ -91,10 +91,10 @@ export default () => {
   const chatStore = useChatStore()
   const contextUsage = useContextUsage()
   const fleet = useFleetRegistry()
-  const config = usePyrolaConfig()
+  const config = useVixlConfig()
   const mcp = useMcpServers()
 
-  const setDraftSelection = (model: string, mode: PyrolaChatMode): void => {
+  const setDraftSelection = (model: string, mode: VixlChatMode): void => {
     if (model) {
       draftModelRef.value = model
     }

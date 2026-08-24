@@ -7,7 +7,7 @@ import {
 import { releaseLocksForChat } from '@/services/browser/registry'
 import { killShellsForChat } from '@/services/harness/shell/registry'
 import { rejectPendingMcpAuthForChat } from '@/services/mcp/mcp-auth-gate'
-import { updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import type { QueuedChatMessage } from '@/types/chat/queued-chat-message'
 import type { SendArgs } from './send'
 import type { AgentHarnessState, AttentionHelpers } from './types'

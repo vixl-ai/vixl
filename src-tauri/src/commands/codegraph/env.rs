@@ -7,11 +7,11 @@ pub fn codegraph_store_env_vars(
 ) -> Vec<(String, String)> {
   vec![
     (
-      "PYROLA_CODEGRAPH_PROJECT".to_string(),
+      "VIXL_CODEGRAPH_PROJECT".to_string(),
       canonical_root.to_string_lossy().to_string(),
     ),
     (
-      "PYROLA_CODEGRAPH_STORE".to_string(),
+      "VIXL_CODEGRAPH_STORE".to_string(),
       store_dir.to_string_lossy().to_string(),
     ),
     (

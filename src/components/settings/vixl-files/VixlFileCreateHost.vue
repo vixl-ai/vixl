@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import AgentCreateForm from '@/components/settings/pyrola-files/AgentCreateForm.vue'
-import PlanCreateForm from '@/components/settings/pyrola-files/PlanCreateForm.vue'
-import RuleCreateForm from '@/components/settings/pyrola-files/RuleCreateForm.vue'
-import SkillCreateForm from '@/components/settings/pyrola-files/SkillCreateForm.vue'
-import StudioCreateForm from '@/components/settings/pyrola-files/StudioCreateForm.vue'
-import type { PyrolaFilesKind } from '@/services/pyrola/pyrola-tauri'
+import AgentCreateForm from '@/components/settings/vixl-files/AgentCreateForm.vue'
+import PlanCreateForm from '@/components/settings/vixl-files/PlanCreateForm.vue'
+import RuleCreateForm from '@/components/settings/vixl-files/RuleCreateForm.vue'
+import SkillCreateForm from '@/components/settings/vixl-files/SkillCreateForm.vue'
+import StudioCreateForm from '@/components/settings/vixl-files/StudioCreateForm.vue'
+import type { VixlFilesKind } from '@/services/vixl/vixl-tauri'
 
 defineProps<{
-  kind: PyrolaFilesKind
+  kind: VixlFilesKind
   open: boolean
   scope: 'personal' | 'project'
   projectRoot?: string

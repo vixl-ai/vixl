@@ -4,14 +4,14 @@ import type { LanguageModelUsage } from 'ai'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
 import type {
-  PyrolaCustomProviderModel,
-  PyrolaSettings,
-} from '@/types/pyrola/pyrola-settings'
+  VixlCustomProviderModel,
+  VixlSettings,
+} from '@/types/vixl/vixl-settings'
 import recordBillableUsage from '@/services/billing/record-billable-usage'
 import appendUsageLedger from '@/services/billing/append-usage-ledger'
 import aggregateTurnUsage from '@/services/billing/aggregate-turn-usage'
 import enrichGatewayCost from '@/services/billing/enrich-gateway-cost'
-import { getSecret } from '@/services/pyrola/pyrola-tauri'
+import { getSecret } from '@/services/vixl/vixl-tauri'
 import {
   getCustomProvider,
   keychainKeyForProvider,
@@ -33,12 +33,12 @@ const gatewayGenerationId = (providerMetadata: unknown): string | undefined => {
 }
 
 const resolveGatewayApiKey = async (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
 ): Promise<string | undefined> => {
   const custom = getCustomProvider(settings, 'gateway')
   const ref =
     custom?.apiKeyRef ??
-    (settings['providers.gateway.apiKeyRef' as keyof PyrolaSettings] as
+    (settings['providers.gateway.apiKeyRef' as keyof VixlSettings] as
       | string
       | undefined)
   if (!ref) {
@@ -63,8 +63,8 @@ export default async (input: {
   providerMetadata?: unknown
   responseId?: string
   subagentId?: string
-  settings: PyrolaSettings
-  customModel?: PyrolaCustomProviderModel
+  settings: VixlSettings
+  customModel?: VixlCustomProviderModel
   onEvent: (event: HarnessEvent) => void
 }): Promise<BillableUsageRecord> => {
   const generationId = gatewayGenerationId(input.providerMetadata)

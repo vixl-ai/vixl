@@ -69,9 +69,9 @@ export default defineConfig({
   // https://v2.tauri.app/start/create-project/#manual-setup-tauri-cli
   server: {
     watch: {
-      // Project `.pyrola/` is runtime config (mcp.json, settings); writing it
+      // Project `.vixl/` is runtime config (mcp.json, settings); writing it
       // must not trigger a Vite full reload / app reboot.
-      ignored: ['**/src-tauri/**', '**/.pyrola/**'],
+      ignored: ['**/src-tauri/**', '**/.vixl/**'],
     },
   },
 })

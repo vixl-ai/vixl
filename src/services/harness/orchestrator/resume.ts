@@ -1,7 +1,7 @@
 import { convertToModelMessages, type ModelMessage } from 'ai'
 import type { ResumeOrchestratorInput } from '@/types/harness/orchestrator-input'
 import createModel from '@/services/providers/create-model'
-import { readChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { readChatMeta } from '@/services/vixl/vixl-tauri'
 import filterMessagesForActiveContext from '@/services/context/filter-messages-for-active-context'
 import {
   clearPendingBackgroundResume,

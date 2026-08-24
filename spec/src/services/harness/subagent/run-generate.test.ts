@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import estimateTextTokens from '@/utils/estimate-text-tokens'
 
@@ -73,7 +73,7 @@ const baseCtx = (): HarnessToolContext => ({
   projectSlug: 'project',
   chatId: 'chat-1',
   turnId: 'turn-1',
-  settings: { version: 1 } as PyrolaSettings,
+  settings: { version: 1 } as VixlSettings,
   permissionLevel: 'ask',
   sessionAllows: new Set(),
   sessionDenies: new Set(),

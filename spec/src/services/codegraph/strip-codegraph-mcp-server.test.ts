@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import stripCodegraphMcpServer from '@/services/codegraph/strip-codegraph-mcp-server'
 import { CODEGRAPH_SERVER_ID } from '@/types/codegraph/managed-codegraph'
-import type { McpConfig } from '@/types/pyrola/mcp-config'
+import type { McpConfig } from '@/types/vixl/mcp-config'
 
 describe('stripCodegraphMcpServer', () => {
   it('removes reserved codegraph without clobbering other servers', () => {

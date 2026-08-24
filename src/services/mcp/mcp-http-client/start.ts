@@ -3,14 +3,14 @@ import {
   ElicitationRequestSchema,
   type OAuthClientProvider,
 } from '@ai-sdk/mcp'
-import type { McpHttpServer } from '@/types/pyrola/mcp-config'
+import type { McpHttpServer } from '@/types/vixl/mcp-config'
 import { isAllowedMcpUrl } from '@/services/mcp/is-allowed-mcp-url'
 import {
   detectMcpToolDrift,
   loadMcpToolBaseline,
   saveMcpToolBaseline,
 } from '@/services/mcp/mcp-tool-baseline'
-import type { McpServerState } from '@/services/pyrola/pyrola-tauri'
+import type { McpServerState } from '@/services/vixl/vixl-tauri'
 import {
   getMcpElicitationHandler,
   httpServers,
@@ -49,7 +49,7 @@ export const startHttpServer = async (
         redirect: 'error',
       },
       maxRetries: 0,
-      clientName: 'Pyrola',
+      clientName: 'Vixl',
       capabilities: {
         elicitation: {},
       },

@@ -5,7 +5,7 @@ import {
   clearAwaitingPlanGo,
   setSubagentModelLock,
 } from '@/services/harness/plan-execution-session'
-import { getUserHomeDir, updateChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { getUserHomeDir, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import { isReasoningLevel } from '@/types/models/reasoning-level'
 import type { AgentThreadViewState } from './types'

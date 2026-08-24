@@ -8,7 +8,7 @@ const makeSelection = (
 ): BrowserElementSelection => {
   const detailOverrides = overrides?.detail
   return {
-    screenshotPath: overrides?.screenshotPath ?? '/tmp/pyrola/screenshots/element.png',
+    screenshotPath: overrides?.screenshotPath ?? '/tmp/vixl/screenshots/element.png',
     screenshotBytes: overrides?.screenshotBytes ?? new Uint8Array([137, 80, 78, 71]),
     detail: {
       xpath: '/html[1]/body[1]/button[1]',
@@ -19,7 +19,7 @@ const makeSelection = (
       boundingBox: { x: 0, y: 0, width: 10, height: 10 },
       computedStyles: {},
       componentHint: null,
-      screenshotPath: '/tmp/pyrola/screenshots/element.png',
+      screenshotPath: '/tmp/vixl/screenshots/element.png',
       outerHTML: '<button class="primary">Save</button>',
       innerText: 'Save',
       pageUrl: 'https://example.com',

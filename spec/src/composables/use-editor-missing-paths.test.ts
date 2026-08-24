@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { mockPyrolaTauri } from '../test-utils/mocks/pyrola-tauri'
+import { mockVixlTauri } from '../test-utils/mocks/vixl-tauri'
 
 const fsStat = vi.hoisted(() =>
   vi.fn<(projectRoot: string, path: string) => Promise<{
@@ -12,8 +12,8 @@ const fsStat = vi.hoisted(() =>
   }>>(),
 )
 
-vi.mock('@/services/pyrola/pyrola-tauri', () =>
-  mockPyrolaTauri({
+vi.mock('@/services/vixl/vixl-tauri', () =>
+  mockVixlTauri({
     fsStat: (...args: [string, string]) => fsStat(...args),
   }),
 )

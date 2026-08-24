@@ -1,6 +1,6 @@
 import type { OAuthClientProvider } from '@ai-sdk/mcp'
-import type { McpHttpServer, McpServerConfig } from '@/types/pyrola/mcp-config'
-import { isMcpHttpServer, isMcpStdioServer } from '@/types/pyrola/mcp-config'
+import type { McpHttpServer, McpServerConfig } from '@/types/vixl/mcp-config'
+import { isMcpHttpServer, isMcpStdioServer } from '@/types/vixl/mcp-config'
 import { isAllowedMcpUrl } from '@/services/mcp/is-allowed-mcp-url'
 import { assertSafeMcpEnvOverlay } from '@/services/mcp/mcp-dangerous-env'
 import {
@@ -18,7 +18,7 @@ import {
   mcpStart,
   mcpStop,
   type McpServerState,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import { assertServerTrusted, clearServerSecrets } from './trust'
 import { createTokenProvider } from './oauth'
 import type { McpRuntimeOptions } from './types'

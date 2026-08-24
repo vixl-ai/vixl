@@ -29,12 +29,12 @@ import {
 import { toast } from 'vue-sonner'
 import McpServerIcon from '@/components/mcp/ServerIcon.vue'
 import useMcpServers from '@/composables/use-mcp-servers'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import { isMcpServerEnabled } from '@/schemas/mcp-config'
 import type { EffectiveMcpServer } from '@/services/mcp/merge-mcp-config'
 import { isMcpTrusted, sessionTrusts } from '@/services/mcp/mcp-trust'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
-import type { SettingsTab } from '@/composables/use-pyrola-config'
+import type { SettingsTab } from '@/composables/use-vixl-config'
 
 const {
   personalMcp,
@@ -47,7 +47,7 @@ const {
   refreshStates,
   listUserMcpServers,
 } = useMcpServers()
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const router = useRouter()
 
 const menuOpen = ref(false)

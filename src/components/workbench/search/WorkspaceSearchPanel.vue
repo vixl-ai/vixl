@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from '@/components/shadcn/ui/alert-dialog'
 import useWorkspaceSearch from '@/composables/workspace-search'
-import type { GrepMatch } from '@/services/pyrola/pyrola-tauri'
+import type { GrepMatch } from '@/services/vixl/vixl-tauri'
 
 const props = defineProps<{
   projectId: string

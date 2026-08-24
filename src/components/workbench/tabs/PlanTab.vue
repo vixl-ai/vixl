@@ -21,13 +21,13 @@ import {
 } from '@/components/shadcn/ui/tooltip'
 import WorkbenchPlansOrchestratePlanDialog from '@/components/workbench/plans/OrchestratePlanDialog.vue'
 import StudioBlocksMermaid from '@/components/studio/blocks/StudioBlocksMermaid.vue'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import useStartPlanBuild from '@/composables/use-start-plan-build'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import parsePlan from '@/services/plans/parse-plan'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
-import { fsReadFile } from '@/services/pyrola/pyrola-tauri'
+import { fsReadFile } from '@/services/vixl/vixl-tauri'
 import type { PlanTodoItem } from '@/types/plans/plan-document'
 import type { PlanPayload, WorkbenchTab } from '@/types/workbench/workbench-tab'
 
@@ -49,7 +49,7 @@ const props = defineProps<{
 }>()
 
 const workbench = useWorkbenchStore()
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const { building, startPlanBuild } = useStartPlanBuild()
 const body = ref('')
 const todos = ref<PlanTodoItem[]>([])

@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 
 use tauri::AppHandle;
 
-use super::paths::{resolve_project_pyrola_dir, user_pyrola_dir};
+use super::paths::{resolve_project_vixl_dir, user_vixl_dir};
 
 fn read_json(path: &PathBuf) -> Result<serde_json::Value, String> {
   if !path.exists() {
@@ -24,12 +24,12 @@ fn write_json(path: &PathBuf, value: serde_json::Value) -> Result<(), String> {
   fs::write(path, content).map_err(|e| e.to_string())
 }
 
-fn path_has_pyrola_ancestor(path: &Path) -> bool {
+fn path_has_vixl_ancestor(path: &Path) -> bool {
   path.ancestors().any(|ancestor| {
     ancestor
       .file_name()
       .and_then(|name| name.to_str())
-      .is_some_and(|name| name == ".pyrola")
+      .is_some_and(|name| name == ".vixl")
   })
 }
 
@@ -75,18 +75,18 @@ fn resolve_json_path_for_allow_check(path: &Path) -> Result<PathBuf, String> {
 }
 
 fn ensure_json_path_allowed(app: &AppHandle, path: &Path) -> Result<PathBuf, String> {
-  let user_dir = user_pyrola_dir(app)?;
+  let user_dir = user_vixl_dir(app)?;
   let user_canon = user_dir
     .canonicalize()
     .unwrap_or_else(|_| user_dir.clone());
 
   let resolved = resolve_json_path_for_allow_check(path)?;
 
-  if resolved.starts_with(&user_canon) || path_has_pyrola_ancestor(&resolved) {
+  if resolved.starts_with(&user_canon) || path_has_vixl_ancestor(&resolved) {
     return Ok(resolved);
   }
 
-  Err("Path is outside allowed .pyrola directories".to_string())
+  Err("Path is outside allowed .vixl directories".to_string())
 }
 
 #[tauri::command]
@@ -158,7 +158,7 @@ fn mcp_path(app: &AppHandle, scope: &str, root_path: Option<String>) -> Result<P
 }
 
 fn lsp_path(app: &AppHandle) -> Result<PathBuf, String> {
-  user_pyrola_dir(app).map(|p| p.join("lsp.json"))
+  user_vixl_dir(app).map(|p| p.join("lsp.json"))
 }
 
 pub(crate) fn load_lsp_config(app: &AppHandle) -> Result<serde_json::Value, String> {
@@ -240,10 +240,10 @@ fn read_settings_internal(
 
 fn base_path(app: &AppHandle, scope: &str, root_path: Option<String>) -> Result<PathBuf, String> {
   match scope {
-    "personal" => user_pyrola_dir(app),
+    "personal" => user_vixl_dir(app),
     "project" => {
       let root = root_path.ok_or_else(|| "root_path required for project scope".to_string())?;
-      let dir = resolve_project_pyrola_dir(&root);
+      let dir = resolve_project_vixl_dir(&root);
       fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
       Ok(dir)
     }

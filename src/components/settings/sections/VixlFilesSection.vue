@@ -20,36 +20,36 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
-import PyrolaFileCreateHost from '@/components/settings/pyrola-files/PyrolaFileCreateHost.vue'
-import PyrolaFileListItem from '@/components/settings/pyrola-files/PyrolaFileListItem.vue'
+import VixlFileCreateHost from '@/components/settings/vixl-files/VixlFileCreateHost.vue'
+import VixlFileListItem from '@/components/settings/vixl-files/VixlFileListItem.vue'
 import SettingsSectionScroll from '@/components/settings/SettingsSectionScroll.vue'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import useFleetRegistry from '@/composables/use-fleet-registry'
-import useStartPyrolaFilesChat from '@/composables/use-start-pyrola-files-chat'
+import useStartVixlFilesChat from '@/composables/use-start-vixl-files-chat'
 import useWorkbenchStore from '@/composables/use-workbench-store'
-import type { SettingsTab } from '@/composables/use-pyrola-config'
+import type { SettingsTab } from '@/composables/use-vixl-config'
 import {
-  lastPyrolaFileChange,
-  pyrolaFileChangeToken,
-} from '@/composables/use-pyrola-live-sync'
-import type { PyrolaFilesKind } from '@/services/pyrola/pyrola-tauri'
+  lastVixlFileChange,
+  vixlFileChangeToken,
+} from '@/composables/use-vixl-live-sync'
+import type { VixlFilesKind } from '@/services/vixl/vixl-tauri'
 import {
   fsMkdir,
-  getPyrolaDir,
-  listPyrolaFiles,
+  getVixlDir,
+  listVixlFiles,
   revealInFolder,
   type ProjectFileEntry,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 
 const props = defineProps<{
   tab: SettingsTab
-  kind: PyrolaFilesKind
+  kind: VixlFilesKind
   title: string
   emptyMessage: string
   folderLabel: string
 }>()
 
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const fleet = useFleetRegistry()
 const workbench = useWorkbenchStore()
 const files = ref<ProjectFileEntry[]>([])
@@ -59,7 +59,7 @@ const scope = computed<'personal' | 'project'>(() =>
   props.tab === 'personal' ? 'personal' : 'project',
 )
 
-const { handleSelectChat } = useStartPyrolaFilesChat({
+const { handleSelectChat } = useStartVixlFilesChat({
   scope,
   kind: toRef(props, 'kind'),
 })
@@ -72,7 +72,7 @@ const usesCreateMenu = computed(
   () => props.kind === 'plans' || props.kind === 'studio',
 )
 
-const NEW_ITEM_TOOLTIPS: Record<PyrolaFilesKind, string> = {
+const NEW_ITEM_TOOLTIPS: Record<VixlFilesKind, string> = {
   plans: 'New plan',
   studio: 'New studio',
   skills: 'New skill',
@@ -94,7 +94,7 @@ const load = async (): Promise<void> => {
     return
   }
 
-  files.value = await listPyrolaFiles(
+  files.value = await listVixlFiles(
     props.tab === 'personal' ? 'personal' : 'project',
     props.kind,
     config.activeRootPath.value,
@@ -111,7 +111,7 @@ const refresh = async (): Promise<void> => {
 
 const revealRoot = async (): Promise<void> => {
   try {
-    const dir = await getPyrolaDir(scope.value, config.activeRootPath.value)
+    const dir = await getVixlDir(scope.value, config.activeRootPath.value)
     const folderPath = `${dir}/${props.folderLabel}`
     await fsMkdir({ projectRoot: dir, path: props.folderLabel }).catch(() => {
       // Best-effort create; reveal will surface real errors.
@@ -188,8 +188,8 @@ watch(
   },
 )
 
-watch(pyrolaFileChangeToken, async () => {
-  const change = lastPyrolaFileChange.value
+watch(vixlFileChangeToken, async () => {
+  const change = lastVixlFileChange.value
   if (change?.kind !== props.kind) {
     return
   }
@@ -280,7 +280,7 @@ watch(pyrolaFileChangeToken, async () => {
     </Empty>
 
     <div v-else class="flex flex-1 min-h-0 flex-col gap-2">
-      <PyrolaFileListItem
+      <VixlFileListItem
         v-for="file in files"
         :key="file.path"
         :file="file"
@@ -289,7 +289,7 @@ watch(pyrolaFileChangeToken, async () => {
       />
     </div>
 
-    <PyrolaFileCreateHost
+    <VixlFileCreateHost
       v-model:open="formOpen"
       :kind="kind"
       :scope="scope"

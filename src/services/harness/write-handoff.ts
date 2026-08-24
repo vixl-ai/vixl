@@ -1,4 +1,4 @@
-import { writeTempHandoff } from '@/services/pyrola/pyrola-tauri'
+import { writeTempHandoff } from '@/services/vixl/vixl-tauri'
 
 export type WriteHandoffInput = {
   summary: string

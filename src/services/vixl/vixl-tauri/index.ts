@@ -4,7 +4,7 @@ export type {
   OAuthLoopbackStart,
   FleetProjectRecord,
   ProjectFileEntry,
-  PyrolaFilesKind,
+  VixlFilesKind,
   McpToolInfo,
   McpServerState,
   HttpProxyRequest,
@@ -26,17 +26,17 @@ export type {
 export type { GraphListItem } from '@/types/codegraph/graph-list-item'
 export type { CodegraphStoreStat } from '@/types/codegraph/store-stat'
 export {
-  getUserPyrolaDir,
+  getUserVixlDir,
   readJsonFile,
   writeJsonFile,
-  hasProjectPyrola,
+  hasProjectVixl,
   readSettings,
   writeSettings,
   readMcpConfig,
   writeMcpConfig,
   readLspConfig,
   writeLspConfig,
-  watchPyrolaPaths,
+  watchVixlPaths,
   getSecret,
   setSecret,
   deleteSecret,
@@ -50,8 +50,8 @@ export {
   getDefaultWorkspaceRoot,
   getUserHomeDir,
   getActiveProjectId,
-  getPyrolaDir,
-  listPyrolaFiles,
+  getVixlDir,
+  listVixlFiles,
   listProjectFiles,
 } from './config'
 export {

@@ -15,9 +15,9 @@ import {
 } from '@/components/shadcn/ui/form'
 import { Input } from '@/components/shadcn/ui/input'
 import { Textarea } from '@/components/shadcn/ui/textarea'
-import AgentToolsInput from '@/components/settings/pyrola-files/AgentToolsInput.vue'
-import PyrolaFileCreateSheet from '@/components/settings/pyrola-files/PyrolaFileCreateSheet.vue'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import AgentToolsInput from '@/components/settings/vixl-files/AgentToolsInput.vue'
+import VixlFileCreateSheet from '@/components/settings/vixl-files/VixlFileCreateSheet.vue'
+import useVixlConfig from '@/composables/use-vixl-config'
 import writeAgent from '@/services/agents/write-agent'
 
 const agentFormSchema = toTypedSchema(
@@ -41,7 +41,7 @@ const emit = defineEmits<{
   (e: 'submitted'): void
 }>()
 
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 
 const saving = ref(false)
 
@@ -90,7 +90,7 @@ const onSubmit = handleSubmit(async (formValues) => {
 </script>
 
 <template>
-  <PyrolaFileCreateSheet
+  <VixlFileCreateSheet
     :open="open"
     @update:open="emit('update:open', $event)"
   >
@@ -165,5 +165,5 @@ const onSubmit = handleSubmit(async (formValues) => {
         {{ saving ? 'Creating...' : 'Create agent' }}
       </Button>
     </form>
-  </PyrolaFileCreateSheet>
+  </VixlFileCreateSheet>
 </template>

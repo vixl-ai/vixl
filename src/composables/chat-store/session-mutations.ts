@@ -8,7 +8,7 @@ import type { PendingQuestionState } from '@/types/chat/pending-question'
 import type { TodoItem, HarnessEvent } from '@/types/harness/harness-event'
 import { resolveQuestion } from '@/services/harness/permission/question-gate'
 import { chatMetaSchema } from '@/schemas/chat-meta'
-import { readChatMeta } from '@/services/pyrola/pyrola-tauri'
+import { readChatMeta } from '@/services/vixl/vixl-tauri'
 import {
   truncateChatLogAfterLastUser,
   truncateChatLogAfterUserMessage,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import groupMatches from '@/services/workspace-search/group-matches'
-import type { GrepMatch } from '@/services/pyrola/pyrola-tauri'
+import type { GrepMatch } from '@/services/vixl/vixl-tauri'
 
 const hit = (
   path: string,

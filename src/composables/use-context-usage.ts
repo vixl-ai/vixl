@@ -5,7 +5,7 @@ import type { ContextBucket } from '@/types/harness/context-bucket'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { PrefixSnapshot } from '@/types/harness/prefix-snapshot'
-import type { PyrolaChatMode, PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ActiveContextSlice } from '@/services/context/filter-messages-for-active-context'
 import countContextBudget from '@/services/context/count-context-budget'
 import parseModelRef from '@/utils/parse-model-ref'
@@ -33,13 +33,13 @@ let refreshGeneration = 0
 
 export type RefreshContextUsageInput = {
   modelId: string
-  mode: PyrolaChatMode
+  mode: VixlChatMode
   projectName: string
   projectRoot: string
   mentions?: ContextMention[]
   messages: UIMessage[]
   timeline?: ChatTimelineItem[]
-  settings?: PyrolaSettings
+  settings?: VixlSettings
   standalone?: boolean
   frozenSnapshot?: PrefixSnapshot | null
   activeContext?: ActiveContextSlice | null

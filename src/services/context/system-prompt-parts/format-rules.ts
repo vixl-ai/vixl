@@ -1,5 +1,5 @@
-import type { ProjectFileEntry } from '@/services/pyrola/pyrola-tauri'
-import { fsReadFile } from '@/services/pyrola/pyrola-tauri'
+import type { ProjectFileEntry } from '@/services/vixl/vixl-tauri'
+import { fsReadFile } from '@/services/vixl/vixl-tauri'
 
 const getRelativePath = (absolutePath: string, projectRoot: string): string | null => {
   const prefix = projectRoot.endsWith('/') ? projectRoot : `${projectRoot}/`

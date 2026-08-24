@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { planTodoItemSchema } from '@/schemas/plan-document'
 import parsePlan from '@/services/plans/parse-plan'
 import { updatePlanTodos } from '@/services/plans/write-plan'
-import { fsReadFile, fsWriteFile } from '@/services/pyrola/pyrola-tauri'
+import { fsReadFile, fsWriteFile } from '@/services/vixl/vixl-tauri'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import {
   getPlanExecutionSession,
@@ -18,7 +18,7 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
       'Replace the todos array in an existing plan file. Omit planPath to use the active plan; if none, updates in-chat Tasks.',
       [
         {
-          planPath: '.pyrola/plans/harness-tool-examples-2026-08-06-221900/PLAN.md',
+          planPath: '.vixl/plans/harness-tool-examples-2026-08-06-221900/PLAN.md',
           todos: [
             {
               id: 'helper',

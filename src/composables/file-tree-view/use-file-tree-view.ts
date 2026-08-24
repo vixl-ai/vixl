@@ -3,7 +3,7 @@ import { toast } from 'vue-sonner'
 import {
   fsListDir,
   fsListDirTree,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { isHomeChatSlug } from '@/constants/home-chat'
 import {

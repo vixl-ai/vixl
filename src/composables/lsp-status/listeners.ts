@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import { listen } from '@tauri-apps/api/event'
-import { isTauri } from '@/services/pyrola/pyrola-tauri'
+import { isTauri } from '@/services/vixl/vixl-tauri'
 import { parseLspDiagnostics } from '@/utils/monaco-lsp'
 import { refreshCatalog, warmDefaults } from './catalog'
 import {

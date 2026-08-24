@@ -1,7 +1,7 @@
 import type { FleetProject } from '@/types/fleet/fleet-project'
 import type { WorkbenchTab } from '@/types/workbench/workbench-tab'
 import useFleetRegistry from '@/composables/use-fleet-registry'
-import { getUserHomeDir } from '@/services/pyrola/pyrola-tauri'
+import { getUserHomeDir } from '@/services/vixl/vixl-tauri'
 import { HOME_WORKSPACE_ID, isHomeChatSlug } from '@/constants/home-chat'
 import {
   activeTabId,

@@ -1,5 +1,5 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ProviderModelGroup } from '@/types/models/provider-model-group'
 import listAllProviderModels from '@/services/providers/list-all-provider-models'
 import collapseProviderModelGroups from '@/services/models/collapse-provider-model-groups'
@@ -10,7 +10,7 @@ import { canonicalizeModelRef } from '@/services/models/resolve-model-ref-for-ca
 import parseModelRef from '@/utils/parse-model-ref'
 
 export type UseProviderModelsCatalogOptions = {
-  settings: Ref<PyrolaSettings> | ComputedRef<PyrolaSettings>
+  settings: Ref<VixlSettings> | ComputedRef<VixlSettings>
   extraModelRefs?: Ref<string[]> | ComputedRef<string[]>
 }
 

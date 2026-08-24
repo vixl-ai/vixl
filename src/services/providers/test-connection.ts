@@ -1,4 +1,4 @@
-import { httpProxyRequest } from '@/services/pyrola/pyrola-tauri'
+import { httpProxyRequest } from '@/services/vixl/vixl-tauri'
 import {
   bearerAuth,
   resolveModelsListRequest,

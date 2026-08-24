@@ -1,6 +1,6 @@
 import aiSdkProviderCatalog from '@/data/ai-sdk-provider-catalog'
 import type { ProviderCatalogEntry } from '@/types/providers/provider-catalog-entry'
-import type { PyrolaCustomProvider, PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlCustomProvider, VixlSettings } from '@/types/vixl/vixl-settings'
 
 export type { ProviderCatalogEntry } from '@/types/providers/provider-catalog-entry'
 
@@ -20,19 +20,19 @@ export const getProviderCatalogEntry = (id: string): ProviderCatalogEntry | unde
 export const providerKeyRef = (providerId: string): string => providerId
 
 export const keychainKeyForProvider = (apiKeyRef: string): string =>
-  `pyrola:provider:${apiKeyRef}`
+  `vixl:provider:${apiKeyRef}`
 
 export const getCustomProvider = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   providerId: string,
-): PyrolaCustomProvider | undefined => {
+): VixlCustomProvider | undefined => {
   const customKey = `providers.custom.${providerId}` as const
   return settings[customKey]
 }
 
 export const providerRequiresApiKey = (
   providerId: string,
-  settings?: PyrolaSettings,
+  settings?: VixlSettings,
 ): boolean => {
   if (settings && getCustomProvider(settings, providerId)) {
     return false

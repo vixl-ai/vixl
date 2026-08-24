@@ -1,6 +1,6 @@
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
-export default (settings: PyrolaSettings): string[] => {
+export default (settings: VixlSettings): string[] => {
   const ids = new Set<string>()
 
   for (const key of Object.keys(settings)) {

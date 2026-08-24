@@ -1,7 +1,7 @@
 import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type { HarnessEvent, TodoItem } from '@/types/harness/harness-event'
-import { appendChatLine } from '@/services/pyrola/pyrola-tauri'
+import { appendChatLine } from '@/services/vixl/vixl-tauri'
 import { nowIso } from './helpers'
 
 export const persistLine = async (

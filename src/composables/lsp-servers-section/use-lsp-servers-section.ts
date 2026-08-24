@@ -10,7 +10,7 @@ import {
   Trash2,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import {
   isTauri,
   lspCatalog,
@@ -19,7 +19,7 @@ import {
   lspSetServerDisabled,
   lspUninstallServer,
   type LspCatalogEntry,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import formatUnknownError from '@/utils/format-unknown-error'
 import lspServerIconName from '@/utils/lsp-server-icon-name'
@@ -27,7 +27,7 @@ import { buildStatusBadges } from './status-badges'
 
 
 export default () => {
-  const config = usePyrolaConfig()
+  const config = useVixlConfig()
   const fleet = useFleetRegistry()
   const catalog = ref<LspCatalogEntry[]>([])
   const installMessage = ref<string | null>(null)

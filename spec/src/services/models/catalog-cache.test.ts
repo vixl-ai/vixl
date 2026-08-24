@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderModelGroup } from '@/types/models/provider-model-group'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const { listAllProviderModels } = vi.hoisted(() => ({
   listAllProviderModels: vi.fn<() => Promise<ProviderModelGroup[]>>(),
@@ -30,7 +30,7 @@ describe('loadProviderModelsCatalog', () => {
     const settings = {
       version: 1,
       'providers.openai.apiKeyRef': `ref-${crypto.randomUUID()}`,
-    } as PyrolaSettings
+    } as VixlSettings
 
     const first = await loadProviderModelsCatalog(settings)
     const second = await loadProviderModelsCatalog(settings)

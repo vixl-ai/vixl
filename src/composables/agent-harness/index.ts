@@ -12,7 +12,7 @@ import type { PendingMcpAuthView } from '@/types/chat/pending-mcp-auth'
 import useChatStore from '@/composables/use-chat-store'
 import useContextUsage from '@/composables/use-context-usage'
 import useChatContextBudgetSync from '@/composables/use-chat-context-budget-sync'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import useFleetSidebar from '@/composables/use-fleet-sidebar'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import useMcpServers from '@/composables/use-mcp-servers'
@@ -48,7 +48,7 @@ export const resetAgentHarnessCacheForTests = (): void => {
 const createAgentHarness = (options: AgentHarnessOptions) => {
   const chatStore = useChatStore()
   const session = chatStore.forChat(options.projectSlug, options.chatId)
-  const config = usePyrolaConfig()
+  const config = useVixlConfig()
   const contextUsage = useContextUsage()
   const contextBudgetSync = useChatContextBudgetSync()
   const fleetSidebar = useFleetSidebar()

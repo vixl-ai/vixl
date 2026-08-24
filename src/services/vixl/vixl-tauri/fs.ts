@@ -12,7 +12,7 @@ export const revealInFolder = (path: string): Promise<void> =>
 
 export const openFolderPicker = async (): Promise<string | null> => {
   if (!isTauri()) {
-    throw new Error('Pyrola desktop APIs are only available in the Tauri app')
+    throw new Error('Vixl desktop APIs are only available in the Tauri app')
   }
 
   const selected = await open({
@@ -32,7 +32,7 @@ export const saveTextFileWithDialog = async (
   content: string,
 ): Promise<boolean> => {
   if (!isTauri()) {
-    throw new Error('Pyrola desktop APIs are only available in the Tauri app')
+    throw new Error('Vixl desktop APIs are only available in the Tauri app')
   }
 
   const path = await save({

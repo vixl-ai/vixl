@@ -12,7 +12,7 @@ const setTauriWindow = (): void => {
   })
 }
 
-describe('pyrola-tauri IPC adapters', () => {
+describe('vixl-tauri IPC adapters', () => {
   beforeEach(() => {
     invoke.mockReset()
     setTauriWindow()
@@ -24,7 +24,7 @@ describe('pyrola-tauri IPC adapters', () => {
       truncated: false,
     })
 
-    const { workspaceGlob } = await import('@/services/pyrola/pyrola-tauri')
+    const { workspaceGlob } = await import('@/services/vixl/vixl-tauri')
     const result = await workspaceGlob('/project', '**/*.ts')
 
     expect(invoke).toHaveBeenCalledWith('workspace_glob', {
@@ -39,7 +39,7 @@ describe('pyrola-tauri IPC adapters', () => {
       truncated: false,
     })
 
-    const { workspaceGrep } = await import('@/services/pyrola/pyrola-tauri')
+    const { workspaceGrep } = await import('@/services/vixl/vixl-tauri')
     const result = await workspaceGrep({
       projectRoot: '/project',
       pattern: 'import',
@@ -70,7 +70,7 @@ describe('pyrola-tauri IPC adapters', () => {
       truncated: false,
     })
 
-    const { workspaceGrep } = await import('@/services/pyrola/pyrola-tauri')
+    const { workspaceGrep } = await import('@/services/vixl/vixl-tauri')
     const result = await workspaceGrep({
       projectRoot: '/project',
       pattern: 'foo',
@@ -99,7 +99,7 @@ describe('pyrola-tauri IPC adapters', () => {
   it('passes tagged write request to fs_stage_preview', async () => {
     invoke.mockResolvedValueOnce([])
 
-    const { fsStagePreviewWrite } = await import('@/services/pyrola/pyrola-tauri')
+    const { fsStagePreviewWrite } = await import('@/services/vixl/vixl-tauri')
     await fsStagePreviewWrite({
       projectRoot: '/project',
       path: 'src/main.ts',
@@ -119,7 +119,7 @@ describe('pyrola-tauri IPC adapters', () => {
   it('passes tagged edit request to fs_stage_preview', async () => {
     invoke.mockResolvedValueOnce([])
 
-    const { fsStagePreviewEdit } = await import('@/services/pyrola/pyrola-tauri')
+    const { fsStagePreviewEdit } = await import('@/services/vixl/vixl-tauri')
     await fsStagePreviewEdit({
       projectRoot: '/project',
       path: 'src/main.ts',
@@ -139,7 +139,7 @@ describe('pyrola-tauri IPC adapters', () => {
   it('passes replacements array to fs_edit_file', async () => {
     invoke.mockResolvedValueOnce({ path: 'src/main.ts', operation: 'update', hunks: [] })
 
-    const { fsEditFile } = await import('@/services/pyrola/pyrola-tauri')
+    const { fsEditFile } = await import('@/services/vixl/vixl-tauri')
     await fsEditFile({
       projectRoot: '/project',
       path: 'src/main.ts',

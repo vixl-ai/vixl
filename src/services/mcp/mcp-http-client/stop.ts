@@ -1,5 +1,5 @@
-import type { McpHttpServer } from '@/types/pyrola/mcp-config'
-import type { McpServerState } from '@/services/pyrola/pyrola-tauri'
+import type { McpHttpServer } from '@/types/vixl/mcp-config'
+import type { McpServerState } from '@/services/vixl/vixl-tauri'
 import { httpServers, setEntryState } from './store'
 
 export const stopHttpServer = async (serverId: string): Promise<void> => {

@@ -1,6 +1,6 @@
 import { ref, watch, type ComputedRef, type Ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { fsStat } from '@/services/pyrola/pyrola-tauri'
+import { fsStat } from '@/services/vixl/vixl-tauri'
 
 export default (
   projectRoot: Ref<string | null> | ComputedRef<string | null>,

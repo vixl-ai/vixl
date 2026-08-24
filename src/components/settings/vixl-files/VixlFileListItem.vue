@@ -6,12 +6,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
-import type { ProjectFileEntry, PyrolaFilesKind } from '@/services/pyrola/pyrola-tauri'
-import { revealInFolder } from '@/services/pyrola/pyrola-tauri'
+import type { ProjectFileEntry, VixlFilesKind } from '@/services/vixl/vixl-tauri'
+import { revealInFolder } from '@/services/vixl/vixl-tauri'
 
 defineProps<{
   file: ProjectFileEntry
-  kind: PyrolaFilesKind
+  kind: VixlFilesKind
 }>()
 
 const emit = defineEmits<{

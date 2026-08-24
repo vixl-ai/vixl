@@ -1,11 +1,11 @@
 import type { RawThemeSetting, ThemeRegistration } from 'shiki'
 
-export const PYROLA_CODE_THEME_LIGHT = 'pyrola-light' as const
-export const PYROLA_CODE_THEME_DARK = 'pyrola-dark' as const
+export const VIXL_CODE_THEME_LIGHT = 'vixl-light' as const
+export const VIXL_CODE_THEME_DARK = 'vixl-dark' as const
 
-export type PyrolaCodeTheme = typeof PYROLA_CODE_THEME_LIGHT | typeof PYROLA_CODE_THEME_DARK
+export type VixlCodeTheme = typeof VIXL_CODE_THEME_LIGHT | typeof VIXL_CODE_THEME_DARK
 
-interface PyrolaSyntaxPalette {
+interface VixlSyntaxPalette {
   background: string
   foreground: string
   comment: string
@@ -26,7 +26,7 @@ interface PyrolaSyntaxPalette {
 }
 
 // oklch(0.145 0 0) background, oklch(0.985 0 0) foreground — muted vs-dark-style tokens
-const pyrolaDarkPalette: PyrolaSyntaxPalette = {
+const vixlDarkPalette: VixlSyntaxPalette = {
   background: '#252525',
   foreground: '#d4d4d4',
   comment: '#707070',
@@ -47,7 +47,7 @@ const pyrolaDarkPalette: PyrolaSyntaxPalette = {
 }
 
 // oklch(1 0 0) background, oklch(0.145 0 0) foreground — muted light-plus-style tokens
-const pyrolaLightPalette: PyrolaSyntaxPalette = {
+const vixlLightPalette: VixlSyntaxPalette = {
   background: '#ffffff',
   foreground: '#252525',
   comment: '#737373',
@@ -67,7 +67,7 @@ const pyrolaLightPalette: PyrolaSyntaxPalette = {
   escape: '#6b5a4a',
 }
 
-const buildTokenColors = (palette: PyrolaSyntaxPalette): RawThemeSetting[] => [
+const buildTokenColors = (palette: VixlSyntaxPalette): RawThemeSetting[] => [
   {
     scope: [
       'meta.embedded',
@@ -325,10 +325,10 @@ const buildTokenColors = (palette: PyrolaSyntaxPalette): RawThemeSetting[] => [
   { scope: 'entity.name.label', settings: { foreground: palette.operator } },
 ]
 
-const createPyrolaTheme = (
-  name: PyrolaCodeTheme,
+const createVixlTheme = (
+  name: VixlCodeTheme,
   type: 'light' | 'dark',
-  palette: PyrolaSyntaxPalette,
+  palette: VixlSyntaxPalette,
 ): ThemeRegistration => ({
   name,
   type,
@@ -341,16 +341,16 @@ const createPyrolaTheme = (
   settings: buildTokenColors(palette),
 })
 
-export const pyrolaCodeThemeDark = createPyrolaTheme(
-  PYROLA_CODE_THEME_DARK,
+export const vixlCodeThemeDark = createVixlTheme(
+  VIXL_CODE_THEME_DARK,
   'dark',
-  pyrolaDarkPalette,
+  vixlDarkPalette,
 )
 
-export const pyrolaCodeThemeLight = createPyrolaTheme(
-  PYROLA_CODE_THEME_LIGHT,
+export const vixlCodeThemeLight = createVixlTheme(
+  VIXL_CODE_THEME_LIGHT,
   'light',
-  pyrolaLightPalette,
+  vixlLightPalette,
 )
 
-export const pyrolaCodeThemes = [pyrolaCodeThemeLight, pyrolaCodeThemeDark] as const
+export const vixlCodeThemes = [vixlCodeThemeLight, vixlCodeThemeDark] as const

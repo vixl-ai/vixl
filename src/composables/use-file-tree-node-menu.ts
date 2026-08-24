@@ -6,7 +6,7 @@ import useChatPromptBridge from '@/composables/use-chat-prompt-bridge'
 import useChatStore from '@/composables/use-chat-store'
 import useFileTreeClipboard from '@/composables/use-file-tree-clipboard'
 import useFleetRegistry from '@/composables/use-fleet-registry'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
 import { setPendingChatMessage } from '@/services/chat/pending-message'
@@ -14,7 +14,7 @@ import {
   fsCopy,
   fsMove,
   revealInFolder,
-} from '@/services/pyrola/pyrola-tauri'
+} from '@/services/vixl/vixl-tauri'
 
 export const FileTreeProjectRootKey: InjectionKey<Ref<string | null>> =
   Symbol('FileTreeProjectRoot')
@@ -83,7 +83,7 @@ export default () => {
   const workbench = useWorkbenchStore()
   const fleet = useFleetRegistry()
   const chatStore = useChatStore()
-  const config = usePyrolaConfig()
+  const config = useVixlConfig()
   const chatPromptBridge = useChatPromptBridge()
   const router = useRouter()
 

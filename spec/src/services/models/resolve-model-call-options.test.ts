@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { resolveModelCallOptions } from '@/services/models/resolve-model-call-options'
 import toCachedInstructions from '@/services/models/to-cached-instructions'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
-const settings = { version: 1 } as PyrolaSettings
+const settings = { version: 1 } as VixlSettings
 
 const frozenSystem = 'Frozen system prefix. Mentions stay out of instructions.'
 
@@ -48,7 +48,7 @@ describe('resolveModelCallOptions prompt cache', () => {
         'models.catalogOptions': {
           'anthropic::claude-opus-4-8': { fast: true },
         },
-      } as PyrolaSettings,
+      } as VixlSettings,
       {
         providerId: 'anthropic',
         modelId: 'claude-opus-4-8',

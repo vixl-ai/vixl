@@ -7,7 +7,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/shadcn/ui/collapsible'
 import { ScrollArea } from '@/components/shadcn/ui/scroll-area'
-import type { GrepMatch } from '@/services/pyrola/pyrola-tauri'
+import type { GrepMatch } from '@/services/vixl/vixl-tauri'
 import type { SearchFileGroup } from '@/types/workbench/search-file-group'
 import openAtLine from '@/utils/open-at-line'
 

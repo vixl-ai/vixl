@@ -1,5 +1,5 @@
 import type CdpClient from '@/services/browser/cdp-client'
-import { appendTempLog } from '@/services/pyrola/pyrola-tauri'
+import { appendTempLog } from '@/services/vixl/vixl-tauri'
 
 type CaptureHandle = {
   logFile: string

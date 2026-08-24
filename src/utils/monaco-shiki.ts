@@ -3,18 +3,18 @@ import { createHighlighter } from 'shiki'
 import { shikiToMonaco, textmateThemeToMonacoTheme } from '@shikijs/monaco'
 import type * as monaco from 'monaco-editor'
 import {
-  PYROLA_CODE_THEME_DARK,
-  PYROLA_CODE_THEME_LIGHT,
-  pyrolaCodeThemeDark,
-  pyrolaCodeThemeLight,
-} from '@/components/ai-elements/code-block/pyrola-code-theme'
+  VIXL_CODE_THEME_DARK,
+  VIXL_CODE_THEME_LIGHT,
+  vixlCodeThemeDark,
+  vixlCodeThemeLight,
+} from '@/components/ai-elements/code-block/vixl-code-theme'
 import {
-  markPyrolaMonacoThemesRegistered,
+  markVixlMonacoThemesRegistered,
   resolveMonacoThemeId,
 } from '@/utils/monaco-theme'
 
 type MonacoApi = typeof monaco
-type PyrolaHighlighter = Awaited<ReturnType<typeof createHighlighter>>
+type VixlHighlighter = Awaited<ReturnType<typeof createHighlighter>>
 
 const PRELOAD_LANGS = [
   'javascript',
@@ -76,8 +76,8 @@ const CUSTOM_LANGUAGE_IDS = [
   'nix',
 ] as const
 
-let highlighterPromise: Promise<PyrolaHighlighter> | null = null
-let highlighterInstance: PyrolaHighlighter | null = null
+let highlighterPromise: Promise<VixlHighlighter> | null = null
+let highlighterInstance: VixlHighlighter | null = null
 let shikiWired = false
 const registeredLanguages = new Set<string>()
 const loadedLanguages = new Set<string>()
@@ -97,18 +97,18 @@ const isDarkMode = (): boolean =>
   document.documentElement.classList.contains('dark')
 
 /** Prefer the active mode as themeIds[0] so shikiToMonaco's initial setTheme matches. */
-const orderedPyrolaThemes = () =>
+const orderedVixlThemes = () =>
   isDarkMode()
-    ? [pyrolaCodeThemeDark, pyrolaCodeThemeLight]
-    : [pyrolaCodeThemeLight, pyrolaCodeThemeDark]
+    ? [vixlCodeThemeDark, vixlCodeThemeLight]
+    : [vixlCodeThemeLight, vixlCodeThemeDark]
 
-const ensureHighlighter = async (): Promise<PyrolaHighlighter> => {
+const ensureHighlighter = async (): Promise<VixlHighlighter> => {
   if (highlighterInstance) {
     return highlighterInstance
   }
   if (!highlighterPromise) {
     highlighterPromise = createHighlighter({
-      themes: orderedPyrolaThemes(),
+      themes: orderedVixlThemes(),
       langs: [...PRELOAD_LANGS],
     })
       .then((highlighter) => {
@@ -131,15 +131,15 @@ const ensureHighlighter = async (): Promise<PyrolaHighlighter> => {
  * colors, which can leave default text unreadable. Redefine with inherit:true
  * and explicit foreground / background.
  */
-const hardenPyrolaMonacoThemes = (monacoApi: MonacoApi, highlighter: PyrolaHighlighter): void => {
+const hardenVixlMonacoThemes = (monacoApi: MonacoApi, highlighter: VixlHighlighter): void => {
   for (const themeId of highlighter.getLoadedThemes()) {
-    if (themeId !== PYROLA_CODE_THEME_LIGHT && themeId !== PYROLA_CODE_THEME_DARK) {
+    if (themeId !== VIXL_CODE_THEME_LIGHT && themeId !== VIXL_CODE_THEME_DARK) {
       continue
     }
     const converted = textmateThemeToMonacoTheme(
       highlighter.getTheme(themeId),
     ) as monaco.editor.IStandaloneThemeData
-    const isDark = themeId === PYROLA_CODE_THEME_DARK
+    const isDark = themeId === VIXL_CODE_THEME_DARK
     const themeData: monaco.editor.IStandaloneThemeData = {
       base: converted.base,
       inherit: true,
@@ -158,15 +158,15 @@ const hardenPyrolaMonacoThemes = (monacoApi: MonacoApi, highlighter: PyrolaHighl
     }
     monacoApi.editor.defineTheme(themeId, themeData)
   }
-  markPyrolaMonacoThemesRegistered()
+  markVixlMonacoThemesRegistered()
 }
 
-const wireShikiToMonaco = (monacoApi: MonacoApi, highlighter: PyrolaHighlighter): void => {
+const wireShikiToMonaco = (monacoApi: MonacoApi, highlighter: VixlHighlighter): void => {
   if (shikiWired) {
     return
   }
   shikiToMonaco(highlighter, monacoApi)
-  hardenPyrolaMonacoThemes(monacoApi, highlighter)
+  hardenVixlMonacoThemes(monacoApi, highlighter)
   // shikiToMonaco sets themeIds[0]; force the active mode so we never flash light/dark.
   monacoApi.editor.setTheme(resolveMonacoThemeId())
   shikiWired = true

@@ -14,7 +14,7 @@ import type {
   McpConfig,
   McpInputDefinition,
   McpServerConfig,
-} from '@/types/pyrola/mcp-config'
+} from '@/types/vixl/mcp-config'
 import useManageMcpServerDialog from '@/composables/manage-mcp-server-dialog'
 
 const props = defineProps<{
@@ -110,7 +110,7 @@ const {
               <div>
                 <Label>Secrets (env)</Label>
                 <p class="text-xs text-muted-foreground">
-                  Name the env var and enter its value once. Pyrola wires it for the process.
+                  Name the env var and enter its value once. Vixl wires it for the process.
                 </p>
               </div>
               <Button

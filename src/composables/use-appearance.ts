@@ -1,10 +1,10 @@
 import { useColorMode } from '@vueuse/core'
 import { onMounted, watch } from 'vue'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 
 export default () => {
   const mode = useColorMode()
-  const config = usePyrolaConfig()
+  const config = useVixlConfig()
 
   const syncTheme = (): void => {
     const theme = config.effectiveSettings.value['appearance.theme'] ?? 'system'

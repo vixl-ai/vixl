@@ -10,9 +10,9 @@ const ARTICLE_HTML = `<!DOCTYPE html>
   <nav>Home Docs Pricing Login</nav>
   <header>Site Chrome Header</header>
   <article>
-    <h1>Installing Pyrola</h1>
+    <h1>Installing Vixl</h1>
     <p>
-      This article explains how to install Pyrola on your workstation with enough
+      This article explains how to install Vixl on your workstation with enough
       prose for Readability to treat it as the primary document content rather
       than navigation chrome or marketing footer copy.
     </p>
@@ -113,8 +113,8 @@ describe('convertWebContent', () => {
       return
     }
     expect(result.kind).toBe('markdown')
-    expect(result.text).toMatch(/Installing Pyrola/)
-    expect(result.text).toMatch(/install Pyrola/)
+    expect(result.text).toMatch(/Installing Vixl/)
+    expect(result.text).toMatch(/install Vixl/)
     expect(result.text).not.toMatch(/window\.TRACK/)
     expect(result.text).not.toMatch(/\.nav\{color:red\}/)
     expect(result.text).not.toMatch(/Home Docs Pricing Login/)

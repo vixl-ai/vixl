@@ -1,11 +1,11 @@
 import type { SideTaskKind } from '@/types/harness/side-task-kind'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 
 export type ModelRoleGroup = 'general' | 'chatModes' | 'nested' | 'backgroundTasks'
 
 export type ModelRoleId =
   | 'default'
-  | PyrolaChatMode
+  | VixlChatMode
   | 'subagent'
   | 'title'
   | 'compaction'

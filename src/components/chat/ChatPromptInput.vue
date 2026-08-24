@@ -49,18 +49,18 @@ import useChatPromptEditor from '@/composables/use-chat-prompt-editor'
 import useChatPromptDraftMedia from '@/composables/use-chat-prompt-draft-media'
 import useContextUsage from '@/composables/use-context-usage'
 import useMcpServers from '@/composables/use-mcp-servers'
-import usePyrolaConfig from '@/composables/use-pyrola-config'
+import useVixlConfig from '@/composables/use-vixl-config'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
 import normalizeCodegraphResult from '@/services/codegraph/normalize-codegraph-result'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
-import { normalizeStoredModelRef } from '@/schemas/pyrola-settings'
+import { normalizeStoredModelRef } from '@/schemas/vixl-settings'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import { CODEGRAPH_SERVER_ID } from '@/types/codegraph/managed-codegraph'
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input/types'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { PermissionLevel } from '@/types/harness/permission'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { FileUIPart } from 'ai'
 import resolveSelectedModelVision from '@/services/harness/resolve-selected-model-vision'
 import contextMentionFromNode from '@/utils/context-mention-from-node'
@@ -89,7 +89,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   submit: [payload: {
     text: string
-    mode: PyrolaChatMode
+    mode: VixlChatMode
     model: string
     projectId: string | null
     permissionLevel: PermissionLevel
@@ -98,7 +98,7 @@ const emit = defineEmits<{
   }]
   submitEdit: [payload: {
     text: string
-    mode: PyrolaChatMode
+    mode: VixlChatMode
     model: string
   }]
   stop: []
@@ -106,7 +106,7 @@ const emit = defineEmits<{
 }>()
 
 const fleet = useFleetRegistry()
-const config = usePyrolaConfig()
+const config = useVixlConfig()
 const git = useGitBranches()
 const chatStore = useChatStore()
 const contextBudgetSync = useChatContextBudgetSync()
@@ -141,7 +141,7 @@ const resolveDefaultPermissionLevel = (): PermissionLevel =>
 const localPermissionLevel = ref<PermissionLevel>(resolveDefaultPermissionLevel())
 
 const session = reactive<{
-  selectedMode: PyrolaChatMode
+  selectedMode: VixlChatMode
   selectedModelRef: string
   modeInitialized: boolean
   modelInitialized: boolean
@@ -218,7 +218,7 @@ const showGitBranch = computed(
   () => git.isRepo.value && promptWorkspaceRoot.value !== null,
 )
 
-const resolveInitialModelRef = (mode: PyrolaChatMode, metaModel?: string): string => {
+const resolveInitialModelRef = (mode: VixlChatMode, metaModel?: string): string => {
   const settings = config.effectiveSettings.value
   const normalizedMeta = metaModel
     ? normalizeStoredModelRef(metaModel) ?? metaModel
@@ -231,7 +231,7 @@ const resolveInitialModelRef = (mode: PyrolaChatMode, metaModel?: string): strin
   return resolveModelForRole(mode, settings) ?? ''
 }
 
-const handleModeSelect = (mode: PyrolaChatMode): void => {
+const handleModeSelect = (mode: VixlChatMode): void => {
   session.selectedMode = mode
   if (!session.selectedModelRef) {
     const resolved = resolveModelForRole(mode, config.effectiveSettings.value)

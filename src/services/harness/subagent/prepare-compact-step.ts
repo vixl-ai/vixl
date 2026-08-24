@@ -1,6 +1,6 @@
 import type { ModelMessage } from 'ai'
 import type { ModelRef } from '@/types/models/model-ref'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import {
@@ -17,7 +17,7 @@ import {
 import estimateTextTokens from '@/utils/estimate-text-tokens'
 
 type PrepareCompactStepInput = {
-  settings: PyrolaSettings
+  settings: VixlSettings
   modelRef: ModelRef
   system: string
   signal: AbortSignal
@@ -43,7 +43,7 @@ const estimatePromptTokens = (
   )
 
 const resolveChildWindow = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   modelRef: ModelRef,
 ): number => {
   const maxInput = resolveMaxInputTokens(settings, modelRef)

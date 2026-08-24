@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { asSchema } from 'ai'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 
 const gateToolPermission = vi.fn<() => Promise<boolean>>().mockResolvedValue(true)
@@ -200,7 +200,7 @@ describe('harness browser tools', () => {
     projectSlug: 'project',
     chatId: 'chat-1',
     userMessageId: 'user-1',
-    settings: { version: 1 } as PyrolaSettings,
+    settings: { version: 1 } as VixlSettings,
     permissionLevel: 'ask' as const,
     sessionAllows: new Set<string>(),
     sessionDenies: new Set<string>(),

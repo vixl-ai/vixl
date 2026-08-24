@@ -55,7 +55,7 @@ vi.mock('@/composables/use-chat-prompt-bridge', () => ({
 }))
 
 const selection: BrowserElementSelection = {
-  screenshotPath: '/tmp/pyrola/screenshots/element.png',
+  screenshotPath: '/tmp/vixl/screenshots/element.png',
   screenshotBytes: new Uint8Array([1, 2, 3]),
   detail: {
     xpath: '/html[1]/body[1]/button[1]',
@@ -66,7 +66,7 @@ const selection: BrowserElementSelection = {
     boundingBox: { x: 10, y: 20, width: 80, height: 32 },
     computedStyles: {},
     componentHint: null,
-    screenshotPath: '/tmp/pyrola/screenshots/element.png',
+    screenshotPath: '/tmp/vixl/screenshots/element.png',
     outerHTML: null,
     innerText: null,
     pageUrl: null,

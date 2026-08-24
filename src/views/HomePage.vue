@@ -7,13 +7,13 @@ import useChatStore from '@/composables/use-chat-store'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import { setPendingChatMessage } from '@/services/chat/pending-message'
-import { getUserHomeDir } from '@/services/pyrola/pyrola-tauri'
+import { getUserHomeDir } from '@/services/vixl/vixl-tauri'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import chatRouteFor from '@/utils/chat-route-for'
 import type { FileUIPart } from 'ai'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { PermissionLevel } from '@/types/harness/permission'
-import type { PyrolaChatMode } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 
 const router = useRouter()
@@ -27,7 +27,7 @@ onMounted(() => {
 
 const handleSubmit = async (payload: {
   text: string
-  mode: PyrolaChatMode
+  mode: VixlChatMode
   model: string
   reasoning?: ReasoningLevel
   projectId: string | null

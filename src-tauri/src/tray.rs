@@ -7,8 +7,8 @@ use tauri::{
 const MAIN_WINDOW_LABEL: &str = "main";
 
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
-  let show_item = MenuItem::with_id(app, "show", "Show Pyrola", true, None::<&str>)?;
-  let quit_item = MenuItem::with_id(app, "quit", "Quit Pyrola", true, None::<&str>)?;
+  let show_item = MenuItem::with_id(app, "show", "Show Vixl", true, None::<&str>)?;
+  let quit_item = MenuItem::with_id(app, "quit", "Quit Vixl", true, None::<&str>)?;
   let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
   let Some(icon) = app.default_window_icon().cloned() else {
@@ -20,7 +20,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     .icon(icon)
     .menu(&menu)
     .show_menu_on_left_click(false)
-    .tooltip("Pyrola")
+    .tooltip("Vixl")
     .build(app)?;
 
   let app_handle = app.clone();

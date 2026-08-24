@@ -1,10 +1,10 @@
 import type { BundledLanguage, HighlighterGeneric, ThemedToken } from 'shiki'
 import { createHighlighter } from 'shiki'
 import {
-  PYROLA_CODE_THEME_DARK,
-  PYROLA_CODE_THEME_LIGHT,
-  pyrolaCodeThemes,
-} from './pyrola-code-theme'
+  VIXL_CODE_THEME_DARK,
+  VIXL_CODE_THEME_LIGHT,
+  vixlCodeThemes,
+} from './vixl-code-theme'
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 export const isItalic = (fontStyle: number | undefined) => fontStyle && fontStyle & 1
@@ -44,7 +44,7 @@ const getHighlighter = (
   }
 
   const highlighterPromise = createHighlighter({
-    themes: [...pyrolaCodeThemes],
+    themes: [...vixlCodeThemes],
     langs: [language],
   }) as unknown as Promise<HighlighterGeneric<BundledLanguage, string>>
 
@@ -101,8 +101,8 @@ export const highlightCode = (
       const result = highlighter.codeToTokens(code, {
         lang: langToUse,
         themes: {
-          light: PYROLA_CODE_THEME_LIGHT,
-          dark: PYROLA_CODE_THEME_DARK,
+          light: VIXL_CODE_THEME_LIGHT,
+          dark: VIXL_CODE_THEME_DARK,
         },
       })
 

@@ -3,7 +3,7 @@
   "bundle": {
     "targets": ["nsis"],
     "externalBin": [
-      "binaries/pyrola_cef_helper"
+      "binaries/vixl_cef_helper"
     ],
     "resources": {
       "cef-runtime/**/*": "./"

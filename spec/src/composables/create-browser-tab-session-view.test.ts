@@ -29,7 +29,7 @@ vi.mock('vue-sonner', () => ({
   },
 }))
 
-vi.mock('@/services/pyrola/pyrola-tauri/browser', () => ({
+vi.mock('@/services/vixl/vixl-tauri/browser', () => ({
   browserCefResize: (
     sessionId: string,
     bounds: CefBounds,

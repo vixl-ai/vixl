@@ -1,4 +1,4 @@
-import type { McpServerState } from '@/services/pyrola/pyrola-tauri'
+import type { McpServerState } from '@/services/vixl/vixl-tauri'
 import { loadingServers, serverStates } from './state'
 
 export const isActiveStatus = (status: string): boolean =>

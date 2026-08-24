@@ -2,8 +2,8 @@ import type {
   McpTrustRecord,
   PermissionRecord,
 } from '@/types/harness/permission'
-import type { PyrolaSettings } from '@/types/pyrola/pyrola-settings'
-import { defaultPyrolaSettings } from '@/schemas/pyrola-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import { defaultVixlSettings } from '@/schemas/vixl-settings'
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -92,16 +92,16 @@ const unionStringArrays = (
 }
 
 export const mergeSettings = (
-  personal: PyrolaSettings,
-  project: PyrolaSettings | null,
-): PyrolaSettings => {
-  const base = { ...defaultPyrolaSettings(), ...personal, version: 1 as const }
+  personal: VixlSettings,
+  project: VixlSettings | null,
+): VixlSettings => {
+  const base = { ...defaultVixlSettings(), ...personal, version: 1 as const }
 
   if (!project) {
     return base
   }
 
-  const merged: PyrolaSettings = { ...base }
+  const merged: VixlSettings = { ...base }
 
   for (const [key, value] of Object.entries(project)) {
     if (key === 'version') {
@@ -146,9 +146,9 @@ export const mergeSettings = (
 }
 
 export const removeSettingsKeys = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   keys: string[],
-): PyrolaSettings => {
+): VixlSettings => {
   const next = { ...settings }
 
   for (const key of keys) {
@@ -164,9 +164,9 @@ export const isPersonalOnlyProjectKey = (key: string): boolean =>
   PERSONAL_ONLY_PROJECT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
 
 export const stripPersonalOnlyProjectOverrides = (
-  settings: PyrolaSettings,
-): PyrolaSettings => {
-  const next: PyrolaSettings = { version: 1 }
+  settings: VixlSettings,
+): VixlSettings => {
+  const next: VixlSettings = { version: 1 }
 
   for (const [key, value] of Object.entries(settings)) {
     if (key === 'version') {
@@ -182,10 +182,10 @@ export const stripPersonalOnlyProjectOverrides = (
 }
 
 export const removeSectionOverrides = (
-  settings: PyrolaSettings,
+  settings: VixlSettings,
   sectionPrefix: string,
-): PyrolaSettings => {
-  const next: PyrolaSettings = { version: 1 }
+): VixlSettings => {
+  const next: VixlSettings = { version: 1 }
   const prefixes =
     sectionPrefix === 'providers'
       ? ['providers.']
@@ -206,8 +206,8 @@ export const removeSectionOverrides = (
   return next
 }
 
-export const parseSettingsRecord = (record: Record<string, unknown>): PyrolaSettings => {
-  const settings: PyrolaSettings = { version: 1 }
+export const parseSettingsRecord = (record: Record<string, unknown>): VixlSettings => {
+  const settings: VixlSettings = { version: 1 }
 
   for (const [key, value] of Object.entries(record)) {
     if (key === 'version') {

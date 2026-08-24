@@ -1,7 +1,7 @@
 import type {
-  PyrolaCustomProvider,
-  PyrolaCustomProviderModel,
-} from '@/types/pyrola/pyrola-settings'
+  VixlCustomProvider,
+  VixlCustomProviderModel,
+} from '@/types/vixl/vixl-settings'
 
 export type KeyValueRow = {
   key: string
@@ -44,7 +44,7 @@ export type ManageProviderDialogProps = {
   open: boolean
   mode: 'create' | 'edit'
   providerId?: string | null
-  initialProvider?: PyrolaCustomProvider | null
+  initialProvider?: VixlCustomProvider | null
   initialApiKeyConfigured?: boolean
   resolveStoredApiKey?: () => Promise<string>
 }
@@ -55,11 +55,11 @@ export type ManageProviderDialogEmit = {
     event: 'save',
     payload: {
       providerId: string
-      provider: PyrolaCustomProvider
+      provider: VixlCustomProvider
       apiKey: string | null
       clearApiKey: boolean
     },
   ): void
 }
 
-export type { PyrolaCustomProvider, PyrolaCustomProviderModel }
+export type { VixlCustomProvider, VixlCustomProviderModel }

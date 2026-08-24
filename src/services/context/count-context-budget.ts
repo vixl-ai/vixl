@@ -1,6 +1,6 @@
 import type { UIMessage } from 'ai'
 import { getContext } from 'tokenlens'
-import type { PyrolaChatMode, PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { ContextBudget } from '@/types/harness/context-budget'
 import type { ContextBucket, ContextBucketId } from '@/types/harness/context-bucket'
@@ -20,7 +20,7 @@ import estimateBuiltinToolDefinitionTokens from '@/services/context/estimate-bui
 import { partsFromFrozenPrefix } from '@/services/harness/prefix-contract'
 import { migrateMcpConfig, isMcpServerEnabled } from '@/schemas/mcp-config'
 import { listUserMcpServers } from '@/services/mcp/merge-mcp-config'
-import { mcpListStatuses, readMcpConfig } from '@/services/pyrola/pyrola-tauri'
+import { mcpListStatuses, readMcpConfig } from '@/services/vixl/vixl-tauri'
 import {
   resolveContextWindow,
   resolveModelCallOptions,
@@ -30,8 +30,8 @@ import {
 export type CountContextBudgetInput = {
   modelId: string
   providerId?: string
-  settings?: PyrolaSettings
-  mode: PyrolaChatMode
+  settings?: VixlSettings
+  mode: VixlChatMode
   projectName: string
   projectRoot: string
   mentions: ContextMention[]
@@ -49,7 +49,7 @@ const DEFAULT_CONTEXT_LIMIT = 128_000
 const resolveContextLimit = (
   modelId: string,
   providerId?: string,
-  settings?: PyrolaSettings,
+  settings?: VixlSettings,
 ): number => {
   if (providerId && settings) {
     const override = resolveContextWindow(settings, { providerId, modelId })
@@ -71,7 +71,7 @@ const resolveContextLimit = (
 const resolveReservedOutput = (
   modelId: string,
   providerId?: string,
-  settings?: PyrolaSettings,
+  settings?: VixlSettings,
 ): number => {
   if (providerId && settings) {
     const options = resolveModelCallOptions(settings, { providerId, modelId })

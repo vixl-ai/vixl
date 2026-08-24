@@ -9,7 +9,7 @@ use super::chat::chat_dir_for;
 use super::fs::{canonical_project_root, resolve_workspace_path};
 
 const MAX_BASELINE_BYTES: u64 = 2 * 1024 * 1024;
-const ABSENT_MARKER: &str = "__pyrola_absent__";
+const ABSENT_MARKER: &str = "__vixl_absent__";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

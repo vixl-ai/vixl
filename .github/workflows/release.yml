@@ -184,9 +184,9 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         with:
           tagName: v__VERSION__
-          releaseName: pyrola v__VERSION__
+          releaseName: vixl v__VERSION__
           releaseBody: |
-            Alpha prerelease for pyrola v__VERSION__. This is an early preview, not a stable release.
+            Alpha prerelease for vixl v__VERSION__. This is an early preview, not a stable release.
 
             This build includes the embedded CEF (`cef` feature). User-facing docs will land later.
 
@@ -220,8 +220,8 @@ jobs:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
-          mkdir -p /tmp/pyrola-release
-          cd /tmp/pyrola-release
+          mkdir -p /tmp/vixl-release
+          cd /tmp/vixl-release
 
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir . --pattern '*'
 
@@ -237,7 +237,7 @@ jobs:
           sha512sum -- "${files[@]}" > SHA512SUMS.txt
 
           {
-            echo "## pyrola v${VERSION} (alpha)"
+            echo "## vixl v${VERSION} (alpha)"
             echo
             echo "This is an alpha prerelease, not a stable release."
             echo

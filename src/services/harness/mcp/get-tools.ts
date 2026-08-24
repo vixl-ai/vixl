@@ -5,7 +5,7 @@ import { listUserMcpServers } from '@/services/mcp/merge-mcp-config'
 import { isMcpTrusted, sessionTrusts } from '@/services/mcp/mcp-trust'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
-import { readMcpConfig } from '@/services/pyrola/pyrola-tauri'
+import { readMcpConfig } from '@/services/vixl/vixl-tauri'
 import { truncateMcpDescription } from '@/services/harness/mcp/auth'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 

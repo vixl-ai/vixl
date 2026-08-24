@@ -3,9 +3,9 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-const SERVICE: &str = "pyrola";
-const KEY_PREFIX: &str = "pyrola:";
-pub const VAULT_ACCOUNT: &str = "pyrola:vault";
+const SERVICE: &str = "vixl";
+const KEY_PREFIX: &str = "vixl:";
+pub const VAULT_ACCOUNT: &str = "vixl:vault";
 
 pub type VaultMap = HashMap<String, String>;
 
@@ -37,9 +37,9 @@ lazy_static! {
   static ref VAULT: Mutex<VaultState> = Mutex::new(VaultState::empty());
 }
 
-pub fn require_pyrola_key(key: &str) -> Result<(), String> {
+pub fn require_vixl_key(key: &str) -> Result<(), String> {
   if !key.starts_with(KEY_PREFIX) {
-    return Err("Keychain key must start with 'pyrola:'".to_string());
+    return Err("Keychain key must start with 'vixl:'".to_string());
   }
   if key == VAULT_ACCOUNT {
     return Err("Keychain key cannot be the vault account".to_string());
@@ -57,7 +57,7 @@ fn map_keyring_error(err: keyring::Error) -> String {
     }
     keyring::Error::NoStorageAccess(inner) => {
       format!(
-        "OS keychain access denied ({inner}). Unlock your system keyring or grant pyrola access."
+        "OS keychain access denied ({inner}). Unlock your system keyring or grant vixl access."
       )
     }
     other => other.to_string(),
@@ -179,7 +179,7 @@ fn migrate_legacy_into_vault(state: &mut VaultState, key: &str) -> Result<Option
 
 #[tauri::command]
 pub fn get_secret(key: String) -> Result<Option<String>, String> {
-  require_pyrola_key(&key)?;
+  require_vixl_key(&key)?;
   let mut state = VAULT
     .lock()
     .map_err(|_| "Keychain vault lock poisoned".to_string())?;
@@ -195,7 +195,7 @@ pub fn get_secret(key: String) -> Result<Option<String>, String> {
 
 #[tauri::command]
 pub fn set_secret(key: String, value: String) -> Result<(), String> {
-  require_pyrola_key(&key)?;
+  require_vixl_key(&key)?;
   let mut state = VAULT
     .lock()
     .map_err(|_| "Keychain vault lock poisoned".to_string())?;
@@ -210,7 +210,7 @@ pub fn set_secret(key: String, value: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn delete_secret(key: String) -> Result<(), String> {
-  require_pyrola_key(&key)?;
+  require_vixl_key(&key)?;
   let mut state = VAULT
     .lock()
     .map_err(|_| "Keychain vault lock poisoned".to_string())?;

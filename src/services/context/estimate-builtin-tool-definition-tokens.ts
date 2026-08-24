@@ -1,11 +1,11 @@
 import { asSchema } from 'ai'
-import type { PyrolaChatMode, PyrolaSettings } from '@/types/pyrola/pyrola-settings'
+import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 import { MODE_TOOL_ALLOWLIST } from '@/services/harness/mode-allowlists'
 import buildTools, { type HarnessToolContext } from '@/services/harness/build-tools'
-import { defaultPyrolaSettings } from '@/schemas/pyrola-settings'
+import { defaultVixlSettings } from '@/schemas/vixl-settings'
 import estimateTextTokens from '@/utils/estimate-text-tokens'
 
-const buildStubContext = (settings: PyrolaSettings): HarnessToolContext => ({
+const buildStubContext = (settings: VixlSettings): HarnessToolContext => ({
   projectRoot: '/',
   projectSlug: '_budget',
   chatId: '_budget',
@@ -18,8 +18,8 @@ const buildStubContext = (settings: PyrolaSettings): HarnessToolContext => ({
   onPendingApproval: () => {},
 })
 
-export default (mode: PyrolaChatMode, settings?: PyrolaSettings): number => {
-  const tools = buildTools(buildStubContext(settings ?? defaultPyrolaSettings()))
+export default (mode: VixlChatMode, settings?: VixlSettings): number => {
+  const tools = buildTools(buildStubContext(settings ?? defaultVixlSettings()))
   const allow = new Set(MODE_TOOL_ALLOWLIST[mode])
   let total = 0
 

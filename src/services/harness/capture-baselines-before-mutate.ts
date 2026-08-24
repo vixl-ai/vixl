@@ -1,4 +1,4 @@
-import { fileCheckpointCapture } from '@/services/pyrola/pyrola-tauri'
+import { fileCheckpointCapture } from '@/services/vixl/vixl-tauri'
 
 type CaptureContext = {
   projectRoot: string
