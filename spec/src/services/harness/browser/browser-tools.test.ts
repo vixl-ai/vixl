@@ -199,6 +199,7 @@ describe('harness browser tools', () => {
     projectRoot: '/project',
     projectSlug: 'project',
     chatId: 'chat-1',
+    mode: 'agent' as const,
     userMessageId: 'user-1',
     settings: { version: 1 } as VixlSettings,
     permissionLevel: 'ask' as const,

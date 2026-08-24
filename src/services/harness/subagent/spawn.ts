@@ -15,6 +15,7 @@ import {
 } from '@/services/harness/subagent/helpers'
 import resolveSpawnModel from '@/services/harness/subagent/resolve-spawn-model'
 import runSubagentGenerate from '@/services/harness/subagent/run-generate'
+import { READ_ONLY_SPAWN_MODES } from '@/services/harness/subagent/constants'
 import withToolExamples from '@/services/harness/with-tool-examples'
 import linkAbortSignal from '@/utils/link-abort-signal'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
@@ -22,7 +23,7 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 const spawnSubagent = (ctx: HarnessToolContext) =>
   tool({
     description: withToolExamples(
-      "Spawn a subagent. Default mode is blocking (waits until complete). Set mode to background to run concurrently: return immediately, end your turn, and do not poll with terminal_output (subagentId is not a shell_id). The harness resumes this chat with the summary when all background subagents finish. Default capabilities are read-only. Edit, write, modify, delete, move, or shell/git mutations REQUIRE capabilities: 'write'. A read-only subagent can only report; it cannot make changes. agentName must be a very brief verb phrase that explains the work (for example \"Reading auth\", \"Editing config\").",
+      "Spawn a subagent. Default mode is blocking (waits until complete). Set mode to background to run concurrently: return immediately, end your turn, and do not poll with terminal_output (subagentId is not a shell_id). The harness resumes this chat with the summary when all background subagents finish. Default capabilities are read-only. Edit, write, modify, delete, move, or shell/git mutations REQUIRE capabilities: 'write'. A read-only subagent can only report; it cannot make changes. In Ask, Plan, and Studio modes, subagents are restricted to read-only; the write capability is rejected. agentName must be a very brief verb phrase that explains the work (for example \"Reading auth\", \"Editing config\").",
       [
         {
           agentName: 'Reading auth',
@@ -86,6 +87,16 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         throw new Error('Subagent aborted')
       }
 
+      const resolvedCapabilities = capabilities ?? 'read-only'
+      if (
+        READ_ONLY_SPAWN_MODES.has(ctx.mode) &&
+        resolvedCapabilities === 'write'
+      ) {
+        throw new Error(
+          `Write-capable subagents are not allowed in ${ctx.mode} mode. Spawn with capabilities: "read-only" (the default).`,
+        )
+      }
+
       const subagentId = crypto.randomUUID()
       const lockedSubagentModel = getPlanExecutionSession(
         ctx.projectSlug,
@@ -102,7 +113,6 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         settings: ctx.settings,
       })
       const blocking = mode === 'blocking'
-      const resolvedCapabilities = capabilities ?? 'read-only'
       const controller = new AbortController()
       linkAbortSignal(ctx.signal, controller)
 

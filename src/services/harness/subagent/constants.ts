@@ -1,3 +1,7 @@
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
+
+export const READ_ONLY_SPAWN_MODES = new Set<VixlChatMode>(['ask', 'plan', 'studio'])
+
 export const SUBAGENT_READ_ONLY_TOOLS = [
   'read_file',
   'list_dir',

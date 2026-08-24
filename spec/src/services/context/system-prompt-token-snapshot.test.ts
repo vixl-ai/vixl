@@ -17,39 +17,39 @@ const TOOLS_HINT =
 const MODES: VixlChatMode[] = ['ask', 'plan', 'studio', 'agent', 'orchestrator']
 
 /**
- * Empty-project (standalone, no rules, no MCP) ceilings after Slice 1 trims.
+ * Empty-project (standalone, no rules, no MCP) ceilings after the capability model.
  * Measured totals (system join + builtin tool defs, chars/4):
- * ask 2368, plan 2916, studio 4329, agent 10532, orchestrator 8937.
+ * ask 8023, plan 8566, studio 9427, agent 10562, orchestrator 8968.
  * Headroom is about 3 percent so waste cannot return unnoticed.
  */
 const TOTAL_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 2450,
-  plan: 3000,
-  studio: 4450,
+  ask: 8270,
+  plan: 8830,
+  studio: 9710,
   agent: 10600,
   orchestrator: 9000,
 }
 
 const BASE_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 610,
-  plan: 680,
-  studio: 780,
+  ask: 1130,
+  plan: 1180,
+  studio: 1280,
   agent: 1460,
   orchestrator: 1320,
 }
 
 const SKILLS_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 40,
-  plan: 30,
+  ask: 45,
+  plan: 40,
   studio: 90,
   agent: 35,
   orchestrator: 35,
 }
 
 const TOOL_DEF_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 1800,
-  plan: 2300,
-  studio: 3600,
+  ask: 7080,
+  plan: 7600,
+  studio: 8340,
   agent: 9150,
   orchestrator: 7700,
 }
@@ -93,7 +93,7 @@ const measureMode = async (mode: VixlChatMode): Promise<ModeSnapshot> => {
 
 describe('system prompt token snapshot (empty project)', () => {
   it.each(MODES)(
-    'keeps %s system plus builtin tool-def tokens under Slice 1 ceilings',
+    'keeps %s system plus builtin tool-def tokens under capability-model ceilings',
     async (mode) => {
       const snapshot = await measureMode(mode)
       expect(snapshot.parts.tools).toBe(TOOLS_HINT)
@@ -118,9 +118,9 @@ describe('system prompt token snapshot (empty project)', () => {
     expect(studio.total).toBeLessThan(agent.total)
   })
 
-  it('omits browser CDP, apply_patch, and shell guidance from ask', async () => {
+  it('includes browser guidance but omits patch and shell guidance from ask', async () => {
     const snapshot = await measureMode('ask')
-    expect(snapshot.systemString).not.toContain('browser_cdp')
+    expect(snapshot.systemString).toContain('browser_cdp')
     expect(snapshot.systemString).not.toContain('apply_patch')
     expect(snapshot.systemString).not.toContain('run_terminal only')
   })

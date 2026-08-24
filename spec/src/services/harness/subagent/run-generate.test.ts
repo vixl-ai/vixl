@@ -72,6 +72,7 @@ const baseCtx = (): HarnessToolContext => ({
   projectRoot: '/tmp/project',
   projectSlug: 'project',
   chatId: 'chat-1',
+  mode: 'agent',
   turnId: 'turn-1',
   settings: { version: 1 } as VixlSettings,
   permissionLevel: 'ask',

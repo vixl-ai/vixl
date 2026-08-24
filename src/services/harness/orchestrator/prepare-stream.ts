@@ -222,6 +222,7 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     projectRoot,
     projectSlug,
     chatId,
+    mode,
     userMessageId,
     // AgentTurn.id is passed as assistantId from use-agent-harness.
     turnId: assistantId,

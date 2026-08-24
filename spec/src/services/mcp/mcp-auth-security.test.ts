@@ -50,18 +50,13 @@ describe('mode allowlists mcp', () => {
     'get_mcp_prompt',
   ]
 
-  it('includes MCP in studio, agent, orchestrator', () => {
+  it('includes MCP in ask, plan, studio, agent, and orchestrator', () => {
     for (const name of mcpTools) {
+      expect(MODE_TOOL_ALLOWLIST.ask).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.plan).toContain(name)
       expect(MODE_TOOL_ALLOWLIST.studio).toContain(name)
       expect(MODE_TOOL_ALLOWLIST.agent).toContain(name)
       expect(MODE_TOOL_ALLOWLIST.orchestrator).toContain(name)
-    }
-  })
-
-  it('excludes MCP from ask and plan', () => {
-    for (const name of mcpTools) {
-      expect(MODE_TOOL_ALLOWLIST.ask).not.toContain(name)
-      expect(MODE_TOOL_ALLOWLIST.plan).not.toContain(name)
     }
   })
 

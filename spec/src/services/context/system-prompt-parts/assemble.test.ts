@@ -24,12 +24,12 @@ describe('assemble system prompt parts', () => {
     expect(parts.base).not.toContain('- read_file:')
   })
 
-  it('omits browser, shell, MCP, and patch guidance from ask and plan', async () => {
+  it('includes browser and MCP but not shell or patch guidance for ask and plan', async () => {
     for (const mode of ['ask', 'plan'] as const) {
       const parts = await assembleSystemPromptParts(input(mode))
-      expect(parts.base).not.toContain('browser_lock')
+      expect(parts.base).toContain('browser_lock')
+      expect(parts.base).toContain('get_mcp_tools if stale')
       expect(parts.base).not.toContain('run_terminal only')
-      expect(parts.base).not.toContain('get_mcp_tools if stale')
       expect(parts.base).not.toContain('apply_patch is OpenCode-style')
     }
   })
@@ -42,11 +42,11 @@ describe('assemble system prompt parts', () => {
     expect(parts.base).toContain('apply_patch is OpenCode-style')
   })
 
-  it('includes MCP and shell but not browser or patch for studio', async () => {
+  it('includes MCP, shell, and browser but not patch for studio', async () => {
     const parts = await assembleSystemPromptParts(input('studio'))
     expect(parts.base).toContain('get_mcp_tools if stale')
     expect(parts.base).toContain('run_terminal only')
-    expect(parts.base).not.toContain('browser_lock')
+    expect(parts.base).toContain('browser_lock')
     expect(parts.base).not.toContain('apply_patch is OpenCode-style')
   })
 

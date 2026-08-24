@@ -6,12 +6,13 @@ describe('loadToolGuidanceForMode', () => {
     const ask = loadToolGuidanceForMode('ask')
     expect(ask).toContain('codebase_explore')
     expect(ask).toContain('function calls')
-    expect(ask).not.toContain('browser_cdp')
   })
 
-  it('adds browser guidance only for agent and orchestrator', () => {
+  it('includes browser guidance in all modes', () => {
+    expect(loadToolGuidanceForMode('ask')).toContain('browser_lock')
+    expect(loadToolGuidanceForMode('plan')).toContain('browser_lock')
+    expect(loadToolGuidanceForMode('studio')).toContain('browser_lock')
     expect(loadToolGuidanceForMode('agent')).toContain('browser_lock')
     expect(loadToolGuidanceForMode('orchestrator')).toContain('browser_lock')
-    expect(loadToolGuidanceForMode('studio')).not.toContain('browser_lock')
   })
 })

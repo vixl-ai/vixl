@@ -9,6 +9,7 @@ const buildStubContext = (settings: VixlSettings): HarnessToolContext => ({
   projectRoot: '/',
   projectSlug: '_budget',
   chatId: '_budget',
+  mode: 'agent',
   settings,
   permissionLevel: 'bypass',
   sessionAllows: new Set(),

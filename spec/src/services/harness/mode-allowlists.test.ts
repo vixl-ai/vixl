@@ -55,11 +55,11 @@ describe('mode allowlists browser tools', () => {
     }
   })
 
-  it('excludes browser tools from ask, plan, and studio', () => {
+  it('includes browser tools in ask, plan, and studio', () => {
     for (const name of browserTools) {
-      expect(MODE_TOOL_ALLOWLIST.ask).not.toContain(name)
-      expect(MODE_TOOL_ALLOWLIST.plan).not.toContain(name)
-      expect(MODE_TOOL_ALLOWLIST.studio).not.toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.ask).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.plan).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.studio).toContain(name)
     }
   })
 })
@@ -70,10 +70,38 @@ describe('mode allowlists resolve_models', () => {
     expect(MODE_TOOL_ALLOWLIST.orchestrator).toContain('resolve_models')
   })
 
-  it('excludes resolve_models from ask, plan, and studio', () => {
-    expect(MODE_TOOL_ALLOWLIST.ask).not.toContain('resolve_models')
-    expect(MODE_TOOL_ALLOWLIST.plan).not.toContain('resolve_models')
-    expect(MODE_TOOL_ALLOWLIST.studio).not.toContain('resolve_models')
+  it('includes resolve_models in ask, plan, and studio', () => {
+    expect(MODE_TOOL_ALLOWLIST.ask).toContain('resolve_models')
+    expect(MODE_TOOL_ALLOWLIST.plan).toContain('resolve_models')
+    expect(MODE_TOOL_ALLOWLIST.studio).toContain('resolve_models')
+  })
+})
+
+describe('mode allowlists spawn_subagent', () => {
+  it('includes spawn_subagent in ask, plan, studio, agent, and orchestrator', () => {
+    expect(MODE_TOOL_ALLOWLIST.ask).toContain('spawn_subagent')
+    expect(MODE_TOOL_ALLOWLIST.plan).toContain('spawn_subagent')
+    expect(MODE_TOOL_ALLOWLIST.studio).toContain('spawn_subagent')
+    expect(MODE_TOOL_ALLOWLIST.agent).toContain('spawn_subagent')
+    expect(MODE_TOOL_ALLOWLIST.orchestrator).toContain('spawn_subagent')
+  })
+})
+
+describe('mode allowlists mcp tools', () => {
+  const mcpTools = [
+    'call_mcp_tool',
+    'get_mcp_tools',
+    'list_mcp_resources',
+    'read_mcp_resource',
+    'get_mcp_prompt',
+  ]
+
+  it('includes mcp tools in ask, plan, and studio', () => {
+    for (const name of mcpTools) {
+      expect(MODE_TOOL_ALLOWLIST.ask).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.plan).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.studio).toContain(name)
+    }
   })
 })
 
@@ -98,6 +126,52 @@ describe('mode allowlists update_todos', () => {
   })
 })
 
+describe('mode allowlists mutations', () => {
+  const askAndPlanExcluded = [
+    'write_file',
+    'edit_file',
+    'apply_patch',
+    'delete_file',
+    'move_file',
+    'run_terminal',
+    'git_commit',
+    'git_checkout',
+    'git_branch_create',
+    'update_todos',
+    'write_studio_artifact',
+  ]
+
+  const studioExcluded = [
+    'write_file',
+    'edit_file',
+    'apply_patch',
+    'delete_file',
+    'move_file',
+    'git_commit',
+    'git_checkout',
+    'git_branch_create',
+    'update_todos',
+  ]
+
+  it('excludes mutations from ask and plan', () => {
+    for (const name of askAndPlanExcluded) {
+      expect(MODE_TOOL_ALLOWLIST.ask).not.toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.plan).not.toContain(name)
+    }
+    expect(MODE_TOOL_ALLOWLIST.ask).not.toContain('create_plan')
+    expect(MODE_TOOL_ALLOWLIST.plan).toContain('create_plan')
+  })
+
+  it('excludes file and git mutations from studio while keeping shell and studio artifact', () => {
+    for (const name of studioExcluded) {
+      expect(MODE_TOOL_ALLOWLIST.studio).not.toContain(name)
+    }
+    expect(MODE_TOOL_ALLOWLIST.studio).toContain('run_terminal')
+    expect(MODE_TOOL_ALLOWLIST.studio).toContain('write_studio_artifact')
+    expect(MODE_TOOL_ALLOWLIST.studio).toContain('create_plan')
+  })
+})
+
 describe('mode allowlists web_fetch', () => {
   it('includes web_fetch in ask, plan, studio, agent, and orchestrator', () => {
     expect(MODE_TOOL_ALLOWLIST.ask).toContain('web_fetch')
@@ -109,7 +183,7 @@ describe('mode allowlists web_fetch', () => {
 
   it('does not treat web_fetch as a browser tool', () => {
     expect(MODE_TOOL_ALLOWLIST.ask).toContain('web_fetch')
-    expect(MODE_TOOL_ALLOWLIST.ask).not.toContain('browser_navigate')
-    expect(MODE_TOOL_ALLOWLIST.ask).not.toContain('browser_snapshot')
+    expect(MODE_TOOL_ALLOWLIST.ask).toContain('browser_navigate')
+    expect(MODE_TOOL_ALLOWLIST.ask).toContain('browser_snapshot')
   })
 })
