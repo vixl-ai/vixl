@@ -29,7 +29,7 @@ and `SECURITY.md` for security reports.
 Requirements: **Node.js** matching `.nvmrc` (currently 26.7.0; CI reads the same file), **npm**, and a Rust toolchain for the Tauri shell.
 
 ```bash
-git clone https://github.com/aidanhibbard/pyrola.git
+git clone https://github.com/vixl-ai/vixl.git
 cd pyrola
 npm ci
 ```

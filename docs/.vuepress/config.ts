@@ -4,15 +4,15 @@ import { defaultTheme } from '@vuepress/theme-default'
 import { defineUserConfig } from 'vuepress'
 
 export default defineUserConfig({
-  base: '/pyrola/',
+  base: '/',
   lang: 'en-US',
-  title: 'pyrola',
+  title: 'vixl',
   description: 'Local-first BYOK Agents UI',
 
   bundler: viteBundler(),
 
   theme: defaultTheme({
-    repo: 'aidanhibbard/pyrola',
+    repo: 'vixl-ai/vixl',
     docsDir: 'docs',
     docsBranch: 'main',
     editLink: true,

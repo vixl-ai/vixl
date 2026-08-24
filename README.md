@@ -1,13 +1,13 @@
 # Pyrola
 
 <p align="center">
-  <a href="https://github.com/aidanhibbard/pyrola/actions/workflows/ci.yml"><img src="https://github.com/aidanhibbard/pyrola/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/aidanhibbard/pyrola/actions/workflows/deploy-docs.yml"><img src="https://github.com/aidanhibbard/pyrola/actions/workflows/deploy-docs.yml/badge.svg" alt="Deploy docs" /></a>
-  <a href="https://aidanhibbard.github.io/pyrola/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Docs" /></a>
+  <a href="https://github.com/vixl-ai/vixl/actions/workflows/ci.yml"><img src="https://github.com/vixl-ai/vixl/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/vixl-ai/vixl/actions/workflows/deploy-docs.yml"><img src="https://github.com/vixl-ai/vixl/actions/workflows/deploy-docs.yml/badge.svg" alt="Deploy docs" /></a>
+  <a href="https://vixl.app/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Docs" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License: MIT" /></a>
-  <a href="https://aidanhibbard.github.io/pyrola/"><img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="Status: Alpha" /></a>
-  <a href="https://github.com/aidanhibbard/pyrola/stargazers"><img src="https://img.shields.io/github/stars/aidanhibbard/pyrola?style=flat" alt="GitHub stars" /></a>
-  <a href="https://github.com/aidanhibbard/pyrola/issues"><img src="https://img.shields.io/github/issues/aidanhibbard/pyrola" alt="GitHub issues" /></a>
+  <a href="https://vixl.app/"><img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="Status: Alpha" /></a>
+  <a href="https://github.com/vixl-ai/vixl/stargazers"><img src="https://img.shields.io/github/stars/vixl-ai/vixl?style=flat" alt="GitHub stars" /></a>
+  <a href="https://github.com/vixl-ai/vixl/issues"><img src="https://img.shields.io/github/issues/vixl-ai/vixl" alt="GitHub issues" /></a>
 </p>
 
 <p align="center">
@@ -19,13 +19,13 @@
   <a href="https://ai-sdk.dev/"><img src="https://img.shields.io/badge/Vercel%20AI%20SDK-000000?logo=vercel&logoColor=white" alt="Vercel AI SDK" /></a>
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-000000?logo=claude&logoColor=white" alt="MCP" /></a>
   <a href="https://vuepress.vuejs.org/"><img src="https://img.shields.io/badge/VuePress-3eaf7c?logo=vue.js&logoColor=white" alt="VuePress" /></a>
-  <a href="https://aidanhibbard.github.io/pyrola/"><img src="https://img.shields.io/badge/local--first-BYOK-0ea5e9" alt="Local-first BYOK" /></a>
-  <a href="https://aidanhibbard.github.io/pyrola/"><img src="https://img.shields.io/badge/Agents%20UI-desktop-8b5cf6" alt="Agents UI" /></a>
+  <a href="https://vixl.app/"><img src="https://img.shields.io/badge/local--first-BYOK-0ea5e9" alt="Local-first BYOK" /></a>
+  <a href="https://vixl.app/"><img src="https://img.shields.io/badge/Agents%20UI-desktop-8b5cf6" alt="Agents UI" /></a>
 </p>
 
 Pyrola is a local-first BYOK desktop Agents UI (Tauri, Vue, AI SDK).
 
-This project is in alpha. Download a build from [GitHub Releases](https://github.com/aidanhibbard/pyrola/releases).
+This project is in alpha. Download a build from [GitHub Releases](https://github.com/vixl-ai/vixl/releases).
 
 Contributors should start with [CONTRIBUTING.md](./CONTRIBUTING.md).
 
