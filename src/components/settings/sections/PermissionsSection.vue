@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/shadcn/ui/button'
 import { Badge } from '@/components/shadcn/ui/badge'
 import { Label } from '@/components/shadcn/ui/label'
+import { Switch } from '@/components/shadcn/ui/switch'
 import {
   Tooltip,
   TooltipContent,
@@ -18,6 +19,11 @@ import {
 } from '@/components/shadcn/ui/tooltip'
 import McpServerIcon from '@/components/mcp/ServerIcon.vue'
 import SettingsSectionScroll from '@/components/settings/SettingsSectionScroll.vue'
+import {
+  sandboxEnabledFromSettings,
+  sandboxNetworkFromSettings,
+  type SandboxNetwork,
+} from '@/components/settings/sections/sandbox-settings'
 import useMcpServers from '@/composables/use-mcp-servers'
 import usePyrolaConfig from '@/composables/use-pyrola-config'
 import groupPersistedPermissionRecords from '@/services/harness/permission/group-persisted-records'
@@ -26,11 +32,20 @@ import { parsePermissionRecords } from '@/services/harness/permission/policy'
 import usesPermissionSubgroupAccordion from '@/services/harness/permission/uses-subgroup-accordion'
 import type { PermissionRecord } from '@/types/harness/permission'
 import type { PermissionGroup } from '@/types/harness/permission-group'
+import formatUnknownError from '@/utils/format-unknown-error'
 
 const config = usePyrolaConfig()
 const { refreshStates } = useMcpServers()
 
 const clearing = ref(false)
+
+const sandboxEnabled = computed(() =>
+  sandboxEnabledFromSettings(config.personalSettings.value),
+)
+
+const sandboxNetwork = computed(() =>
+  sandboxNetworkFromSettings(config.personalSettings.value),
+)
 
 const records = computed((): PermissionRecord[] =>
   parsePermissionRecords(config.personalSettings.value['agent.permissions']),
@@ -39,6 +54,26 @@ const records = computed((): PermissionRecord[] =>
 const groupedRecords = computed((): PermissionGroup[] =>
   groupPersistedPermissionRecords(records.value),
 )
+
+const updateSandboxEnabled = async (value: boolean): Promise<void> => {
+  try {
+    await config.updateSetting('personal', 'agent.sandbox.enabled', value)
+  } catch (error) {
+    toast.error('Failed to save sandbox setting', {
+      description: formatUnknownError(error),
+    })
+  }
+}
+
+const updateSandboxNetwork = async (value: SandboxNetwork): Promise<void> => {
+  try {
+    await config.updateSetting('personal', 'agent.sandbox.network', value)
+  } catch (error) {
+    toast.error('Failed to save sandbox network setting', {
+      description: formatUnknownError(error),
+    })
+  }
+}
 
 const handleRemove = async (record: PermissionRecord): Promise<void> => {
   try {
@@ -96,19 +131,66 @@ onMounted(() => {
       </Tooltip>
     </template>
 
-    <div
-      v-if="records.length === 0"
-      class="py-8 text-center"
-    >
-      <p class="text-sm text-muted-foreground">
-        No saved permissions. Allow or deny prompts will appear as the agent requests access.
-      </p>
-    </div>
+    <div class="space-y-6">
+      <div class="flex items-center justify-between gap-4">
+        <div class="space-y-1">
+          <Label>Sandbox terminal</Label>
+          <p class="text-sm text-muted-foreground">
+            Sandboxed commands can auto-run. Leaving the sandbox always asks.
+          </p>
+        </div>
+        <Switch
+          :model-value="sandboxEnabled"
+          @update:model-value="updateSandboxEnabled"
+        />
+      </div>
 
-    <div
-      v-else
-      class="space-y-6"
-    >
+      <div class="flex items-center justify-between gap-4">
+        <div class="space-y-1">
+          <Label>Sandbox network</Label>
+          <p class="text-sm text-muted-foreground">
+            Network access for sandboxed commands. Deny is the default.
+          </p>
+        </div>
+        <div class="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-7"
+            :class="sandboxNetwork === 'deny' ? 'bg-muted text-foreground' : 'text-muted-foreground'"
+            :aria-pressed="sandboxNetwork === 'deny'"
+            :disabled="!sandboxEnabled"
+            @click="updateSandboxNetwork('deny')"
+          >
+            Deny
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-7"
+            :class="sandboxNetwork === 'allow' ? 'bg-muted text-foreground' : 'text-muted-foreground'"
+            :aria-pressed="sandboxNetwork === 'allow'"
+            :disabled="!sandboxEnabled"
+            @click="updateSandboxNetwork('allow')"
+          >
+            Allow
+          </Button>
+        </div>
+      </div>
+
+      <div
+        v-if="records.length === 0"
+        class="py-8 text-center"
+      >
+        <p class="text-sm text-muted-foreground">
+          No saved permissions. Allow or deny prompts will appear as the agent requests access.
+        </p>
+      </div>
+
+      <div
+        v-else
+        class="space-y-6"
+      >
       <div
         v-for="group in groupedRecords"
         :key="group.kind"
@@ -212,6 +294,7 @@ onMounted(() => {
             </div>
           </template>
         </div>
+      </div>
       </div>
     </div>
   </SettingsSectionScroll>

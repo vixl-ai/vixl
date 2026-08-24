@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AgentShellRecord } from '@/types/harness/agent-shell'
 import { SquareIcon, TerminalIcon } from '@lucide/vue'
+import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import {
   Queue,
   QueueItem,
@@ -55,7 +56,9 @@ const truncateCommand = (command: string, max = 60): string =>
                 class="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80 text-left"
                 @click="emit('openShell', shell.shellId)"
               >
-                {{ truncateCommand(shell.command) }}
+                <AiElementsShimmerShimmer :duration="1" as="span">
+                  {{ truncateCommand(shell.command) }}
+                </AiElementsShimmerShimmer>
               </button>
               <QueueItemActions class="ml-auto shrink-0">
                 <Tooltip>

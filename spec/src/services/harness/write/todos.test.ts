@@ -155,11 +155,11 @@ vi.mock('@/composables/use-workbench-store', () => ({
 }))
 
 
-describe('build-tools write_todos', () => {
+describe('build-tools update_todos', () => {
   const ctx = {
     projectRoot: '/project',
     projectSlug: 'project',
-    chatId: 'chat-write-todos',
+    chatId: 'chat-update-todos',
     userMessageId: 'user-1',
     settings: { version: 1 } as PyrolaSettings,
     permissionLevel: 'ask' as const,
@@ -187,11 +187,34 @@ describe('build-tools write_todos', () => {
     const tools = buildTools(ctx)
     const todos = [
       { id: 'review', content: 'Review harness wiring', status: 'completed' as const },
-      { id: 'tests', content: 'Cover write_todos', status: 'pending' as const },
+      { id: 'tests', content: 'Cover update_todos', status: 'pending' as const },
     ]
 
-    const result = await runTool(tools.write_todos.execute, { todos }, 'tc-write-todos')
+    const result = await runTool(tools.update_todos.execute, { todos }, 'tc-update-todos')
 
     expect(result).toEqual({ todos })
+    expect(fsWriteFile).not.toHaveBeenCalled()
+    expect(openStudio).not.toHaveBeenCalled()
+  })
+
+  it('update_plan_todo with no session plan returns todos and does not write files', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      chatId: 'chat-update-plan-todo-no-session',
+    })
+    const todos = [
+      { id: 'chat-only', content: 'Track in chat Tasks', status: 'in_progress' as const },
+    ]
+
+    const result = await runTool(
+      tools.update_plan_todo.execute,
+      { todos },
+      'tc-update-plan-todo-no-session',
+    )
+
+    expect(result).toEqual({ todos })
+    expect(fsWriteFile).not.toHaveBeenCalled()
+    expect(openStudio).not.toHaveBeenCalled()
   })
 })

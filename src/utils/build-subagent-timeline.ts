@@ -15,6 +15,14 @@ export default (subagent: SubagentTimelineItem): ChatTimelineItem[] => {
     items.push({ type: 'user', message })
   }
 
+  for (const compaction of subagent.compactions) {
+    items.push({
+      type: 'compaction',
+      summary: compaction.summary,
+      focus: compaction.focus,
+    })
+  }
+
   const turn: AgentTurn = {
     id: `${subagent.subagentId}-turn`,
     text: subagent.summary?.trim() ?? '',

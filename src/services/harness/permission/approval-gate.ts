@@ -21,6 +21,8 @@ export type PendingApproval = {
   unsandboxed?: boolean
   allowedScopes: PermissionScope[]
   diff?: FileDiff[]
+  subagentId?: string
+  subagentLabel?: string
   resolve: (result: ApprovalResolution) => void
 }
 

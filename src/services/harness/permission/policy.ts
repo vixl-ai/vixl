@@ -49,6 +49,17 @@ const SENSITIVE_PATH_PATTERNS = [
 export const isSensitivePath = (path: string): boolean =>
   SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(path))
 
+/** Once-approvals for these hop onto sessionAllows for the rest of the stream. */
+export const isStickyShellElevation = (
+  capability: PermissionCapabilityKey,
+): boolean => capability === 'shell.network' || capability === 'shell.unsandboxed'
+
+export const sessionAllowsUnsandboxed = (sessionAllows: Set<string>): boolean =>
+  sessionAllows.has('shell.unsandboxed')
+
+export const sessionAllowsNetwork = (sessionAllows: Set<string>): boolean =>
+  sessionAllows.has('shell.network') || sessionAllowsUnsandboxed(sessionAllows)
+
 export const parsePermissionRecords = (
   value: unknown,
 ): PermissionRecord[] => {
@@ -117,11 +128,25 @@ export const decidePermission = (input: PermissionDecisionInput): PermissionDeci
     return { verdict: 'deny', allowedScopes: [], reason: 'Permanently denied' }
   }
 
-  if (action === 'shell' || action === 'shell.unsandboxed') {
+  if (
+    action === 'shell' ||
+    action === 'shell.network' ||
+    action === 'shell.unsandboxed'
+  ) {
     // Shell is never covered by Bypass. Approval scopes are once/session/never only
     // (no workspace/always persist). OS sandboxing (Seatbelt / bwrap) is separate from
     // this permission gate; sandboxed vs unsandboxed is chosen at spawn time.
-    if (sessionAllows.has(capability) || sessionAllows.has('shell')) {
+    // Session allow of `shell` must not cover `shell.network` or `shell.unsandboxed`.
+    // Session allow of `shell.unsandboxed` may cover network and sandboxed shell
+    // (full access implies network). Session allow of `shell.network` covers only
+    // that hop, not unsandboxed.
+    const sessionAllowed =
+      action === 'shell.unsandboxed'
+        ? sessionAllowsUnsandboxed(sessionAllows)
+        : action === 'shell.network'
+          ? sessionAllowsNetwork(sessionAllows)
+          : sessionAllows.has('shell') || sessionAllowsUnsandboxed(sessionAllows)
+    if (sessionAllowed) {
       return { verdict: 'allow', allowedScopes: shellScopesPhaseA() }
     }
     return {

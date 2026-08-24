@@ -1,4 +1,5 @@
 import type { ToolRun } from '@/types/harness/tool-run'
+import { clipTerminalLabel } from '@/utils/clip-terminal-label'
 
 const TOOL_LABELS_DONE: Record<string, string> = {
   read_file: 'Read',
@@ -28,6 +29,8 @@ const TOOL_LABELS_DONE: Record<string, string> = {
   get_mcp_tools: 'Listed MCP tools',
   create_plan: 'Created plan',
   update_plan_todo: 'Updated plan',
+  update_todos: 'Updated todos',
+  write_todos: 'Updated todos',
   lsp: 'LSP lookup',
   diagnostics: 'Read diagnostics',
   web_fetch: 'Fetched',
@@ -78,6 +81,8 @@ const TOOL_LABELS_RUNNING: Record<string, string> = {
   get_mcp_tools: 'Listing MCP tools',
   create_plan: 'Writing plan',
   update_plan_todo: 'Updating plan',
+  update_todos: 'Updating todos',
+  write_todos: 'Updating todos',
   lsp: 'LSP lookup',
   diagnostics: 'Reading diagnostics',
   web_fetch: 'Fetching',
@@ -100,20 +105,13 @@ const TOOL_LABELS_RUNNING: Record<string, string> = {
   browser_get_bounding_box: 'Measuring element',
 }
 
-const formatArgsHint = (
-  args: unknown,
-  options?: { omitPathHint?: boolean },
-): string | null => {
+const formatArgsHint = (args: unknown, options?: { omitPathHint?: boolean }): string | null => {
   if (!args || typeof args !== 'object') {
     return null
   }
   const record = args as Record<string, unknown>
   const omitPath = options?.omitPathHint === true
-  if (
-    !omitPath &&
-    typeof record.path === 'string' &&
-    record.path.length > 0
-  ) {
+  if (!omitPath && typeof record.path === 'string' && record.path.length > 0) {
     return record.path
   }
   if (typeof record.pattern === 'string' && record.pattern.length > 0) {
@@ -125,6 +123,12 @@ const formatArgsHint = (
   if (typeof record.agentName === 'string' && record.agentName.length > 0) {
     return record.agentName
   }
+  if (typeof record.description === 'string' && record.description.length > 0) {
+    const label = clipTerminalLabel(record.description)
+    if (label.length > 0) {
+      return label
+    }
+  }
   if (typeof record.command === 'string' && record.command.length > 0) {
     return record.command
   }
@@ -134,11 +138,7 @@ const formatArgsHint = (
   if (typeof record.symbol === 'string' && record.symbol.length > 0) {
     return record.symbol
   }
-  if (
-    !omitPath &&
-    typeof record.from === 'string' &&
-    record.from.length > 0
-  ) {
+  if (!omitPath && typeof record.from === 'string' && record.from.length > 0) {
     return record.from
   }
   return null
@@ -201,15 +201,39 @@ const formatBrowserNavigateLabel = (run: ToolRun, isRunning: boolean): string =>
   return host.length > 0 ? `${prefix} ${host}` : prefix
 }
 
-export default (
-  run: ToolRun,
-  options?: { omitPathHint?: boolean },
-): string => {
+const formatTerminalRunLabel = (run: ToolRun, isRunning: boolean): string => {
+  const args = asRecord(run.args)
+  const result = asRecord(run.result)
+  const desc = clipTerminalLabel(
+    (typeof result?.description === 'string' ? result.description : '') ||
+      (typeof args?.description === 'string' ? args.description : ''),
+  )
+  const mapped = isRunning ? TOOL_LABELS_RUNNING[run.name] : TOOL_LABELS_DONE[run.name]
+  const prefix = mapped ?? (isRunning ? 'Running command' : 'Ran command')
+  const target = desc.length > 0 ? ` ${desc}` : ''
+  if (isRunning) {
+    return `${prefix}${target}…`
+  }
+  if (run.status === 'rejected') {
+    return `${prefix}${target} (rejected)`
+  }
+  return `${prefix}${target}`
+}
+
+export default (run: ToolRun, options?: { omitPathHint?: boolean }): string => {
   if (run.name === 'spawn_subagent') {
     return formatSpawnSubagentLabel(run)
   }
 
   const isRunning = run.status === 'running'
+
+  if (
+    run.name === 'run_terminal' ||
+    run.name === 'terminal_output' ||
+    run.name === 'stop_terminal'
+  ) {
+    return formatTerminalRunLabel(run, isRunning)
+  }
 
   if (run.name === 'browser_lock') {
     const label = formatBrowserLockLabel(run, isRunning)
@@ -233,16 +257,10 @@ export default (
     return label
   }
 
-  const mapped = isRunning
-    ? TOOL_LABELS_RUNNING[run.name]
-    : TOOL_LABELS_DONE[run.name]
+  const mapped = isRunning ? TOOL_LABELS_RUNNING[run.name] : TOOL_LABELS_DONE[run.name]
   const prefix =
-    mapped ??
-    (isRunning
-      ? `Calling ${humanizeToolName(run.name)}`
-      : humanizeToolName(run.name))
-  const hint =
-    run.name.startsWith('browser_') ? null : formatArgsHint(run.args, options)
+    mapped ?? (isRunning ? `Calling ${humanizeToolName(run.name)}` : humanizeToolName(run.name))
+  const hint = run.name.startsWith('browser_') ? null : formatArgsHint(run.args, options)
   const target = hint ? ` ${hint}` : ''
 
   if (isRunning) {

@@ -22,7 +22,7 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 const spawnSubagent = (ctx: HarnessToolContext) =>
   tool({
     description: withToolExamples(
-      'Spawn a subagent. Default mode is blocking (waits until complete). Set mode to background to run concurrently: return immediately, end your turn, and do not poll with terminal_output (subagentId is not a shell_id). The harness resumes this chat with the summary when all background subagents finish. agentName must be a very brief verb phrase that explains the work (for example "Reading auth", "Editing config").',
+      "Spawn a subagent. Default mode is blocking (waits until complete). Set mode to background to run concurrently: return immediately, end your turn, and do not poll with terminal_output (subagentId is not a shell_id). The harness resumes this chat with the summary when all background subagents finish. Default capabilities are read-only. Edit, write, modify, delete, move, or shell/git mutations REQUIRE capabilities: 'write'. A read-only subagent can only report; it cannot make changes. agentName must be a very brief verb phrase that explains the work (for example \"Reading auth\", \"Editing config\").",
       [
         {
           agentName: 'Reading auth',
@@ -34,6 +34,12 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
           agentName: 'Scanning permissions',
           prompt: 'List shell and MCP permission gates.',
           mode: 'background',
+        },
+        {
+          agentName: 'Editing config',
+          prompt: 'Update the timeout in the harness settings file.',
+          mode: 'blocking',
+          capabilities: 'write',
         },
       ],
     ),
@@ -56,9 +62,15 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         .describe(
           'Exact provider::modelId from resolve_models (for example anthropic::claude-sonnet-4). Fuzzy names are rejected.',
         ),
+      capabilities: z
+        .enum(['read-only', 'write'])
+        .default('read-only')
+        .describe(
+          "REQUIRED 'write' for edit/write/modify/delete/move or shell/git mutations. read-only (default) can only report, not change. write grants file edit, apply_patch, delete/move, run_terminal, and git commit/checkout/branch.",
+        ),
     }),
     execute: async (
-      { agentName, prompt, mode, model: callModel },
+      { agentName, prompt, mode, model: callModel, capabilities },
       { toolCallId },
     ): Promise<
       | { subagentId: string; name: string; summary: string }
@@ -90,6 +102,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         settings: ctx.settings,
       })
       const blocking = mode === 'blocking'
+      const resolvedCapabilities = capabilities ?? 'read-only'
       const controller = new AbortController()
       linkAbortSignal(ctx.signal, controller)
 
@@ -114,6 +127,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         blocking,
         prompt,
         model,
+        capabilities: resolvedCapabilities,
       })
 
       if (!blocking) {
@@ -135,6 +149,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
               toolCallId,
               signal: controller.signal,
               model,
+              capabilities: resolvedCapabilities,
             })
 
             resolveSubagent(subagentId, { subagentId, name: agentName, summary })
@@ -177,6 +192,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
           toolCallId,
           signal: controller.signal,
           model,
+          capabilities: resolvedCapabilities,
         })
 
         resolveSubagent(subagentId, { subagentId, name: agentName, summary })

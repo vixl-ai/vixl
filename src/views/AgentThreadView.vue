@@ -62,7 +62,6 @@ const {
   <ChatChatPanelContextMenu
     :project-slug="projectSlug"
     :chat-id="chatId"
-    :disabled="!threadReady"
   >
     <!--
       Always host the ring on the chat column titlebar band. Parent main uses
@@ -114,6 +113,12 @@ const {
       class="shrink-0 px-4 pb-4 pt-2"
     >
       <div class="mx-auto flex w-full max-w-3xl flex-col">
+        <ChatPendingApprovals
+          v-if="harnessPendingApprovals.length > 0"
+          :approvals="harnessPendingApprovals"
+          class="mb-2 w-full"
+          @resolve="handleResolveApproval"
+        />
         <ChatTodoTimeline
           v-if="todos.length > 0"
           :todos="todos"

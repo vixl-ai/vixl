@@ -10,6 +10,8 @@ const toPermCtx = (ctx: HarnessToolContext): PermissionGateContext => ({
   sandboxEnabled: ctx.sandboxEnabled,
   onPendingApproval: ctx.onPendingApproval,
   persistPermission: ctx.persistPermission,
+  subagentId: ctx.subagentId,
+  subagentLabel: ctx.subagentLabel,
 })
 
 export default toPermCtx

@@ -1,7 +1,7 @@
 import { readFile, listDir, grep, globFiles } from '@/services/harness/read'
 import {
   writeFile,
-  writeTodos,
+  updateTodos,
   writeStudioArtifact,
   deleteFile,
   moveFile,
@@ -85,7 +85,7 @@ const buildHarnessTools = (ctx: HarnessToolContext) => ({
   load_skill: loadSkillTool(ctx),
   create_plan: createPlanTool(ctx),
   update_plan_todo: updatePlanTodo(ctx),
-  write_todos: writeTodos(),
+  update_todos: updateTodos(),
   write_studio_artifact: writeStudioArtifact(ctx),
   run_terminal: runTerminal(ctx),
   terminal_output: terminalOutput(),

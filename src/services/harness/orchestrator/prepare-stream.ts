@@ -229,7 +229,7 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     permissionLevel: input.permissionLevel ?? settings['agent.permissionLevel'] ?? 'allowlist',
     sessionAllows,
     sessionDenies,
-    sandboxEnabled: settings['agent.sandbox.enabled'] ?? false,
+    sandboxEnabled: settings['agent.sandbox.enabled'] ?? true,
     supportsVision,
     onPendingApproval: (entry) => {
       onEvent({
@@ -242,6 +242,8 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
         unsandboxed: entry.unsandboxed,
         allowedScopes: entry.allowedScopes,
         diff: entry.diff ?? [],
+        subagentId: entry.subagentId,
+        subagentLabel: entry.subagentLabel,
       })
     },
     persistPermission: input.persistPermission,

@@ -6,7 +6,6 @@ import type { ChatTimelineItem, SubagentTimelineItem } from '@/types/chat/chat-t
 import type { PendingQuestionState } from '@/types/chat/pending-question'
 import type { PendingMcpAuthView } from '@/types/chat/pending-mcp-auth'
 import type { McpConfig } from '@/types/pyrola/mcp-config'
-import type { ApprovalResolution } from '@/services/harness/permission/approval-gate'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import ChatAgentTurn from '@/components/chat/ChatAgentTurn.vue'
@@ -15,7 +14,6 @@ import ChatMessageTurn from '@/components/chat/ChatMessageTurn.vue'
 import ChatMcpAuthCard from '@/components/chat/ChatMcpAuthCard.vue'
 import ChatQuestionCard from '@/components/chat/ChatQuestionCard.vue'
 import ChatSubAgentTurn from '@/components/chat/SubAgentTurn.vue'
-import ChatToolCard from '@/components/chat/ChatToolCard.vue'
 import useChatBrowserLock from '@/composables/use-chat-browser-lock'
 import {
   MessageScroller,
@@ -39,7 +37,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  resolveApproval: [toolCallId: string, resolution: ApprovalResolution]
   submitAnswer: [toolCallId: string, answer: string]
   authenticateMcp: [toolCallId: string]
   skipMcpAuth: [toolCallId: string]
@@ -52,14 +49,6 @@ const emit = defineEmits<{
 
 const { scrollToEnd } = useMessageScroller()
 const { handleContentChange } = useMessageScrollerContext()
-
-const approvalMap = computed(() => {
-  const map = new Map<string, PendingApprovalView>()
-  for (const item of props.pendingApprovals) {
-    map.set(item.toolCallId, item)
-  }
-  return map
-})
 
 const isLive = computed(() => props.status === 'streaming' || props.status === 'submitted')
 
@@ -382,12 +371,6 @@ watch(
           @skip="(toolCallId) => emit('skipMcpAuth', toolCallId)"
           @open-settings="(serverId) => emit('openMcpSettings', serverId)"
           @secrets-saved="(toolCallId, serverId) => emit('secretsSavedMcp', toolCallId, serverId)"
-        />
-        <ChatToolCard
-          v-for="[toolCallId, approval] in readOnly ? [] : approvalMap"
-          :key="toolCallId"
-          :approval="approval"
-          @resolve="(resolution) => emit('resolveApproval', toolCallId, resolution)"
         />
       </MessageScrollerContent>
     </MessageScrollerViewport>

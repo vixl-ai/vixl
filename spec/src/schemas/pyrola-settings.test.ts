@@ -51,6 +51,13 @@ describe('migratePyrolaSettings', () => {
     expect(migrated['workbench.duplicateTabBehavior']).toBe('ask')
   })
 
+  it('defaults sandbox enabled with network deny', () => {
+    const migrated = migratePyrolaSettings({ version: 1 })
+
+    expect(migrated['agent.sandbox.enabled']).toBe(true)
+    expect(migrated['agent.sandbox.network']).toBe('deny')
+  })
+
   it('accepts custom providers with models', () => {
     const migrated = migratePyrolaSettings({
       version: 1,

@@ -233,6 +233,34 @@ const applyHydrateHarnessEvent = (
     if (!run.toolCallId) {
       return true
     }
+    const existingIndex = acc.nextTimeline.findIndex(
+      (item) =>
+        item.type === 'agent-turn' &&
+        item.turn.steps.some((step) =>
+          step.tools.some((tool) => tool.toolCallId === run.toolCallId),
+        ),
+    )
+    if (existingIndex >= 0) {
+      const item = acc.nextTimeline[existingIndex]
+      if (item?.type === 'agent-turn') {
+        const turn = item.turn
+        const step = turn.steps.find((candidate) =>
+          candidate.tools.some((tool) => tool.toolCallId === run.toolCallId),
+        )
+        if (step) {
+          const updatedStep = upsertToolInStep(step, run)
+          const updatedTurn = patchStep(turn, step.id, updatedStep)
+          const nextTimeline = acc.nextTimeline.map((timelineItem, index) =>
+            index === existingIndex
+              ? { type: 'agent-turn' as const, turn: updatedTurn }
+              : timelineItem,
+          )
+          acc.nextTimeline.length = 0
+          acc.nextTimeline.push(...nextTimeline)
+          return true
+        }
+      }
+    }
     if (!acc.pendingTurn) {
       acc.pendingTurn = {
         id: run.toolCallId,

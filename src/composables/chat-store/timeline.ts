@@ -20,8 +20,9 @@ export const upsertTodoTimelineItem = (
 
 export const upsertSubagentStart = (
   items: ChatTimelineItem[],
-  subagent: Omit<SubagentTimelineItem, 'type' | 'status' | 'tools'> & {
+  subagent: Omit<SubagentTimelineItem, 'type' | 'status' | 'tools' | 'compactions'> & {
     tools?: SubagentTimelineItem['tools']
+    compactions?: SubagentTimelineItem['compactions']
   },
 ): ChatTimelineItem[] => {
   const index = items.findIndex(
@@ -39,6 +40,7 @@ export const upsertSubagentStart = (
         prompt: subagent.prompt ?? existing.prompt,
         model: subagent.model ?? existing.model,
         tools: subagent.tools ?? existing.tools,
+        compactions: subagent.compactions ?? existing.compactions ?? [],
       }
     }
     return next
@@ -55,6 +57,7 @@ export const upsertSubagentStart = (
       model: subagent.model,
       status: 'running',
       tools: subagent.tools ?? [],
+      compactions: subagent.compactions ?? [],
     },
   ]
 }
@@ -76,6 +79,7 @@ export const completeSubagentTimelineItem = (
         ...existing,
         status,
         summary,
+        compactions: existing.compactions ?? [],
       }
     }
     return next
@@ -90,6 +94,7 @@ export const completeSubagentTimelineItem = (
       status,
       summary,
       tools: [],
+      compactions: [],
     },
   ]
 }
@@ -110,9 +115,27 @@ export const appendSubagentToolEvent = (
     return items
   }
   const next = [...items]
+  if (event.type === 'compaction') {
+    const summary = event.summary
+    if (typeof summary === 'string' && summary.length > 0) {
+      next[index] = {
+        ...existing,
+        tools: existing.tools,
+        compactions: [
+          ...(existing.compactions ?? []),
+          {
+            summary,
+            focus: typeof event.focus === 'string' ? event.focus : null,
+          },
+        ],
+      }
+    }
+    return next
+  }
   next[index] = {
     ...existing,
     tools: applySubagentToolEvent(existing.tools, event),
+    compactions: existing.compactions ?? [],
   }
   return next
 }

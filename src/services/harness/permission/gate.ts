@@ -10,7 +10,10 @@ import {
   requestApproval,
   type ApprovalKind,
 } from '@/services/harness/permission/approval-gate'
-import { decidePermission } from '@/services/harness/permission/policy'
+import {
+  decidePermission,
+  isStickyShellElevation,
+} from '@/services/harness/permission/policy'
 
 export type PendingApprovalView = {
   toolCallId: string
@@ -22,6 +25,8 @@ export type PendingApprovalView = {
   allowedScopes: PermissionScope[]
   diff?: FileDiff[]
   serverId?: string
+  subagentId?: string
+  subagentLabel?: string
 }
 
 export type PermissionGateContext = {
@@ -37,6 +42,8 @@ export type PermissionGateContext = {
     verdict: 'allow' | 'deny',
     scope: 'workspace' | 'always',
   ) => Promise<void>
+  subagentId?: string
+  subagentLabel?: string
 }
 
 export const gateToolPermission = async (args: {
@@ -81,6 +88,8 @@ export const gateToolPermission = async (args: {
     allowedScopes: decision.allowedScopes,
     diff: args.diff,
     serverId: args.serverId,
+    subagentId: args.ctx.subagentId,
+    subagentLabel: args.ctx.subagentLabel,
   })
 
   const result = await requestApproval({
@@ -95,6 +104,8 @@ export const gateToolPermission = async (args: {
     unsandboxed: args.unsandboxed,
     allowedScopes: decision.allowedScopes,
     diff: args.diff,
+    subagentId: args.ctx.subagentId,
+    subagentLabel: args.ctx.subagentLabel,
   })
 
   if (!result.approved) {
@@ -105,11 +116,15 @@ export const gateToolPermission = async (args: {
     return false
   }
 
-  if (result.scope === 'session') {
+  if (
+    result.scope === 'session' ||
+    result.scope === 'workspace' ||
+    result.scope === 'always' ||
+    (result.scope === 'once' && isStickyShellElevation(args.capability))
+  ) {
     args.ctx.sessionAllows.add(args.capability)
   }
   if (result.scope === 'workspace' || result.scope === 'always') {
-    args.ctx.sessionAllows.add(args.capability)
     await args.ctx.persistPermission?.(
       args.capability,
       'allow',

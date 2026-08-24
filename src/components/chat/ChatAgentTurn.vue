@@ -66,6 +66,14 @@ const stepEntries = computed(() =>
   })),
 )
 
+const errorTitle = computed(() => {
+  const kind = props.turn.error?.kind
+  if (kind === 'timeout') {
+    return 'Timed out'
+  }
+  return 'Something went wrong'
+})
+
 const isStepStreaming = (index: number): boolean => {
   if (!isStreaming.value) {
     return false
@@ -86,14 +94,6 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
     props.subagentsByToolCallId ?? new Map(),
     props.subagentsById ?? new Map(),
   )
-
-const errorTitle = computed(() => {
-  const kind = props.turn.error?.kind
-  if (kind === 'timeout') {
-    return 'Timed out'
-  }
-  return 'Something went wrong'
-})
 </script>
 
 <template>
