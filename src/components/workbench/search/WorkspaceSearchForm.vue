@@ -106,11 +106,11 @@ defineExpose({
           <Tooltip>
             <TooltipTrigger as-child>
               <Toggle
-                :pressed="matchCase"
+                :model-value="matchCase"
                 size="sm"
                 class="h-7 w-7 shrink-0 p-0"
                 aria-label="Match case"
-                @update:pressed="matchCase = $event"
+                @update:model-value="matchCase = $event"
               >
                 <CaseSensitive class="h-3.5 w-3.5" />
               </Toggle>
@@ -120,11 +120,11 @@ defineExpose({
           <Tooltip>
             <TooltipTrigger as-child>
               <Toggle
-                :pressed="matchWholeWord"
+                :model-value="matchWholeWord"
                 size="sm"
                 class="h-7 w-7 shrink-0 p-0"
                 aria-label="Match whole word"
-                @update:pressed="matchWholeWord = $event"
+                @update:model-value="matchWholeWord = $event"
               >
                 <WholeWord class="h-3.5 w-3.5" />
               </Toggle>
@@ -134,11 +134,11 @@ defineExpose({
           <Tooltip>
             <TooltipTrigger as-child>
               <Toggle
-                :pressed="useRegex"
+                :model-value="useRegex"
                 size="sm"
                 class="h-7 w-7 shrink-0 p-0"
                 aria-label="Use regular expression"
-                @update:pressed="useRegex = $event"
+                @update:model-value="useRegex = $event"
               >
                 <Regex class="h-3.5 w-3.5" />
               </Toggle>

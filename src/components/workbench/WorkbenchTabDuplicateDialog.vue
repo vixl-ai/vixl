@@ -68,7 +68,7 @@ const handleOpenChange = (open: boolean): void => {
       <div class="flex items-center gap-2">
         <Checkbox
           id="duplicate-tab-dont-ask"
-          v-model:checked="dontAskAgain"
+          v-model="dontAskAgain"
         />
         <Label for="duplicate-tab-dont-ask">Don't ask me again</Label>
       </div>

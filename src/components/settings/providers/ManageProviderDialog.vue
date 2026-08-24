@@ -364,21 +364,21 @@ const {
                 <div class="flex items-center gap-1.5">
                   <Checkbox
                     :id="`model-tools-${index}`"
-                    v-model:checked="model.toolCalling"
+                    v-model="model.toolCalling"
                   />
                   <Label :for="`model-tools-${index}`" class="text-xs font-normal">Tools</Label>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <Checkbox
                     :id="`model-vision-${index}`"
-                    v-model:checked="model.vision"
+                    v-model="model.vision"
                   />
                   <Label :for="`model-vision-${index}`" class="text-xs font-normal">Vision</Label>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <Checkbox
                     :id="`model-thinking-${index}`"
-                    v-model:checked="model.thinking"
+                    v-model="model.thinking"
                   />
                   <Label :for="`model-thinking-${index}`" class="text-xs font-normal">
                     Thinking
@@ -387,7 +387,7 @@ const {
                 <div class="flex items-center gap-1.5">
                   <Checkbox
                     :id="`model-streaming-${index}`"
-                    v-model:checked="model.streaming"
+                    v-model="model.streaming"
                   />
                   <Label :for="`model-streaming-${index}`" class="text-xs font-normal">
                     Stream
