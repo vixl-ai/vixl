@@ -58,6 +58,7 @@ declare module 'vue' {
     BrowserPageStrip: typeof import('./components/workbench/tabs/browser/BrowserPageStrip.vue')['default']
     BrowserTab: typeof import('./components/workbench/tabs/BrowserTab.vue')['default']
     BrowserToolbar: typeof import('./components/workbench/tabs/browser/BrowserToolbar.vue')['default']
+    BuildPlanDialog: typeof import('./components/workbench/plans/BuildPlanDialog.vue')['default']
     Canvas: typeof import('./components/ai-elements/canvas/Canvas.vue')['default']
     ChainOfThought: typeof import('./components/ai-elements/chain-of-thought/ChainOfThought.vue')['default']
     ChainOfThoughtContent: typeof import('./components/ai-elements/chain-of-thought/ChainOfThoughtContent.vue')['default']

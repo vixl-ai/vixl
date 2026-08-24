@@ -1,14 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import {
-  CheckCircle2Icon,
-  CircleDashedIcon,
-  CircleDotIcon,
-  CircleIcon,
-  Hammer,
-  Network,
-  XCircleIcon,
-} from '@lucide/vue'
+import { CheckCircle2Icon, Hammer, Network } from '@lucide/vue'
 import { Markdown } from 'vue-stream-markdown'
 import 'vue-stream-markdown/index.css'
 import { toast } from 'vue-sonner'
@@ -24,18 +16,13 @@ import StudioBlocksMermaid from '@/components/studio/blocks/StudioBlocksMermaid.
 import useVixlConfig from '@/composables/use-vixl-config'
 import useStartPlanBuild from '@/composables/use-start-plan-build'
 import useWorkbenchStore from '@/composables/use-workbench-store'
+import usePlanBuildStatus from '@/composables/use-plan-build-status'
 import parsePlan from '@/services/plans/parse-plan'
+import { planTodoStatusIcon, splitPlanBodySegments } from '@/utils/plans'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
-import resolveModelForRole from '@/services/models/resolve-model-for-role'
 import { fsReadFile } from '@/services/vixl/vixl-tauri'
 import type { PlanTodoItem } from '@/types/plans/plan-document'
 import type { PlanPayload, WorkbenchTab } from '@/types/workbench/workbench-tab'
-
-type PlanBodySegment =
-  | { type: 'markdown'; content: string }
-  | { type: 'mermaid'; content: string }
-
-const MERMAID_FENCE_RE = /```mermaid\s*\n([\s\S]*?)```/g
 
 const STATUS_LABELS: Record<PlanTodoItem['status'], string> = {
   pending: 'Pending',
@@ -55,9 +42,17 @@ const body = ref('')
 const todos = ref<PlanTodoItem[]>([])
 const title = ref('')
 const sourceChatId = ref<string | null>(null)
+const lastBuildChatId = ref<string | null>(null)
 const loading = ref(false)
 const parseError = ref<string | null>(null)
 const orchestrateOpen = ref(false)
+const buildNowOpen = ref(false)
+
+const { buildChatStatus } = usePlanBuildStatus({
+  projectId: () => props.tab.projectId,
+  lastBuildChatId,
+  sourceChatId,
+})
 
 const planPayload = computed(() => props.tab.payload as PlanPayload)
 const projectRoot = computed(() => workbench.getProject(props.tab.projectId)?.rootPath ?? null)
@@ -68,7 +63,12 @@ const hasProviders = computed(
 )
 
 const actionsDisabled = computed(
-  () => loading.value || building.value || Boolean(parseError.value) || !hasProviders.value,
+  () =>
+    loading.value ||
+    building.value ||
+    Boolean(parseError.value) ||
+    !hasProviders.value ||
+    buildChatStatus.value === 'running',
 )
 
 const allTodosDone = computed(
@@ -79,50 +79,7 @@ const allTodosDone = computed(
     ),
 )
 
-const bodySegments = computed((): PlanBodySegment[] => {
-  const text = body.value
-  if (!text.trim()) {
-    return []
-  }
-
-  const segments: PlanBodySegment[] = []
-  let lastIndex = 0
-
-  for (const match of text.matchAll(MERMAID_FENCE_RE)) {
-    const start = match.index ?? 0
-    if (start > lastIndex) {
-      segments.push({ type: 'markdown', content: text.slice(lastIndex, start) })
-    }
-    segments.push({ type: 'mermaid', content: match[1] ?? '' })
-    lastIndex = start + match[0].length
-  }
-
-  if (lastIndex < text.length) {
-    segments.push({ type: 'markdown', content: text.slice(lastIndex) })
-  }
-
-  if (segments.length === 0) {
-    return [{ type: 'markdown', content: text }]
-  }
-
-  return segments
-})
-
-const statusIcon = (status: PlanTodoItem['status']) => {
-  if (status === 'completed') {
-    return CheckCircle2Icon
-  }
-  if (status === 'in_progress') {
-    return CircleDotIcon
-  }
-  if (status === 'cancelled') {
-    return XCircleIcon
-  }
-  if (status === 'pending') {
-    return CircleDashedIcon
-  }
-  return CircleIcon
-}
+const bodySegments = computed(() => splitPlanBodySegments(body.value))
 
 const statusClass = (status: PlanTodoItem['status']): string => {
   if (status === 'completed') {
@@ -154,6 +111,7 @@ const loadPlan = async (): Promise<void> => {
       body.value = parsed.body
       todos.value = []
       sourceChatId.value = null
+      lastBuildChatId.value = null
       return
     }
 
@@ -161,6 +119,7 @@ const loadPlan = async (): Promise<void> => {
     body.value = parsed.body
     todos.value = parsed.frontmatter?.todos ?? []
     sourceChatId.value = parsed.frontmatter?.sourceChatId ?? null
+    lastBuildChatId.value = parsed.frontmatter?.lastBuildChatId ?? null
   } catch (error) {
     toast.error('Failed to load plan', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -170,36 +129,22 @@ const loadPlan = async (): Promise<void> => {
   }
 }
 
+const { handleBuildNowConfirm, handleOrchestrateConfirm } = usePlanBuildActions({
+  projectId: () => props.tab.projectId,
+  planPath: () => planPayload.value.path,
+  planTitle: () => title.value || props.tab.label,
+  sourceChatId,
+  lastBuildChatId,
+  startPlanBuild,
+  loadPlan,
+})
+
 const handleBuildNow = (): void => {
   if (!hasProviders.value) {
     toast.error('Configure a provider before building')
     return
   }
-
-  const model = resolveModelForRole('agent', config.effectiveSettings.value)
-  if (!model) {
-    toast.error('Select a default Agent model in Settings before building')
-    return
-  }
-
-  startPlanBuild({
-    projectId: props.tab.projectId,
-    planPath: planPayload.value.path,
-    planTitle: title.value || props.tab.label,
-    sourceChatId: sourceChatId.value,
-    model,
-    executionMode: 'agent',
-  })
-    .then(async (success) => {
-      if (success) {
-        await loadPlan()
-      }
-    })
-    .catch((error) => {
-      toast.error('Could not start plan build', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-      })
-    })
+  buildNowOpen.value = true
 }
 
 const handleOpenOrchestrate = (): void => {
@@ -208,31 +153,6 @@ const handleOpenOrchestrate = (): void => {
     return
   }
   orchestrateOpen.value = true
-}
-
-const handleOrchestrateConfirm = (payload: {
-  parentModel: string
-  subagentModel: string
-}): void => {
-  startPlanBuild({
-    projectId: props.tab.projectId,
-    planPath: planPayload.value.path,
-    planTitle: title.value || props.tab.label,
-    sourceChatId: sourceChatId.value,
-    model: payload.parentModel,
-    subagentModel: payload.subagentModel,
-    executionMode: 'orchestrator',
-  })
-    .then(async (success) => {
-      if (success) {
-        await loadPlan()
-      }
-    })
-    .catch((error) => {
-      toast.error('Could not start orchestration', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-      })
-    })
 }
 
 onMounted(() => {
@@ -256,7 +176,16 @@ watch([planPayload, projectRoot, refreshToken], () => {
   <div class="flex h-full min-h-0 flex-col overflow-y-auto">
     <div class="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
       <div class="min-w-0">
-        <h2 class="text-sm font-semibold">{{ title || tab.label }}</h2>
+        <div class="flex min-w-0 items-center gap-2">
+          <h2 class="truncate text-sm font-semibold">{{ title || tab.label }}</h2>
+          <span
+            v-if="buildChatStatus === 'running' && !allTodosDone"
+            class="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
+          >
+            <span class="size-2 animate-pulse rounded-full bg-primary" />
+            Building
+          </span>
+        </div>
         <p v-if="loading" class="text-xs text-muted-foreground">Loading…</p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
@@ -320,7 +249,7 @@ watch([planPayload, projectRoot, refreshToken], () => {
                   :aria-label="STATUS_LABELS[todo.status]"
                 >
                   <component
-                    :is="statusIcon(todo.status)"
+                    :is="planTodoStatusIcon(todo.status)"
                     class="size-3.5"
                     :class="statusClass(todo.status)"
                   />
@@ -349,6 +278,11 @@ watch([planPayload, projectRoot, refreshToken], () => {
       v-model:open="orchestrateOpen"
       :disabled="building"
       @confirm="handleOrchestrateConfirm"
+    />
+    <BuildPlanDialog
+      v-model:open="buildNowOpen"
+      :disabled="building"
+      @confirm="handleBuildNowConfirm"
     />
   </div>
 </template>

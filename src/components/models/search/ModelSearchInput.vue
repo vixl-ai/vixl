@@ -25,7 +25,7 @@ const model = defineModel<string>({ default: '' })
       data-slot="command-input"
       autofocus
       :placeholder="placeholder"
-      class="placeholder:text-muted-foreground flex h-10 w-full rounded-md bg-transparent py-3.5 text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
+      class="placeholder:text-muted-foreground flex w-full rounded-md bg-transparent pr-8 text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
     >
   </div>
 </template>

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { CommandInput } from '@/components/ui/command'
-import { cn } from '@/lib/utils'
 
 type VoiceSelectorInputProps = InstanceType<typeof CommandInput>['$props']
 
@@ -14,6 +13,6 @@ const props = defineProps<Props>()
 
 <template>
   <CommandInput
-    :class="cn('h-auto py-3.5', props.class)"
+    :class="props.class"
   />
 </template>

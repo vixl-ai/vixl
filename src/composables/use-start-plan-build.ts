@@ -25,6 +25,8 @@ export type StartPlanBuildInput = {
   planPath: string
   planTitle: string
   sourceChatId?: string | null
+  lastBuildChatId?: string | null
+  freshChat?: boolean
   model?: string
   subagentModel?: string
   reasoning?: ReasoningLevel
@@ -41,18 +43,22 @@ export default () => {
 
   const resolveExistingChatId = async (
     projectSlug: string,
-    sourceChatId: string | null | undefined,
+    candidates: Array<string | null | undefined>,
   ): Promise<string | null> => {
-    if (!sourceChatId) {
-      return null
+    const seen = new Set<string>()
+    for (const candidate of candidates) {
+      if (!candidate || seen.has(candidate)) {
+        continue
+      }
+      seen.add(candidate)
+      try {
+        await readChatMeta(projectSlug, candidate)
+        return candidate
+      } catch {
+        continue
+      }
     }
-
-    try {
-      await readChatMeta(projectSlug, sourceChatId)
-      return sourceChatId
-    } catch {
-      return null
-    }
+    return null
   }
 
   const startPlanBuild = async (input: StartPlanBuildInput): Promise<boolean> => {
@@ -113,7 +119,13 @@ export default () => {
     try {
       await fleet.setActiveProject(project.id)
 
-      let chatId = await resolveExistingChatId(project.slug, input.sourceChatId)
+      let chatId: string | null = null
+      if (!input.freshChat) {
+        chatId = await resolveExistingChatId(project.slug, [
+          input.lastBuildChatId,
+          input.sourceChatId,
+        ])
+      }
       if (!chatId) {
         const chat = await chatStore.createNewChat({
           projectSlug: project.slug,
@@ -123,6 +135,12 @@ export default () => {
           title: input.planTitle,
         })
         chatId = chat.id
+      }
+
+      const session = chatStore.forChat(project.slug, chatId)
+      if (session.meta.value?.status === 'running') {
+        toast.error('Plan is already building in that chat')
+        return false
       }
 
       await updateChatMeta(project.slug, chatId, {

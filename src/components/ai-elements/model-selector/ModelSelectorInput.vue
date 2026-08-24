@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { CommandInput } from '@/components/ui/command'
-import { cn } from '@/lib/utils'
 
 interface Props {
   class?: HTMLAttributes['class']
@@ -12,7 +11,7 @@ const props = defineProps<Props>()
 
 <template>
   <CommandInput
-    :class="cn('h-auto py-3.5', props.class)"
+    :class="props.class"
     v-bind="$attrs"
   />
 </template>

@@ -296,6 +296,8 @@
     "useParentElement": true,
     "usePerformanceObserver": true,
     "usePermission": true,
+    "usePlanBuildActions": true,
+    "usePlanBuildStatus": true,
     "usePointer": true,
     "usePointerLock": true,
     "usePointerSwipe": true,
