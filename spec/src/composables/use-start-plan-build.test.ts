@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, ref } from 'vue'
+import { computed, ref, type ComputedRef } from 'vue'
 import { toast } from 'vue-sonner'
 import useStartPlanBuild from '@/composables/use-start-plan-build'
 import type { PendingChatMessage } from '@/services/chat/pending-message'
 import type { PlanBuildFrontmatterPatch } from '@/services/plans/update-plan-frontmatter'
-import type { ChatStatus } from '@/types/chat/chat-meta'
+import type { ChatMeta, ChatStatus } from '@/types/chat/chat-meta'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 
 const createNewChat = vi.hoisted(
@@ -15,7 +15,9 @@ const createNewChat = vi.hoisted(
 )
 const forChat = vi.hoisted(
   () =>
-    vi.fn<(projectSlug: string, chatId: string) => { meta: ReturnType<typeof computed> }>(),
+    vi.fn<
+      (projectSlug: string, chatId: string) => { meta: ComputedRef<ChatMeta | null> }
+    >(),
 )
 const readChatMetaMock = vi.hoisted(
   () =>
@@ -113,11 +115,16 @@ vi.mock('@/services/prompts/load-prompt', () => ({
 }))
 
 vi.mock('@/services/chat/pending-message', () => ({
-  setPendingChatMessage: (...args: unknown[]) => setPendingChatMessageMock(...args),
+  setPendingChatMessage: (payload: PendingChatMessage) =>
+    setPendingChatMessageMock(payload),
 }))
 
 vi.mock('@/services/plans/update-plan-frontmatter', () => ({
-  default: (...args: unknown[]) => updatePlanFrontmatter(...args),
+  default: (args: {
+    projectRoot: string
+    path: string
+    patch: PlanBuildFrontmatterPatch
+  }) => updatePlanFrontmatter(args),
 }))
 
 vi.mock('@/services/harness/plan-execution-session', () => ({
@@ -135,7 +142,11 @@ vi.mock('@/services/harness/plan-execution-session', () => ({
 vi.mock('@/services/vixl/vixl-tauri', () => ({
   readChatMeta: (projectSlug: string, chatId: string) =>
     readChatMetaMock(projectSlug, chatId),
-  updateChatMeta: (...args: unknown[]) => updateChatMeta(...args),
+  updateChatMeta: (
+    projectSlug: string,
+    chatId: string,
+    patch: Record<string, unknown>,
+  ) => updateChatMeta(projectSlug, chatId, patch),
 }))
 
 const baseInput = {
@@ -159,9 +170,9 @@ describe('use-start-plan-build', () => {
     createNewChat.mockResolvedValue({ id: 'fresh-chat' })
     readChatMetaMock.mockImplementation(async (_projectSlug, chatId) => ({ id: chatId }))
     forChat.mockImplementation((_projectSlug, chatId) => ({
-      meta: computed(() =>
+      meta: computed((): ChatMeta | null =>
         sessionStatus.value
-          ? { id: chatId, status: sessionStatus.value }
+          ? ({ id: chatId, status: sessionStatus.value } as ChatMeta)
           : null,
       ),
     }))

@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, ref } from 'vue'
-import type { ChatStatus } from '@/types/chat/chat-meta'
+import { computed, ref, type ComputedRef } from 'vue'
+import type { ChatMeta, ChatStatus } from '@/types/chat/chat-meta'
 
 const forChat = vi.hoisted(
   () =>
-    vi.fn<(projectSlug: string, chatId: string) => { meta: ReturnType<typeof computed> }>(),
+    vi.fn<
+      (projectSlug: string, chatId: string) => { meta: ComputedRef<ChatMeta | null> }
+    >(),
 )
 const getProject = vi.hoisted(
   () =>
@@ -34,8 +36,10 @@ describe('use-plan-build-status', () => {
     getProject.mockReset()
     getProject.mockImplementation(() => project.value)
     forChat.mockImplementation((_slug, _chatId) => ({
-      meta: computed(() =>
-        sessionStatus.value === null ? null : { status: sessionStatus.value },
+      meta: computed((): ChatMeta | null =>
+        sessionStatus.value === null
+          ? null
+          : ({ status: sessionStatus.value } as ChatMeta),
       ),
     }))
   })
