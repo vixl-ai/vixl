@@ -179,16 +179,7 @@ onMounted(() => {
       </div>
 
       <div
-        v-if="records.length === 0"
-        class="py-8 text-center"
-      >
-        <p class="text-sm text-muted-foreground">
-          No saved permissions. Allow or deny prompts will appear as the agent requests access.
-        </p>
-      </div>
-
-      <div
-        v-else
+        v-if="records.length > 0"
         class="space-y-6"
       >
       <div
