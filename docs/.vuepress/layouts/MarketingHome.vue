@@ -3,7 +3,6 @@ import { AppWindow, ArrowRight, ArrowUpRight, Laptop, Terminal } from '@lucide/v
 import { RouteLink } from 'vuepress/client'
 import { Button } from '@docs/components/ui/button'
 import GithubMark from '../components/GithubMark.vue'
-import MarketingFeatureRows from '../components/MarketingFeatureRows.vue'
 import MarketingHomeHeader from '../components/MarketingHomeHeader.vue'
 import useMarketingTheme from '../composables/use-marketing-theme'
 
@@ -23,7 +22,7 @@ const { isDark, toggleTheme } = useMarketingTheme()
     <div class="marketing-home min-h-screen bg-background text-foreground">
       <MarketingHomeHeader :is-dark="isDark" @toggle-theme="toggleTheme" />
 
-      <main class="flex flex-col items-center pb-28">
+      <main class="flex flex-col items-center pb-16">
         <section class="flex w-full max-w-[88rem] flex-col items-center px-6 pt-10">
           <h1 class="max-w-5xl text-center text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl">
             Local First Agents UI
@@ -64,9 +63,7 @@ const { isDark, toggleTheme } = useMarketingTheme()
           </div>
         </section>
 
-        <MarketingFeatureRows />
-
-        <section class="mt-28 grid w-full max-w-3xl grid-cols-3 gap-12 px-6">
+        <section class="mt-16 grid w-full max-w-3xl grid-cols-3 gap-12 px-6">
           <article
             v-for="platform in platforms"
             :key="platform.name"
