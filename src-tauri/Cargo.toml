@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 description = "Local-first BYOK Agents UI"
 authors = ["Aidan Hibbard"]
 license = "MIT"
