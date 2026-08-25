@@ -1,16 +1,10 @@
 <script setup lang="ts">
-import { AppWindow, ArrowRight, ArrowUpRight, Laptop, Terminal } from '@lucide/vue'
+import { ArrowRight, ArrowUpRight } from '@lucide/vue'
 import { RouteLink } from 'vuepress/client'
 import { Button } from '@docs/components/ui/button'
 import GithubMark from '../components/GithubMark.vue'
 import MarketingHomeHeader from '../components/MarketingHomeHeader.vue'
 import useMarketingTheme from '../composables/use-marketing-theme'
-
-const platforms = [
-  { name: 'Linux', icon: Terminal },
-  { name: 'Mac', icon: Laptop },
-  { name: 'Windows', icon: AppWindow },
-] as const
 
 const releasesUrl = 'https://github.com/vixl-ai/vixl/releases'
 
@@ -61,17 +55,6 @@ const { isDark, toggleTheme } = useMarketingTheme()
               src="/hero.png"
             />
           </div>
-        </section>
-
-        <section class="mt-16 grid w-full max-w-3xl grid-cols-3 gap-12 px-6">
-          <article
-            v-for="platform in platforms"
-            :key="platform.name"
-            class="flex flex-col items-center gap-3 text-center"
-          >
-            <component :is="platform.icon" class="size-6" />
-            <h2 class="text-base font-medium tracking-tight">{{ platform.name }}</h2>
-          </article>
         </section>
       </main>
     </div>
