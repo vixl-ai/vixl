@@ -5,7 +5,6 @@ import loadPrompt from '@/services/prompts/load-prompt'
 const SNIPPETS: Array<{ tools: readonly string[]; path: string }> = [
   { tools: ['get_mcp_tools', 'call_mcp_tool'], path: 'system/tool-guidance-mcp.md' },
   { tools: ['run_terminal'], path: 'system/tool-guidance-shell.md' },
-  { tools: ['browser_tabs'], path: 'system/tool-guidance-browser.md' },
   { tools: ['apply_patch'], path: 'system/tool-guidance-patch.md' },
 ]
 

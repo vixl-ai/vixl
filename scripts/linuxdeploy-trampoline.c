@@ -19,7 +19,6 @@ static void prepend_ld_library_path(const char *dir) {
 }
 
 int main(int argc, char **argv) {
-  const char *cef = getenv("CEF_PATH");
   const char *appdir = NULL;
   char *next[argc + 1];
   int n = 0;
@@ -31,9 +30,6 @@ int main(int argc, char **argv) {
     } else if (strncmp(argv[i], "--appdir=", 9) == 0) {
       appdir = argv[i] + 9;
     }
-  }
-  if (cef && cef[0]) {
-    prepend_ld_library_path(cef);
   }
   if (appdir && appdir[0]) {
     prepend_ld_library_path(appdir);

@@ -11,7 +11,6 @@ type DeriveAgentActivityArgs = {
   hasPendingApproval?: boolean
   hasPendingQuestion?: boolean
   hasPendingMcpAuth?: boolean
-  waitingForBrowser?: boolean
 }
 
 const waitForSubagentsLabel = (subagents: SubagentTimelineItem[]): string => {
@@ -20,17 +19,6 @@ const waitForSubagentsLabel = (subagents: SubagentTimelineItem[]): string => {
     return `Waiting for ${name}`
   }
   return `Waiting for ${subagents.length} sub-agents`
-}
-
-const isBrowserLockWait = (tool: ToolRun): boolean => {
-  if (tool.name !== 'browser_lock' || tool.status !== 'running') {
-    return false
-  }
-  if (!tool.args || typeof tool.args !== 'object') {
-    return false
-  }
-  const args = tool.args as Record<string, unknown>
-  return args.action !== 'unlock' && args.wait === true
 }
 
 const collectRunningTools = (turn: AgentTurn): ToolRun[] => {
@@ -81,17 +69,6 @@ export default (args: DeriveAgentActivityArgs): string | null => {
 
   if (blockingSubagents.length > 0) {
     return waitForSubagentsLabel(blockingSubagents)
-  }
-
-  const otherNonSpawn = nonSpawnRunning.filter(
-    (tool) => !isBrowserLockWait(tool),
-  )
-  const lockWaitRunning = nonSpawnRunning.filter(isBrowserLockWait)
-  if (
-    otherNonSpawn.length === 0 &&
-    (args.waitingForBrowser === true || lockWaitRunning.length > 0)
-  ) {
-    return 'Waiting for browser'
   }
 
   // Tool rows own the live verb once a call exists. Only spawn needs a

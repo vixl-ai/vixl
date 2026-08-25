@@ -5,51 +5,28 @@ import {
 } from '@/services/context/system-prompt-parts/format-mentions'
 import type { ContextMention } from '@/types/harness/context-mention'
 
-const browserElementMention: ContextMention = {
-  type: 'browser-element',
-  screenshotPath: '/tmp/vixl/screenshots/element.png',
-  detail: {
-    xpath: '/html[1]/body[1]/button[1]',
-    cssSelector: 'button.submit',
-    role: 'button',
-    name: 'Submit',
-    attributes: { type: 'submit', class: 'primary' },
-    boundingBox: { x: 10, y: 20, width: 100, height: 40 },
-    computedStyles: {
-      display: 'inline-block',
-      color: 'rgb(0, 0, 0)',
-    },
-    componentHint: null,
-    screenshotPath: '/tmp/vixl/screenshots/element.png',
-    outerHTML: null,
-    innerText: null,
-    pageUrl: null,
-    ancestorPath: null,
-    matchedCss: null,
-  },
+const fileMention: ContextMention = {
+  type: 'file',
+  path: 'src/utils/foo.ts',
+  content: 'export const foo = 1',
 }
 
-describe('format-mentions browser-element', () => {
-  it('formats a browser-element mention as a readable text block', () => {
-    const text = formatMentionsAsText([browserElementMention])
+describe('format-mentions', () => {
+  it('formats a file mention as a readable text block', () => {
+    const text = formatMentionsAsText([fileMention])
 
-    expect(text).toContain('Browser element button (/html[1]/body[1]/button[1]):')
-    expect(text).toContain('role: button')
-    expect(text).toContain('name: Submit')
-    expect(text).toContain('attributes: type=submit; class=primary')
-    expect(text).toContain('boundingBox: 10,20 100,40')
-    expect(text).toContain('computedStyles: display: inline-block; color: rgb(0, 0, 0)')
-    expect(text).toContain('screenshot: /tmp/vixl/screenshots/element.png')
+    expect(text).toContain('File src/utils/foo.ts:')
+    expect(text).toContain('export const foo = 1')
   })
 
-  it('includes browser-element in formatMentionBlocks mentions', () => {
+  it('splits skills from other mentions in formatMentionBlocks', () => {
     const blocks = formatMentionBlocks([
-      browserElementMention,
+      fileMention,
       { type: 'skill', name: 'ask' },
     ])
 
     expect(blocks.skills).toBe('Skill ask')
-    expect(blocks.mentions).toContain('Browser element button')
-    expect(blocks.mentions).toContain('screenshot: /tmp/vixl/screenshots/element.png')
+    expect(blocks.mentions).toContain('File src/utils/foo.ts:')
+    expect(blocks.mentions).toContain('export const foo = 1')
   })
 })

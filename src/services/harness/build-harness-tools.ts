@@ -30,24 +30,6 @@ import {
   codebaseStatus,
 } from '@/services/harness/codebase'
 import { runTerminal, terminalOutput, stopTerminal } from '@/services/harness/shell'
-import {
-  browserTabs,
-  browserNavigate,
-  browserLock,
-  browserSnapshot,
-  browserTakeScreenshot,
-  browserClick,
-  browserMouseClickXy,
-  browserType,
-  browserFill,
-  browserSelectOption,
-  browserPressKey,
-  browserScroll,
-  browserDrag,
-  browserGetBoundingBox,
-  browserHighlight,
-  browserCdp,
-} from '@/services/harness/browser'
 import { createPlanTool, updatePlanTodo } from '@/services/harness/plan'
 import { askUser } from '@/services/harness/ask'
 import { loadSkillTool } from '@/services/harness/skill'
@@ -92,22 +74,6 @@ const buildHarnessTools = (ctx: HarnessToolContext) => ({
   stop_terminal: stopTerminal(),
   lsp: lspQuery(),
   diagnostics: diagnostics(),
-  browser_tabs: browserTabs(ctx),
-  browser_navigate: browserNavigate(ctx),
-  browser_lock: browserLock(ctx),
-  browser_snapshot: browserSnapshot(ctx),
-  browser_take_screenshot: browserTakeScreenshot(ctx),
-  browser_click: browserClick(ctx),
-  browser_mouse_click_xy: browserMouseClickXy(ctx),
-  browser_type: browserType(ctx),
-  browser_fill: browserFill(ctx),
-  browser_select_option: browserSelectOption(ctx),
-  browser_press_key: browserPressKey(ctx),
-  browser_scroll: browserScroll(ctx),
-  browser_drag: browserDrag(ctx),
-  browser_get_bounding_box: browserGetBoundingBox(ctx),
-  browser_highlight: browserHighlight(ctx),
-  browser_cdp: browserCdp(ctx),
   web_fetch: webFetchTool(ctx),
 })
 

@@ -10,7 +10,7 @@ describe('format-tool-validation-error', () => {
   it('formats nested AI SDK Zod issues with tool name, path, and types', () => {
     const formatted = formatToolValidationError({
       name: 'AI_InvalidToolInputError',
-      toolName: 'browser_cdp',
+      toolName: 'web_fetch',
       cause: {
         name: 'AI_TypeValidationError',
         cause: {
@@ -25,7 +25,7 @@ describe('format-tool-validation-error', () => {
         },
       },
     })
-    expect(formatted).toContain('Invalid input for tool browser_cdp')
+    expect(formatted).toContain('Invalid input for tool web_fetch')
     expect(formatted).toContain('path: params.expression')
     expect(formatted).toContain('expected: string')
     expect(formatted).toContain('received: object')

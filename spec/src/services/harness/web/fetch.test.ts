@@ -145,7 +145,9 @@ describe('web_fetch tool', () => {
     })) as Record<string, unknown>
 
     expect(result.spaShell).toBe(true)
-    expect(String(result.hint)).toContain('browser_snapshot')
+    expect(String(result.hint)).toContain(
+      'JS SPA shell or bot challenge page from a plain HTTP GET',
+    )
   })
 
   it('fetches github.com URLs (not blocked)', async () => {

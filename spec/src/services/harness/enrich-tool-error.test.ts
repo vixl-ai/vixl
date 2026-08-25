@@ -12,11 +12,6 @@ describe('enrich-tool-error', () => {
     expect(result).toBe('Something unexpected happened')
   })
 
-  it('adds hint for CDP invalid params', () => {
-    const result = enrichToolError('CDP error -32602: Invalid parameters')
-    expect(result).toContain('params.expression must be a JavaScript source string')
-  })
-
   it('does not prefer edit_file on SANDBOX_ jail errors', () => {
     const result = enrichToolError(
       'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (isolated devices). Isolated /dev has no block devices. Command failed (exit 1): lsblk not available',

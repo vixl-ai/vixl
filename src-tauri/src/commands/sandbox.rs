@@ -10,16 +10,16 @@
 /// Ancestor directories of `home` and `project_root` are emitted as literal
 /// file-read allows so Node/npm `realpath`/`lstat` walks do not hit EPERM.
 pub fn generate_seatbelt_profile(allow_network: bool, home: &str, project_root: &str) -> String {
-  let network_rule = if allow_network {
-    "(allow network*)\n"
-  } else {
-    ""
-  };
+    let network_rule = if allow_network {
+        "(allow network*)\n"
+    } else {
+        ""
+    };
 
-  let ancestor_rules = format_ancestor_read_rules(home, project_root);
+    let ancestor_rules = format_ancestor_read_rules(home, project_root);
 
-  format!(
-    r#"(version 1)
+    format!(
+        r#"(version 1)
 (deny default)
 
 ; Process and signal operations required for shell execution
@@ -96,50 +96,48 @@ pub fn generate_seatbelt_profile(allow_network: bool, home: &str, project_root: 
 (allow file-write* (subpath (param "TMPDIR")))
 
 {network_rule}"#
-  )
+    )
 }
 
 /// Ancestor directories of `path` from the parent up to (but not including) `/`.
 /// Empty or relative paths yield no ancestors.
 pub fn path_ancestors(path: &str) -> Vec<String> {
-  let trimmed = path.trim().trim_end_matches('/');
-  if trimmed.is_empty() || !trimmed.starts_with('/') {
-    return Vec::new();
-  }
-
-  let mut ancestors = Vec::new();
-  let mut current = trimmed.to_string();
-  loop {
-    let parent = match std::path::Path::new(&current).parent() {
-      Some(p) => p.to_string_lossy().to_string(),
-      None => break,
-    };
-    if parent.is_empty() || parent == "/" {
-      break;
+    let trimmed = path.trim().trim_end_matches('/');
+    if trimmed.is_empty() || !trimmed.starts_with('/') {
+        return Vec::new();
     }
-    ancestors.push(parent.clone());
-    current = parent;
-  }
-  ancestors
+
+    let mut ancestors = Vec::new();
+    let mut current = trimmed.to_string();
+    loop {
+        let parent = match std::path::Path::new(&current).parent() {
+            Some(p) => p.to_string_lossy().to_string(),
+            None => break,
+        };
+        if parent.is_empty() || parent == "/" {
+            break;
+        }
+        ancestors.push(parent.clone());
+        current = parent;
+    }
+    ancestors
 }
 
 fn format_ancestor_read_rules(home: &str, project_root: &str) -> String {
-  let mut seen = std::collections::BTreeSet::new();
-  for path in [home, project_root] {
-    for ancestor in path_ancestors(path) {
-      seen.insert(ancestor);
+    let mut seen = std::collections::BTreeSet::new();
+    for path in [home, project_root] {
+        for ancestor in path_ancestors(path) {
+            seen.insert(ancestor);
+        }
     }
-  }
 
-  if seen.is_empty() {
-    return String::new();
-  }
+    if seen.is_empty() {
+        return String::new();
+    }
 
-  let mut out = String::new();
-  for ancestor in seen {
-    out.push_str(&format!(
-      "(allow file-read* (literal \"{ancestor}\"))\n"
-    ));
-  }
-  out
+    let mut out = String::new();
+    for ancestor in seen {
+        out.push_str(&format!("(allow file-read* (literal \"{ancestor}\"))\n"));
+    }
+    out
 }

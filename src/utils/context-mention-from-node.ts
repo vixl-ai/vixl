@@ -1,5 +1,4 @@
 import type { Editor } from '@tiptap/core'
-import type { BrowserElementDetail } from '@/types/browser/browser-element-detail'
 import type { ContextMention } from '@/types/harness/context-mention'
 
 export type ChatMentionNodeAttrs = {
@@ -22,62 +21,11 @@ const asType = (value: unknown): ContextMention['type'] | null => {
     value === 'rule' ||
     value === 'skill' ||
     value === 'symbol' ||
-    value === 'codebase' ||
-    value === 'browser-element'
+    value === 'codebase'
   ) {
     return value
   }
   return null
-}
-
-const browserElementLabel = (detail: BrowserElementDetail): string =>
-  detail.name ?? detail.role ?? detail.cssSelector ?? 'browser-element'
-
-const parseBrowserElementDetail = (raw: string): BrowserElementDetail | null => {
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') {
-      return null
-    }
-    const record = parsed as Record<string, unknown>
-    if (typeof record.xpath !== 'string') {
-      return null
-    }
-    return {
-      xpath: record.xpath,
-      cssSelector: typeof record.cssSelector === 'string' ? record.cssSelector : null,
-      role: typeof record.role === 'string' ? record.role : null,
-      name: typeof record.name === 'string' ? record.name : null,
-      attributes:
-        record.attributes &&
-        typeof record.attributes === 'object' &&
-        !Array.isArray(record.attributes)
-          ? (record.attributes as Record<string, string>)
-          : {},
-      boundingBox:
-        record.boundingBox &&
-        typeof record.boundingBox === 'object' &&
-        !Array.isArray(record.boundingBox)
-          ? (record.boundingBox as BrowserElementDetail['boundingBox'])
-          : null,
-      computedStyles:
-        record.computedStyles &&
-        typeof record.computedStyles === 'object' &&
-        !Array.isArray(record.computedStyles)
-          ? (record.computedStyles as Record<string, string>)
-          : {},
-      componentHint: typeof record.componentHint === 'string' ? record.componentHint : null,
-      screenshotPath:
-        typeof record.screenshotPath === 'string' ? record.screenshotPath : null,
-      outerHTML: typeof record.outerHTML === 'string' ? record.outerHTML : null,
-      innerText: typeof record.innerText === 'string' ? record.innerText : null,
-      pageUrl: typeof record.pageUrl === 'string' ? record.pageUrl : null,
-      ancestorPath: typeof record.ancestorPath === 'string' ? record.ancestorPath : null,
-      matchedCss: typeof record.matchedCss === 'string' ? record.matchedCss : null,
-    }
-  } catch {
-    return null
-  }
 }
 
 const mentionKey = (mention: ContextMention): string => {
@@ -89,9 +37,6 @@ const mentionKey = (mention: ContextMention): string => {
   }
   if (mention.type === 'codebase') {
     return `codebase:${mention.query}`
-  }
-  if (mention.type === 'browser-element') {
-    return `browser-element:${mention.detail.xpath}:${mention.screenshotPath}`
   }
   return `${mention.type}:${mention.name}`
 }
@@ -105,9 +50,6 @@ const mentionLabel = (mention: ContextMention): string => {
   }
   if (mention.type === 'codebase') {
     return `codebase ${mention.query}`
-  }
-  if (mention.type === 'browser-element') {
-    return browserElementLabel(mention.detail)
   }
   return mention.name
 }
@@ -145,14 +87,6 @@ const toAttrs = (mention: ContextMention): ChatMentionNodeAttrs => {
       ...base,
       query: mention.query,
       content: mention.content ?? null,
-    }
-  }
-  if (mention.type === 'browser-element') {
-    return {
-      ...base,
-      path: mention.screenshotPath,
-      name: browserElementLabel(mention.detail),
-      content: JSON.stringify(mention.detail),
     }
   }
   return { ...base, name: mention.name }
@@ -223,19 +157,6 @@ const fromAttrs = (attrs: Partial<ChatMentionNodeAttrs>): ContextMention | null 
       mention.content = attrs.content
     }
     return mention
-  }
-
-  if (mentionType === 'browser-element') {
-    const screenshotPath = attrs.path?.trim()
-    const detailRaw = attrs.content?.trim()
-    if (!screenshotPath || !detailRaw) {
-      return null
-    }
-    const detail = parseBrowserElementDetail(detailRaw)
-    if (!detail) {
-      return null
-    }
-    return { type: 'browser-element', detail, screenshotPath }
   }
 
   const name = attrs.name?.trim() || attrs.label?.trim()

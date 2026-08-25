@@ -18,44 +18,44 @@ jobs:
         include:
           - platform: macos-latest
             label: macOS aarch64 dmg
-            args: '--target aarch64-apple-darwin --features cef --config src-tauri/tauri.cef.macos.conf.json --bundles dmg'
+            args: '--target aarch64-apple-darwin --bundles dmg'
             rust_targets: aarch64-apple-darwin
-            cache_key: cef-macos-latest-aarch64-apple-darwin-release
+            cache_key: macos-latest-aarch64-apple-darwin-release
           - platform: macos-latest
             label: macOS x86_64 dmg
-            args: '--target x86_64-apple-darwin --features cef --config src-tauri/tauri.cef.macos.conf.json --bundles dmg'
+            args: '--target x86_64-apple-darwin --bundles dmg'
             rust_targets: x86_64-apple-darwin
-            cache_key: cef-macos-latest-x86_64-apple-darwin-release
+            cache_key: macos-latest-x86_64-apple-darwin-release
           - platform: macos-latest
             label: macOS aarch64 app
-            args: '--target aarch64-apple-darwin --features cef --config src-tauri/tauri.cef.macos.conf.json --bundles app'
+            args: '--target aarch64-apple-darwin --bundles app'
             rust_targets: aarch64-apple-darwin
-            cache_key: cef-macos-latest-aarch64-apple-darwin-release
+            cache_key: macos-latest-aarch64-apple-darwin-release
           - platform: macos-latest
             label: macOS x86_64 app
-            args: '--target x86_64-apple-darwin --features cef --config src-tauri/tauri.cef.macos.conf.json --bundles app'
+            args: '--target x86_64-apple-darwin --bundles app'
             rust_targets: x86_64-apple-darwin
-            cache_key: cef-macos-latest-x86_64-apple-darwin-release
+            cache_key: macos-latest-x86_64-apple-darwin-release
           - platform: ubuntu-24.04
             label: Linux AppImage
-            args: '--features cef --config src-tauri/tauri.cef.linux.conf.json --bundles appimage --verbose'
+            args: '--bundles appimage --verbose'
             rust_targets: ''
-            cache_key: cef-ubuntu-24.04-release
+            cache_key: ubuntu-24.04-release
           - platform: ubuntu-24.04
             label: Linux deb
-            args: '--features cef --config src-tauri/tauri.cef.linux.conf.json --bundles deb'
+            args: '--bundles deb'
             rust_targets: ''
-            cache_key: cef-ubuntu-24.04-release
+            cache_key: ubuntu-24.04-release
           - platform: ubuntu-24.04
             label: Linux rpm
-            args: '--features cef --config src-tauri/tauri.cef.linux.conf.json --bundles rpm --verbose'
+            args: '--bundles rpm --verbose'
             rust_targets: ''
-            cache_key: cef-ubuntu-24.04-release
+            cache_key: ubuntu-24.04-release
           - platform: windows-latest
             label: Windows NSIS
-            args: '--features cef --config src-tauri/tauri.cef.windows.conf.json --bundles nsis'
+            args: '--bundles nsis'
             rust_targets: ''
-            cache_key: cef-windows-latest-release
+            cache_key: windows-latest-release
 
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 45
@@ -68,34 +68,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
-            cmake \
-            ninja-build \
             pkg-config \
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
             patchelf \
             xdg-utils \
-            libnss3 \
-            libnspr4 \
-            libgbm1 \
-            libxshmfence1 \
-            libxkbcommon0 \
-            libatk-bridge2.0-0 \
-            libxcomposite1 \
-            libxdamage1 \
-            libxrandr2 \
-            libcups2 \
-            libpangocairo-1.0-0 \
             rpm
-          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
           sudo apt-get install -y libfuse2t64 || sudo apt-get install -y libfuse2
-
-      - name: Install macOS build tools
-        if: matrix.platform == 'macos-latest'
-        run: |
-          brew list cmake >/dev/null 2>&1 || brew install cmake
-          brew list ninja >/dev/null 2>&1 || brew install ninja
 
       - uses: actions/setup-node@v7
         with:
@@ -112,58 +92,7 @@ jobs:
           workspaces: ./src-tauri -> target
           key: ${{ matrix.cache_key }}
 
-      - name: Resolve CEF cache path
-        id: cef
-        shell: bash
-        run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            CEF_DIR="${USERPROFILE}/.local/share/cef"
-          else
-            CEF_DIR="${HOME}/.local/share/cef"
-          fi
-          echo "path=${CEF_DIR}" >> "$GITHUB_OUTPUT"
-          VERSION="$(awk '/name = "cef"/{getline; if ($1=="version") {gsub(/"/,"",$3); print $3; exit}}' src-tauri/Cargo.lock)"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "CEF_PATH=${CEF_DIR}" >> "$GITHUB_ENV"
-
-      - name: Cache CEF binaries
-        uses: actions/cache@v6
-        with:
-          path: ${{ steps.cef.outputs.path }}
-          key: cef-${{ matrix.platform }}-${{ runner.arch }}-${{ steps.cef.outputs.version }}
-
-      - name: Ensure CEF binaries
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -d "${CEF_PATH}" ]] && [[ -n "$(ls -A "${CEF_PATH}" 2>/dev/null || true)" ]]; then
-            echo "CEF cache hit at ${CEF_PATH}"
-            exit 0
-          fi
-          cargo install export-cef-dir --locked
-          mkdir -p "${CEF_PATH}"
-          export-cef-dir --force "${CEF_PATH}"
-
       - run: npm ci
-
-      - name: Stage CEF framework and helper
-        shell: bash
-        run: |
-          set -euo pipefail
-          export CEF_PATH
-          export CEF_BUNDLE_PROFILE=release
-          if [[ -n "${{ matrix.rust_targets }}" ]]; then
-            export CARGO_BUILD_TARGET="${{ matrix.rust_targets }}"
-          fi
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-cef-bundle.ps1
-          else
-            chmod +x scripts/prepare-cef-bundle.sh
-            ./scripts/prepare-cef-bundle.sh
-          fi
-          # CEF binaries must match the build target architecture. Cross-compiling
-          # (e.g. x86_64-apple-darwin on arm64 runners) requires a matching CEF_PATH.
-          echo "Using CEF_PATH=${CEF_PATH} for ${{ matrix.label }}"
 
       - name: Extract linuxdeploy without FUSE
         if: contains(matrix.args, '--bundles appimage')
@@ -180,15 +109,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           NO_STRIP: 'true'
-          CEF_PATH: ${{ env.CEF_PATH }}
           APPIMAGE_EXTRACT_AND_RUN: '1'
         with:
           tagName: v__VERSION__
           releaseName: vixl v__VERSION__
           releaseBody: |
             Alpha prerelease for vixl v__VERSION__. This is an early preview, not a stable release.
-
-            This build includes the embedded CEF (`cef` feature). User-facing docs will land later.
 
             Checksums (`SHA256SUMS.txt`, `SHA512SUMS.txt`) are attached after all platform builds finish.
             See CONTRIBUTING.md for how to verify downloads.
@@ -240,8 +166,6 @@ jobs:
             echo "## vixl v${VERSION} (alpha)"
             echo
             echo "This is an alpha prerelease, not a stable release."
-            echo
-            echo "This build includes the embedded CEF (\`cef\` feature). User-facing docs will land later."
             echo
             echo "Installers and bundles for macOS, Linux, and Windows are attached below."
             echo

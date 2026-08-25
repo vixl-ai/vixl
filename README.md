@@ -55,12 +55,6 @@ Contributors should start with [CONTRIBUTING.md](./CONTRIBUTING.md).
     <img src="./docs/media/readme/editor-readme.jpg" alt="Workbench editor with shared LSPs" />
   </p>
 
-- Embedded browser with CDP
-
-  <p align="center">
-    <img src="./docs/media/readme/cdp-readme.jpg" alt="Embedded browser with CDP" />
-  </p>
-
 - Built-in terminals
 
   <p align="center">

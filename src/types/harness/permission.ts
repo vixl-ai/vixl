@@ -1,4 +1,4 @@
-export type ApprovalKind = 'fs' | 'shell' | 'git' | 'mcp' | 'browser' | 'web'
+export type ApprovalKind = 'fs' | 'shell' | 'git' | 'mcp' | 'web'
 
 export type PermissionAction =
   | 'fs.write'
@@ -8,9 +8,6 @@ export type PermissionAction =
   | 'shell.unsandboxed'
   | 'git.write'
   | 'mcp.call'
-  | 'browser.navigate'
-  | 'browser.interact'
-  | 'browser.cdp'
   | 'web.fetch'
 
 export type PermissionVerdict = 'allow' | 'ask' | 'deny'
@@ -30,10 +27,6 @@ export type PermissionCapabilityKey =
   | 'git.branch_create'
   | `mcp:${string}`
   | `mcp:${string}:${string}`
-  | 'browser.navigate'
-  | 'browser.interact'
-  | 'browser.cdp'
-  | 'browser'
   | 'web.fetch'
   | `web.fetch:${string}`
 

@@ -7,8 +7,6 @@ license = "MIT"
 repository = "https://github.com/vixl-ai/vixl"
 edition = "2021"
 rust-version = "1.77.2"
-# Required when the `cef` feature enables extra bins (helper / spike validate).
-default-run = "app"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -23,7 +21,7 @@ tauri-build = { version = "2.6.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.3", features = ["macos-private-api", "tray-icon", "unstable"] }
+tauri = { version = "2.11.3", features = ["macos-private-api", "tray-icon"] }
 tauri-plugin-log = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"
@@ -47,34 +45,14 @@ flate2 = "1.1.9"
 tar = "0.4.46"
 which = "8.0.5"
 sha2 = "0.10.9"
-cef = { version = "151", default-features = false, optional = true }
-cef-dll-sys = { version = "151", default-features = false, optional = true }
-
-[features]
-default = ["cef"]
-cef = ["dep:cef", "dep:cef-dll-sys"]
-# Dev-only spike validator; not enabled by release `--features cef`.
-cef-spike = ["cef"]
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-dispatch2 = "0.3"
 objc2 = { version = "0.6", features = ["exception"] }
 objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry", "NSDate", "NSRunLoop", "NSValue"] }
 objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSButton", "NSView", "NSApplication", "NSRunningApplication", "NSEvent", "NSColor"] }
-objc2-web-kit = { version = "0.3", features = ["WKWebView"] }
-
-[[bin]]
-name = "vixl_cef_helper"
-path = "src/bin/vixl_cef_helper.rs"
-required-features = ["cef"]
-
-[[bin]]
-name = "cef-spike-validate"
-path = "src/bin/cef-spike-validate.rs"
-required-features = ["cef-spike"]
 
 [[test]]
 name = "commands_shell"

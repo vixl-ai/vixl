@@ -6,7 +6,6 @@ import WorkbenchTabsTerminalTab from '@/components/workbench/tabs/TerminalTab.vu
 import WorkbenchTabsPlanTab from '@/components/workbench/tabs/PlanTab.vue'
 import WorkbenchTabsStudioTab from '@/components/workbench/tabs/StudioTab.vue'
 import WorkbenchTabsAgentShellTab from '@/components/workbench/tabs/AgentShellTab.vue'
-import WorkbenchTabsBrowserTab from '@/components/workbench/tabs/BrowserTab.vue'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import type { WorkbenchTabType } from '@/types/workbench/workbench-tab'
 
@@ -19,7 +18,6 @@ const tabComponentMap: Record<WorkbenchTabType, object> = {
   plan: WorkbenchTabsPlanTab,
   studio: WorkbenchTabsStudioTab,
   'agent-shell': WorkbenchTabsAgentShellTab,
-  browser: WorkbenchTabsBrowserTab,
 }
 
 const activeTabId = computed(() => workbench.activeTabId.value)
@@ -30,8 +28,7 @@ const activeTabId = computed(() => workbench.activeTabId.value)
     <template v-for="tab in workbench.tabs.value" :key="tab.id">
       <div
         v-show="tab.id === activeTabId"
-        class="absolute inset-0 min-h-0 overflow-hidden"
-        :class="tab.type === 'browser' ? '' : 'bg-sidebar'"
+        class="absolute inset-0 min-h-0 overflow-hidden bg-sidebar"
       >
         <component :is="tabComponentMap[tab.type]" :tab="tab" />
       </div>

@@ -42,24 +42,8 @@ describe('createSessionOps flushPendingChatMessage', () => {
     ]
     const mentions: ContextMention[] = [
       {
-        type: 'browser-element',
-        detail: {
-          xpath: '/html[1]/body[1]/div[1]',
-          cssSelector: 'div.box',
-          role: 'generic',
-          name: null,
-          attributes: {},
-          boundingBox: { x: 0, y: 0, width: 10, height: 10 },
-          computedStyles: {},
-          componentHint: null,
-          screenshotPath: '/tmp/element.png',
-          outerHTML: null,
-          innerText: null,
-          pageUrl: null,
-          ancestorPath: null,
-          matchedCss: null,
-        },
-        screenshotPath: '/tmp/element.png',
+        type: 'file',
+        path: 'src/utils/foo.ts',
       },
     ]
 

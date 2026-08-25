@@ -50,32 +50,4 @@ describe('contextMentionDisplayToken', () => {
       token: '@codebase mention highlight',
     })
   })
-
-  it('formats browser-element mentions with the detail label', () => {
-    expect(
-      contextMentionDisplayToken({
-        type: 'browser-element',
-        screenshotPath: '/tmp/shot.png',
-        detail: {
-          xpath: '/html[1]/body[1]/button[1]',
-          cssSelector: 'button.submit',
-          role: 'button',
-          name: 'Submit',
-          attributes: {},
-          boundingBox: null,
-          computedStyles: {},
-          componentHint: null,
-          screenshotPath: '/tmp/shot.png',
-          outerHTML: null,
-          innerText: null,
-          pageUrl: null,
-          ancestorPath: null,
-          matchedCss: null,
-        },
-      }),
-    ).toEqual({
-      kind: 'mention',
-      token: '@Submit',
-    })
-  })
 })

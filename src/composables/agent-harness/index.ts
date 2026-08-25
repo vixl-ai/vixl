@@ -25,7 +25,6 @@ import createPersistence from './persistence'
 import createSessionOps from './session-ops'
 import createTurnLoop from './turn-loop'
 import type { AgentHarnessState, LastRunConfig } from './types'
-import { releaseLocksForChat } from '@/services/browser/registry'
 
 type AgentHarness = ReturnType<typeof createAgentHarness>
 
@@ -35,7 +34,6 @@ export const dropAgentHarness = (projectSlug: string, chatId: string): void => {
   const key = makeHarnessKey(projectSlug, chatId)
   const existing = harnessCache.get(key)
   harnessCache.delete(key)
-  releaseLocksForChat(chatId, 'chat_deleted')
   if (existing) {
     existing.dispose().catch(() => undefined)
   }

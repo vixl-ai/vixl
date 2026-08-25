@@ -8,11 +8,12 @@ describe('loadToolGuidanceForMode', () => {
     expect(ask).toContain('function calls')
   })
 
-  it('includes browser guidance in all modes', () => {
-    expect(loadToolGuidanceForMode('ask')).toContain('browser_lock')
-    expect(loadToolGuidanceForMode('plan')).toContain('browser_lock')
-    expect(loadToolGuidanceForMode('studio')).toContain('browser_lock')
-    expect(loadToolGuidanceForMode('agent')).toContain('browser_lock')
-    expect(loadToolGuidanceForMode('orchestrator')).toContain('browser_lock')
+  it('includes MCP guidance in all modes and omits embedded browser guidance', () => {
+    for (const mode of ['ask', 'plan', 'studio', 'agent', 'orchestrator'] as const) {
+      const text = loadToolGuidanceForMode(mode)
+      expect(text).toContain('get_mcp_tools if stale')
+      expect(text).not.toContain('browser_lock')
+      expect(text).not.toContain('browser_cdp')
+    }
   })
 })

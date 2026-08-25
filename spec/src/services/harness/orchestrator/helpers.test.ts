@@ -79,8 +79,8 @@ describe('orchestrator helpers', () => {
     it('includes Zod path and expected type for AI SDK validation errors', () => {
       const error = {
         name: 'AI_InvalidToolInputError',
-        toolName: 'browser_cdp',
-        message: 'Invalid input for tool browser_cdp: Type validation failed',
+        toolName: 'web_fetch',
+        message: 'Invalid input for tool web_fetch: Type validation failed',
         cause: {
           name: 'AI_TypeValidationError',
           message: 'Type validation failed',
@@ -99,7 +99,7 @@ describe('orchestrator helpers', () => {
         },
       }
       const message = resolveToolErrorMessage(error)
-      expect(message).toContain('browser_cdp')
+      expect(message).toContain('web_fetch')
       expect(message).toContain('params.expression')
       expect(message).toContain('expected: string')
       expect(message).toContain('received: object')

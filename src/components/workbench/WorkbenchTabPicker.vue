@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import {
   FileCode,
   GitBranch,
-  Globe,
   Terminal,
 } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
@@ -34,13 +33,11 @@ const props = withDefaults(
 
 const fleet = useFleetRegistry()
 const workbench = useWorkbenchStore()
-const passthroughSuspend = useBrowserPassthroughSuspend()
 const open = ref(false)
 
 const items = [
   { id: 'editor', label: 'Editor', icon: FileCode, requiresProject: false },
   { id: 'terminal', label: 'Terminal', icon: Terminal, requiresProject: false },
-  { id: 'browser', label: 'Browser', icon: Globe, requiresProject: true },
   { id: 'changes', label: 'Changes', icon: GitBranch, requiresProject: true },
 ] as const
 
@@ -63,15 +60,6 @@ const handleOpen = async (type: (typeof items)[number]['id']): Promise<void> => 
       case 'terminal':
         await workbench.openTerminal(projectId)
         break
-      case 'browser':
-        if (!activeProjectId.value) {
-          toast.error('Select a project', {
-            description: 'Browser requires a project workspace.',
-          })
-          return
-        }
-        await workbench.openBrowser(projectId)
-        break
       case 'changes':
         if (!activeProjectId.value) {
           toast.error('Select a project', {
@@ -89,23 +77,6 @@ const handleOpen = async (type: (typeof items)[number]['id']): Promise<void> => 
     })
   }
 }
-
-watch(open, (isOpen, wasOpen) => {
-  if (isOpen === wasOpen) {
-    return
-  }
-  if (isOpen) {
-    passthroughSuspend.suspend()
-    return
-  }
-  passthroughSuspend.resume()
-})
-
-onBeforeUnmount(() => {
-  if (open.value) {
-    passthroughSuspend.resume()
-  }
-})
 </script>
 
 <template>

@@ -97,8 +97,6 @@ const findPersisted = (
 
 const shellScopesPhaseA = (): PermissionScope[] => ['once', 'session', 'never']
 
-const browserScopes = (): PermissionScope[] => ['once', 'session', 'never']
-
 const defaultScopes = (): PermissionScope[] => [
   'once',
   'session',
@@ -154,19 +152,6 @@ export const decidePermission = (input: PermissionDecisionInput): PermissionDeci
       allowedScopes: shellScopesPhaseA(),
       reason: sandboxEnabled ? undefined : 'Unsandboxed shell',
     }
-  }
-
-  if (
-    action === 'browser.navigate' ||
-    action === 'browser.interact' ||
-    action === 'browser.cdp'
-  ) {
-    // Browser is never covered by Bypass. Approval scopes are once/session/never only
-    // (no workspace/always persist for now), matching shell.
-    if (sessionAllows.has(capability) || sessionAllows.has('browser')) {
-      return { verdict: 'allow', allowedScopes: browserScopes() }
-    }
-    return { verdict: 'ask', allowedScopes: browserScopes(), reason: 'Browser action' }
   }
 
   if (action === 'web.fetch') {

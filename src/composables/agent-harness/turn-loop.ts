@@ -2,7 +2,6 @@ import { toast } from 'vue-sonner'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { PermissionCapabilityKey } from '@/types/harness/permission'
 import { resumeOrchestrator } from '@/services/harness/orchestrator'
-import { releaseLocksForChat } from '@/services/browser/registry'
 import {
   clearPendingBackgroundResume,
   clearTurnResponseMessages,
@@ -171,7 +170,6 @@ export default (
     if (action === 'clear') {
       clearPendingBackgroundResume(options.chatId)
       clearTurnResponseMessages(options.chatId)
-      releaseLocksForChat(options.chatId, 'run_complete')
       updateChatMeta(options.projectSlug, options.chatId, { status: 'idle' })
         .then(() => {
           session.patchMeta({ status: 'idle' })

@@ -119,25 +119,6 @@ export {
   shellKillTracked,
 } from './shell'
 export {
-  browserCefCreate,
-  browserCefDestroy,
-  browserCefNavigate,
-  browserCefResize,
-  browserCefSetPassthroughRects,
-  browserCefFocus,
-  browserCefGetUrl,
-  browserCefGetTitle,
-  browserCefCanGoBack,
-  browserCefCanGoForward,
-  browserCefGoBack,
-  browserCefGoForward,
-  browserCefReload,
-  browserCefGetCdpWsUrl,
-  browserCefLastWarmInitError,
-  browserCefCdpEndpoint,
-  browserCefBench,
-} from './browser'
-export {
   lspStatus,
   lspCatalog,
   lspRequest,

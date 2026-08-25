@@ -18,7 +18,7 @@ const workbench = useWorkbenchStore()
 const dontAskAgain = ref(false)
 
 const tabTypeLabels: Record<
-  Exclude<WorkbenchTabType, 'plan' | 'studio' | 'agent-shell' | 'browser'>,
+  Exclude<WorkbenchTabType, 'plan' | 'studio' | 'agent-shell'>,
   string
 > = {
   editor: 'Editor',

@@ -14,7 +14,6 @@ import ChatMessageTurn from '@/components/chat/ChatMessageTurn.vue'
 import ChatMcpAuthCard from '@/components/chat/ChatMcpAuthCard.vue'
 import ChatQuestionCard from '@/components/chat/ChatQuestionCard.vue'
 import ChatSubAgentTurn from '@/components/chat/SubAgentTurn.vue'
-import useChatBrowserLock from '@/composables/use-chat-browser-lock'
 import {
   MessageScroller,
   MessageScrollerContent,
@@ -69,8 +68,6 @@ const lastAgentTurn = computed(() => {
   return null
 })
 
-const browserLock = useChatBrowserLock()
-
 const activityLabel = computed(() =>
   deriveAgentActivity({
     status: props.status ?? 'ready',
@@ -79,7 +76,6 @@ const activityLabel = computed(() =>
     hasPendingApproval: props.pendingApprovals.length > 0,
     hasPendingQuestion: Boolean(props.pendingQuestion),
     hasPendingMcpAuth: (props.pendingMcpAuth?.length ?? 0) > 0,
-    waitingForBrowser: browserLock.waitingForBrowser.value,
   }),
 )
 

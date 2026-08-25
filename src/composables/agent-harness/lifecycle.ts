@@ -4,7 +4,6 @@ import {
   abortOne,
   clearPendingBackgroundResume,
 } from '@/services/harness/subagent/registry'
-import { releaseLocksForChat } from '@/services/browser/registry'
 import { killShellsForChat } from '@/services/harness/shell/registry'
 import { rejectPendingMcpAuthForChat } from '@/services/mcp/mcp-auth-gate'
 import { updateChatMeta } from '@/services/vixl/vixl-tauri'
@@ -46,7 +45,6 @@ export default (
 
   const stop = async (): Promise<void> => {
     abortController.value?.abort()
-    releaseLocksForChat(options.chatId, 'aborted')
     rejectPendingMcpAuthForChat(options.chatId)
     pendingMcpAuth.value = []
     deps.stopMcpAuthPolling()

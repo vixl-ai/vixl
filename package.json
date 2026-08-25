@@ -27,8 +27,7 @@
     "audit:rust": "cargo audit --file src-tauri/Cargo.lock",
     "ci": "run-s lint type-check test:coverage audit:deps build",
     "tauri": "tauri",
-    "tauri:dev": "cargo build --features cef --bin vixl_cef_helper --manifest-path src-tauri/Cargo.toml && tauri dev",
-    "tauri:build:cef": "node scripts/tauri-build-cef.mjs",
+    "tauri:dev": "tauri dev",
     "docs:dev": "vuepress dev docs",
     "docs:build": "vuepress build docs"
   },

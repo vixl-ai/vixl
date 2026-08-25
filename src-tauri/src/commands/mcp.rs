@@ -13,6 +13,6 @@ pub(crate) use resolve_cmd::apply_resolved_path_env;
 pub use resolve_cmd::resolve_command;
 pub use spawn::{mcp_start, mcp_stop};
 pub use status::{
-  mcp_call_tool, mcp_list_statuses, mcp_list_tools, mcp_logout, mcp_refresh, mcp_status,
+    mcp_call_tool, mcp_list_statuses, mcp_list_tools, mcp_logout, mcp_refresh, mcp_status,
 };
 pub use types::{McpIcon, McpServerState, McpToolInfo};

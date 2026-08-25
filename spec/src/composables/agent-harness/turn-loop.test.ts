@@ -3,9 +3,6 @@ import { computed, ref, shallowRef } from 'vue'
 import type { AgentHarnessState, AttentionHelpers } from '@/composables/agent-harness/types'
 import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
-const releaseLocksForChat = vi.hoisted(() =>
-  vi.fn<(chatId: string, cancelled?: string) => void>(),
-)
 const clearPendingBackgroundResume = vi.hoisted(() =>
   vi.fn<(chatId: string) => void>(),
 )
@@ -24,11 +21,6 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
     updateChatMeta: (...args: unknown[]) => updateChatMeta(...args),
   }),
 )
-
-vi.mock('@/services/browser/registry', () => ({
-  releaseLocksForChat: (...args: unknown[]) =>
-    releaseLocksForChat(...(args as [string, string?])),
-}))
 
 vi.mock('@/services/harness/subagent/registry', () => ({
   clearPendingBackgroundResume: (chatId: string) =>
@@ -96,14 +88,14 @@ const buildAttention = (): AttentionHelpers =>
     applyTurnEndAttention: vi.fn<() => void>(),
   }) as unknown as AttentionHelpers
 
-describe('maybeFlushBackgroundSubagentResume lock release', () => {
+describe('maybeFlushBackgroundSubagentResume', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     updateChatMeta.mockResolvedValue(undefined)
     shouldFlushBackgroundSubagentResume.mockReturnValue('noop')
   })
 
-  it('releases locks with run_complete when background flush clears', () => {
+  it('clears pending resume state when flush is clear', () => {
     shouldFlushBackgroundSubagentResume.mockReturnValue('clear')
     const { maybeFlushBackgroundSubagentResume } = createTurnLoop(
       buildState(),
@@ -120,10 +112,10 @@ describe('maybeFlushBackgroundSubagentResume lock release', () => {
 
     expect(clearPendingBackgroundResume).toHaveBeenCalledWith('chat-1')
     expect(clearTurnResponseMessages).toHaveBeenCalledWith('chat-1')
-    expect(releaseLocksForChat).toHaveBeenCalledWith('chat-1', 'run_complete')
+    expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', { status: 'idle' })
   })
 
-  it('does not release locks when flush is a noop', () => {
+  it('does not clear pending resume when flush is a noop', () => {
     const { maybeFlushBackgroundSubagentResume } = createTurnLoop(
       buildState(),
       buildAttention(),
@@ -137,6 +129,7 @@ describe('maybeFlushBackgroundSubagentResume lock release', () => {
 
     maybeFlushBackgroundSubagentResume()
 
-    expect(releaseLocksForChat).not.toHaveBeenCalled()
+    expect(clearPendingBackgroundResume).not.toHaveBeenCalled()
+    expect(updateChatMeta).not.toHaveBeenCalled()
   })
 })

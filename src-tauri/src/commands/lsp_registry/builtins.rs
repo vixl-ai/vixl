@@ -3,61 +3,64 @@ use std::collections::HashMap;
 use super::types::*;
 
 pub fn builtin_specs() -> Vec<&'static BuiltinLspSpec> {
-  BUILTINS.iter().collect()
+    BUILTINS.iter().collect()
 }
 
 pub fn builtin_spec_by_id(id: &str) -> Option<&'static BuiltinLspSpec> {
-  BUILTINS.iter().find(|spec| spec.id == id)
+    BUILTINS.iter().find(|spec| spec.id == id)
 }
 
 pub fn tier_a_ids() -> Vec<&'static str> {
-  BUILTINS
-    .iter()
-    .filter(|spec| spec.tier == LspTier::A)
-    .map(|spec| spec.id)
-    .collect()
+    BUILTINS
+        .iter()
+        .filter(|spec| spec.tier == LspTier::A)
+        .map(|spec| spec.id)
+        .collect()
 }
 
 pub fn language_id_for_extension(extension: &str) -> String {
-  let ext = extension.trim_start_matches('.');
-  for spec in BUILTINS {
-    for (i, configured) in spec.extensions.iter().enumerate() {
-      let configured = configured.trim_start_matches('.');
-      if configured.eq_ignore_ascii_case(ext) {
-        if let Some(lang) = spec.language_ids.get(i).or_else(|| spec.language_ids.first()) {
-          return (*lang).to_string();
+    let ext = extension.trim_start_matches('.');
+    for spec in BUILTINS {
+        for (i, configured) in spec.extensions.iter().enumerate() {
+            let configured = configured.trim_start_matches('.');
+            if configured.eq_ignore_ascii_case(ext) {
+                if let Some(lang) = spec
+                    .language_ids
+                    .get(i)
+                    .or_else(|| spec.language_ids.first())
+                {
+                    return (*lang).to_string();
+                }
+            }
         }
-      }
     }
-  }
-  match ext {
-    "ts" | "tsx" => "typescript".to_string(),
-    "js" | "jsx" | "mjs" | "cjs" | "mts" | "cts" => "javascript".to_string(),
-    other => other.to_string(),
-  }
+    match ext {
+        "ts" | "tsx" => "typescript".to_string(),
+        "js" | "jsx" | "mjs" | "cjs" | "mts" | "cts" => "javascript".to_string(),
+        other => other.to_string(),
+    }
 }
 
-
 macro_rules! npm_spec {
-  ($id:expr, $cmd:expr, $exts:expr, $langs:expr, $tier:expr, $pkgs:expr, $bin:expr, $markers:expr) => {
-    BuiltinLspSpec {
-      id: $id,
-      command: $cmd,
-      extensions: $exts,
-      language_ids: $langs,
-      tier: $tier,
-      install: LspInstallKind::Npm,
-      npm: Some(NpmInstallSpec {
-        packages: $pkgs,
-        bin: $bin,
-      }),
-      github: None,
-      http: None,
-      go: None,
-      root_markers: $markers,
-      requires_trust: false,
-    }
-  };
+    ($id:expr, $cmd:expr, $exts:expr, $langs:expr, $tier:expr, $pkgs:expr, $bin:expr, $markers:expr) => {
+        BuiltinLspSpec {
+            id: $id,
+            command: $cmd,
+            extensions: $exts,
+            language_ids: $langs,
+            tier: $tier,
+            install: LspInstallKind::Npm,
+            npm: Some(NpmInstallSpec {
+                packages: $pkgs,
+                bin: $bin,
+            }),
+            github: None,
+            http: None,
+            go: None,
+            root_markers: $markers,
+            requires_trust: false,
+        }
+    };
 }
 
 pub(crate) static BUILTINS: &[BuiltinLspSpec] = &[
@@ -700,23 +703,23 @@ pub(crate) static BUILTINS: &[BuiltinLspSpec] = &[
 ];
 
 pub fn builtin_server_map() -> HashMap<String, (Vec<String>, Vec<String>, serde_json::Value)> {
-  let mut map = HashMap::new();
-  for spec in BUILTINS {
-    if spec.tier == LspTier::D {
-      continue;
+    let mut map = HashMap::new();
+    for spec in BUILTINS {
+        if spec.tier == LspTier::D {
+            continue;
+        }
+        let command = spec.command.iter().map(|s| (*s).to_string()).collect();
+        let extensions = spec.extensions.iter().map(|s| (*s).to_string()).collect();
+        let initialization = if spec.id == "vue" {
+            // Vue LS 3 hybrid mode: script/TS features come from typescript-language-server
+            // + @vue/typescript-plugin. The client must bridge tsserver/request notifications.
+            serde_json::json!({
+              "vue": { "complete": { "codelenses": true } }
+            })
+        } else {
+            serde_json::json!({})
+        };
+        map.insert(spec.id.to_string(), (command, extensions, initialization));
     }
-    let command = spec.command.iter().map(|s| (*s).to_string()).collect();
-    let extensions = spec.extensions.iter().map(|s| (*s).to_string()).collect();
-    let initialization = if spec.id == "vue" {
-      // Vue LS 3 hybrid mode: script/TS features come from typescript-language-server
-      // + @vue/typescript-plugin. The client must bridge tsserver/request notifications.
-      serde_json::json!({
-        "vue": { "complete": { "codelenses": true } }
-      })
-    } else {
-      serde_json::json!({})
-    };
-    map.insert(spec.id.to_string(), (command, extensions, initialization));
-  }
-  map
+    map
 }

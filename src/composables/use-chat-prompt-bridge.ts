@@ -1,13 +1,10 @@
 import { ref } from 'vue'
-import type { BrowserElementSelection } from '@/types/browser/browser-element-selection'
 import type { ContextMention } from '@/types/harness/context-mention'
 
 const mentionAppendToken = ref(0)
 const pendingMention = ref<ContextMention | null>(null)
 const skillAppendToken = ref(0)
 const pendingSkill = ref<string | null>(null)
-const browserElementAppendToken = ref(0)
-const pendingBrowserElement = ref<BrowserElementSelection | null>(null)
 
 const appendMention = (path: string): void => {
   const trimmed = path.trim().replace(/^@/, '')
@@ -39,17 +36,6 @@ const consumePendingSkill = (): string | null => {
   return skill
 }
 
-const appendBrowserElement = (selection: BrowserElementSelection): void => {
-  pendingBrowserElement.value = selection
-  browserElementAppendToken.value += 1
-}
-
-const consumePendingBrowserElement = (): BrowserElementSelection | null => {
-  const selection = pendingBrowserElement.value
-  pendingBrowserElement.value = null
-  return selection
-}
-
 export default () => ({
   mentionAppendToken,
   appendMention,
@@ -57,7 +43,4 @@ export default () => ({
   skillAppendToken,
   appendSkill,
   consumePendingSkill,
-  browserElementAppendToken,
-  appendBrowserElement,
-  consumePendingBrowserElement,
 })

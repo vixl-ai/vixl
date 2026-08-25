@@ -191,93 +191,24 @@ describe('formatToolRunLabel', () => {
     ).toBe('Read missing.ts')
   })
 
-  it('labels browser_lock wait as Waiting for browser while running', () => {
+  it('labels web_fetch with the URL', () => {
     expect(
       formatToolRunLabel(
         toolRun({
-          name: 'browser_lock',
-          status: 'running',
-          args: { action: 'lock', wait: true },
-        }),
-      ),
-    ).toBe('Waiting for browser…')
-  })
-
-  it('labels granted and released browser_lock', () => {
-    expect(
-      formatToolRunLabel(
-        toolRun({
-          name: 'browser_lock',
-          status: 'running',
-          args: { action: 'lock' },
-        }),
-      ),
-    ).toBe('Using browser…')
-    expect(
-      formatToolRunLabel(
-        toolRun({
-          name: 'browser_lock',
-          args: { action: 'lock' },
-          result: { locked: true },
-        }),
-      ),
-    ).toBe('Locked browser')
-    expect(
-      formatToolRunLabel(
-        toolRun({
-          name: 'browser_lock',
-          args: { action: 'unlock' },
-          result: { locked: false },
-        }),
-      ),
-    ).toBe('Released browser')
-  })
-
-  it('labels browser_navigate with the URL host', () => {
-    expect(
-      formatToolRunLabel(
-        toolRun({
-          name: 'browser_navigate',
+          name: 'web_fetch',
           status: 'running',
           args: { url: 'https://example.com/docs' },
         }),
       ),
-    ).toBe('Opening example.com…')
+    ).toBe('Fetching https://example.com/docs…')
     expect(
       formatToolRunLabel(
         toolRun({
-          name: 'browser_navigate',
+          name: 'web_fetch',
           args: { url: 'https://example.com/docs' },
         }),
       ),
-    ).toBe('Opened example.com')
-  })
-
-  it('labels browser snapshot and screenshot verbs', () => {
-    expect(
-      formatToolRunLabel(
-        toolRun({
-          name: 'browser_snapshot',
-          status: 'running',
-        }),
-      ),
-    ).toBe('Reading page…')
-    expect(
-      formatToolRunLabel(
-        toolRun({
-          name: 'browser_take_screenshot',
-          status: 'running',
-        }),
-      ),
-    ).toBe('Capturing screenshot…')
-    expect(
-      formatToolRunLabel(
-        toolRun({
-          name: 'browser_click',
-          status: 'running',
-        }),
-      ),
-    ).toBe('Clicking…')
+    ).toBe('Fetched https://example.com/docs')
   })
 
   it('labels run_terminal with the short description, not the command', () => {

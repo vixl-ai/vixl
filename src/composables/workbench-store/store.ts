@@ -24,7 +24,6 @@ import {
 } from './helpers'
 import {
   openAgentShell,
-  openBrowser,
   openChanges,
   openDiff,
   openEditor,
@@ -86,7 +85,6 @@ const useWorkbenchStore = () => ({
   openStudio,
   openAgentShell,
   openChanges,
-  openBrowser,
   closeTab,
   closeOthers,
   closeAll,

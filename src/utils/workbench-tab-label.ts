@@ -12,8 +12,6 @@ export default (type: WorkbenchTabType): string => {
       return 'Studio'
     case 'plan':
       return 'Plan'
-    case 'browser':
-      return 'Browser'
     default:
       return 'Tab'
   }

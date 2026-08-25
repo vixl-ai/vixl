@@ -2,9 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HarnessStreamInput } from '@/types/harness/harness-stream-input'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
-const releaseLocksForChat = vi.hoisted(() =>
-  vi.fn<(chatId: string, cancelled?: string) => void>(),
-)
 const hasRunningSubagentsForChat = vi.hoisted(() =>
   vi.fn<(chatId: string) => boolean>(),
 )
@@ -25,11 +22,6 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
     updateChatMeta: (...args: unknown[]) => updateChatMeta(...args),
   }),
 )
-
-vi.mock('@/services/browser/registry', () => ({
-  releaseLocksForChat: (...args: unknown[]) =>
-    releaseLocksForChat(...(args as [string, string?])),
-}))
 
 vi.mock('@/services/harness/permission/approval-gate', () => ({
   rejectPendingForChat: vi.fn<() => void>(),
@@ -70,7 +62,7 @@ const buildInput = (signal: AbortSignal): HarnessStreamInput =>
     onEvent: vi.fn<(...args: unknown[]) => void>(),
   }) as unknown as HarnessStreamInput
 
-describe('harness stream lock release', () => {
+describe('harness stream status', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     consumeStream.mockResolvedValue(undefined)
@@ -79,27 +71,33 @@ describe('harness stream lock release', () => {
     hasRunningSubagentsForChat.mockReturnValue(false)
   })
 
-  it('releases locks with run_complete when the chat is idle', async () => {
+  it('marks the chat idle when no background subagents are running', async () => {
     await runStream(buildInput(new AbortController().signal))
 
-    expect(releaseLocksForChat).toHaveBeenCalledWith('chat-1', 'run_complete')
+    expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', {
+      status: 'idle',
+    })
   })
 
-  it('keeps the lock when waiting on background subagents', async () => {
+  it('keeps sidebar running while background subagents are still working', async () => {
     hasRunningSubagentsForChat.mockReturnValue(true)
 
     await runStream(buildInput(new AbortController().signal))
 
-    expect(releaseLocksForChat).not.toHaveBeenCalled()
+    expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', {
+      status: 'running',
+    })
   })
 
-  it('releases locks with aborted when the stream is aborted', async () => {
+  it('still settles status when the stream is aborted', async () => {
     const controller = new AbortController()
     controller.abort()
     hasRunningSubagentsForChat.mockReturnValue(true)
 
     await runStream(buildInput(controller.signal))
 
-    expect(releaseLocksForChat).toHaveBeenCalledWith('chat-1', 'aborted')
+    expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', {
+      status: 'running',
+    })
   })
 })

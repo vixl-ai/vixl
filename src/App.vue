@@ -12,6 +12,7 @@ import WorkbenchHeader from '@/components/workbench/WorkbenchHeader.vue'
 import TitleBar from '@/components/navigation/header/TitleBar.vue'
 import WindowResizeHandles from '@/components/navigation/header/WindowResizeHandles.vue'
 import {
+  ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/shadcn/ui/resizable'
@@ -115,7 +116,7 @@ watch(rightSidebarOpen, (open) => {
 <template>
   <SidebarProvider class="overflow-x-hidden">
     <AppSidebar />
-    <SidebarInset class="min-w-0 w-0 flex-1 overflow-hidden bg-transparent">
+    <SidebarInset class="min-w-0 w-0 flex-1 overflow-hidden bg-background">
       <RightSidebarProvider
         v-model:open="rightSidebarOpen"
         class="h-svh min-w-0 flex-1 overflow-hidden"
@@ -130,7 +131,7 @@ watch(rightSidebarOpen, (open) => {
               <RouterView class="min-h-0 flex-1" />
             </main>
           </ResizablePanel>
-          <RightSidebarResizeHandle v-show="rightSidebarOpen" />
+          <ResizableHandle v-show="rightSidebarOpen" />
           <ResizablePanel
             ref="rightSidebarPanelRef"
             collapsible

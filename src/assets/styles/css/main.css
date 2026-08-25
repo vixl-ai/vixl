@@ -1,7 +1,3 @@
-html {
-  background: transparent;
-}
-
 /*
  * Monaco LSP hover / suggest / parameter hints live in overflowingContentWidgets.
  * Without an explicit stacking context on that layer, view-lines can paint over
@@ -95,7 +91,7 @@ html {
   }
 }
 
-/* Soft full-perimeter pastel ring (chat prompt while waiting, locked browser pane) */
+/* Soft full-perimeter pastel ring (chat prompt while waiting) */
 @property --agent-aurora-angle {
   syntax: '<angle>';
   inherits: false;
@@ -121,38 +117,6 @@ html {
   animation: agent-aurora-drift 14s linear infinite;
 }
 
-/* Locked browser: 2px rotating ring only. Interior is masked out so CEF stays visible. */
-.agent-aurora-ring {
-  position: relative;
-}
-
-.agent-aurora-ring::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  pointer-events: none;
-  border-radius: inherit;
-  padding: 2px;
-  background: conic-gradient(
-    from var(--agent-aurora-angle),
-    color-mix(in oklab, #b89ad4 55%, var(--border)),
-    color-mix(in oklab, #7eb6d9 55%, var(--border)),
-    color-mix(in oklab, #7ec9a0 55%, var(--border)),
-    color-mix(in oklab, #a894d4 55%, var(--border)),
-    color-mix(in oklab, #b89ad4 55%, var(--border))
-  );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  animation: agent-aurora-drift 14s linear infinite;
-}
-
 @keyframes agent-aurora-drift {
   to {
     --agent-aurora-angle: 360deg;
@@ -160,7 +124,6 @@ html {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-aurora-ring::before,
   .chat-prompt-aurora [data-slot='input-group'] {
     animation: none;
   }

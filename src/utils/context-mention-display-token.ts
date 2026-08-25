@@ -11,14 +11,6 @@ const mentionLabel = (mention: ContextMention): string => {
   if (mention.type === 'codebase') {
     return `codebase ${mention.query}`
   }
-  if (mention.type === 'browser-element') {
-    return (
-      mention.detail.name ??
-      mention.detail.role ??
-      mention.detail.cssSelector ??
-      'browser-element'
-    )
-  }
   return mention.name
 }
 

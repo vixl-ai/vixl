@@ -14,8 +14,8 @@ import type { WebFetchFormat } from '@/types/harness/web-content'
 
 const DEFAULT_MAX_LENGTH = 32000
 
-const BROWSER_HINT =
-  'This response looks like a JS SPA shell or bot challenge page from a plain HTTP GET (no JavaScript). Use browser_snapshot or other browser_* tools for rendered content, login, or interaction.'
+const SPA_GET_HINT =
+  'This response looks like a JS SPA shell or bot challenge page from a plain HTTP GET (no JavaScript).'
 
 const headerValue = (
   headers: Record<string, string>,
@@ -34,8 +34,7 @@ const webFetchTool = (ctx: HarnessToolContext) =>
   tool({
     description: withToolExamples(
       [
-        'Fetch an http(s) URL and return markdown (default), text, or html. This is NOT the CEF browser.',
-        'For JS-rendered SPAs, login, or interaction use browser_snapshot / browser_* tools.',
+        'Fetch an http(s) URL and return markdown (default), text, or html. Plain HTTP GET, no JavaScript.',
         'Works for any host including git forges (GitLab, Gitea, Forgejo, Bitbucket, Codeberg, github.com). Do not refuse github.com.',
         'If this machine has gh and the URL is github.com, the shell tool with gh pr view / gh issue view / gh api can be better for private GitHub data. Otherwise fetch the URL.',
       ].join(' '),
@@ -142,7 +141,7 @@ const webFetchTool = (ctx: HarnessToolContext) =>
         startIndex,
       })
       const wrapped = wrapUntrustedWebContent(parsed.href, truncated.text)
-      const needsBrowserHint = cached.spaShell || cached.challenge
+      const needsSpaHint = cached.spaShell || cached.challenge
 
       return {
         status: cached.status,
@@ -154,7 +153,7 @@ const webFetchTool = (ctx: HarnessToolContext) =>
         ...(truncated.nextStartIndex !== undefined
           ? { nextStartIndex: truncated.nextStartIndex }
           : {}),
-        ...(needsBrowserHint ? { hint: BROWSER_HINT } : {}),
+        ...(needsSpaHint ? { hint: SPA_GET_HINT } : {}),
         text: wrapped,
       }
     },

@@ -1,24 +1,5 @@
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 
-const BROWSER_TOOLS = [
-  'browser_tabs',
-  'browser_navigate',
-  'browser_lock',
-  'browser_snapshot',
-  'browser_take_screenshot',
-  'browser_click',
-  'browser_mouse_click_xy',
-  'browser_type',
-  'browser_fill',
-  'browser_select_option',
-  'browser_press_key',
-  'browser_scroll',
-  'browser_drag',
-  'browser_get_bounding_box',
-  'browser_highlight',
-  'browser_cdp',
-] as const
-
 const MCP_TOOLS = [
   'call_mcp_tool',
   'get_mcp_tools',
@@ -46,7 +27,6 @@ const ASK_TOOLS = [
   'ask_user',
   'web_fetch',
   ...MCP_TOOLS,
-  ...BROWSER_TOOLS,
   'spawn_subagent',
   'resolve_models',
 ] as const
@@ -85,7 +65,6 @@ const ORCHESTRATOR_TOOLS = [
   'update_todos',
   'spawn_subagent',
   'resolve_models',
-  ...BROWSER_TOOLS,
 ] as const
 
 export const MODE_TOOL_ALLOWLIST: Record<VixlChatMode, string[]> = {
@@ -102,7 +81,6 @@ export const MODE_TOOL_ALLOWLIST: Record<VixlChatMode, string[]> = {
     'list_mcp_resources',
     'read_mcp_resource',
     'get_mcp_prompt',
-    ...BROWSER_TOOLS,
     'spawn_subagent',
     'resolve_models',
   ],
@@ -146,7 +124,6 @@ export const MODE_TOOL_ALLOWLIST: Record<VixlChatMode, string[]> = {
     'write_studio_artifact',
     'spawn_subagent',
     'resolve_models',
-    ...BROWSER_TOOLS,
   ],
   orchestrator: [...ORCHESTRATOR_TOOLS],
 }
