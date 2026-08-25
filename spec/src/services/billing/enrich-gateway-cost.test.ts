@@ -29,9 +29,13 @@ vi.mock('@/services/billing/read-usage-ledger', () => ({
 vi.mock('@/services/vixl/vixl-tauri', () =>
   mockVixlTauri({
     getUserVixlDir: vi.fn<() => Promise<string>>(async () => '/tmp/vixl'),
-    writeJsonFile: vi.fn<(path: string, value: unknown) => Promise<void>>(
-      async () => undefined,
-    ),
+    writeChatUsage: vi.fn<
+      (
+        projectSlug: string,
+        chatId: string,
+        records: unknown[],
+      ) => Promise<void>
+    >(async () => undefined),
     updateChatMeta: vi.fn<
       (
         projectSlug: string,
@@ -94,7 +98,7 @@ describe('enrichGatewayCost', () => {
     expect(delay).toHaveBeenCalledTimes(3)
     expect(delay.mock.calls.map((call) => call[0])).toEqual([2000, 2000, 4000])
     expect(toast.error).not.toHaveBeenCalled()
-    expect(vixl.writeJsonFile).not.toHaveBeenCalled()
+    expect(vixl.writeChatUsage).not.toHaveBeenCalled()
     expect(vixl.updateChatMeta).not.toHaveBeenCalled()
     expect(result.record).toBeNull()
     expect(result.usageTotals).toBeNull()
@@ -132,7 +136,7 @@ describe('enrichGatewayCost', () => {
     expect(delay).toHaveBeenCalledTimes(1)
     expect(delay).toHaveBeenCalledWith(2000)
     expect(toast.error).not.toHaveBeenCalled()
-    expect(vixl.writeJsonFile).toHaveBeenCalledTimes(1)
+    expect(vixl.writeChatUsage).toHaveBeenCalledTimes(1)
     expect(vixl.updateChatMeta).toHaveBeenCalledTimes(1)
     expect(result.record?.costUSD).toBe(0.012)
     expect(result.record?.pricingSource).toBe('provider_reported')
@@ -165,7 +169,7 @@ describe('enrichGatewayCost', () => {
     expect(toast.error).toHaveBeenCalledWith('Failed to load gateway cost', {
       description: 'Unauthorized',
     })
-    expect(vixl.writeJsonFile).not.toHaveBeenCalled()
+    expect(vixl.writeChatUsage).not.toHaveBeenCalled()
     expect(vixl.updateChatMeta).not.toHaveBeenCalled()
     expect(result.record?.costUSD).toBeNull()
     expect(result.record?.pricingSource).toBe('none')

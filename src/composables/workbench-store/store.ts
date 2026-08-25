@@ -52,6 +52,7 @@ import {
   unregisterTerminalSession,
   writeToActiveTerminal,
 } from './tab-lifecycle'
+import { startWorkbenchPersist } from './persist'
 
 const activeTab = computed(
   () => tabs.value.find((tab) => tab.id === activeTabId.value) ?? null,
@@ -65,6 +66,8 @@ const hasMultipleProjects = computed(() => {
 watch(vixlFileChangeToken, () => {
   refreshPlanStudioTabs()
 })
+
+startWorkbenchPersist()
 
 const useWorkbenchStore = () => ({
   tabs,

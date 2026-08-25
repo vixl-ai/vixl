@@ -4,6 +4,7 @@ import {
   ensureMonacoBaseThemes,
   observeMonacoTheme,
 } from '@/utils/monaco-theme'
+import { disposeEditorViewStateListeners } from './view-state'
 import type { MonacoEditorContext } from './types'
 
 export const hasEditorDimensions = (element: HTMLElement): boolean =>
@@ -63,6 +64,7 @@ export const createHelpers = (ctx: MonacoEditorContext) => {
   }
 
   const disposeCodeEditor = (): void => {
+    disposeEditorViewStateListeners(ctx)
     ctx.editor?.dispose()
     ctx.editor = null
   }

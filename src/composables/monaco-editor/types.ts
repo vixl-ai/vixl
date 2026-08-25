@@ -38,6 +38,7 @@ export type MonacoEditorContext = {
   unlistenDiagnostics: (() => void) | null
   stopThemeObserver: (() => void) | null
   lspProvidersRegistered: boolean
+  viewStateDisposables: monaco.IDisposable[]
   models: Map<string, monaco.editor.ITextModel>
   originalModels: Map<string, monaco.editor.ITextModel>
   pathByModel: Map<monaco.editor.ITextModel, string>

@@ -4,18 +4,9 @@ import billableUsageRecordSchema from '@/schemas/billing/billable-usage-record-s
 import computeChatUsageTotals from '@/services/billing/compute-chat-usage-totals'
 import readUsageLedger from '@/services/billing/read-usage-ledger'
 import {
-  getUserVixlDir,
   updateChatMeta,
-  writeJsonFile,
+  writeChatUsage,
 } from '@/services/vixl/vixl-tauri'
-
-const ledgerPath = async (
-  projectSlug: string,
-  chatId: string,
-): Promise<string> => {
-  const root = await getUserVixlDir()
-  return `${root}/chats/${projectSlug}/${chatId}/usage-ledger.json`
-}
 
 export type AppendUsageLedgerResult = {
   records: BillableUsageRecord[]
@@ -35,7 +26,7 @@ export default async (
   const existing = await readUsageLedger(projectSlug, chatId)
   const records = [...existing, validated]
 
-  await writeJsonFile(await ledgerPath(projectSlug, chatId), records)
+  await writeChatUsage(projectSlug, chatId, records)
 
   const usageTotals = computeChatUsageTotals(records)
   await updateChatMeta(projectSlug, chatId, { usageTotals })

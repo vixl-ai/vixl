@@ -143,4 +143,12 @@ export {
   fileCheckpointRestore,
   pinChat,
   listPinnedChats,
+  readChatUsage,
+  writeChatUsage,
 } from './chat'
+export {
+  workbenchLoadSession,
+  workbenchReplaceSession,
+  editorLoadViewState,
+  editorSaveViewState,
+} from './workbench'

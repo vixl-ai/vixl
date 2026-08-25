@@ -20,9 +20,11 @@ pub mod sandbox;
 pub mod shell;
 pub mod watch;
 pub mod web_fetch;
+pub mod workbench;
 pub use chat::{
     append_chat_line, create_chat, delete_chat, fork_chat, list_chats, list_pinned_chats, pin_chat,
-    read_chat_messages, read_chat_meta, truncate_chat_log, update_chat_meta,
+    read_chat_messages, read_chat_meta, read_chat_usage, truncate_chat_log, update_chat_meta,
+    write_chat_usage,
 };
 pub use codegraph::{codegraph_cli, codegraph_store_stat, delete_graph, list_graphs};
 pub use config::{
@@ -70,3 +72,7 @@ pub use shell::{
 };
 pub use watch::{watch_vixl_paths, WatchState};
 pub use web_fetch::web_fetch;
+pub use workbench::{
+    editor_load_view_state, editor_save_view_state, workbench_load_session,
+    workbench_replace_session,
+};

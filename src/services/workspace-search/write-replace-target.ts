@@ -1,4 +1,5 @@
 import { fsWriteFile } from '@/services/vixl/vixl-tauri'
+import { resolveProjectIdByRoot } from '@/composables/workbench-store/helpers'
 import getWorkingModel from './get-working-model'
 
 export default async (args: {
@@ -6,7 +7,10 @@ export default async (args: {
   path: string
   content: string
 }): Promise<'model' | 'disk'> => {
-  const model = getWorkingModel(args.path)
+  const model = getWorkingModel(
+    resolveProjectIdByRoot(args.projectRoot),
+    args.path,
+  )
   if (model) {
     if (model.getValue() !== args.content) {
       model.setValue(args.content)

@@ -4,11 +4,12 @@ import { fsReadFile, fsWriteFile, gitShowFile } from '@/services/vixl/vixl-tauri
 import formatMonacoError from '@/utils/format-monaco-error'
 import { detectMonacoLanguage } from '@/utils/monaco-language'
 import { ensureMonacoLanguage } from '@/utils/monaco-shiki'
-import { GIT_HEAD_SCHEME, workingFileUri } from '@/utils/monaco-working-uri'
+import { gitHeadUri, workingFileUri } from '@/utils/monaco-working-uri'
 import { ensureLanguageRegistered } from './helpers'
 import type { MonacoHelpers } from './helpers'
 import type { MonacoLsp } from './lsp'
 import type { MonacoEditorContext } from './types'
+import { restoreEditorViewState } from './view-state'
 
 type ModelsDeps = {
   helpers: MonacoHelpers
@@ -83,7 +84,7 @@ export const createModels = (ctx: MonacoEditorContext, deps: ModelsDeps) => {
 
     const languageId = detectMonacoLanguage(path)
     ensureLanguageRegistered(languageId)
-    const uri = monaco.Uri.parse(`${GIT_HEAD_SCHEME}://${encodeURIComponent(path)}`)
+    const uri = gitHeadUri(ctx.props.projectId, path)
     const model = monaco.editor.createModel(content, languageId, uri)
     ctx.originalModels.set(path, model)
     ensureMonacoLanguage(monaco, languageId).catch(() => {
@@ -126,7 +127,7 @@ export const createModels = (ctx: MonacoEditorContext, deps: ModelsDeps) => {
 
     const languageId = detectMonacoLanguage(path)
     ensureLanguageRegistered(languageId)
-    const uri = workingFileUri(path)
+    const uri = workingFileUri(ctx.props.projectId, path)
     const model = monaco.editor.createModel(content, languageId, uri)
     ctx.models.set(path, model)
     ctx.pathByModel.set(model, path)
@@ -171,6 +172,8 @@ export const createModels = (ctx: MonacoEditorContext, deps: ModelsDeps) => {
     }
 
     activeEditor.setModel(model)
+
+    await restoreEditorViewState(ctx, path)
 
     await deps.lsp.setupLspForPath(path, model)
 

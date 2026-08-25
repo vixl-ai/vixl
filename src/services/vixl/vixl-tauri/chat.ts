@@ -83,3 +83,15 @@ export const pinChat = (
 ): Promise<ChatMetaRecord> => call('pin_chat', { projectSlug, chatId, pinned })
 
 export const listPinnedChats = (): Promise<ChatMetaRecord[]> => call('list_pinned_chats')
+
+export const readChatUsage = (
+  projectSlug: string,
+  chatId: string,
+): Promise<Record<string, unknown>[]> =>
+  call('read_chat_usage', { projectSlug, chatId })
+
+export const writeChatUsage = (
+  projectSlug: string,
+  chatId: string,
+  records: unknown[],
+): Promise<void> => call('write_chat_usage', { projectSlug, chatId, records })

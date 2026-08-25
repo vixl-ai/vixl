@@ -6,6 +6,7 @@ import { applyMonacoTheme, resolveMonacoEditorOptions } from '@/utils/monaco-the
 import type { MonacoHelpers } from './helpers'
 import type { MonacoModels } from './models'
 import type { MonacoEditorContext } from './types'
+import { bindEditorViewStateListeners } from './view-state'
 
 type EditorDeps = {
   helpers: MonacoHelpers
@@ -40,6 +41,8 @@ export const createEditorInstances = (ctx: MonacoEditorContext, deps: EditorDeps
     if (ctx.props.path) {
       await deps.models.attachModel(ctx.props.path)
     }
+
+    bindEditorViewStateListeners(ctx)
 
     return ctx.editor === created
   }

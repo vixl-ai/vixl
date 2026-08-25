@@ -58,6 +58,9 @@ export const resolveWorkspaceProjectId = (): string => {
 }
 
 export const resolveProjectIdByRoot = (projectRoot: string): string | null => {
+  if (homeRootPath.value && projectRoot === homeRootPath.value) {
+    return HOME_WORKSPACE_ID
+  }
   const fleet = useFleetRegistry()
   return fleet.projects.value.find((p) => p.rootPath === projectRoot)?.id ?? null
 }

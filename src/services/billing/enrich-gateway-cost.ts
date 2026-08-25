@@ -6,9 +6,8 @@ import computeChatUsageTotals from '@/services/billing/compute-chat-usage-totals
 import isGatewayGenerationPending from '@/services/billing/is-gateway-generation-pending'
 import readUsageLedger from '@/services/billing/read-usage-ledger'
 import {
-  getUserVixlDir,
   updateChatMeta,
-  writeJsonFile,
+  writeChatUsage,
 } from '@/services/vixl/vixl-tauri'
 
 /** Waits between getGenerationInfo attempts when the usage event is still pending. */
@@ -18,14 +17,6 @@ const defaultDelay = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
-
-const ledgerPath = async (
-  projectSlug: string,
-  chatId: string,
-): Promise<string> => {
-  const root = await getUserVixlDir()
-  return `${root}/chats/${projectSlug}/${chatId}/usage-ledger.json`
-}
 
 const unchanged = (
   current: BillableUsageRecord,
@@ -117,10 +108,7 @@ export default async (input: {
       const next = [...records]
       next[index] = billableUsageRecordSchema.parse(patched)
 
-      await writeJsonFile(
-        await ledgerPath(input.projectSlug, input.chatId),
-        next,
-      )
+      await writeChatUsage(input.projectSlug, input.chatId, next)
 
       const usageTotals = computeChatUsageTotals(next)
       await updateChatMeta(input.projectSlug, input.chatId, { usageTotals })

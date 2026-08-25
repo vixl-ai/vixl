@@ -4,12 +4,21 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
 const VIXL_DIR: &str = ".vixl";
+pub const VIXL_SQLITE_FILE: &str = "vixl.sqlite";
 
 pub fn user_vixl_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let dir = app_data.join(VIXL_DIR);
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
+}
+
+pub fn vixl_sqlite_path(user_vixl_dir: &Path) -> PathBuf {
+    user_vixl_dir.join(VIXL_SQLITE_FILE)
+}
+
+pub fn user_vixl_sqlite_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(vixl_sqlite_path(&user_vixl_dir(app)?))
 }
 
 pub fn project_vixl_dir(root_path: &str) -> PathBuf {

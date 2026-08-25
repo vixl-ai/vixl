@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod db;
 mod tray;
 
 use tauri::Manager;
@@ -6,26 +7,28 @@ use tauri::Manager;
 use commands::http::HttpStreamRegistry;
 use commands::{
     append_chat_line, append_temp_log, codegraph_cli, codegraph_store_stat, config_exists,
-    create_chat, delete_chat, delete_graph, delete_secret, file_checkpoint_capture,
-    file_checkpoint_restore, fork_chat, fs_apply_patch, fs_copy, fs_delete, fs_edit_file,
-    fs_list_dir, fs_list_dir_tree, fs_mkdir, fs_move, fs_read_file, fs_rename, fs_stage_preview,
-    fs_stat, fs_write_file, get_active_project, get_default_workspace_root, get_secret,
-    get_user_vixl_dir, get_vixl_dir, git_branch_create, git_checkout_branch, git_commit, git_diff,
-    git_list_branches, git_log, git_repo_info, git_show_file, git_status, has_project_vixl,
-    http_proxy_request, http_proxy_stream, http_proxy_stream_cancel, list_chats, list_graphs,
-    list_pinned_chats, list_project_files, list_vixl_files, lsp_catalog, lsp_ensure_server,
-    lsp_install_server, lsp_prefetch_defaults, lsp_request, lsp_set_server_disabled, lsp_status,
-    lsp_stop_server, lsp_uninstall_server, mcp_call_tool, mcp_list_statuses, mcp_list_tools,
-    mcp_logout, mcp_refresh, mcp_start, mcp_status, mcp_stop, oauth_begin_loopback,
-    oauth_cancel_loopback, open_external_url, open_project_at_path, open_project_at_path_command,
-    pin_chat, read_chat_messages, read_chat_meta, read_json_file, read_lsp_config, read_mcp_config,
+    create_chat, delete_chat, delete_graph, delete_secret, editor_load_view_state,
+    editor_save_view_state, file_checkpoint_capture, file_checkpoint_restore, fork_chat,
+    fs_apply_patch, fs_copy, fs_delete, fs_edit_file, fs_list_dir, fs_list_dir_tree, fs_mkdir,
+    fs_move, fs_read_file, fs_rename, fs_stage_preview, fs_stat, fs_write_file, get_active_project,
+    get_default_workspace_root, get_secret, get_user_vixl_dir, get_vixl_dir, git_branch_create,
+    git_checkout_branch, git_commit, git_diff, git_list_branches, git_log, git_repo_info,
+    git_show_file, git_status, has_project_vixl, http_proxy_request, http_proxy_stream,
+    http_proxy_stream_cancel, list_chats, list_graphs, list_pinned_chats, list_project_files,
+    list_vixl_files, lsp_catalog, lsp_ensure_server, lsp_install_server, lsp_prefetch_defaults,
+    lsp_request, lsp_set_server_disabled, lsp_status, lsp_stop_server, lsp_uninstall_server,
+    mcp_call_tool, mcp_list_statuses, mcp_list_tools, mcp_logout, mcp_refresh, mcp_start,
+    mcp_status, mcp_stop, oauth_begin_loopback, oauth_cancel_loopback, open_external_url,
+    open_project_at_path, open_project_at_path_command, pin_chat, read_chat_messages,
+    read_chat_meta, read_chat_usage, read_json_file, read_lsp_config, read_mcp_config,
     read_settings, registry_add_project, registry_list_projects, registry_remove_project,
     registry_set_active_project, registry_update_project_root, resolve_launch_path,
     reveal_in_folder, set_secret, shell_kill_pty, shell_kill_tracked, shell_resize_pty,
     shell_spawn_pty, shell_spawn_tracked, shell_write_pty, truncate_chat_log, update_chat_meta,
-    watch_vixl_paths, web_fetch, workspace_glob, workspace_grep, write_json_file, write_lsp_config,
-    write_mcp_config, write_settings, write_temp_bytes, write_temp_handoff, write_text_file,
-    OAuthLoopbackState, WatchState,
+    watch_vixl_paths, web_fetch, workbench_load_session, workbench_replace_session, workspace_glob,
+    workspace_grep, write_chat_usage, write_json_file, write_lsp_config, write_mcp_config,
+    write_settings, write_temp_bytes, write_temp_handoff, write_text_file, OAuthLoopbackState,
+    WatchState,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -55,6 +58,16 @@ pub fn run_with_launch_path(launch_path: Option<String>) {
                         .build(),
                 )?;
             }
+
+            let sqlite_path = commands::paths::user_vixl_sqlite_path(app.handle())?;
+            let db = db::open_managed(&sqlite_path)?;
+            {
+                let conn = db.lock()?;
+                if let Err(error) = commands::chat::import_jsonl_if_needed(app.handle(), &conn) {
+                    log::error!("Failed to import chats into sqlite: {error}");
+                }
+            }
+            app.manage(db);
 
             if let Some(path_arg) = launch_path.as_deref() {
                 match resolve_launch_path(path_arg) {
@@ -144,6 +157,12 @@ pub fn run_with_launch_path(launch_path: Option<String>) {
         fork_chat,
         pin_chat,
         list_pinned_chats,
+        read_chat_usage,
+        write_chat_usage,
+        workbench_load_session,
+        workbench_replace_session,
+        editor_load_view_state,
+        editor_save_view_state,
         file_checkpoint_capture,
         file_checkpoint_restore,
         mcp_call_tool,

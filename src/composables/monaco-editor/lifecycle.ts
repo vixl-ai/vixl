@@ -8,6 +8,10 @@ import type { MonacoLsp } from './lsp'
 import type { MonacoModels } from './models'
 import type { MonacoEditorInstances } from './editor-instances'
 import type { LspDiagnosticsEvent, MonacoEditorContext } from './types'
+import {
+  disposeEditorViewStateListeners,
+  saveEditorViewState,
+} from './view-state'
 
 type LifecycleDeps = {
   helpers: MonacoHelpers
@@ -73,6 +77,11 @@ export const bindMonacoLifecycle = (ctx: MonacoEditorContext, deps: LifecycleDep
       if (!path || path === previousPath) {
         return
       }
+      saveEditorViewState(ctx, previousPath).catch((error) => {
+        toast.error('Failed to save editor position', {
+          description: formatMonacoError(error),
+        })
+      })
       if (ctx.props.diffView) {
         deps.models.attachDiffModels(path).catch((error) => {
           toast.error('Failed to load diff', {
@@ -143,6 +152,8 @@ export const bindMonacoLifecycle = (ctx: MonacoEditorContext, deps: LifecycleDep
   onBeforeUnmount(() => {
     ctx.unlistenDiagnostics?.()
     ctx.unlistenDiagnostics = null
+
+    disposeEditorViewStateListeners(ctx)
 
     ctx.stopThemeObserver?.()
     ctx.stopThemeObserver = null

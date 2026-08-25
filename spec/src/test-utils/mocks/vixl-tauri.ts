@@ -53,6 +53,14 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
     readChatMeta: vi.fn<() => Promise<unknown>>(),
     readChatMessages: vi.fn<() => Promise<unknown[]>>(async () => []),
     updateChatMeta: vi.fn<() => Promise<unknown>>(),
+    readChatUsage: vi.fn<() => Promise<unknown[]>>(async () => []),
+    writeChatUsage: vi.fn<() => Promise<void>>(async () => undefined),
+    workbenchLoadSession: vi.fn<() => Promise<{ tabs: unknown[] }>>(async () => ({
+      tabs: [],
+    })),
+    workbenchReplaceSession: vi.fn<() => Promise<void>>(async () => undefined),
+    editorLoadViewState: vi.fn<() => Promise<unknown | null>>(async () => null),
+    editorSaveViewState: vi.fn<() => Promise<void>>(async () => undefined),
     ...overrides,
   }
 }

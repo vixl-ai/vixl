@@ -43,6 +43,7 @@ export default (props: MonacoEditorProps, emit: MonacoEditorEmit) => {
     unlistenDiagnostics: null,
     stopThemeObserver: null,
     lspProvidersRegistered: false,
+    viewStateDisposables: [],
     models: new Map<string, monaco.editor.ITextModel>(),
     originalModels: new Map<string, monaco.editor.ITextModel>(),
     pathByModel: new Map(),

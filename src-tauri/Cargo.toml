@@ -45,6 +45,7 @@ flate2 = "1.1.9"
 tar = "0.4.46"
 which = "8.0.5"
 sha2 = "0.10.9"
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

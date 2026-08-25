@@ -4,8 +4,14 @@ import {
   workingFileUri,
 } from '@/utils/monaco-working-uri'
 
-export default (path: string): monaco.editor.ITextModel | null => {
-  const model = monaco.editor.getModel(workingFileUri(path))
+export default (
+  projectId: string | null,
+  path: string,
+): monaco.editor.ITextModel | null => {
+  if (!projectId) {
+    return null
+  }
+  const model = monaco.editor.getModel(workingFileUri(projectId, path))
   if (!model || isGitHeadModel(model)) {
     return null
   }

@@ -34,6 +34,10 @@ fn active_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(user_vixl_dir(app)?.join("active-project.json"))
 }
 
+pub(crate) fn fleet_projects(app: &AppHandle) -> Result<Vec<FleetProject>, String> {
+    Ok(read_registry(app)?.projects)
+}
+
 fn read_registry(app: &AppHandle) -> Result<ProjectsRegistry, String> {
     let path = projects_path(app)?;
     if !path.exists() {
