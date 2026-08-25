@@ -41,7 +41,7 @@ const useLspStatus = () => {
       ) {
         return true
       }
-      if (busy && (row.id === 'vue' || row.id === 'typescript')) {
+      if (busy && awaitingProjectLoad.value.has(row.id)) {
         return true
       }
       return false
@@ -128,14 +128,7 @@ const useLspStatus = () => {
         if (root !== projectRoot.value) {
           return
         }
-        const vue = servers.value.find((entry) => entry.id === 'vue')
-        const typescript = servers.value.find((entry) => entry.id === 'typescript')
-        const needsWarm =
-          (Boolean(vue?.installed) && !vue?.running) ||
-          (Boolean(typescript?.installed) && !typescript?.running)
-        if (needsWarm) {
-          await warmDefaults(root)
-        }
+        await warmDefaults(root)
       })
       .catch((error: unknown) => {
         installMessage.value =
@@ -151,14 +144,7 @@ const useLspStatus = () => {
       if (!root) {
         return
       }
-      const vue = servers.value.find((entry) => entry.id === 'vue')
-      const typescript = servers.value.find((entry) => entry.id === 'typescript')
-      const needsWarm =
-        (Boolean(vue?.installed) && !vue?.running) ||
-        (Boolean(typescript?.installed) && !typescript?.running)
-      if (needsWarm) {
-        await warmDefaults(root)
-      }
+      await warmDefaults(root)
     }
     start().catch((error: unknown) => {
       installMessage.value =

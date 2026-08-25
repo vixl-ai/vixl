@@ -2,8 +2,8 @@ use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use app_lib::commands::lsp_registry::{
-    builtin_spec_by_id, language_id_for_extension, root_marker_score, tier_rank, GithubTargetStyle,
-    LspInstallKind, LspTier,
+    builtin_server_map, builtin_spec_by_id, language_id_for_extension, root_marker_score,
+    tier_a_ids, tier_rank, workspace_is_vue_nuxt, GithubTargetStyle, LspInstallKind, LspTier,
 };
 
 fn temp_dir(label: &str) -> std::path::PathBuf {
@@ -64,6 +64,92 @@ fn language_id_for_extension_covers_systems_langs() {
 }
 
 #[test]
+fn language_id_for_extension_uses_react_ids_for_tsx_jsx() {
+    assert_eq!(language_id_for_extension("tsx"), "typescriptreact");
+    assert_eq!(language_id_for_extension(".tsx"), "typescriptreact");
+    assert_eq!(language_id_for_extension("jsx"), "javascriptreact");
+    assert_eq!(language_id_for_extension(".jsx"), "javascriptreact");
+    assert_eq!(language_id_for_extension("ts"), "typescript");
+    assert_eq!(language_id_for_extension("js"), "javascript");
+}
+
+#[test]
+fn vue_is_not_tier_a() {
+    assert!(!tier_a_ids().contains(&"vue"));
+    assert!(tier_a_ids().contains(&"typescript"));
+    assert!(tier_a_ids().contains(&"json"));
+    assert!(tier_a_ids().contains(&"yaml"));
+    assert!(tier_a_ids().contains(&"markdown"));
+    let vue = builtin_spec_by_id("vue").unwrap();
+    assert_eq!(vue.tier, LspTier::B);
+    assert!(!vue.root_markers.contains(&"package.json"));
+}
+
+#[test]
+fn react_package_json_is_not_vue_workspace() {
+    let dir = temp_dir("react");
+    fs::write(
+        dir.join("package.json"),
+        r#"{"dependencies":{"react":"19.0.0"},"devDependencies":{"typescript":"5.8.2"}}"#,
+    )
+    .unwrap();
+
+    assert!(!workspace_is_vue_nuxt(&dir));
+    let vue = builtin_spec_by_id("vue").unwrap();
+    let typescript = builtin_spec_by_id("typescript").unwrap();
+    assert!(root_marker_score(Some(&dir), typescript) < root_marker_score(Some(&dir), vue));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn bare_package_json_is_not_vue_workspace() {
+    let dir = temp_dir("bare-pkg");
+    fs::write(dir.join("package.json"), "{}").unwrap();
+    assert!(!workspace_is_vue_nuxt(&dir));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn vue_dependency_is_vue_workspace() {
+    let dir = temp_dir("vue-dep");
+    fs::write(
+        dir.join("package.json"),
+        r#"{"devDependencies":{"vue":"3.5.0"}}"#,
+    )
+    .unwrap();
+    assert!(workspace_is_vue_nuxt(&dir));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn nuxt_scoped_dependency_is_vue_workspace() {
+    let dir = temp_dir("nuxt-scoped");
+    fs::write(
+        dir.join("package.json"),
+        r#"{"dependencies":{"@nuxt/kit":"3.17.0"}}"#,
+    )
+    .unwrap();
+    assert!(workspace_is_vue_nuxt(&dir));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn nuxt_config_marker_is_vue_workspace() {
+    let dir = temp_dir("nuxt-file");
+    fs::write(dir.join("nuxt.config.ts"), "export default {}").unwrap();
+    assert!(workspace_is_vue_nuxt(&dir));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn vue_config_marker_is_vue_workspace() {
+    let dir = temp_dir("vue-config");
+    fs::write(dir.join("vue.config.js"), "module.exports = {}").unwrap();
+    assert!(workspace_is_vue_nuxt(&dir));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn java_is_managed_http_archive_tier_b() {
     let java = builtin_spec_by_id("java").unwrap();
     assert_eq!(java.tier, LspTier::B);
@@ -120,4 +206,32 @@ fn gopls_uses_go_install_and_nix_is_toolchain() {
 #[test]
 fn tier_rank_orders_a_before_c() {
     assert!(tier_rank(LspTier::A) < tier_rank(LspTier::C));
+}
+
+#[test]
+fn typescript_builtin_is_native_ts7_not_tls() {
+    let typescript = builtin_spec_by_id("typescript").unwrap();
+    assert_eq!(typescript.command, &["tsc", "--lsp", "--stdio"]);
+    let npm = typescript.npm.as_ref().unwrap();
+    assert!(npm.native);
+    assert!(npm
+        .packages
+        .iter()
+        .any(|pkg| pkg.starts_with("typescript@7")));
+    assert!(!npm
+        .packages
+        .iter()
+        .any(|pkg| pkg.contains("typescript-language-server")));
+    assert!(tier_a_ids().contains(&"typescript"));
+}
+
+#[test]
+fn typescript_classic_is_hidden_vue_hybrid_install() {
+    let classic = builtin_spec_by_id("typescript-classic").unwrap();
+    assert_eq!(classic.command, &["typescript-language-server", "--stdio"]);
+    assert!(!classic.npm.as_ref().unwrap().native);
+    assert_eq!(classic.tier, LspTier::B);
+    assert!(!tier_a_ids().contains(&"typescript-classic"));
+    assert!(!builtin_server_map().contains_key("typescript-classic"));
+    assert!(builtin_server_map().contains_key("typescript"));
 }

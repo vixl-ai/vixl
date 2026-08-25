@@ -47,7 +47,7 @@ pub use http::{http_proxy_request, http_proxy_stream, http_proxy_stream_cancel};
 pub use keychain::{delete_secret, get_secret, set_secret};
 pub use lsp::{
     lsp_catalog, lsp_ensure_server, lsp_request, lsp_set_server_disabled, lsp_status,
-    lsp_stop_server, lsp_uninstall_server,
+    lsp_stop_server, lsp_uninstall_server, lsp_workspace_profile,
 };
 pub use lsp_install::{lsp_install_server, lsp_prefetch_defaults};
 pub use mcp::{

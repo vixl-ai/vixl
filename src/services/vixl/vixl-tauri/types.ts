@@ -170,6 +170,10 @@ export type LspServerStatus = {
   installState?: string | null
 }
 
+export type LspWorkspaceProfile = {
+  vueNuxt: boolean
+}
+
 export type LspCatalogEntry = {
   id: string
   label: string

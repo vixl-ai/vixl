@@ -22,6 +22,7 @@ export type {
   CodegraphCliResult,
   LspServerStatus,
   LspCatalogEntry,
+  LspWorkspaceProfile,
 } from './types'
 export type { GraphListItem } from '@/types/codegraph/graph-list-item'
 export type { CodegraphStoreStat } from '@/types/codegraph/store-stat'
@@ -128,6 +129,7 @@ export {
   lspInstallServer,
   lspUninstallServer,
   lspSetServerDisabled,
+  lspWorkspaceProfile,
 } from './lsp'
 export {
   createChat,

@@ -116,7 +116,8 @@ const {
         v-else
         class="text-sm text-muted-foreground"
       >
-        Language servers are always available. Install managed ones below, or disable a server globally.
+        Language servers are available. They are not all started automatically.
+        Install managed ones below, or disable a server globally.
       </p>
 
       <div class="space-y-2">

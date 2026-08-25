@@ -2,13 +2,19 @@ mod documents;
 mod helpers;
 mod resolve;
 mod rpc;
+mod typescript;
 mod vue_tsserver;
 
 pub use helpers::{
     apply_server_disabled_flag, normalize_lsp_params, server_display_label, LspCatalogEntry,
-    LspServerStatus,
+    LspServerStatus, LspWorkspaceProfile,
 };
 pub use resolve::{resolve_lsp_servers, LspServerEntry};
+pub use typescript::{
+    compute_vue_in_play, merge_vue_plugin_options, pick_typescript_tsdk,
+    should_inject_vue_typescript_plugin, typescript_lsp_argv,
+    typescript_version_supports_native_lsp,
+};
 pub use vue_tsserver::{tsserver_request_body, unwrap_tsserver_request_tuple};
 
 use std::sync::Arc;
@@ -21,7 +27,7 @@ use tokio::time::{sleep, Duration};
 use super::config::{load_lsp_config, workspace_is_trusted};
 use super::fs::resolve_workspace_path;
 use super::lsp_install::{install_source_label, remove_managed_install};
-use super::lsp_registry::builtin_specs;
+use super::lsp_registry::{builtin_specs, workspace_is_vue_nuxt};
 
 use documents::{
     close_document, ensure_document_open, sync_document_change, sync_document_change_with_content,
@@ -30,11 +36,12 @@ use helpers::{
     install_kind_label, is_managed_install_kind, lsp_method_is_notification, normalize_lsp_method,
     path_to_uri, LspDiagnosticsEvent,
 };
-use resolve::{load_effective_servers, server_binary_available, workspace_configuration_response};
+use resolve::{load_effective_servers, server_binary_available};
 use rpc::{
     ensure_running_server, json_rpc_request, read_lsp_message, respond_to_server_request,
     send_notification, set_state, LspProcess, LSP_SERVERS, LSP_STATES,
 };
+use typescript::{vue_in_play_for, workspace_configuration_response};
 use vue_tsserver::{forward_vue_tsserver_request, mirror_vue_document_to_typescript};
 
 pub(crate) fn spawn_reader(process: Arc<Mutex<LspProcess>>, server_id: String, app: AppHandle) {
@@ -69,12 +76,19 @@ pub(crate) fn spawn_reader(process: Arc<Mutex<LspProcess>>, server_id: String, a
                     guard.workspace_root.clone()
                 };
                 let trusted = workspace_is_trusted(&app, Some(workspace_root.as_str()));
+                let vue_running =
+                    server_id == "vue" || LSP_SERVERS.lock().await.contains_key("vue");
+                let vue_in_play = vue_in_play_for(&workspace_root, None, vue_running);
                 let result = match method {
                     "window/workDoneProgress/create" => serde_json::json!(null),
                     "client/registerCapability" => serde_json::json!(null),
-                    "workspace/configuration" => {
-                        workspace_configuration_response(&app, &message, &workspace_root, trusted)
-                    }
+                    "workspace/configuration" => workspace_configuration_response(
+                        &app,
+                        &message,
+                        &workspace_root,
+                        trusted,
+                        vue_in_play,
+                    ),
                     _ => serde_json::json!(null),
                 };
                 let _ = respond_to_server_request(&process, &id, result).await;
@@ -375,6 +389,13 @@ pub async fn lsp_stop_server(server_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn lsp_workspace_profile(project_root: String) -> Result<LspWorkspaceProfile, String> {
+    Ok(LspWorkspaceProfile {
+        vue_nuxt: workspace_is_vue_nuxt(std::path::Path::new(&project_root)),
+    })
+}
+
+#[tauri::command]
 pub async fn lsp_catalog(app: AppHandle) -> Result<Vec<LspCatalogEntry>, String> {
     let effective = load_effective_servers(&app).await.unwrap_or_default();
     let states = LSP_STATES.lock().await;
@@ -382,6 +403,9 @@ pub async fn lsp_catalog(app: AppHandle) -> Result<Vec<LspCatalogEntry>, String>
     let mut seen = std::collections::HashSet::new();
 
     for spec in builtin_specs() {
+        if spec.id == "typescript-classic" {
+            continue;
+        }
         seen.insert(spec.id.to_string());
         let state = states.get(spec.id);
         let source = install_source_label(&app, spec.id);

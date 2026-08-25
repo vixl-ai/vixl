@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 
 use super::super::lsp_registry::{BuiltinLspSpec, GithubTargetStyle, LspInstallKind};
+use super::native_npm::managed_native_npm_bin;
 use super::paths::managed_server_dir;
 use super::resolve::{github_target_token, host_asset_target};
 
@@ -40,12 +41,7 @@ pub fn managed_bin_path(app: &AppHandle, spec: &BuiltinLspSpec) -> Option<PathBu
     match spec.install {
         LspInstallKind::Npm => {
             let npm = spec.npm.as_ref()?;
-            let candidate = dir.join(npm.bin);
-            if candidate.is_file() {
-                Some(candidate)
-            } else {
-                None
-            }
+            managed_native_npm_bin(&dir, npm)
         }
         LspInstallKind::GithubRelease => {
             let github = spec.github.as_ref()?;

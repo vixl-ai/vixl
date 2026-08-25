@@ -1,5 +1,6 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
 import { toast } from 'vue-sonner'
+import shouldStreamRequest from '@/services/providers/should-stream-request'
 import { httpProxyRequest, isTauri } from '@/services/vixl/vixl-tauri'
 
 type HttpProxyStreamEvent =
@@ -18,16 +19,6 @@ const toHeaderRecord = (headers?: HeadersInit): Record<string, string> => {
     record[key] = value
   })
   return record
-}
-
-const shouldStreamRequest = (method: string, body?: string): boolean => {
-  if (method !== 'POST' && method !== 'PUT' && method !== 'PATCH') {
-    return false
-  }
-  if (!body) {
-    return false
-  }
-  return body.includes('"stream":true') || body.includes('"stream": true')
 }
 
 const toError = (error: unknown): Error =>
@@ -287,7 +278,7 @@ const proxyFetch: typeof fetch = async (input, init) => {
         ? init.body
         : await new Response(init.body).text()
 
-  if (shouldStreamRequest(method, body)) {
+  if (shouldStreamRequest(method, init?.headers, body)) {
     return streamProxyFetch(input, {
       ...init,
       method,

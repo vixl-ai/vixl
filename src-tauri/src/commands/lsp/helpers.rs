@@ -20,6 +20,12 @@ pub struct LspServerStatus {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LspWorkspaceProfile {
+    pub vue_nuxt: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LspCatalogEntry {
     pub id: String,
     pub label: String,

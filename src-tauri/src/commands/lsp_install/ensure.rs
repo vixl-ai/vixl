@@ -174,9 +174,17 @@ pub fn managed_vue_typescript_lib(app: &AppHandle) -> Option<PathBuf> {
 }
 
 pub fn managed_typescript_lib(app: &AppHandle) -> Option<PathBuf> {
-    let spec = builtin_spec_by_id("typescript")?;
+    managed_spec_typescript_lib(app, "typescript")
+}
+
+pub fn managed_classic_typescript_lib(app: &AppHandle) -> Option<PathBuf> {
+    managed_spec_typescript_lib(app, "typescript-classic")
+}
+
+fn managed_spec_typescript_lib(app: &AppHandle, spec_id: &str) -> Option<PathBuf> {
+    let spec = builtin_spec_by_id(spec_id)?;
     let key = version_key_for_spec(spec);
-    let dir = managed_server_dir(app, "typescript", &key).ok()?;
+    let dir = managed_server_dir(app, spec_id, &key).ok()?;
     let lib = dir.join("node_modules/typescript/lib");
     if lib.is_dir() {
         Some(lib)
@@ -191,6 +199,13 @@ pub fn install_source_label(app: &AppHandle, server_id: &str) -> String {
     };
     if managed_bin_path(app, spec).is_some() {
         return "managed".to_string();
+    }
+    if server_id == "typescript" {
+        if let Some(classic) = builtin_spec_by_id("typescript-classic") {
+            if managed_bin_path(app, classic).is_some() {
+                return "managed".to_string();
+            }
+        }
     }
     if which::which(spec.command.first().copied().unwrap_or("")).is_ok() {
         return "path".to_string();

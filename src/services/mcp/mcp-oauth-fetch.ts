@@ -1,7 +1,10 @@
+import proxyFetch from '@/services/providers/proxy-fetch'
+
 /**
  * Hardened fetch for OAuth discovery / token / DCR.
  * Blocks redirects and private / link-local / metadata targets.
  * Allows https to public hosts, and http only to loopback.
+ * Uses the Rust HTTP proxy in Tauri so webview CORS does not apply.
  */
 export const mcpOAuthFetch = async (
   input: RequestInfo | URL,
@@ -37,7 +40,7 @@ export const mcpOAuthFetch = async (
     throw new Error(`OAuth fetch blocked for private host ${parsed.hostname}`)
   }
 
-  return fetch(input, {
+  return proxyFetch()(input, {
     ...init,
     redirect: 'error',
   })

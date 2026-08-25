@@ -4,16 +4,16 @@ use std::path::Path;
 use tauri::AppHandle;
 
 use super::super::config::load_lsp_config;
-use super::super::lsp_install::{
-    find_node_bin, managed_bin_path, managed_typescript_lib, managed_vue_plugin_path,
-    managed_vue_typescript_lib,
-};
+use super::super::lsp_install::{find_node_bin, managed_bin_path, should_wrap_npm_bin_with_node};
 use super::super::lsp_registry::{
-    allowlisted_lsp_basenames, builtin_server_map, builtin_spec_by_id, root_marker_score,
-    tier_rank, LspInstallKind,
+    allowlisted_lsp_basenames, builtin_server_map, builtin_spec_by_id, dedicated_extension_rank,
+    root_marker_score, tier_rank, LspInstallKind,
 };
 use super::super::registry::{get_active_project, registry_list_projects};
 use super::helpers::{is_absolute_program, normalize_extension};
+use super::typescript::{
+    apply_typescript_stack_command, resolve_spec_for_command, workspace_native_tsc,
+};
 
 #[derive(Clone)]
 pub struct LspServerEntry {
@@ -175,6 +175,13 @@ pub(crate) fn server_binary_available(
             return true;
         }
     }
+    if server_id == "typescript" {
+        if let Some(classic) = builtin_spec_by_id("typescript-classic") {
+            if managed_bin_path(app, classic).is_some() {
+                return true;
+            }
+        }
+    }
     let Some(program) = entry.command.first() else {
         return false;
     };
@@ -205,6 +212,13 @@ pub(crate) fn find_server_for_extension(
         let spec_a = builtin_spec_by_id(id_a);
         let spec_b = builtin_spec_by_id(id_b);
 
+        let dedicated_a = spec_a
+            .map(|spec| dedicated_extension_rank(spec, extension))
+            .unwrap_or(1);
+        let dedicated_b = spec_b
+            .map(|spec| dedicated_extension_rank(spec, extension))
+            .unwrap_or(1);
+
         let marker_a = spec_a
             .map(|spec| root_marker_score(root_path, spec))
             .unwrap_or(100);
@@ -226,8 +240,9 @@ pub(crate) fn find_server_for_extension(
             1
         };
 
-        marker_a
-            .cmp(&marker_b)
+        dedicated_a
+            .cmp(&dedicated_b)
+            .then(marker_a.cmp(&marker_b))
             .then(tier_a.cmp(&tier_b))
             .then(available_a.cmp(&available_b))
             .then(id_a.cmp(id_b))
@@ -287,13 +302,17 @@ pub(crate) fn resolve_lsp_command(
     entry: &LspServerEntry,
     workspace_root: &str,
     trusted: bool,
+    classic_typescript: bool,
 ) -> Result<ResolvedLspCommand, String> {
-    let program = entry
-        .command
+    let mut entry_command = entry.command.clone();
+    if server_id == "typescript" {
+        apply_typescript_stack_command(&mut entry_command, classic_typescript);
+    }
+    let program = entry_command
         .first()
         .cloned()
         .ok_or_else(|| "LSP command missing".to_string())?;
-    let args = entry.command.iter().skip(1).cloned().collect::<Vec<_>>();
+    let args = entry_command.iter().skip(1).cloned().collect::<Vec<_>>();
 
     if is_absolute_program(&program) {
         if Path::new(&program).is_file() {
@@ -320,24 +339,35 @@ pub(crate) fn resolve_lsp_command(
         }
     }
 
-    if let Some(spec) = builtin_spec_by_id(server_id) {
+    if server_id == "typescript" && !classic_typescript {
+        if let Some(local) = workspace_native_tsc(workspace_root, trusted) {
+            return Ok(ResolvedLspCommand {
+                program: local.to_string_lossy().replace('\\', "/"),
+                args,
+                source: "project".to_string(),
+            });
+        }
+    }
+
+    if let Some(spec) = resolve_spec_for_command(server_id, classic_typescript) {
         if let Some(managed) = managed_bin_path(app, spec) {
-            // npm packages are node scripts; spawn via node
-            if spec.npm.is_some() {
-                let node = find_node_bin(app)
+            if let Some(npm) = spec.npm.as_ref() {
+                if should_wrap_npm_bin_with_node(npm, &managed) {
+                    let node = find_node_bin(app)
           .map(|p| p.to_string_lossy().replace('\\', "/"))
           .or_else(|| which::which("node").ok().map(|p| p.to_string_lossy().replace('\\', "/")))
           .ok_or_else(|| {
             "Node.js is required for this language server. Enable auto-download or install Node."
               .to_string()
           })?;
-                let mut node_args = vec![managed.to_string_lossy().replace('\\', "/")];
-                node_args.extend(args);
-                return Ok(ResolvedLspCommand {
-                    program: node,
-                    args: node_args,
-                    source: "managed".to_string(),
-                });
+                    let mut node_args = vec![managed.to_string_lossy().replace('\\', "/")];
+                    node_args.extend(args);
+                    return Ok(ResolvedLspCommand {
+                        program: node,
+                        args: node_args,
+                        source: "managed".to_string(),
+                    });
+                }
             }
             return Ok(ResolvedLspCommand {
                 program: managed.to_string_lossy().replace('\\', "/"),
@@ -372,11 +402,21 @@ pub(crate) fn resolve_lsp_command(
                 source: "project".to_string(),
             });
         }
+        if cfg!(windows) {
+            let exe = local.with_extension("exe");
+            if exe.is_file() {
+                return Ok(ResolvedLspCommand {
+                    program: exe.to_string_lossy().replace('\\', "/"),
+                    args,
+                    source: "project".to_string(),
+                });
+            }
+        }
     }
 
     Err(format!(
         "LSP server '{server_id}' is not installed yet. {}",
-        match builtin_spec_by_id(server_id).map(|spec| spec.install) {
+        match resolve_spec_for_command(server_id, classic_typescript).map(|spec| spec.install) {
             Some(LspInstallKind::ToolchainPath) => {
                 format!(
                     "Install `{program}` on PATH, or configure lsp.servers.{server_id}.command."
@@ -389,167 +429,4 @@ pub(crate) fn resolve_lsp_command(
             _ => "Enable lsp.autoDownload or install the binary.".to_string(),
         }
     ))
-}
-
-pub(crate) fn typescript_tsdk_path(app: &AppHandle, workspace_root: &str, trusted: bool) -> String {
-    if trusted {
-        let project = Path::new(workspace_root).join("node_modules/typescript/lib");
-        if project.is_dir() {
-            return project.to_string_lossy().replace('\\', "/");
-        }
-    }
-    if let Some(managed) = managed_typescript_lib(app) {
-        return managed.to_string_lossy().replace('\\', "/");
-    }
-    // Vue managed install also ships typescript after we added it as a dependency.
-    if let Some(vue_ts) = managed_vue_typescript_lib(app) {
-        return vue_ts.to_string_lossy().replace('\\', "/");
-    }
-    Path::new(workspace_root)
-        .join("node_modules/typescript/lib")
-        .to_string_lossy()
-        .replace('\\', "/")
-}
-
-pub(crate) fn build_initialization_options(
-    app: &AppHandle,
-    server_id: &str,
-    base: &serde_json::Value,
-    workspace_root: &str,
-    trusted: bool,
-) -> serde_json::Value {
-    let mut base = if base.is_null() {
-        serde_json::json!({})
-    } else {
-        base.clone()
-    };
-
-    if server_id == "typescript" {
-        let plugin_path = if trusted {
-            let language_server =
-                Path::new(workspace_root).join("node_modules/@vue/language-server");
-            if language_server.is_dir() {
-                Some(language_server)
-            } else {
-                let project = Path::new(workspace_root).join("node_modules/@vue/typescript-plugin");
-                if project.is_dir() {
-                    Some(project)
-                } else {
-                    managed_vue_plugin_path(app)
-                }
-            }
-        } else {
-            managed_vue_plugin_path(app)
-        };
-
-        if let Some(plugin_path) = plugin_path {
-            let location = plugin_path.to_string_lossy().replace('\\', "/");
-            let plugins = serde_json::json!([{
-              "name": "@vue/typescript-plugin",
-              "location": location,
-              "languages": ["vue"],
-              "configNamespace": "typescript",
-            }]);
-            if let Some(obj) = base.as_object_mut() {
-                if !obj.contains_key("plugins") {
-                    obj.insert("plugins".to_string(), plugins);
-                }
-            } else {
-                base = serde_json::json!({ "plugins": plugins });
-            }
-        }
-    }
-
-    // @vue/language-server v3: typescript.tsdk init option was dropped; pass --tsdk.
-    // Prefer the TypeScript bundled with the managed Vue server over the
-    // workspace copy (this repo may be on TS 6 while the language server
-    // expects the TS 5.x it was installed with).
-    if server_id == "vue" {
-        let tsdk = managed_vue_typescript_lib(app)
-            .map(|path| path.to_string_lossy().replace('\\', "/"))
-            .unwrap_or_else(|| typescript_tsdk_path(app, workspace_root, trusted));
-        if let Some(obj) = base.as_object_mut() {
-            let typescript = obj
-                .entry("typescript")
-                .or_insert_with(|| serde_json::json!({}));
-            if let Some(ts_obj) = typescript.as_object_mut() {
-                ts_obj.insert("tsdk".to_string(), serde_json::json!(tsdk));
-            } else {
-                *typescript = serde_json::json!({ "tsdk": tsdk });
-            }
-        } else {
-            base = serde_json::json!({
-              "typescript": { "tsdk": tsdk }
-            });
-        }
-    }
-
-    base
-}
-
-pub(crate) fn inject_vue_tsdk_arg(
-    app: &AppHandle,
-    server_id: &str,
-    workspace_root: &str,
-    trusted: bool,
-    resolved: &mut ResolvedLspCommand,
-) {
-    if server_id != "vue" {
-        return;
-    }
-    if resolved
-        .args
-        .iter()
-        .any(|arg| arg == "--tsdk" || arg.starts_with("--tsdk="))
-    {
-        return;
-    }
-    let tsdk = managed_vue_typescript_lib(app)
-        .map(|path| path.to_string_lossy().replace('\\', "/"))
-        .unwrap_or_else(|| typescript_tsdk_path(app, workspace_root, trusted));
-    resolved.args.push(format!("--tsdk={tsdk}"));
-}
-
-pub(crate) fn workspace_configuration_response(
-    app: &AppHandle,
-    message: &serde_json::Value,
-    workspace_root: &str,
-    trusted: bool,
-) -> serde_json::Value {
-    let items = message
-        .get("params")
-        .and_then(|params| params.get("items"))
-        .and_then(|items| items.as_array());
-
-    let Some(items) = items else {
-        return serde_json::json!([]);
-    };
-
-    let tsdk = typescript_tsdk_path(app, workspace_root, trusted);
-    let typescript_config = serde_json::json!({
-      "tsdk": tsdk,
-      "preferences": {
-        "importModuleSpecifier": "relative",
-        "quotePreference": "single",
-      }
-    });
-
-    let configs = items
-        .iter()
-        .map(|item| {
-            let section = item
-                .get("section")
-                .and_then(|value| value.as_str())
-                .unwrap_or_default();
-            match section {
-                "typescript" | "javascript" => typescript_config.clone(),
-                "vue" => serde_json::json!({
-                  "complete": { "codelenses": true }
-                }),
-                _ => serde_json::json!({}),
-            }
-        })
-        .collect::<Vec<_>>();
-
-    serde_json::json!(configs)
 }

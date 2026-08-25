@@ -24,25 +24,26 @@ pub fn language_id_for_extension(extension: &str) -> String {
         for (i, configured) in spec.extensions.iter().enumerate() {
             let configured = configured.trim_start_matches('.');
             if configured.eq_ignore_ascii_case(ext) {
-                if let Some(lang) = spec
-                    .language_ids
-                    .get(i)
-                    .or_else(|| spec.language_ids.first())
-                {
+                if let Some(lang) = spec.language_ids.get(i) {
                     return (*lang).to_string();
                 }
             }
         }
     }
     match ext {
-        "ts" | "tsx" => "typescript".to_string(),
-        "js" | "jsx" | "mjs" | "cjs" | "mts" | "cts" => "javascript".to_string(),
+        "ts" | "mts" | "cts" => "typescript".to_string(),
+        "tsx" => "typescriptreact".to_string(),
+        "js" | "mjs" | "cjs" => "javascript".to_string(),
+        "jsx" => "javascriptreact".to_string(),
         other => other.to_string(),
     }
 }
 
 macro_rules! npm_spec {
     ($id:expr, $cmd:expr, $exts:expr, $langs:expr, $tier:expr, $pkgs:expr, $bin:expr, $markers:expr) => {
+        npm_spec!($id, $cmd, $exts, $langs, $tier, $pkgs, $bin, $markers, false)
+    };
+    ($id:expr, $cmd:expr, $exts:expr, $langs:expr, $tier:expr, $pkgs:expr, $bin:expr, $markers:expr, $native:expr) => {
         BuiltinLspSpec {
             id: $id,
             command: $cmd,
@@ -53,6 +54,7 @@ macro_rules! npm_spec {
             npm: Some(NpmInstallSpec {
                 packages: $pkgs,
                 bin: $bin,
+                native: $native,
             }),
             github: None,
             http: None,
@@ -67,40 +69,34 @@ pub(crate) static BUILTINS: &[BuiltinLspSpec] = &[
   // Tier A
   npm_spec!(
     "typescript",
-    &["typescript-language-server", "--stdio"],
+    &["tsc", "--lsp", "--stdio"],
     &[".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
     &["typescript", "typescriptreact", "javascript", "javascriptreact", "javascript", "javascript", "typescript", "typescript"],
     LspTier::A,
+    &["typescript@7.0.2"],
+    "node_modules/typescript/bin/tsc",
+    &[
+      "package.json",
+      "nuxt.config.ts",
+      "nuxt.config.js",
+      "nuxt.config.mjs",
+      "nuxt.config.cjs",
+      ".nuxtrc",
+      ".nuxt",
+    ],
+    true
+  ),
+  // Install source for Vue LS 3 hybrid. Not a catalog/status row; spawned as id `typescript`.
+  npm_spec!(
+    "typescript-classic",
+    &["typescript-language-server", "--stdio"],
+    &[],
+    &[],
+    LspTier::B,
     // 4.4+ required for typescript.tsserverRequest (Vue LS 3 hybrid bridge).
     &["typescript-language-server@5.3.0", "typescript@5.8.2"],
     "node_modules/typescript-language-server/lib/cli.mjs",
-    &[
-      "package.json",
-      "nuxt.config.ts",
-      "nuxt.config.js",
-      "nuxt.config.mjs",
-      "nuxt.config.cjs",
-      ".nuxtrc",
-      ".nuxt",
-    ]
-  ),
-  npm_spec!(
-    "vue",
-    &["vue-language-server", "--stdio"],
-    &[".vue"],
-    &["vue"],
-    LspTier::A,
-    &["@vue/language-server@3.3.9", "@vue/typescript-plugin@3.3.9", "typescript@5.8.2"],
-    "node_modules/@vue/language-server/bin/vue-language-server.js",
-    &[
-      "package.json",
-      "nuxt.config.ts",
-      "nuxt.config.js",
-      "nuxt.config.mjs",
-      "nuxt.config.cjs",
-      ".nuxtrc",
-      ".nuxt",
-    ]
+    &[]
   ),
   npm_spec!(
     "json",
@@ -144,6 +140,25 @@ pub(crate) static BUILTINS: &[BuiltinLspSpec] = &[
     requires_trust: false,
   },
   // Tier B
+  npm_spec!(
+    "vue",
+    &["vue-language-server", "--stdio"],
+    &[".vue"],
+    &["vue"],
+    LspTier::B,
+    &["@vue/language-server@3.3.9", "@vue/typescript-plugin@3.3.9", "typescript@5.8.2"],
+    "node_modules/@vue/language-server/bin/vue-language-server.js",
+    &[
+      "nuxt.config.ts",
+      "nuxt.config.js",
+      "nuxt.config.mjs",
+      "nuxt.config.cjs",
+      "vue.config.js",
+      "vue.config.ts",
+      ".nuxtrc",
+      ".nuxt",
+    ]
+  ),
   npm_spec!(
     "python",
     &["basedpyright-langserver", "--stdio"],
@@ -705,7 +720,7 @@ pub(crate) static BUILTINS: &[BuiltinLspSpec] = &[
 pub fn builtin_server_map() -> HashMap<String, (Vec<String>, Vec<String>, serde_json::Value)> {
     let mut map = HashMap::new();
     for spec in BUILTINS {
-        if spec.tier == LspTier::D {
+        if spec.tier == LspTier::D || spec.id == "typescript-classic" {
             continue;
         }
         let command = spec.command.iter().map(|s| (*s).to_string()).collect();

@@ -73,6 +73,46 @@ describe('proxyFetch buffered abort', () => {
     expect(invoke).toHaveBeenCalledWith('http_proxy_stream_cancel', { requestId })
   })
 
+  it('uses http_proxy_stream when Accept includes text/event-stream', async () => {
+    invoke.mockImplementation(async (cmd, args) => {
+      if (cmd !== 'http_proxy_stream') {
+        return undefined
+      }
+      const onEvent = args?.onEvent as {
+        onmessage?: (event: {
+          kind: string
+          status?: number
+          headers?: Record<string, string>
+        }) => void
+      }
+      onEvent.onmessage?.({
+        kind: 'headers',
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      })
+      onEvent.onmessage?.({ kind: 'end' })
+      return undefined
+    })
+
+    const fetch = createProxyFetch()
+    const response = await fetch('https://mcp.example/sse', {
+      method: 'GET',
+      headers: { Accept: 'text/event-stream' },
+    })
+
+    expect(response.status).toBe(200)
+    expect(httpProxyRequest).not.toHaveBeenCalled()
+    expect(invoke).toHaveBeenCalledWith(
+      'http_proxy_stream',
+      expect.objectContaining({
+        request: expect.objectContaining({
+          url: 'https://mcp.example/sse',
+          method: 'GET',
+        }),
+      }),
+    )
+  })
+
   it('rejects with AbortError when the proxy reports Request aborted', async () => {
     httpProxyRequest.mockRejectedValue(new Error('Request aborted'))
 

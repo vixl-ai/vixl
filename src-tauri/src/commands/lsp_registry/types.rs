@@ -23,6 +23,8 @@ pub struct NpmInstallSpec {
     pub packages: &'static [&'static str],
     /// Relative path from the managed install dir to the CLI entry (node script or bin name).
     pub bin: &'static str,
+    /// When true, spawn the bin as a native executable (do not wrap with `node`).
+    pub native: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

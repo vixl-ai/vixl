@@ -5,6 +5,7 @@ import {
 } from '@ai-sdk/mcp'
 import type { McpHttpServer } from '@/types/vixl/mcp-config'
 import { isAllowedMcpUrl } from '@/services/mcp/is-allowed-mcp-url'
+import { mcpOAuthFetch } from '@/services/mcp/mcp-oauth-fetch'
 import {
   detectMcpToolDrift,
   loadMcpToolBaseline,
@@ -47,6 +48,7 @@ export const startHttpServer = async (
         headers: config.headers,
         authProvider: options?.authProvider,
         redirect: 'error',
+        fetch: mcpOAuthFetch,
       },
       maxRetries: 0,
       clientName: 'Vixl',

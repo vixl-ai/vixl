@@ -97,6 +97,21 @@ pub(crate) async fn forward_vue_tsserver_request_inner(
     }
     .ok_or_else(|| "TypeScript language server is not running".to_string())?;
 
+    let uses_classic = {
+        let guard = ts_managed.process.lock().await;
+        guard.uses_classic_typescript
+    };
+    if !uses_classic {
+        stop_server_internal("typescript").await.ok();
+        let _ = ensure_running_server(app, "ts", Some(workspace_root.clone())).await?;
+        let ts_managed = {
+            let servers = LSP_SERVERS.lock().await;
+            servers.get("typescript").cloned()
+        }
+        .ok_or_else(|| "TypeScript language server is not running".to_string())?;
+        return execute(ts_managed.process.clone(), command.to_string(), args).await;
+    }
+
     match execute(
         ts_managed.process.clone(),
         command.to_string(),

@@ -1,9 +1,14 @@
 import { call } from './helpers'
-import type { LspCatalogEntry, LspServerStatus } from './types'
+import type { LspCatalogEntry, LspServerStatus, LspWorkspaceProfile } from './types'
 
 export const lspStatus = (): Promise<LspServerStatus[]> => call('lsp_status')
 
 export const lspCatalog = (): Promise<LspCatalogEntry[]> => call('lsp_catalog')
+
+export const lspWorkspaceProfile = (
+  projectRoot: string,
+): Promise<LspWorkspaceProfile> =>
+  call('lsp_workspace_profile', { projectRoot })
 
 export const lspRequest = (
   serverId: string,

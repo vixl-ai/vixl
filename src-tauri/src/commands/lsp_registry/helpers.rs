@@ -1,4 +1,5 @@
 use super::types::{BuiltinLspSpec, LspTier};
+use super::workspace::workspace_is_vue_nuxt;
 
 fn marker_name_matches(pattern: &str, file_name: &str) -> bool {
     if !pattern.contains('*') {
@@ -26,6 +27,9 @@ pub fn root_marker_score(workspace_root: Option<&std::path::Path>, spec: &Builti
             500
         };
     };
+    if spec.id == "vue" && workspace_is_vue_nuxt(root) {
+        return 0;
+    }
     if spec.root_markers.is_empty() {
         return 100;
     }
@@ -59,6 +63,21 @@ pub fn root_marker_score(workspace_root: Option<&std::path::Path>, spec: &Builti
     best.unwrap_or(1000)
 }
 
+/// Lower is better. A spec that only claims this extension outranks overlays
+/// (for example Tailwind listing `.vue`) so opening a `.vue` file starts Vue.
+pub fn dedicated_extension_rank(spec: &BuiltinLspSpec, extension: &str) -> i32 {
+    let ext = extension.trim_start_matches('.');
+    if spec.extensions.len() == 1
+        && spec.extensions[0]
+            .trim_start_matches('.')
+            .eq_ignore_ascii_case(ext)
+    {
+        0
+    } else {
+        1
+    }
+}
+
 pub fn tier_rank(tier: LspTier) -> i32 {
     match tier {
         LspTier::A => 0,
@@ -70,6 +89,7 @@ pub fn tier_rank(tier: LspTier) -> i32 {
 
 pub fn allowlisted_lsp_basenames() -> &'static [&'static str] {
     &[
+        "tsc",
         "typescript-language-server",
         "vue-language-server",
         "vscode-json-language-server",

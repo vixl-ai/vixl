@@ -17,9 +17,10 @@ use super::super::lsp_install::{
 use super::super::lsp_registry::builtin_spec_by_id;
 use super::helpers::{path_to_uri, LspServerStatus};
 use super::resolve::{
-    active_project_root, build_initialization_options, find_server_for_extension,
-    inject_vue_tsdk_arg, load_effective_servers, resolve_lsp_command, LspServerEntry,
+    active_project_root, find_server_for_extension, load_effective_servers, resolve_lsp_command,
+    LspServerEntry,
 };
+use super::typescript::{build_initialization_options, inject_vue_tsdk_arg, vue_in_play_for};
 
 pub(crate) struct LspProcess {
     pub(crate) child: Child,
@@ -29,6 +30,7 @@ pub(crate) struct LspProcess {
     pub(crate) diagnostics_by_uri: HashMap<String, serde_json::Value>,
     pub(crate) pending: Mutex<HashMap<u64, oneshot::Sender<serde_json::Value>>>,
     pub(crate) next_id: Mutex<u64>,
+    pub(crate) uses_classic_typescript: bool,
 }
 
 pub(crate) struct ManagedLspServer {
@@ -258,10 +260,24 @@ pub(crate) async fn start_server(
     entry: LspServerEntry,
     workspace_root: String,
     app: AppHandle,
+    classic_typescript: bool,
 ) -> Result<Arc<Mutex<LspProcess>>, String> {
     let trusted = workspace_is_trusted(&app, Some(workspace_root.as_str()));
-    let mut resolved = resolve_lsp_command(&app, &server_id, &entry, &workspace_root, trusted)?;
-    inject_vue_tsdk_arg(&app, &server_id, &workspace_root, trusted, &mut resolved);
+    let mut resolved = resolve_lsp_command(
+        &app,
+        &server_id,
+        &entry,
+        &workspace_root,
+        trusted,
+        classic_typescript,
+    )?;
+    inject_vue_tsdk_arg(
+        &app,
+        &server_id,
+        &workspace_root,
+        trusted,
+        &mut resolved.args,
+    );
 
     let mut command = Command::new(&resolved.program);
     command
@@ -295,6 +311,7 @@ pub(crate) async fn start_server(
         diagnostics_by_uri: HashMap::new(),
         pending: Mutex::new(HashMap::new()),
         next_id: Mutex::new(0),
+        uses_classic_typescript: server_id == "typescript" && classic_typescript,
     }));
 
     super::spawn_reader(process.clone(), server_id.clone(), app.clone());
@@ -307,6 +324,7 @@ pub(crate) async fn start_server(
         &entry.initialization,
         &workspace_root,
         trusted,
+        classic_typescript,
     );
 
     json_rpc_request(
@@ -403,6 +421,21 @@ pub(crate) async fn ensure_running_server(
         find_server_for_extension(app, &servers, extension, Some(workspace_root.as_str()))
             .ok_or_else(|| format!("No LSP server configured for extension: {extension}"))?;
 
+    let vue_running = LSP_SERVERS.lock().await.contains_key("vue");
+    let classic_typescript = vue_in_play_for(&workspace_root, Some(extension), vue_running);
+
+    if classic_typescript {
+        if let Some(managed) = LSP_SERVERS.lock().await.get("typescript").cloned() {
+            let uses_classic = {
+                let guard = managed.process.lock().await;
+                guard.uses_classic_typescript
+            };
+            if !uses_classic {
+                super::stop_server_internal("typescript").await.ok();
+            }
+        }
+    }
+
     if let Some(spec) = builtin_spec_by_id(&server_id) {
         if spec.requires_trust {
             if !workspace_is_trusted(app, Some(workspace_root.as_str())) {
@@ -426,7 +459,12 @@ pub(crate) async fn ensure_running_server(
     )
     .await;
 
-    match ensure_server_installed(app, &server_id).await {
+    let install_id = if server_id == "typescript" && classic_typescript {
+        "typescript-classic"
+    } else {
+        server_id.as_str()
+    };
+    match ensure_server_installed(app, install_id).await {
         Ok(_) => {}
         Err(error) => {
             set_state(
@@ -437,13 +475,15 @@ pub(crate) async fn ensure_running_server(
                 Some("error".to_string()),
             )
             .await;
-            // Continue: PATH fallback may still work inside resolve_lsp_command
             let _ = error;
         }
     }
+    if server_id == "vue" {
+        let _ = ensure_server_installed(app, "typescript-classic").await;
+    }
 
-    // Warm portable node for npm-backed servers
-    if builtin_spec_by_id(&server_id)
+    if builtin_spec_by_id(install_id)
+        .or_else(|| builtin_spec_by_id(&server_id))
         .map(|s| s.npm.is_some())
         .unwrap_or(false)
     {
@@ -451,13 +491,19 @@ pub(crate) async fn ensure_running_server(
     }
 
     if let Some(managed) = LSP_SERVERS.lock().await.get(&server_id).cloned() {
-        let (should_restart, current_root) = {
+        let (should_restart, current_root, uses_classic) = {
             let restart = managed.restart.lock().await;
             let guard = managed.process.lock().await;
-            (*restart, guard.workspace_root.clone())
+            (
+                *restart,
+                guard.workspace_root.clone(),
+                guard.uses_classic_typescript,
+            )
         };
 
-        if current_root != workspace_root {
+        let stack_mismatch = server_id == "typescript" && uses_classic != classic_typescript;
+
+        if current_root != workspace_root || stack_mismatch {
             super::stop_server_internal(&server_id).await.ok();
         } else if !should_restart {
             let running = {
@@ -487,7 +533,15 @@ pub(crate) async fn ensure_running_server(
         }
     }
 
-    match start_server(server_id.clone(), entry, workspace_root, app.clone()).await {
+    match start_server(
+        server_id.clone(),
+        entry,
+        workspace_root,
+        app.clone(),
+        classic_typescript,
+    )
+    .await
+    {
         Ok(_) => Ok(LspServerStatus {
             id: server_id.clone(),
             running: true,
