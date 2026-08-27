@@ -9,6 +9,7 @@ describe('formatTokenCount', () => {
   it('uses k and M for even thousands', () => {
     expect(formatTokenCount(200_000)).toBe('200k')
     expect(formatTokenCount(1_000_000)).toBe('1M')
+    expect(formatTokenCount(1_048_576)).toBe('1M')
     expect(formatTokenCount(8_192)).toBe('8,192')
   })
 })
@@ -39,8 +40,8 @@ describe('formatCatalogMetaHint', () => {
         pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
       }),
     ).toEqual([
-      'Reported context: 200k',
-      'Reported max output: 8,192',
+      'Context 200k',
+      'Max output 8,192',
       'Vision, Tools',
       `${formatCatalogPricing({ inputPerMillion: 2.5, outputPerMillion: 10 })}`,
     ])
@@ -50,6 +51,19 @@ describe('formatCatalogMetaHint', () => {
     expect(formatCatalogMetaHint({ vision: false, toolCalling: false })).toEqual(
       [],
     )
+  })
+
+  it('skips token lines when the panel shows size selects', () => {
+    expect(
+      formatCatalogMetaHint(
+        {
+          contextWindow: 1_000_000,
+          maxOutputTokens: 32_768,
+          vision: true,
+        },
+        { omitContext: true, omitOutput: true },
+      ),
+    ).toEqual(['Vision'])
   })
 })
 

@@ -2,14 +2,25 @@ import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
 import formatTokenCount from './format-token-count'
 import formatCatalogPricing from './format-pricing'
 
-const formatCatalogMetaHint = (meta: ModelCatalogMeta): string[] => {
+const formatCatalogMetaHint = (
+  meta: ModelCatalogMeta,
+  options?: { omitContext?: boolean; omitOutput?: boolean },
+): string[] => {
   const lines: string[] = []
 
-  if (typeof meta.contextWindow === 'number' && meta.contextWindow > 0) {
-    lines.push(`Reported context: ${formatTokenCount(meta.contextWindow)}`)
+  if (
+    !options?.omitContext &&
+    typeof meta.contextWindow === 'number' &&
+    meta.contextWindow > 0
+  ) {
+    lines.push(`Context ${formatTokenCount(meta.contextWindow)}`)
   }
-  if (typeof meta.maxOutputTokens === 'number' && meta.maxOutputTokens > 0) {
-    lines.push(`Reported max output: ${formatTokenCount(meta.maxOutputTokens)}`)
+  if (
+    !options?.omitOutput &&
+    typeof meta.maxOutputTokens === 'number' &&
+    meta.maxOutputTokens > 0
+  ) {
+    lines.push(`Max output ${formatTokenCount(meta.maxOutputTokens)}`)
   }
 
   const caps: string[] = []

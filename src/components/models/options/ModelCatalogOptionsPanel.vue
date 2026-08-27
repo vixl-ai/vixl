@@ -8,7 +8,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { formatCatalogMetaHint } from '@/services/models/options'
+import {
+  contextWindowSelectValues,
+  formatCatalogMetaHint,
+  maxOutputSelectValues,
+} from '@/services/models/options'
 import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
@@ -37,7 +41,20 @@ const fast = computed(() => props.option.fast === true)
 const reasoning = computed(
   () => props.option.reasoning ?? 'provider-default',
 )
-const hintLines = computed(() => formatCatalogMetaHint(props.meta))
+const contextValues = computed(() =>
+  contextWindowSelectValues(props.meta.contextWindow, props.option.contextWindow),
+)
+
+const outputValues = computed(() =>
+  maxOutputSelectValues(props.meta.maxOutputTokens, props.option.maxOutputTokens),
+)
+
+const hintLines = computed(() =>
+  formatCatalogMetaHint(props.meta, {
+    omitContext: contextValues.value.length > 0,
+    omitOutput: outputValues.value.length > 0,
+  }),
+)
 
 const handleAllowed = (value: boolean): void => {
   emit('change', { allowed: value ? true : false })
@@ -102,16 +119,20 @@ const handleMaxOutputTokens = (value: number | undefined): void => {
         </SelectContent>
       </Select>
     </div>
-    <ModelCatalogTokenField
+    <ModelCatalogTokenSelect
+      v-if="contextValues.length > 0 && meta.contextWindow"
       label="Context window"
       :model-value="option.contextWindow"
       :reported-max="meta.contextWindow"
+      :values="contextValues"
       @change="handleContextWindow"
     />
-    <ModelCatalogTokenField
+    <ModelCatalogTokenSelect
+      v-if="outputValues.length > 0 && meta.maxOutputTokens"
       label="Max output"
       :model-value="option.maxOutputTokens"
       :reported-max="meta.maxOutputTokens"
+      :values="outputValues"
       @change="handleMaxOutputTokens"
     />
     <p
