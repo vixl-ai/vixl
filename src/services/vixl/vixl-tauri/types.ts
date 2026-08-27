@@ -172,6 +172,8 @@ export type LspServerStatus = {
 
 export type LspWorkspaceProfile = {
   vueNuxt: boolean
+  warm: string[]
+  warmExtensions: string[]
 }
 
 export type LspCatalogEntry = {

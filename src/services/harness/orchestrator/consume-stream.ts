@@ -19,6 +19,7 @@ import {
 } from './helpers'
 import { persistLine } from './persistence'
 import type { PreparedHarnessStream } from './prepare-stream'
+import prepareParentCompactStep from './prepare-compact-step'
 
 export default async (prepared: PreparedHarnessStream): Promise<void> => {
   const {
@@ -37,6 +38,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     signal,
     onEvent,
     captureTurnMessages,
+    messages,
   } = prepared
 
   let streamError: Error | null = null
@@ -60,6 +62,17 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
       isLoopFinished(),
       () => getPlanExecutionSession(projectSlug, chatId).createdPlanThisTurn,
     ],
+    prepareStep: prepareParentCompactStep({
+      settings,
+      modelRef: callModel.optionRef,
+      system,
+      signal,
+      projectSlug,
+      chatId,
+      turnId: assistantId,
+      messages,
+      onEvent,
+    }),
     abortSignal: signal,
     onAbort: async () => {
       rejectPendingForChat(chatId)

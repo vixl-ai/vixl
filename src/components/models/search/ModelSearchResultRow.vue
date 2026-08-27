@@ -8,7 +8,7 @@ import {
 } from '@/components/shadcn/ui/popover'
 import ModelsSearchModelSelectorLogo from '@/components/ai-elements/model-selector/ModelSelectorLogo.vue'
 import ModelsSearchModelSelectorName from '@/components/ai-elements/model-selector/ModelSelectorName.vue'
-import ModelsOptionsModelCatalogOptionsPanel from '@/components/models/options/ModelCatalogOptionsPanel.vue'
+import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
 import type { ScoredVendorModelEntry } from '@/types/models/scored-vendor-model-entry'
 import type { ReasoningCapability } from '@/services/models/resolve-reasoning-capability'
@@ -23,9 +23,11 @@ withDefaults(
     supportsFast: boolean
     optionsTitle: string
     showDisabledBadge?: boolean
+    meta?: ModelCatalogMeta
   }>(),
   {
     showDisabledBadge: false,
+    meta: () => ({}),
   },
 )
 
@@ -81,16 +83,17 @@ const handleChange = (patch: ModelCatalogOption): void => {
       </Button>
     </PopoverTrigger>
     <PopoverContent
-      class="w-56"
+      class="w-72"
       align="end"
       :side-offset="6"
       @click.stop
       @pointerdown.stop
     >
-      <ModelsOptionsModelCatalogOptionsPanel
+      <ModelCatalogOptionsPanel
         :option="option"
         :capability="capability"
         :supports-fast="supportsFast"
+        :meta="meta"
         @change="handleChange"
       />
     </PopoverContent>

@@ -43,8 +43,12 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
     gitDiff: vi.fn<() => Promise<unknown>>(),
     gitLog: vi.fn<() => Promise<unknown>>(),
     lspEnsureServer: vi.fn<() => Promise<unknown>>(),
-    lspWorkspaceProfile: vi.fn<() => Promise<{ vueNuxt: boolean }>>(async () => ({
+    lspWorkspaceProfile: vi.fn<
+      () => Promise<{ vueNuxt: boolean; warm: string[]; warmExtensions: string[] }>
+    >(async () => ({
       vueNuxt: false,
+      warm: [],
+      warmExtensions: [],
     })),
     lspRequest: vi.fn<() => Promise<unknown>>(),
     mcpCallTool: vi.fn<() => Promise<unknown>>(),

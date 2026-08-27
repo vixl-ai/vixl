@@ -81,4 +81,20 @@ describe('resolveModelVision', () => {
       }),
     ).toBe(false)
   })
+
+  it('falls back to catalogMeta.vision when SDK does not advertise images', async () => {
+    expect(
+      await resolveModelVision({
+        model: stubModel({}),
+        providerId: 'openai',
+        modelId: 'gpt-4o',
+        settings: {
+          ...baseSettings(),
+          'models.catalogMeta': {
+            'openai::gpt-4o': { vision: true },
+          },
+        },
+      }),
+    ).toBe(true)
+  })
 })

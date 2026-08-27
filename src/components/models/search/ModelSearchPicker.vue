@@ -24,6 +24,8 @@ import {
   isModelAllowed,
   mergeModelCatalogOption,
 } from '@/services/models/model-catalog-options'
+import { getModelCatalogMeta } from '@/services/models/model-catalog-meta'
+import { formatModelSearchSuffix } from '@/services/models/options'
 import clampModelCatalogOption from '@/services/models/clamp-model-catalog-option'
 import resolveReasoningCapability from '@/services/models/resolve-reasoning-capability'
 import { canonicalizeModelRef } from '@/services/models/resolve-model-ref-for-call'
@@ -143,18 +145,16 @@ const selectedSuffix = computed(() => {
   if (!canonical) {
     return ''
   }
-  const option = getClampedModelCatalogOption(settingsSource.value, canonical)
-  const bits: string[] = []
-  if (option.reasoning && option.reasoning !== 'provider-default') {
-    bits.push(option.reasoning)
-  }
-  if (
-    option.fast === true ||
-    isFastModelId(parseModelRef(props.modelValue)?.modelId ?? '')
-  ) {
-    bits.push('fast')
-  }
-  return bits.length > 0 ? bits.join(', ') : ''
+  return formatModelSearchSuffix({
+    option: getClampedModelCatalogOption(settingsSource.value, canonical),
+    reportedContextWindow: getModelCatalogMeta(
+      settingsSource.value,
+      canonical,
+    ).contextWindow,
+    fastFromModelId: isFastModelId(
+      parseModelRef(props.modelValue)?.modelId ?? '',
+    ),
+  })
 })
 
 const handleOpenChange = (nextOpen: boolean): void => {
@@ -195,6 +195,9 @@ const optionFor = (model: ModelRef): ModelCatalogOption => {
 
 const capabilityFor = (model: ModelRef) =>
   resolveReasoningCapability(settingsSource.value, model)
+
+const metaFor = (model: ModelRef) =>
+  getModelCatalogMeta(settingsSource.value, model)
 
 const openModelOptions = (serialized: string, next: boolean): void => {
   optionsOpenFor.value = next ? serialized : null
@@ -294,6 +297,7 @@ watch(
         :options-open-for="optionsOpenFor"
         :option-for="optionFor"
         :capability-for="capabilityFor"
+        :meta-for="metaFor"
         @select="handleSelect"
         @open-providers="openProvidersSettings"
         @update:options-open-for="openModelOptions"

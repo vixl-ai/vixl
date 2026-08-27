@@ -103,13 +103,14 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
   const persistence = createPersistence(state, {
     send: turnLoop.send,
   })
-  const sessionOps = createSessionOps(state, {
-    handleEvent: events.handleEvent,
-  })
   const lifecycle = createLifecycle(state, attention, {
     send: turnLoop.send,
     stopMcpAuthPolling: approvals.stopMcpAuthPolling,
     maybeFlushBackgroundSubagentResume: turnLoop.maybeFlushBackgroundSubagentResume,
+  })
+  const sessionOps = createSessionOps(state, {
+    handleEvent: events.handleEvent,
+    stop: lifecycle.stop,
   })
 
   return {

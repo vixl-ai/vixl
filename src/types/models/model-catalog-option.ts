@@ -5,6 +5,8 @@ export type ModelCatalogOption = {
   fast?: boolean
   /** When false, hide from chat model pickers. Default true. */
   allowed?: boolean
+  contextWindow?: number
+  maxOutputTokens?: number
 }
 
 export type ModelCatalogOptionsMap = Record<string, ModelCatalogOption>

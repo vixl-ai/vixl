@@ -19,6 +19,7 @@ export const prefixSnapshotSchema = z.object({
   rulesBodies: z.string(),
   hash: z.string(),
   frozenAt: z.string(),
+  mode: chatModeSchema.optional(),
   parts: systemPromptPartsSchema.optional(),
 })
 

@@ -157,4 +157,85 @@ describe('recordBillableUsage', () => {
     expect(record.costUSD).toBe(0.00849)
     expect(record.pricingSource).toBe('provider_reported')
   })
+
+  it('uses catalogMeta.pricing as catalog_estimate after custom rates', () => {
+    const record = recordBillableUsage({
+      chatId: 'chat-1',
+      turnId: 'turn-1',
+      source: 'main',
+      providerId: 'openai',
+      modelId: 'gpt-4o',
+      usage: usageWithTokens(),
+      settings: {
+        version: 1,
+        'models.catalogMeta': {
+          'openai::gpt-4o': {
+            pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
+          },
+        },
+      } as VixlSettings,
+    })
+
+    expect(record.pricingSource).toBe('catalog_estimate')
+    expect(record.costUSD).toBe(2.5 + 5)
+    expect(record.rates).toEqual({
+      inputPerMillion: 2.5,
+      outputPerMillion: 10,
+    })
+  })
+
+  it('prefers custom rates over catalogMeta.pricing', () => {
+    const record = recordBillableUsage({
+      chatId: 'chat-1',
+      turnId: 'turn-1',
+      source: 'main',
+      providerId: 'openrouter',
+      modelId: 'test-model',
+      usage: usageWithTokens(),
+      settings: {
+        ...settingsWithRates,
+        'models.catalogMeta': {
+          'openrouter::test-model': {
+            pricing: { inputPerMillion: 99, outputPerMillion: 99 },
+          },
+        },
+      } as VixlSettings,
+    })
+
+    expect(record.pricingSource).toBe('user_configured')
+    expect(record.costUSD).toBe(2)
+    expect(record.rates).toEqual({
+      inputPerMillion: 1,
+      outputPerMillion: 2,
+    })
+  })
+
+  it('prefers gateway metadata cost over catalog_estimate', () => {
+    const record = recordBillableUsage({
+      chatId: 'chat-1',
+      turnId: 'turn-1',
+      source: 'main',
+      providerId: 'gateway',
+      modelId: 'openai/gpt-4o',
+      usage: usageWithTokens({ prompt_tokens: 10 }),
+      providerMetadata: {
+        gateway: {
+          cost: '0.00849',
+          marketCost: '0.00849',
+        },
+      },
+      settings: {
+        version: 1,
+        'models.catalogMeta': {
+          'gateway::openai/gpt-4o': {
+            pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
+          },
+        },
+      } as VixlSettings,
+    })
+
+    expect(record.costUSD).toBe(0.00849)
+    expect(record.pricingSource).toBe('provider_reported')
+    expect(record.rates).toBeUndefined()
+  })
 })

@@ -3,6 +3,7 @@ import type {
   PermissionLevel,
   PermissionRecord,
 } from '@/types/harness/permission'
+import type { ModelCatalogMetaMap } from '@/types/models/model-catalog-meta'
 import type { ModelCatalogOptionsMap } from '@/types/models/model-catalog-option'
 import type { ModelPricingRates } from '@/types/billing/model-pricing-rates'
 
@@ -79,9 +80,15 @@ export type VixlSettings = {
   'models.titleReasoning'?: string
   'models.compactionReasoning'?: string
   'models.catalogOptions'?: ModelCatalogOptionsMap
+  'models.catalogMeta'?: ModelCatalogMetaMap
   [key: `providers.${string}.apiKeyRef`]: string | undefined
   [key: `providers.custom.${string}`]: VixlCustomProvider | undefined
-  // String model refs and reasoning levels. catalogOptions is declared above and
-  // must stay compatible with this index (object values allowed for that key only).
-  [key: `models.${string}`]: string | ModelCatalogOptionsMap | undefined
+  // String model refs and reasoning levels. catalogOptions and catalogMeta are
+  // declared above and must stay compatible with this index (object values
+  // allowed for those keys only).
+  [key: `models.${string}`]:
+    | string
+    | ModelCatalogOptionsMap
+    | ModelCatalogMetaMap
+    | undefined
 }

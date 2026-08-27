@@ -20,11 +20,15 @@ describe('mode allowlists codebase tools', () => {
   })
 })
 
-describe('mode allowlists studio shell tools', () => {
-  it('includes run_terminal, terminal_output, and stop_terminal in studio', () => {
-    expect(MODE_TOOL_ALLOWLIST.studio).toContain('run_terminal')
-    expect(MODE_TOOL_ALLOWLIST.studio).toContain('terminal_output')
-    expect(MODE_TOOL_ALLOWLIST.studio).toContain('stop_terminal')
+describe('mode allowlists parent shell tools', () => {
+  const shellTools = ['run_terminal', 'terminal_output', 'stop_terminal'] as const
+
+  it('includes run_terminal, terminal_output, and stop_terminal in ask, plan, and studio', () => {
+    for (const name of shellTools) {
+      expect(MODE_TOOL_ALLOWLIST.ask).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.plan).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.studio).toContain(name)
+    }
   })
 })
 
@@ -97,7 +101,6 @@ describe('mode allowlists mutations', () => {
     'apply_patch',
     'delete_file',
     'move_file',
-    'run_terminal',
     'git_commit',
     'git_checkout',
     'git_branch_create',

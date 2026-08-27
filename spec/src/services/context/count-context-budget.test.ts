@@ -32,6 +32,7 @@ vi.mock('@/services/context/system-prompt-parts', async () => {
 
 import countContextBudget from '@/services/context/count-context-budget'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const message = (id: string, createdAt: string, text: string): UIMessage => ({
   id,
@@ -76,6 +77,29 @@ describe('countContextBudget', () => {
     expect(messagesWith).toBeLessThan(messagesWithout)
     expect(withCutoff.buckets.some((b) => b.id === 'mcp')).toBe(true)
     expect(withCutoff.buckets.find((b) => b.id === 'tools')?.tokens).toBe(100)
+  })
+
+  it('uses catalogOptions context window and reserved output when provider is set', async () => {
+    const budget = await countContextBudget({
+      modelId: 'gpt-4o',
+      providerId: 'openai',
+      settings: {
+        version: 1,
+        'models.catalogOptions': {
+          'openai::gpt-4o': { contextWindow: 80_000, maxOutputTokens: 4_000 },
+        },
+        'models.catalogMeta': {
+          'openai::gpt-4o': { contextWindow: 200_000, maxOutputTokens: 16_384 },
+        },
+      } as VixlSettings,
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [message('1', '2026-01-01T00:00:00.000Z', 'hi')],
+    })
+    expect(budget.limit).toBe(80_000)
+    expect(budget.reservedOutput).toBe(4_000)
   })
 
   it('counts tool results from timeline in the conversation bucket', async () => {

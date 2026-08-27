@@ -19,36 +19,36 @@ const MODES: VixlChatMode[] = ['ask', 'plan', 'studio', 'agent', 'orchestrator']
 /**
  * Empty-project (standalone, no rules, no MCP) ceilings after dropping embedded browser tools.
  * Measured totals (system join + builtin tool defs, chars/4):
- * ask 3704, plan 4252, studio 5112, agent 6247, orchestrator 4653.
+ * ask 4328, plan 4899, studio 5112, agent 6247, orchestrator 4653.
  * Headroom is about 3 percent so waste cannot return unnoticed.
  */
 const TOTAL_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 3820,
-  plan: 4380,
+  ask: 4460,
+  plan: 5050,
   studio: 5270,
   agent: 6440,
   orchestrator: 4800,
 }
 
 const BASE_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 730,
-  plan: 785,
+  ask: 820,
+  plan: 885,
   studio: 890,
   agent: 1090,
   orchestrator: 965,
 }
 
 const SKILLS_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 40,
-  plan: 40,
+  ask: 50,
+  plan: 50,
   studio: 80,
   agent: 25,
   orchestrator: 25,
 }
 
 const TOOL_DEF_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 3030,
-  plan: 3550,
+  ask: 3590,
+  plan: 4100,
   studio: 4290,
   agent: 5310,
   orchestrator: 3790,
@@ -118,13 +118,13 @@ describe('system prompt token snapshot (empty project)', () => {
     expect(studio.total).toBeLessThan(agent.total)
   })
 
-  it('includes MCP guidance but omits patch, shell, and embedded browser from ask', async () => {
+  it('includes MCP and shell guidance but omits patch and embedded browser from ask', async () => {
     const snapshot = await measureMode('ask')
     expect(snapshot.systemString).toContain('get_mcp_tools if stale')
+    expect(snapshot.systemString).toContain('run_terminal only')
     expect(snapshot.systemString).not.toContain('browser_cdp')
     expect(snapshot.systemString).not.toContain('browser_lock')
     expect(snapshot.systemString).not.toContain('apply_patch')
-    expect(snapshot.systemString).not.toContain('run_terminal only')
   })
 
   it('keeps the Comark block catalog out of the always-on studio skill', async () => {

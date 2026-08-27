@@ -167,4 +167,40 @@ describe('listAllProviderModels', () => {
     expect(groups[0]?.models[0]?.supportsReasoningEffort).toBeUndefined()
     expect(groups[0]?.models[0]?.reasoningMandatory).toBeUndefined()
   })
+
+  it('copies provider-reported catalog fields onto ModelRef', async () => {
+    httpProxyRequest.mockResolvedValueOnce({
+      status: 200,
+      body: JSON.stringify({
+        data: [
+          {
+            id: 'openai/gpt-4o',
+            context_length: 128000,
+            top_provider: { max_completion_tokens: 16384 },
+            pricing: { prompt: '0.0000025', completion: '0.00001' },
+            architecture: { input_modalities: ['text', 'image'] },
+            supported_parameters: ['tools'],
+          },
+        ],
+      }),
+    })
+
+    const settings = {
+      version: 1 as const,
+      'providers.openrouter.apiKeyRef': 'openrouter',
+    } satisfies VixlSettings
+
+    const groups = await listAllProviderModels(settings)
+    expect(groups[0]?.models).toEqual([
+      {
+        providerId: 'openrouter',
+        modelId: 'openai/gpt-4o',
+        contextWindow: 128000,
+        maxOutputTokens: 16384,
+        pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
+        vision: true,
+        toolCalling: true,
+      },
+    ])
+  })
 })

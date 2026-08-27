@@ -4,6 +4,7 @@ import ModelsSearchModelSelectorList from '@/components/ai-elements/model-select
 import ModelsSearchModelSelectorGroup from '@/components/ai-elements/model-selector/ModelSelectorGroup.vue'
 import ModelsSearchModelSelectorItem from '@/components/ai-elements/model-selector/ModelSelectorItem.vue'
 import ModelsSearchModelSelectorEmpty from '@/components/ai-elements/model-selector/ModelSelectorEmpty.vue'
+import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
 import type { ModelRef } from '@/types/models/model-ref'
 import type { ScoredVendorGroup } from '@/types/models/scored-vendor-group'
@@ -21,6 +22,7 @@ defineProps<{
   optionsOpenFor: string | null
   optionFor: (model: ModelRef) => ModelCatalogOption
   capabilityFor: (model: ModelRef) => ReasoningCapability
+  metaFor: (model: ModelRef) => ModelCatalogMeta
 }>()
 
 const emit = defineEmits<{
@@ -94,6 +96,7 @@ const handleOptionChange = (
             :option="optionFor(model)"
             :capability="capabilityFor(model)"
             :supports-fast="resolveSupportsFast(model)"
+            :meta="metaFor(model)"
             :options-title="`Options for ${model.label}`"
             :show-disabled-badge="optionFor(model).allowed === false"
             @update:options-open="handleOptionsOpen(serializedFor(model), $event)"
@@ -120,6 +123,7 @@ const handleOptionChange = (
             :option="optionFor(model)"
             :capability="capabilityFor(model)"
             :supports-fast="resolveSupportsFast(model)"
+            :meta="metaFor(model)"
             :options-title="`Re-enable ${model.label}`"
             @update:options-open="handleOptionsOpen(serializedFor(model), $event)"
             @change="handleOptionChange(model, $event)"

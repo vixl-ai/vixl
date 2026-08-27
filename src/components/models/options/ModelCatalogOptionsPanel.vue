@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { Label } from '@/components/shadcn/ui/label'
 import { Switch } from '@/components/shadcn/ui/switch'
 import {
@@ -9,6 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { formatCatalogMetaHint } from '@/services/models/options'
+import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import { REASONING_LEVEL_LABELS } from '@/types/models/reasoning-level'
@@ -19,9 +20,11 @@ const props = withDefaults(
     option: ModelCatalogOption
     capability: ReasoningCapability
     supportsFast?: boolean
+    meta?: ModelCatalogMeta
   }>(),
   {
     supportsFast: false,
+    meta: () => ({}),
   },
 )
 
@@ -34,6 +37,7 @@ const fast = computed(() => props.option.fast === true)
 const reasoning = computed(
   () => props.option.reasoning ?? 'provider-default',
 )
+const hintLines = computed(() => formatCatalogMetaHint(props.meta))
 
 const handleAllowed = (value: boolean): void => {
   emit('change', { allowed: value ? true : false })
@@ -50,6 +54,14 @@ const handleReasoning = (value: unknown): void => {
   emit('change', {
     reasoning: value as ReasoningLevel,
   })
+}
+
+const handleContextWindow = (value: number | undefined): void => {
+  emit('change', { contextWindow: value })
+}
+
+const handleMaxOutputTokens = (value: number | undefined): void => {
+  emit('change', { maxOutputTokens: value })
 }
 </script>
 
@@ -90,5 +102,29 @@ const handleReasoning = (value: unknown): void => {
         </SelectContent>
       </Select>
     </div>
+    <ModelCatalogTokenField
+      label="Context window"
+      :model-value="option.contextWindow"
+      :reported-max="meta.contextWindow"
+      @change="handleContextWindow"
+    />
+    <ModelCatalogTokenField
+      label="Max output"
+      :model-value="option.maxOutputTokens"
+      :reported-max="meta.maxOutputTokens"
+      @change="handleMaxOutputTokens"
+    />
+    <p
+      v-if="hintLines.length > 0"
+      class="space-y-0.5 text-[11px] leading-snug text-muted-foreground"
+    >
+      <span
+        v-for="line in hintLines"
+        :key="line"
+        class="block"
+      >
+        {{ line }}
+      </span>
+    </p>
   </div>
 </template>

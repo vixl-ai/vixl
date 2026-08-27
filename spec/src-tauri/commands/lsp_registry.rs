@@ -2,8 +2,9 @@ use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use app_lib::commands::lsp_registry::{
-    builtin_server_map, builtin_spec_by_id, language_id_for_extension, root_marker_score,
-    tier_a_ids, tier_rank, workspace_is_vue_nuxt, GithubTargetStyle, LspInstallKind, LspTier,
+    builtin_server_map, builtin_spec_by_id, language_id_for_extension, primary_server_id_for_extension,
+    root_marker_score, tier_a_ids, tier_rank, workspace_is_vue_nuxt, workspace_warm_plan,
+    workspace_warm_server_ids, GithubTargetStyle, LspInstallKind, LspTier,
 };
 
 fn temp_dir(label: &str) -> std::path::PathBuf {
@@ -234,4 +235,53 @@ fn typescript_classic_is_hidden_vue_hybrid_install() {
     assert!(!tier_a_ids().contains(&"typescript-classic"));
     assert!(!builtin_server_map().contains_key("typescript-classic"));
     assert!(builtin_server_map().contains_key("typescript"));
+}
+
+#[test]
+fn warm_starts_servers_for_present_files_only() {
+    let dir = temp_dir("warm-files");
+    fs::write(dir.join("package.json"), r#"{"dependencies":{"react":"19"}}"#).unwrap();
+    fs::create_dir(dir.join("src")).unwrap();
+    fs::write(dir.join("src/App.tsx"), "export const App = () => null").unwrap();
+    fs::write(dir.join("README.md"), "# app").unwrap();
+
+    let plan = workspace_warm_plan(&dir);
+    assert!(plan.server_ids.contains(&"typescript".to_string()));
+    assert!(plan.server_ids.contains(&"markdown".to_string()));
+    assert!(plan.server_ids.contains(&"json".to_string()));
+    assert!(!plan.server_ids.contains(&"vue".to_string()));
+    assert_eq!(
+        primary_server_id_for_extension("tsx", &dir),
+        Some("typescript")
+    );
+    assert_eq!(primary_server_id_for_extension("md", &dir), Some("markdown"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn warm_starts_vue_when_vue_files_exist() {
+    let dir = temp_dir("warm-vue");
+    fs::write(dir.join("App.vue"), "<template></template>").unwrap();
+    let warm = workspace_warm_server_ids(&dir);
+    assert!(warm.contains(&"vue".to_string()));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn empty_workspace_warms_nothing() {
+    let dir = temp_dir("warm-empty");
+    let plan = workspace_warm_plan(&dir);
+    assert!(plan.server_ids.is_empty());
+    assert!(plan.extensions.is_empty());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn node_modules_files_do_not_warm_servers() {
+    let dir = temp_dir("warm-nm");
+    fs::create_dir_all(dir.join("node_modules/pkg")).unwrap();
+    fs::write(dir.join("node_modules/pkg/index.ts"), "export {}").unwrap();
+    let plan = workspace_warm_plan(&dir);
+    assert!(!plan.server_ids.contains(&"typescript".to_string()));
+    let _ = fs::remove_dir_all(&dir);
 }

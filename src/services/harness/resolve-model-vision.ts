@@ -4,6 +4,7 @@ import type {
   VixlSettings,
 } from '@/types/vixl/vixl-settings'
 import { getCustomProvider } from '@/services/providers/registry'
+import { getModelCatalogMeta } from '@/services/models/model-catalog-meta'
 
 const hasImageSupportedUrls = async (model: LanguageModel): Promise<boolean> => {
   if (typeof model === 'string') {
@@ -32,8 +33,8 @@ const findCustomModel = (
  * Resolve whether the active model can consume image parts.
  *
  * - Custom providers: trust the user-configured `vision` flag on that model.
- * - Otherwise: ask the AI SDK LanguageModel via `supportedUrls` for `image` / `image/*`
- *   (what Anthropic/OpenAI/Google chat adapters advertise). No hand-maintained model lists.
+ * - Otherwise: ask the AI SDK LanguageModel via `supportedUrls` for `image` / `image/*`.
+ * - If the SDK does not advertise images, fall back to catalogMeta.vision.
  */
 export default async (args: {
   model: LanguageModel
@@ -46,5 +47,14 @@ export default async (args: {
     return custom.vision === true
   }
 
-  return hasImageSupportedUrls(args.model)
+  if (await hasImageSupportedUrls(args.model)) {
+    return true
+  }
+
+  return (
+    getModelCatalogMeta(args.settings, {
+      providerId: args.providerId,
+      modelId: args.modelId,
+    }).vision === true
+  )
 }

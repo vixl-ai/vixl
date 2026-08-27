@@ -13,12 +13,6 @@ import {
   warmState,
 } from './state'
 
-const warmIdsForProfile = (vueNuxt: boolean): string[] =>
-  vueNuxt ? ['vue', 'typescript'] : ['typescript']
-
-const ensureExtensionForId = (id: string): string =>
-  id === 'typescript' ? 'ts' : id
-
 const desiredServersRunning = (ids: string[]): boolean =>
   ids.every((id) => Boolean(servers.value.find((entry) => entry.id === id)?.running))
 
@@ -39,17 +33,22 @@ export const warmDefaults = async (root: string, force = false): Promise<void> =
     return
   }
 
-  let vueNuxt = false
+  let ids: string[] = []
+  let extensions: string[] = []
   try {
-    vueNuxt = (await lspWorkspaceProfile(root)).vueNuxt
+    const profile = await lspWorkspaceProfile(root)
+    ids = profile.warm
+    extensions = profile.warmExtensions
   } catch (error) {
     installMessage.value =
       error instanceof Error
         ? error.message
         : 'Failed to detect workspace language servers'
   }
-
-  const ids = warmIdsForProfile(vueNuxt)
+  if (ids.length === 0 || extensions.length === 0) {
+    warmState.lastWarmedRoot = root
+    return
+  }
   if (!force && warmState.lastWarmedRoot === root && desiredServersRunning(ids)) {
     return
   }
@@ -59,9 +58,18 @@ export const warmDefaults = async (root: string, force = false): Promise<void> =
   awaitingProjectLoad.value = new Set(ids)
   scheduleAwaitingClear()
   try {
-    await Promise.all(
-      ids.map((id) => lspEnsureServer(ensureExtensionForId(id), root)),
+    const results = await Promise.allSettled(
+      extensions.map((ext) => lspEnsureServer(ext, root)),
     )
+    const firstRejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    )
+    if (firstRejected) {
+      installMessage.value =
+        firstRejected.reason instanceof Error
+          ? firstRejected.reason.message
+          : 'Failed to start language servers'
+    }
     warmState.lastWarmedRoot = root
   } catch (error) {
     installMessage.value =

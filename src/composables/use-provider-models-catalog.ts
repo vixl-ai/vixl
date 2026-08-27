@@ -1,11 +1,16 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { toast } from 'vue-sonner'
+import useVixlConfig from '@/composables/use-vixl-config'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ProviderModelGroup } from '@/types/models/provider-model-group'
 import listAllProviderModels from '@/services/providers/list-all-provider-models'
 import collapseProviderModelGroups from '@/services/models/collapse-provider-model-groups'
+import mergeCatalogMetaFromGroups from '@/services/models/merge-catalog-meta-from-groups'
+import { getModelCatalogMetaMap } from '@/services/models/model-catalog-meta'
 import { filterProviderModelGroups } from '@/services/models/search'
 import serializeModelRef from '@/utils/serialize-model-ref'
 import formatModelRefLabel from '@/utils/format-model-ref-label'
+import formatUnknownError from '@/utils/format-unknown-error'
 import { canonicalizeModelRef } from '@/services/models/resolve-model-ref-for-call'
 import parseModelRef from '@/utils/parse-model-ref'
 
@@ -64,9 +69,32 @@ const mergeExtraModels = (
 }
 
 export default (options: UseProviderModelsCatalogOptions) => {
+  const config = useVixlConfig()
   const groups = ref<ProviderModelGroup[]>([])
   const loading = ref(false)
   let loadGeneration = 0
+
+  const persistCatalogMeta = async (
+    listed: ProviderModelGroup[],
+    generation: number,
+  ): Promise<void> => {
+    const personal = config.personalSettings.value
+    const nextMeta = mergeCatalogMetaFromGroups(personal, listed)
+    const currentMeta = getModelCatalogMetaMap(personal)
+    if (
+      generation !== loadGeneration ||
+      JSON.stringify(currentMeta) === JSON.stringify(nextMeta)
+    ) {
+      return
+    }
+    try {
+      await config.updateSetting('personal', 'models.catalogMeta', nextMeta)
+    } catch (error) {
+      toast.error('Failed to save catalog metadata', {
+        description: formatUnknownError(error),
+      })
+    }
+  }
 
   const settingsFingerprint = computed(() => {
     const settings = options.settings.value
@@ -95,6 +123,7 @@ export default (options: UseProviderModelsCatalogOptions) => {
       }
       const extra = options.extraModelRefs?.value ?? []
       groups.value = collapseProviderModelGroups(mergeExtraModels(loaded, extra))
+      await persistCatalogMeta(loaded, generation)
     } finally {
       if (generation === loadGeneration) {
         loading.value = false
@@ -132,11 +161,13 @@ export default (options: UseProviderModelsCatalogOptions) => {
 
   watch(
     [settingsFingerprint, () => options.extraModelRefs?.value],
-    () => {
-      refresh().catch(() => {
+    async () => {
+      try {
+        await refresh()
+      } catch {
         groups.value = []
         loading.value = false
-      })
+      }
     },
     { immediate: true, deep: true },
   )

@@ -11,18 +11,21 @@ import type { AgentHarnessState } from './types'
 
 type SessionOpsDeps = {
   handleEvent: (event: HarnessEvent) => void
+  stop: () => Promise<void>
 }
 
 export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
   const { options, session, config, status, contextUsage } = state
 
-  const compactChat = async (focus?: string): Promise<void> => {
-    if (status.value === 'streaming' || status.value === 'submitted') {
-      toast.error('Cannot compact while agent is running', {
-        description: 'Stop the agent first, then compact.',
-      })
+  const abortParentTurnIfNeeded = async (): Promise<void> => {
+    if (status.value !== 'streaming' && status.value !== 'submitted') {
       return
     }
+    await deps.stop()
+  }
+
+  const compactChat = async (focus?: string): Promise<void> => {
+    await abortParentTurnIfNeeded()
 
     const meta = session.meta.value
     if (!meta) {
@@ -67,12 +70,7 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
   }
 
   const createHandoff = async (): Promise<void> => {
-    if (status.value === 'streaming' || status.value === 'submitted') {
-      toast.error('Cannot create handoff while agent is running', {
-        description: 'Stop the agent first.',
-      })
-      return
-    }
+    await abortParentTurnIfNeeded()
 
     const meta = session.meta.value
     if (!meta) {

@@ -247,6 +247,7 @@ declare module 'vue' {
     MicSelectorTrigger: typeof import('./components/ai-elements/mic-selector/MicSelectorTrigger.vue')['default']
     MicSelectorValue: typeof import('./components/ai-elements/mic-selector/MicSelectorValue.vue')['default']
     ModelCatalogOptionsPanel: typeof import('./components/models/options/ModelCatalogOptionsPanel.vue')['default']
+    ModelCatalogTokenField: typeof import('./components/models/options/ModelCatalogTokenField.vue')['default']
     ModelOptionsRow: typeof import('./components/models/options/ModelOptionsRow.vue')['default']
     ModelSearchInput: typeof import('./components/models/search/ModelSearchInput.vue')['default']
     ModelSearchPicker: typeof import('./components/models/search/ModelSearchPicker.vue')['default']

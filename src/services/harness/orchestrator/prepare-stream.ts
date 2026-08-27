@@ -1,4 +1,4 @@
-import type { LanguageModel, ModelMessage } from 'ai'
+import type { LanguageModel, ModelMessage, UIMessage } from 'ai'
 import type { SystemPromptParts } from '@/services/context/system-prompt-parts'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { HarnessStreamInput } from '@/types/harness/harness-stream-input'
@@ -11,6 +11,7 @@ import assembleSystemPromptParts, {
 } from '@/services/context/system-prompt-parts'
 import {
   buildPrefixSnapshot,
+  frozenPrefixMatchesMode,
   getFrozenPrefix,
   partsFromFrozenPrefix,
 } from '@/services/harness/prefix-contract'
@@ -60,6 +61,7 @@ export type PreparedHarnessStream = {
   signal: AbortSignal
   onEvent: (event: HarnessEvent) => void
   captureTurnMessages: boolean
+  messages: UIMessage[]
 }
 
 export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream> => {
@@ -113,11 +115,13 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
   })
 
   const frozenSnapshot = existingMeta ? getFrozenPrefix(existingMeta) : null
+  const reuseFrozen =
+    frozenSnapshot !== null && frozenPrefixMatchesMode(frozenSnapshot, mode)
 
   let system: string
   let parts: SystemPromptParts
 
-  if (frozenSnapshot) {
+  if (reuseFrozen && frozenSnapshot) {
     system = frozenSnapshot.systemString
     parts = partsFromFrozenPrefix(frozenSnapshot)
   } else {
@@ -139,6 +143,7 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
       toolSchemasJson: freshParts.tools,
       mcpCatalogSnapshot: freshParts.mcp,
       rulesBodies: freshParts.rules,
+      mode,
       parts: prefixParts,
     })
     updateChatMeta(projectSlug, chatId, {
@@ -273,5 +278,6 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     signal,
     onEvent,
     captureTurnMessages,
+    messages,
   }
 }

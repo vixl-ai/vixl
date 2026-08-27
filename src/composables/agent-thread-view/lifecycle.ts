@@ -4,6 +4,7 @@ import { PENDING_CHAT_MESSAGE_EVENT } from '@/services/chat/pending-message'
 import type { AgentThreadHandlers } from './handlers'
 import type { AgentThreadSessionOps } from './session'
 import type { AgentThreadViewState } from './types'
+import syncContextActions from './context-actions-sync'
 
 export const bindAgentThreadLifecycle = (
   state: AgentThreadViewState,
@@ -11,35 +12,9 @@ export const bindAgentThreadLifecycle = (
   handlers: AgentThreadHandlers,
 ): void => {
   watch(
-    [state.harnessStatus, state.threadReady, state.isSubagentView],
+    [state.threadReady, state.isSubagentView],
     () => {
-      if (state.isSubagentView.value) {
-        state.contextActions.clear()
-        return
-      }
-      state.contextActions.register({
-        onCompact: () => {
-          handlers.handleCompact().catch((error) => {
-            toast.error('Failed to compact chat', {
-              description: error instanceof Error ? error.message : 'Unknown error',
-            })
-          })
-        },
-        onHandoff: () => {
-          handlers.handleHandoff().catch((error) => {
-            toast.error('Failed to hand off chat', {
-              description: error instanceof Error ? error.message : 'Unknown error',
-            })
-          })
-        },
-      })
-      state.contextActions.setDisabled({
-        triggerDisabled: !state.threadReady.value,
-        actionsDisabled:
-          !state.threadReady.value ||
-          state.harnessStatus.value === 'streaming' ||
-          state.harnessStatus.value === 'submitted',
-      })
+      syncContextActions(state, handlers)
     },
     { immediate: true },
   )

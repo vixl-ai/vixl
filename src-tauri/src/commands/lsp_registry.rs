@@ -1,6 +1,7 @@
 mod builtins;
 mod helpers;
 mod types;
+mod warm;
 mod workspace;
 
 pub use builtins::{
@@ -12,5 +13,9 @@ pub use helpers::{
 pub use types::{
     BuiltinLspSpec, GithubReleaseSpec, GithubTargetStyle, GoInstallSpec, HttpArchiveSpec,
     LspInstallKind, LspTier, NpmInstallSpec,
+};
+pub use warm::{
+    primary_server_id_for_extension, workspace_warm_plan, workspace_warm_server_ids,
+    WorkspaceWarmPlan,
 };
 pub use workspace::workspace_is_vue_nuxt;

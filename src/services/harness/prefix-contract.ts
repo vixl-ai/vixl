@@ -1,11 +1,17 @@
 import type { SystemPromptParts } from '@/services/context/system-prompt-parts'
 import type { PrefixSnapshot } from '@/types/harness/prefix-snapshot'
+import type { VixlChatMode } from '@/types/vixl/vixl-settings'
+
+const PREFIX_MODES = ['ask', 'plan', 'studio', 'agent', 'orchestrator'] as const
+
+const LEGACY_MODE_RE = /in (ask|plan|studio|agent|orchestrator) mode/
 
 type PrefixParts = {
   systemString: string
   toolSchemasJson: string
   mcpCatalogSnapshot: string
   rulesBodies: string
+  mode?: VixlChatMode
   parts?: SystemPromptParts
 }
 
@@ -17,6 +23,9 @@ const djb2 = (str: string): string => {
   }
   return hash.toString(16).padStart(8, '0')
 }
+
+const isChatMode = (value: unknown): value is VixlChatMode =>
+  typeof value === 'string' && (PREFIX_MODES as readonly string[]).includes(value)
 
 export const hashPrefixParts = (parts: PrefixParts): string => {
   const combined = [
@@ -35,6 +44,7 @@ export const buildPrefixSnapshot = (parts: PrefixParts): PrefixSnapshot => ({
   rulesBodies: parts.rulesBodies,
   hash: hashPrefixParts(parts),
   frozenAt: new Date().toISOString(),
+  mode: parts.mode,
   parts: parts.parts,
 })
 
@@ -73,6 +83,19 @@ export const partsFromFrozenPrefix = (snap: PrefixSnapshot): SystemPromptParts =
   }
 }
 
+export const inferPrefixMode = (systemString: string): VixlChatMode | null => {
+  const match = LEGACY_MODE_RE.exec(systemString)
+  return match && isChatMode(match[1]) ? match[1] : null
+}
+
+export const frozenPrefixMatchesMode = (
+  snap: PrefixSnapshot,
+  mode: VixlChatMode,
+): boolean => {
+  const frozenMode = snap.mode ?? inferPrefixMode(snap.systemString)
+  return frozenMode === mode
+}
+
 export const getFrozenPrefix = (meta: { prefixSnapshot?: unknown }): PrefixSnapshot | null => {
   const snap = meta.prefixSnapshot
   if (
@@ -86,6 +109,7 @@ export const getFrozenPrefix = (meta: { prefixSnapshot?: unknown }): PrefixSnaps
   }
   const record = snap as Record<string, unknown>
   const parts = isSystemPromptParts(record.parts) ? record.parts : undefined
+  const mode = isChatMode(record.mode) ? record.mode : undefined
   return {
     systemString: record.systemString as string,
     toolSchemasJson:
@@ -95,6 +119,7 @@ export const getFrozenPrefix = (meta: { prefixSnapshot?: unknown }): PrefixSnaps
     rulesBodies: typeof record.rulesBodies === 'string' ? record.rulesBodies : '',
     hash: record.hash as string,
     frozenAt: record.frozenAt as string,
+    mode,
     parts,
   }
 }

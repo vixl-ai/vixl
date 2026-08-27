@@ -1,4 +1,5 @@
-import { computed, toValue, type MaybeRefOrGetter } from 'vue'
+import { computed, toValue, watch, type MaybeRefOrGetter } from 'vue'
+import { toast } from 'vue-sonner'
 import useChatStore from '@/composables/use-chat-store'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import type { ChatStatus } from '@/types/chat/chat-meta'
@@ -29,6 +30,23 @@ export default (input: PlanBuildStatusInput) => {
     }
     return chatStore.forChat(slug, id).meta.value?.status ?? 'idle'
   })
+
+  watch(
+    [buildChatId, projectSlug],
+    async ([id, slug]) => {
+      if (!id || !slug) {
+        return
+      }
+      try {
+        await chatStore.refreshChatMeta(slug, id)
+      } catch (error) {
+        toast.error('Failed to load plan build status', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        })
+      }
+    },
+    { immediate: true },
+  )
 
   return {
     buildChatId,

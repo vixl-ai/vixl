@@ -224,16 +224,12 @@ export const createLsp = (ctx: MonacoEditorContext) => {
       ctx.lspServerByPath.delete(path)
       clearLspMarkers(model)
       const message = formatMonacoError(error)
-      if (
-        extension === 'java' ||
-        extension === '.java' ||
-        message.toLowerCase().includes('jdk') ||
-        message.toLowerCase().includes('jdtls')
-      ) {
-        toast.error('Java language server failed', {
-          description: message,
-        })
+      if (message.toLowerCase().includes('no lsp server configured')) {
+        return
       }
+      toast.error('Language server failed', {
+        description: message,
+      })
     }
   }
 

@@ -24,12 +24,12 @@ describe('assemble system prompt parts', () => {
     expect(parts.base).not.toContain('- read_file:')
   })
 
-  it('includes MCP but not shell, patch, or embedded browser guidance for ask and plan', async () => {
+  it('includes MCP and shell but not patch or embedded browser guidance for ask and plan', async () => {
     for (const mode of ['ask', 'plan'] as const) {
       const parts = await assembleSystemPromptParts(input(mode))
       expect(parts.base).toContain('get_mcp_tools if stale')
+      expect(parts.base).toContain('run_terminal only')
       expect(parts.base).not.toContain('browser_lock')
-      expect(parts.base).not.toContain('run_terminal only')
       expect(parts.base).not.toContain('apply_patch is OpenCode-style')
     }
   })

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { CheckCircle2Icon, Hammer, Network } from '@lucide/vue'
 import { Markdown } from 'vue-stream-markdown'
 import 'vue-stream-markdown/index.css'
@@ -21,6 +22,7 @@ import parsePlan from '@/services/plans/parse-plan'
 import { planTodoStatusIcon, splitPlanBodySegments } from '@/utils/plans'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
 import { fsReadFile } from '@/services/vixl/vixl-tauri'
+import chatRouteFor from '@/utils/chat-route-for'
 import type { PlanTodoItem } from '@/types/plans/plan-document'
 import type { PlanPayload, WorkbenchTab } from '@/types/workbench/workbench-tab'
 
@@ -37,6 +39,7 @@ const props = defineProps<{
 
 const workbench = useWorkbenchStore()
 const config = useVixlConfig()
+const router = useRouter()
 const { building, startPlanBuild } = useStartPlanBuild()
 const body = ref('')
 const todos = ref<PlanTodoItem[]>([])
@@ -48,7 +51,7 @@ const parseError = ref<string | null>(null)
 const orchestrateOpen = ref(false)
 const buildNowOpen = ref(false)
 
-const { buildChatStatus } = usePlanBuildStatus({
+const { buildChatId, buildChatStatus } = usePlanBuildStatus({
   projectId: () => props.tab.projectId,
   lastBuildChatId,
   sourceChatId,
@@ -62,13 +65,20 @@ const hasProviders = computed(
   () => listConfiguredProviders(config.effectiveSettings.value).length > 0,
 )
 
-const actionsDisabled = computed(
+const orchestrateDisabled = computed(
   () =>
     loading.value ||
     building.value ||
     Boolean(parseError.value) ||
     !hasProviders.value ||
     buildChatStatus.value === 'running',
+)
+
+const buildDisabled = computed(
+  () =>
+    building.value ||
+    (buildChatStatus.value !== 'running' &&
+      (loading.value || Boolean(parseError.value) || !hasProviders.value)),
 )
 
 const allTodosDone = computed(
@@ -139,7 +149,26 @@ const { handleBuildNowConfirm, handleOrchestrateConfirm } = usePlanBuildActions(
   loadPlan,
 })
 
+const handleOpenBuildChat = async (): Promise<void> => {
+  const slug = workbench.getProject(props.tab.projectId)?.slug
+  const chatId = buildChatId.value
+  if (!slug || !chatId) {
+    toast.error('Could not open build chat')
+    return
+  }
+  try {
+    await router.push(chatRouteFor(slug, chatId))
+  } catch (error) {
+    toast.error('Could not open build chat', {
+      description: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
+}
+
 const handleBuildNow = (): void => {
+  if (building.value || buildChatStatus.value === 'running') {
+    return
+  }
   if (!hasProviders.value) {
     toast.error('Configure a provider before building')
     return
@@ -147,7 +176,22 @@ const handleBuildNow = (): void => {
   buildNowOpen.value = true
 }
 
+const handleBuildSlotClick = (): void => {
+  if (buildChatStatus.value === 'running') {
+    handleOpenBuildChat().catch((error) => {
+      toast.error('Could not open build chat', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      })
+    })
+    return
+  }
+  handleBuildNow()
+}
+
 const handleOpenOrchestrate = (): void => {
+  if (building.value || buildChatStatus.value === 'running') {
+    return
+  }
   if (!hasProviders.value) {
     toast.error('Configure a provider before orchestrating')
     return
@@ -176,16 +220,7 @@ watch([planPayload, projectRoot, refreshToken], () => {
   <div class="flex h-full min-h-0 flex-col overflow-y-auto">
     <div class="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
       <div class="min-w-0">
-        <div class="flex min-w-0 items-center gap-2">
-          <h2 class="truncate text-sm font-semibold">{{ title || tab.label }}</h2>
-          <span
-            v-if="buildChatStatus === 'running' && !allTodosDone"
-            class="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
-          >
-            <span class="size-2 animate-pulse rounded-full bg-primary" />
-            Building
-          </span>
-        </div>
+        <h2 class="truncate text-sm font-semibold">{{ title || tab.label }}</h2>
         <p v-if="loading" class="text-xs text-muted-foreground">Loading…</p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
@@ -197,38 +232,39 @@ watch([planPayload, projectRoot, refreshToken], () => {
           </TooltipTrigger>
           <TooltipContent class="z-60">Done</TooltipContent>
         </Tooltip>
-        <template v-else>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8"
-                :disabled="actionsDisabled"
-                aria-label="Orchestrate"
-                @click="handleOpenOrchestrate"
-              >
-                <Network class="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent class="z-60">Orchestrate</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-8 w-8"
-                :disabled="actionsDisabled"
-                aria-label="Build now"
-                @click="handleBuildNow"
-              >
-                <Hammer class="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent class="z-60">Build now</TooltipContent>
-          </Tooltip>
-        </template>
+        <Tooltip v-if="!allTodosDone">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              :disabled="orchestrateDisabled"
+              aria-label="Orchestrate"
+              @click="handleOpenOrchestrate"
+            >
+              <Network class="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent class="z-60">Orchestrate</TooltipContent>
+        </Tooltip>
+        <Tooltip v-if="!allTodosDone || buildChatStatus === 'running'">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8"
+              :disabled="buildDisabled"
+              :aria-label="buildChatStatus === 'running' ? 'Open the active build chat' : 'Build now'"
+              @click="handleBuildSlotClick"
+            >
+              <ChatRunningDots v-if="buildChatStatus === 'running'" />
+              <Hammer v-else class="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent class="z-60">
+            {{ buildChatStatus === 'running' ? 'Open the active build chat' : 'Build now' }}
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
 
@@ -276,12 +312,12 @@ watch([planPayload, projectRoot, refreshToken], () => {
 
     <WorkbenchPlansOrchestratePlanDialog
       v-model:open="orchestrateOpen"
-      :disabled="building"
+      :disabled="building || buildChatStatus === 'running'"
       @confirm="handleOrchestrateConfirm"
     />
     <BuildPlanDialog
       v-model:open="buildNowOpen"
-      :disabled="building"
+      :disabled="building || buildChatStatus === 'running'"
       @confirm="handleBuildNowConfirm"
     />
   </div>

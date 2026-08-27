@@ -27,7 +27,7 @@ use tokio::time::{sleep, Duration};
 use super::config::{load_lsp_config, workspace_is_trusted};
 use super::fs::resolve_workspace_path;
 use super::lsp_install::{install_source_label, remove_managed_install};
-use super::lsp_registry::{builtin_specs, workspace_is_vue_nuxt};
+use super::lsp_registry::{builtin_specs, workspace_is_vue_nuxt, workspace_warm_plan};
 
 use documents::{
     close_document, ensure_document_open, sync_document_change, sync_document_change_with_content,
@@ -390,8 +390,12 @@ pub async fn lsp_stop_server(server_id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn lsp_workspace_profile(project_root: String) -> Result<LspWorkspaceProfile, String> {
+    let root = std::path::Path::new(&project_root);
+    let plan = workspace_warm_plan(root);
     Ok(LspWorkspaceProfile {
-        vue_nuxt: workspace_is_vue_nuxt(std::path::Path::new(&project_root)),
+        vue_nuxt: workspace_is_vue_nuxt(root),
+        warm: plan.server_ids,
+        warm_extensions: plan.extensions,
     })
 }
 

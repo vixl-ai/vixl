@@ -8,6 +8,12 @@ const forChat = vi.hoisted(
       (projectSlug: string, chatId: string) => { meta: ComputedRef<ChatMeta | null> }
     >(),
 )
+const refreshChatMeta = vi.hoisted(
+  () =>
+    vi.fn<(projectSlug: string, chatId: string) => Promise<void>>(
+      async () => undefined,
+    ),
+)
 const getProject = vi.hoisted(
   () =>
     vi.fn<(projectId: string) => { slug: string } | null>(),
@@ -19,6 +25,8 @@ const project = ref<{ slug: string } | null>({ slug: 'proj' })
 vi.mock('@/composables/use-chat-store', () => ({
   default: () => ({
     forChat: (projectSlug: string, chatId: string) => forChat(projectSlug, chatId),
+    refreshChatMeta: (projectSlug: string, chatId: string) =>
+      refreshChatMeta(projectSlug, chatId),
   }),
 }))
 
@@ -33,6 +41,8 @@ describe('use-plan-build-status', () => {
     sessionStatus.value = 'idle'
     project.value = { slug: 'proj' }
     forChat.mockReset()
+    refreshChatMeta.mockReset()
+    refreshChatMeta.mockResolvedValue(undefined)
     getProject.mockReset()
     getProject.mockImplementation(() => project.value)
     forChat.mockImplementation((_slug, _chatId) => ({
@@ -89,5 +99,46 @@ describe('use-plan-build-status', () => {
     sourceChatId.value = null
     expect(buildChatStatus.value).toBe('idle')
     expect(forChat).not.toHaveBeenCalled()
+  })
+
+  it('hydrates chat meta for lastBuildChatId and again when the id changes', async () => {
+    const { default: usePlanBuildStatus } = await import(
+      '@/composables/use-plan-build-status'
+    )
+    const lastBuildChatId = ref<string | null>('build-chat')
+    const sourceChatId = ref<string | null>('source-chat')
+    usePlanBuildStatus({
+      projectId: 'proj-1',
+      lastBuildChatId,
+      sourceChatId,
+    })
+
+    await vi.waitFor(() => {
+      expect(refreshChatMeta).toHaveBeenCalledWith('proj', 'build-chat')
+    })
+    expect(refreshChatMeta).toHaveBeenCalledTimes(1)
+
+    lastBuildChatId.value = 'other-build'
+    await vi.waitFor(() => {
+      expect(refreshChatMeta).toHaveBeenCalledWith('proj', 'other-build')
+    })
+    expect(refreshChatMeta).toHaveBeenCalledTimes(2)
+  })
+
+  it('hydrates sourceChatId when lastBuildChatId is missing', async () => {
+    const { default: usePlanBuildStatus } = await import(
+      '@/composables/use-plan-build-status'
+    )
+    const lastBuildChatId = ref<string | null>(null)
+    const sourceChatId = ref<string | null>('source-chat')
+    usePlanBuildStatus({
+      projectId: 'proj-1',
+      lastBuildChatId,
+      sourceChatId,
+    })
+
+    await vi.waitFor(() => {
+      expect(refreshChatMeta).toHaveBeenCalledWith('proj', 'source-chat')
+    })
   })
 })

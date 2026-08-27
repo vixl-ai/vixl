@@ -78,9 +78,9 @@ export default (input: RecordBillableUsageInput): BillableUsageRecord => {
       customModel: input.customModel,
     })
     if (resolved) {
-      rates = resolved
-      costUSD = computeCostFromRates(usage, resolved)
-      pricingSource = 'user_configured'
+      rates = resolved.rates
+      costUSD = computeCostFromRates(usage, resolved.rates)
+      pricingSource = resolved.source
     }
   }
 

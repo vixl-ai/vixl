@@ -9,6 +9,7 @@ import {
   formatCustomProviderSchemaError,
 } from '@/schemas/providers/custom-provider'
 import { reasoningLevelSchema } from '@/schemas/models/reasoning-level'
+import { modelCatalogMetaMapSchema } from '@/schemas/models/model-catalog-meta'
 import { modelCatalogOptionsMapSchema } from '@/schemas/models/model-catalog-option'
 
 export { customProviderSchema, customProviderModelSchema } from '@/schemas/providers/custom-provider'
@@ -78,12 +79,14 @@ export const vixlSettingsSchema = z
     'models.titleReasoning': reasoningSettingSchema.optional(),
     'models.compactionReasoning': reasoningSettingSchema.optional(),
     'models.catalogOptions': modelCatalogOptionsMapSchema.optional(),
+    'models.catalogMeta': modelCatalogMetaMapSchema.optional(),
   })
   .catchall(
     z.union([
       z.string(),
       customProviderSchema,
       modelCatalogOptionsMapSchema,
+      modelCatalogMetaMapSchema,
       z.number(),
       z.boolean(),
       z.array(z.unknown()),

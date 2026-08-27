@@ -3,6 +3,20 @@ import type { ModelRef } from '@/types/models/model-ref'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import resolveReasoningCapability from '@/services/models/resolve-reasoning-capability'
 import resolveSupportsFast from '@/services/models/resolve-fast-capability'
+import { getModelCatalogMeta } from '@/services/models/model-catalog-meta'
+
+const clampToReported = (
+  override: number | undefined,
+  reported: number | undefined,
+): number | undefined => {
+  if (typeof override !== 'number' || !Number.isFinite(override)) {
+    return undefined
+  }
+  if (typeof reported === 'number' && reported > 0) {
+    return Math.min(Math.max(1, override), reported)
+  }
+  return override
+}
 
 /**
  * Return a catalog option clamped to what the model actually supports.
@@ -29,6 +43,20 @@ export const clampModelCatalogOption = (
 
   if (next.fast === true && !resolveSupportsFast(ref)) {
     delete next.fast
+  }
+
+  const meta = getModelCatalogMeta(settings, ref)
+  const contextWindow = clampToReported(next.contextWindow, meta.contextWindow)
+  if (contextWindow === undefined) {
+    delete next.contextWindow
+  } else {
+    next.contextWindow = contextWindow
+  }
+  const maxOutputTokens = clampToReported(next.maxOutputTokens, meta.maxOutputTokens)
+  if (maxOutputTokens === undefined) {
+    delete next.maxOutputTokens
+  } else {
+    next.maxOutputTokens = maxOutputTokens
   }
 
   return next

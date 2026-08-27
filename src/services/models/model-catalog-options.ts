@@ -7,6 +7,19 @@ import serializeModelRef from '@/utils/serialize-model-ref'
 import type { ModelRef } from '@/types/models/model-ref'
 import clampModelCatalogOption from '@/services/models/clamp-model-catalog-option'
 
+const omitNonPositiveInt = (
+  next: ModelCatalogOption,
+  field: 'contextWindow' | 'maxOutputTokens',
+): void => {
+  const value = next[field]
+  if (value === undefined) {
+    return
+  }
+  if (!Number.isInteger(value) || value <= 0) {
+    delete next[field]
+  }
+}
+
 export const getModelCatalogOptionsMap = (
   settings: VixlSettings,
 ): ModelCatalogOptionsMap => {
@@ -75,6 +88,8 @@ export const mergeModelCatalogOption = (
   if (next.fast === false) {
     delete next.fast
   }
+  omitNonPositiveInt(next, 'contextWindow')
+  omitNonPositiveInt(next, 'maxOutputTokens')
 
   const map = { ...current }
   if (Object.keys(next).length === 0) {

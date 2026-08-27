@@ -237,6 +237,10 @@ export default (
       }
       attention.refreshSidebar()
     }
+    if (event.type === 'compaction') {
+      session.appendLocalCompaction(event.summary, event.focus)
+      contextUsage.clearLastStepUsage()
+    }
     if (event.type === 'turn-aborted') {
       status.value = 'ready'
       session.clearPendingQuestion()

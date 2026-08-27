@@ -12,6 +12,9 @@ import {
 } from '@/services/models/resolve-reasoning-for-call'
 import resolveSupportsFast from '@/services/models/resolve-fast-capability'
 import applyAnthropicPromptCache from '@/services/models/apply-anthropic-prompt-cache'
+import { getClampedModelCatalogOption } from '@/services/models/model-catalog-options'
+import { getModelCatalogMeta } from '@/services/models/model-catalog-meta'
+import lookupTokenlensContext from '@/services/models/lookup-tokenlens-context'
 
 type JsonPrimitive = string | number | boolean | null
 type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
@@ -37,6 +40,7 @@ export type ResolvedModelContextLimits = {
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192
 const DEFAULT_SIDE_TASK_MAX_OUTPUT_TOKENS = 256
+const FALLBACK_CONTEXT_WINDOW = 128_000
 
 const applyFastOption = (
   options: ResolvedModelCallOptions,
@@ -85,19 +89,56 @@ export const getCustomProviderModel = (
 export const resolveContextWindow = (
   settings: VixlSettings,
   ref: ModelRef,
-): number | undefined => {
+): number => {
+  const option = getClampedModelCatalogOption(settings, ref)
+  if (typeof option.contextWindow === 'number' && option.contextWindow > 0) {
+    return option.contextWindow
+  }
+
   const matched = getCustomProviderModel(settings, ref)
-  if (!matched) {
-    return undefined
+  if (matched) {
+    const { model } = matched
+    if (typeof model.contextWindow === 'number' && model.contextWindow > 0) {
+      return model.contextWindow
+    }
+    if (typeof model.maxInputTokens === 'number' && model.maxInputTokens > 0) {
+      return model.maxInputTokens
+    }
   }
-  const { model } = matched
-  if (typeof model.contextWindow === 'number' && model.contextWindow > 0) {
-    return model.contextWindow
+
+  const meta = getModelCatalogMeta(settings, ref)
+  if (typeof meta.contextWindow === 'number' && meta.contextWindow > 0) {
+    return meta.contextWindow
   }
-  if (typeof model.maxInputTokens === 'number' && model.maxInputTokens > 0) {
-    return model.maxInputTokens
+
+  return lookupTokenlensContext(ref.modelId) ?? FALLBACK_CONTEXT_WINDOW
+}
+
+const resolveMaxOutputTokens = (
+  settings: VixlSettings,
+  ref: ModelRef,
+  fallback: number,
+): number => {
+  const option = getClampedModelCatalogOption(settings, ref)
+  if (typeof option.maxOutputTokens === 'number' && option.maxOutputTokens > 0) {
+    return option.maxOutputTokens
   }
-  return undefined
+
+  const meta = getModelCatalogMeta(settings, ref)
+  if (typeof meta.maxOutputTokens === 'number' && meta.maxOutputTokens > 0) {
+    return meta.maxOutputTokens
+  }
+
+  const matched = getCustomProviderModel(settings, ref)
+  if (
+    matched &&
+    typeof matched.model.maxOutputTokens === 'number' &&
+    matched.model.maxOutputTokens > 0
+  ) {
+    return matched.model.maxOutputTokens
+  }
+
+  return fallback
 }
 
 export const resolveMaxInputTokens = (
@@ -126,12 +167,13 @@ export const resolveModelCallOptions = (
   defaults?: { maxOutputTokens?: number; reasoning?: ReasoningLevel },
 ): ResolvedModelCallOptions => {
   const fallbackMaxOutput = defaults?.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS
+  const maxOutputTokens = resolveMaxOutputTokens(settings, ref, fallbackMaxOutput)
   const matched = getCustomProviderModel(settings, ref)
   const reasoningMapping = mapReasoningToCallOptions(settings, ref, defaults?.reasoning)
 
   if (!matched) {
     const options: ResolvedModelCallOptions = {
-      maxOutputTokens: fallbackMaxOutput,
+      maxOutputTokens,
     }
     if (reasoningMapping.reasoning) {
       options.reasoning = reasoningMapping.reasoning
@@ -157,7 +199,7 @@ export const resolveModelCallOptions = (
 
   const { model } = matched
   const options: ResolvedModelCallOptions = {
-    maxOutputTokens: model.maxOutputTokens ?? fallbackMaxOutput,
+    maxOutputTokens,
   }
 
   if (typeof model.temperature === 'number') {
@@ -226,4 +268,8 @@ export const resolveSideTaskCallOptions = (
     reasoning: 'none',
   })
 
-export { DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_SIDE_TASK_MAX_OUTPUT_TOKENS }
+export {
+  DEFAULT_MAX_OUTPUT_TOKENS,
+  DEFAULT_SIDE_TASK_MAX_OUTPUT_TOKENS,
+  FALLBACK_CONTEXT_WINDOW,
+}

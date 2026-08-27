@@ -18,6 +18,7 @@ import buildSubagentTimeline from '@/utils/build-subagent-timeline'
 import { createHandlers } from './handlers'
 import { bindAgentThreadLifecycle } from './lifecycle'
 import { createSessionOps } from './session'
+import resolveHarnessStatus from './harness-status'
 import type { AgentThreadViewState, PendingFilePolicyAction } from './types'
 
 export default () => {
@@ -73,16 +74,17 @@ export default () => {
   const harnessStatus = computed((): ChatStatus => {
     if (isSubagentView.value) {
       const subagent = paintedSession.value?.getSubagent(subagentId.value) ?? null
-      return subagent?.status === 'running' ? 'streaming' : 'ready'
+      return resolveHarnessStatus({
+        isSubagentView: true,
+        subagentRunning: subagent?.status === 'running',
+        parentStatus: 'ready',
+      })
     }
-    const status = unref(harness.value?.status) ?? 'ready'
-    if (status === 'streaming' || status === 'submitted') {
-      return status
-    }
-    const hasRunningSubagent = (paintedSession.value?.timeline.value ?? []).some(
-      (item) => item.type === 'subagent' && item.status === 'running',
-    )
-    return hasRunningSubagent ? 'streaming' : status
+    return resolveHarnessStatus({
+      isSubagentView: false,
+      subagentRunning: false,
+      parentStatus: unref(harness.value?.status) ?? 'ready',
+    })
   })
   const harnessPendingApprovals = computed(
     () => unref(harness.value?.pendingApprovals) ?? [],

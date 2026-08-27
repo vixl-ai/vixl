@@ -1,5 +1,4 @@
 import type { UIMessage } from 'ai'
-import { getContext } from 'tokenlens'
 import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { ContextBudget } from '@/types/harness/context-budget'
@@ -25,7 +24,9 @@ import {
   resolveContextWindow,
   resolveModelCallOptions,
   DEFAULT_MAX_OUTPUT_TOKENS,
+  FALLBACK_CONTEXT_WINDOW,
 } from '@/services/models/resolve-model-call-options'
+import lookupTokenlensContext from '@/services/models/lookup-tokenlens-context'
 
 export type CountContextBudgetInput = {
   modelId: string
@@ -44,28 +45,15 @@ export type CountContextBudgetInput = {
   activeContext?: ActiveContextSlice | null
 }
 
-const DEFAULT_CONTEXT_LIMIT = 128_000
-
 const resolveContextLimit = (
   modelId: string,
   providerId?: string,
   settings?: VixlSettings,
 ): number => {
   if (providerId && settings) {
-    const override = resolveContextWindow(settings, { providerId, modelId })
-    if (typeof override === 'number' && override > 0) {
-      return override
-    }
+    return resolveContextWindow(settings, { providerId, modelId })
   }
-  if (!modelId) {
-    return DEFAULT_CONTEXT_LIMIT
-  }
-  try {
-    const context = getContext({ modelId })
-    return context.maxInput ?? context.maxTotal ?? DEFAULT_CONTEXT_LIMIT
-  } catch {
-    return DEFAULT_CONTEXT_LIMIT
-  }
+  return lookupTokenlensContext(modelId) ?? FALLBACK_CONTEXT_WINDOW
 }
 
 const resolveReservedOutput = (

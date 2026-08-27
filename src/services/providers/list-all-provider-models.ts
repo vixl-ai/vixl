@@ -13,7 +13,7 @@ import {
   listProviderModels,
   type ParsedModelRow,
 } from '@/services/providers/list-provider-models'
-import type { ReasoningLevel } from '@/types/models/reasoning-level'
+import { mergeParsedModelRows } from '@/services/providers/list-models'
 
 const getApiKeyRef = (
   settings: VixlSettings,
@@ -43,54 +43,6 @@ const configuredModelIds = (custom: VixlCustomProvider | undefined): string[] =>
 
 const catalogRows = (providerId: string): ParsedModelRow[] =>
   (getProviderCatalogEntry(providerId)?.models ?? []).map((id) => ({ id }))
-
-const unionReasoningLevels = (
-  left?: ReasoningLevel[],
-  right?: ReasoningLevel[],
-): ReasoningLevel[] | undefined => {
-  if (!left?.length && !right?.length) {
-    return undefined
-  }
-  if (!left?.length) {
-    return right
-  }
-  if (!right?.length) {
-    return left
-  }
-  const seen = new Set<ReasoningLevel>()
-  const next: ReasoningLevel[] = []
-  for (const level of [...left, ...right]) {
-    if (seen.has(level)) {
-      continue
-    }
-    seen.add(level)
-    next.push(level)
-  }
-  return next
-}
-
-const mergeParsedModelRows = (
-  left: ParsedModelRow,
-  right: ParsedModelRow,
-): ParsedModelRow => {
-  const supportsReasoningEffort = unionReasoningLevels(
-    left.supportsReasoningEffort,
-    right.supportsReasoningEffort,
-  )
-  const reasoningMandatory =
-    left.reasoningMandatory === true || right.reasoningMandatory === true
-      ? true
-      : undefined
-  const supportsFast =
-    left.supportsFast === true || right.supportsFast === true ? true : undefined
-
-  return {
-    id: left.id,
-    ...(supportsReasoningEffort ? { supportsReasoningEffort } : {}),
-    ...(reasoningMandatory ? { reasoningMandatory } : {}),
-    ...(supportsFast ? { supportsFast } : {}),
-  }
-}
 
 const mergeModelRows = (
   configured: string[],
@@ -156,6 +108,13 @@ const toModelRefs = (
         ? { reasoningMandatory: row.reasoningMandatory }
         : {}),
       ...(row.supportsFast ? { supportsFast: true } : {}),
+      ...(row.contextWindow !== undefined ? { contextWindow: row.contextWindow } : {}),
+      ...(row.maxOutputTokens !== undefined
+        ? { maxOutputTokens: row.maxOutputTokens }
+        : {}),
+      ...(row.pricing ? { pricing: row.pricing } : {}),
+      ...(row.vision ? { vision: true } : {}),
+      ...(row.toolCalling ? { toolCalling: true } : {}),
     }
   })
 

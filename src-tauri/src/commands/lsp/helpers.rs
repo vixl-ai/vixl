@@ -22,6 +22,8 @@ pub struct LspServerStatus {
 #[serde(rename_all = "camelCase")]
 pub struct LspWorkspaceProfile {
     pub vue_nuxt: bool,
+    pub warm: Vec<String>,
+    pub warm_extensions: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
