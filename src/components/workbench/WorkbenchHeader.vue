@@ -93,7 +93,7 @@ const handleDragEnd = (): void => {
 
 <template>
   <div
-    class="absolute inset-x-0 top-0 z-[51] flex h-(--titlebar-height) items-center gap-0.5 bg-sidebar pointer-events-none"
+    class="absolute inset-x-0 top-0 z-10 flex h-(--titlebar-height) items-center gap-0.5 bg-sidebar pointer-events-none"
     style="--titlebar-height: 40px"
   >
     <div class="pointer-events-auto shrink-0 pl-1">

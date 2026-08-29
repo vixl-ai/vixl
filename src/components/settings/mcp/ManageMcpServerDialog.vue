@@ -9,6 +9,11 @@ import {
   DialogContent,
   DialogFooter,
 } from '@/components/shadcn/ui/dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import SettingsInputPasswordInput from '@/components/settings/input/PasswordInput.vue'
 import type {
   McpConfig,
@@ -103,21 +108,22 @@ const {
 
           <div class="space-y-2">
             <div class="flex items-center justify-between gap-2">
-              <div>
-                <Label>Secrets (env)</Label>
-                <p class="text-xs text-muted-foreground">
-                  Name the env var and enter its value once. Vixl wires it for the process.
-                </p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                @click="addEnvRow"
-              >
-                <Plus class="h-4 w-4" />
-                Add
-              </Button>
+              <Label>Secrets (env)</Label>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8"
+                    aria-label="Add env var"
+                    @click="addEnvRow"
+                  >
+                    <Plus class="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Add env var</TooltipContent>
+              </Tooltip>
             </div>
             <div
               v-for="(row, index) in envRows"
@@ -174,15 +180,21 @@ const {
                   Header name and value. Enter the secret once; it is stored in the keychain.
                 </p>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                @click="addHeaderRow"
-              >
-                <Plus class="h-4 w-4" />
-                Add
-              </Button>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8"
+                    aria-label="Add header"
+                    @click="addHeaderRow"
+                  >
+                    <Plus class="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Add header</TooltipContent>
+              </Tooltip>
             </div>
             <div
               v-for="(row, index) in headerRows"

@@ -126,7 +126,32 @@ describe('resolveModelCallOptions maxOutputTokens precedence', () => {
     expect(resolveModelCallOptions(settings, ref).maxOutputTokens).toBe(8_192)
   })
 
-  it('uses catalogMeta.maxOutputTokens before custom', () => {
+  it('does not request advertised catalogMeta max output', () => {
+    const settings = {
+      version: 1,
+      'models.catalogOptions': {
+        'openai::gpt-4o': { contextWindow: 256_000 },
+      },
+      'models.catalogMeta': {
+        'openai::gpt-4o': { contextWindow: 1_048_576, maxOutputTokens: 131_072 },
+      },
+    } as VixlSettings
+    expect(resolveModelCallOptions(settings, ref).maxOutputTokens).toBe(
+      DEFAULT_MAX_OUTPUT_TOKENS,
+    )
+  })
+
+  it('clamps default max output to catalogMeta when reported is smaller', () => {
+    const settings = {
+      version: 1,
+      'models.catalogMeta': {
+        'openai::gpt-4o': { maxOutputTokens: 4_096 },
+      },
+    } as VixlSettings
+    expect(resolveModelCallOptions(settings, ref).maxOutputTokens).toBe(4_096)
+  })
+
+  it('uses custom maxOutputTokens before advertised catalogMeta', () => {
     const settings = {
       ...customKat({ maxOutputTokens: 2_048 }),
       'models.catalogMeta': {
@@ -136,7 +161,7 @@ describe('resolveModelCallOptions maxOutputTokens precedence', () => {
     expect(
       resolveModelCallOptions(settings, { providerId: 'kat', modelId: 'kat-coder' })
         .maxOutputTokens,
-    ).toBe(16_384)
+    ).toBe(2_048)
   })
 
   it('uses custom maxOutputTokens before default', () => {

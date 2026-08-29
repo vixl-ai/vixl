@@ -102,6 +102,35 @@ describe('countContextBudget', () => {
     expect(budget.reservedOutput).toBe(4_000)
   })
 
+  it('does not reserve advertised max output against a smaller selected window', async () => {
+    const budget = await countContextBudget({
+      modelId: 'zai/glm-5.3-flash',
+      providerId: 'gateway',
+      settings: {
+        version: 1,
+        'models.catalogOptions': {
+          'gateway::zai/glm-5.3-flash': { contextWindow: 256_000 },
+        },
+        'models.catalogMeta': {
+          'gateway::zai/glm-5.3-flash': {
+            contextWindow: 1_048_576,
+            maxOutputTokens: 131_072,
+          },
+        },
+      } as VixlSettings,
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [message('1', '2026-01-01T00:00:00.000Z', 'hi')],
+    })
+    expect(budget.limit).toBe(256_000)
+    expect(budget.reservedOutput).toBe(8_192)
+    expect(budget.limit - budget.reservedOutput - budget.safetyBuffer).toBe(
+      256_000 - 8_192 - 2_000,
+    )
+  })
+
   it('counts tool results from timeline in the conversation bucket', async () => {
     const toolPayload = 'z'.repeat(8000)
     const timeline: ChatTimelineItem[] = [

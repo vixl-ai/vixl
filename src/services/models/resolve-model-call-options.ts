@@ -114,19 +114,26 @@ export const resolveContextWindow = (
   return lookupTokenlensContext(ref.modelId) ?? FALLBACK_CONTEXT_WINDOW
 }
 
+const clampToReportedMax = (
+  value: number,
+  reported: number | undefined,
+): number => {
+  if (typeof reported === 'number' && reported > 0) {
+    return Math.min(Math.max(1, value), reported)
+  }
+  return value
+}
+
 const resolveMaxOutputTokens = (
   settings: VixlSettings,
   ref: ModelRef,
   fallback: number,
 ): number => {
+  const meta = getModelCatalogMeta(settings, ref)
+  const reported = meta.maxOutputTokens
   const option = getClampedModelCatalogOption(settings, ref)
   if (typeof option.maxOutputTokens === 'number' && option.maxOutputTokens > 0) {
     return option.maxOutputTokens
-  }
-
-  const meta = getModelCatalogMeta(settings, ref)
-  if (typeof meta.maxOutputTokens === 'number' && meta.maxOutputTokens > 0) {
-    return meta.maxOutputTokens
   }
 
   const matched = getCustomProviderModel(settings, ref)
@@ -135,10 +142,13 @@ const resolveMaxOutputTokens = (
     typeof matched.model.maxOutputTokens === 'number' &&
     matched.model.maxOutputTokens > 0
   ) {
-    return matched.model.maxOutputTokens
+    return clampToReportedMax(matched.model.maxOutputTokens, reported)
   }
 
-  return fallback
+  // Advertised max output is a ceiling, not the tokens to request or reserve.
+  // GLM 5.3 Flash lists 131k max output on a 1M window; using that as the
+  // call size would carve ~123k usable out of a 256k selection.
+  return clampToReportedMax(fallback, reported)
 }
 
 export const resolveMaxInputTokens = (

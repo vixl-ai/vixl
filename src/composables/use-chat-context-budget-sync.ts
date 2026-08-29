@@ -171,6 +171,8 @@ export default () => {
         () => chatStore.meta.value?.activeContext?.includeFromCreatedAt,
         () => chatStore.meta.value?.activeContext?.summary,
         () => mcpStatusKey(mcp.serverStates.value),
+        () => config.effectiveSettings.value['models.catalogOptions'],
+        () => config.effectiveSettings.value['models.catalogMeta'],
       ],
       () => {
         const timer = window.setTimeout(() => {
