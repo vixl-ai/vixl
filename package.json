@@ -27,7 +27,6 @@
     "audit:rust": "cargo audit --file src-tauri/Cargo.lock",
     "ci": "run-s lint type-check test:coverage audit:deps build",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
     "docs:dev": "vuepress dev docs",
     "docs:build": "vuepress build docs"
   },

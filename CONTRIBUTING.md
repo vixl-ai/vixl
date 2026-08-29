@@ -41,7 +41,7 @@ npm ci
 npm run dev
 
 # Tauri desktop shell
-npm run tauri:dev
+npm run tauri -- dev
 ```
 
 ### Quality checks
