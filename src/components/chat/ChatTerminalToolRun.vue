@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { CheckIcon, ChevronRightIcon, ExternalLinkIcon, ShieldIcon, ShieldOffIcon, TerminalIcon, XIcon } from '@lucide/vue'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
@@ -82,16 +82,6 @@ const phaseStatus = (
     iconClass: terminalPhaseStatusColorClass(kind),
   }
 }
-
-watch(
-  [isRunning],
-  ([running]) => {
-    if (running) {
-      open.value = true
-    }
-  },
-  { immediate: true },
-)
 
 const handleShowTerminal = (): void => {
   const shellId = view.value?.shellId
