@@ -4,7 +4,7 @@ import {
   lspEnsureServer,
   lspWorkspaceProfile,
 } from '@/services/vixl/vixl-tauri'
-import { scheduleAwaitingClear } from './helpers'
+import { pruneAwaitingFromRunning, scheduleAwaitingClear } from './helpers'
 import {
   awaitingProjectLoad,
   installMessage,
@@ -22,6 +22,7 @@ export const refreshCatalog = async (): Promise<void> => {
   }
   try {
     servers.value = await lspCatalog()
+    pruneAwaitingFromRunning()
   } catch (error) {
     installMessage.value =
       error instanceof Error ? error.message : 'Failed to load language servers'
@@ -29,7 +30,7 @@ export const refreshCatalog = async (): Promise<void> => {
 }
 
 export const warmDefaults = async (root: string, force = false): Promise<void> => {
-  if (!isTauri() || warming.value) {
+  if (!isTauri() || (warming.value && !force)) {
     return
   }
 

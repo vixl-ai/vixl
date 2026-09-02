@@ -1,10 +1,13 @@
 mod documents;
+mod ensure_running;
 mod helpers;
 mod resolve;
 mod rpc;
+mod start;
 mod typescript;
 mod vue_tsserver;
 
+pub use ensure_running::start_lock_for;
 pub use helpers::{
     apply_server_disabled_flag, normalize_lsp_params, server_display_label, LspCatalogEntry,
     LspServerStatus, LspWorkspaceProfile,
@@ -32,14 +35,15 @@ use super::lsp_registry::{builtin_specs, workspace_is_vue_nuxt, workspace_warm_p
 use documents::{
     close_document, ensure_document_open, sync_document_change, sync_document_change_with_content,
 };
+use ensure_running::ensure_running_server;
 use helpers::{
     install_kind_label, is_managed_install_kind, lsp_method_is_notification, normalize_lsp_method,
     path_to_uri, LspDiagnosticsEvent,
 };
 use resolve::{load_effective_servers, server_binary_available};
 use rpc::{
-    ensure_running_server, json_rpc_request, read_lsp_message, respond_to_server_request,
-    send_notification, set_state, LspProcess, LSP_SERVERS, LSP_STATES,
+    json_rpc_request, read_lsp_message, respond_to_server_request, send_notification, set_state,
+    LspProcess, LSP_SERVERS, LSP_STATES,
 };
 use typescript::{vue_in_play_for, workspace_configuration_response};
 use vue_tsserver::{forward_vue_tsserver_request, mirror_vue_document_to_typescript};

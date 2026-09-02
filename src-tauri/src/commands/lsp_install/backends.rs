@@ -15,6 +15,21 @@ use super::node::{download_bytes, ensure_portable_node};
 use super::paths::managed_server_dir;
 use super::progress::emit_progress;
 use super::resolve::{github_target_token, resolve_github_asset, resolve_http_archive_url};
+use super::timeout::{with_timeout, INSTALL_TIMEOUT};
+
+async fn timed_output(command: &mut TokioCommand) -> Result<std::process::Output, String> {
+    command.kill_on_drop(true);
+    let timeout_message = format!(
+        "Language server install timed out after {}s",
+        INSTALL_TIMEOUT.as_secs()
+    );
+    with_timeout(
+        INSTALL_TIMEOUT,
+        async { command.output().await.map_err(|e| e.to_string()) },
+        &timeout_message,
+    )
+    .await
+}
 
 pub(crate) async fn npm_install_packages(
     app: &AppHandle,
@@ -51,47 +66,31 @@ pub(crate) async fn npm_install_packages(
         Some(format!("Installing {}", spec.id)),
     );
 
+    let npm_args = [
+        vec![
+            "install".to_string(),
+            "--prefix".to_string(),
+            dir.to_string_lossy().to_string(),
+            "--no-fund".to_string(),
+            "--no-audit".to_string(),
+        ],
+        npm.packages.iter().map(|p| (*p).to_string()).collect(),
+    ]
+    .concat();
+
     // Prefer `node /path/to/npm` style via corepack/npm from PATH, else node -e with npx-like install
     let output = if let Some(npm_bin) = npm_cli {
-        TokioCommand::new(npm_bin)
-            .args(
-                [
-                    vec![
-                        "install".to_string(),
-                        "--prefix".to_string(),
-                        dir.to_string_lossy().to_string(),
-                        "--no-fund".to_string(),
-                        "--no-audit".to_string(),
-                    ],
-                    npm.packages.iter().map(|p| (*p).to_string()).collect(),
-                ]
-                .concat(),
-            )
+        let mut cmd = TokioCommand::new(npm_bin);
+        cmd.args(&npm_args)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await
-            .map_err(|e| e.to_string())?
+            .stderr(Stdio::piped());
+        timed_output(&mut cmd).await?
     } else if let Ok(system_npm) = which::which("npm") {
-        TokioCommand::new(system_npm)
-            .args(
-                [
-                    vec![
-                        "install".to_string(),
-                        "--prefix".to_string(),
-                        dir.to_string_lossy().to_string(),
-                        "--no-fund".to_string(),
-                        "--no-audit".to_string(),
-                    ],
-                    npm.packages.iter().map(|p| (*p).to_string()).collect(),
-                ]
-                .concat(),
-            )
+        let mut cmd = TokioCommand::new(system_npm);
+        cmd.args(&npm_args)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await
-            .map_err(|e| e.to_string())?
+            .stderr(Stdio::piped());
+        timed_output(&mut cmd).await?
     } else {
         // Bootstrap: download packages using node + built-in fetch via a tiny install script is heavy.
         // Fall back: require npm on PATH for first install after portable node without npm.
@@ -300,14 +299,13 @@ pub(crate) async fn go_install_package(
         Some(format!("Running go install for {}", spec.id)),
     );
 
-    let output = TokioCommand::new(go_bin)
+    let mut go_cmd = TokioCommand::new(go_bin);
+    go_cmd
         .args(["install", go_spec.package])
         .env("GOBIN", &dir)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
+        .stderr(Stdio::piped());
+    let output = timed_output(&mut go_cmd).await?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

@@ -5,10 +5,9 @@ use tokio::sync::Mutex;
 
 use super::super::fs::resolve_workspace_path;
 use super::documents::{close_document, ensure_document_open, sync_document_change_with_content};
+use super::ensure_running::ensure_running_server;
 use super::helpers::path_to_uri;
-use super::rpc::{
-    ensure_running_server, json_rpc_request, send_notification, LspProcess, LSP_SERVERS,
-};
+use super::rpc::{json_rpc_request, send_notification, LspProcess, LSP_SERVERS};
 use super::stop_server_internal;
 
 pub fn tsserver_request_body(result: serde_json::Value) -> serde_json::Value {

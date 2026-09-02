@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import { isTauri } from '@/services/vixl/vixl-tauri'
 import { parseLspDiagnostics } from '@/utils/monaco-lsp'
 import { refreshCatalog, warmDefaults } from './catalog'
+import { applyReadyInstallState } from './helpers'
 import {
   awaitingProjectLoad,
   diagnosticsByUri,
@@ -35,59 +36,58 @@ export const bindListeners = async (
   try {
     listenerState.unlistenInstall = await listen<LspInstallProgress>(
       'lsp://install',
-      (event) => {
+      async (event) => {
         const { serverId, state, message } = event.payload
-        installMessage.value = message ?? `${serverId}: ${state}`
+        try {
+          installMessage.value = message ?? `${serverId}: ${state}`
 
-        if (state === 'installing' && serverId === '*') {
-          prefetchBusy.value = true
-        }
+          if (state === 'installing' && serverId === '*') {
+            prefetchBusy.value = true
+          }
 
-        if (state === 'installing' && serverId !== '*') {
-          servers.value = servers.value.map((entry) =>
-            entry.id === serverId
-              ? { ...entry, installState: 'installing', error: null }
-              : entry,
-          )
-        }
+          if (state === 'installing' && serverId !== '*') {
+            servers.value = servers.value.map((entry) =>
+              entry.id === serverId
+                ? { ...entry, installState: 'installing', error: null }
+                : entry,
+            )
+          }
 
-        if (state === 'ready' || state === 'error') {
+          if (state !== 'ready' && state !== 'error') {
+            return
+          }
+
           if (serverId === '*') {
             prefetchBusy.value = false
           }
           if (serverId !== '*') {
-            servers.value = servers.value.map((entry) => {
-              if (entry.id !== serverId) {
-                return entry
-              }
-              if (state === 'ready') {
-                return {
-                  ...entry,
-                  installed: true,
-                  installState: entry.running ? 'ready' : 'starting',
-                  error: null,
-                }
-              }
-              return {
-                ...entry,
-                installState: 'error',
-                error: message ?? entry.error ?? 'Install failed',
-              }
-            })
+            if (state === 'ready') {
+              applyReadyInstallState(serverId)
+            } else {
+              servers.value = servers.value.map((entry) =>
+                entry.id === serverId
+                  ? {
+                      ...entry,
+                      installState: 'error',
+                      error: message ?? entry.error ?? 'Install failed',
+                    }
+                  : entry,
+              )
+            }
           }
-          refreshCatalog()
-            .then(() => {
-              if (state === 'ready' && serverId === '*' && projectRoot.value) {
-                return warmDefaults(projectRoot.value)
-              }
-              return undefined
-            })
-            .catch((error: unknown) => {
-              installMessage.value =
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to refresh language servers'
-            })
+
+          await refreshCatalog()
+          if (state === 'ready' && serverId !== '*') {
+            applyReadyInstallState(serverId)
+          }
+          if (state === 'ready' && serverId === '*' && projectRoot.value) {
+            await warmDefaults(projectRoot.value)
+          }
+        } catch (error: unknown) {
+          installMessage.value =
+            error instanceof Error
+              ? error.message
+              : 'Failed to refresh language servers'
         }
       },
     )

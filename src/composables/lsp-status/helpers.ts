@@ -4,7 +4,13 @@ import type {
 } from '@/types/lsp/lsp-status'
 import type { LspCatalogEntry } from '@/services/vixl/vixl-tauri'
 import { normalizeFileUri } from '@/utils/monaco-lsp'
-import { awaitingProjectLoad, diagnosticsByUri, warmState } from './state'
+import {
+  awaitingProjectLoad,
+  diagnosticsByUri,
+  installMessage,
+  servers,
+  warmState,
+} from './state'
 
 export const scheduleAwaitingClear = (): void => {
   if (warmState.awaitingClearTimer !== null) {
@@ -95,4 +101,38 @@ export const markAwaitingProjectLoad = (serverId: string): void => {
   next.add(serverId)
   awaitingProjectLoad.value = next
   scheduleAwaitingClear()
+}
+
+export const pruneAwaitingFromRunning = (): void => {
+  const awaiting = awaitingProjectLoad.value
+  if (awaiting.size === 0) {
+    return
+  }
+  const runningIds = new Set(
+    servers.value.filter((entry) => entry.running).map((entry) => entry.id),
+  )
+  const next = new Set(
+    [...awaiting].filter((id) => !runningIds.has(id)),
+  )
+  if (next.size === awaiting.size) {
+    return
+  }
+  awaitingProjectLoad.value = next
+  if (next.size === 0) {
+    installMessage.value = 'Language servers ready'
+  }
+}
+
+export const applyReadyInstallState = (serverId: string): void => {
+  servers.value = servers.value.map((entry) => {
+    if (entry.id !== serverId) {
+      return entry
+    }
+    return {
+      ...entry,
+      installed: true,
+      installState: entry.running ? 'ready' : 'starting',
+      error: null,
+    }
+  })
 }

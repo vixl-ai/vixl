@@ -1,15 +1,19 @@
 use std::fs;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use app_lib::commands::lsp::{
     apply_server_disabled_flag, compute_vue_in_play, merge_vue_plugin_options,
     normalize_lsp_params, pick_typescript_tsdk, resolve_lsp_servers, server_display_label,
-    should_inject_vue_typescript_plugin, tsserver_request_body, typescript_lsp_argv,
-    typescript_version_supports_native_lsp, unwrap_tsserver_request_tuple,
+    should_inject_vue_typescript_plugin, start_lock_for, tsserver_request_body,
+    typescript_lsp_argv, typescript_version_supports_native_lsp, unwrap_tsserver_request_tuple,
 };
-use app_lib::commands::lsp_install::{looks_like_javascript_bin, should_wrap_npm_bin_with_node};
+use app_lib::commands::lsp_install::{
+    looks_like_javascript_bin, should_wrap_npm_bin_with_node, with_timeout,
+};
 use app_lib::commands::lsp_registry::NpmInstallSpec;
+use tokio::sync::Mutex;
 
 #[test]
 fn unwraps_vscode_jsonrpc_wrapped_tsserver_tuple() {
@@ -361,4 +365,47 @@ fn native_npm_bins_are_not_wrapped_with_node() {
     assert!(!should_wrap_npm_bin_with_node(&native_spec, &js));
     assert!(!should_wrap_npm_bin_with_node(&native_spec, &native));
     let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn start_mutex_serializes_two_ensures_of_the_same_id() {
+    let id = format!(
+        "test-start-lock-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    );
+    let order = Arc::new(Mutex::new(Vec::<String>::new()));
+
+    let run = |label: &'static str| {
+        let id = id.clone();
+        let order = order.clone();
+        async move {
+            let lock = start_lock_for(&id).await;
+            let _guard = lock.lock().await;
+            order.lock().await.push(format!("{label}-enter"));
+            tokio::time::sleep(Duration::from_millis(40)).await;
+            order.lock().await.push(format!("{label}-leave"));
+        }
+    };
+
+    tokio::join!(run("a"), run("b"));
+    let seq = order.lock().await.clone();
+    assert!(
+        seq == ["a-enter", "a-leave", "b-enter", "b-leave"]
+            || seq == ["b-enter", "b-leave", "a-enter", "a-leave"],
+        "expected serialized lock order, got {seq:?}"
+    );
+}
+
+#[tokio::test]
+async fn write_timeout_maps_to_error() {
+    let result = with_timeout(
+        Duration::from_millis(30),
+        std::future::pending::<Result<(), String>>(),
+        "LSP write timed out after 10s",
+    )
+    .await;
+    assert_eq!(result.unwrap_err(), "LSP write timed out after 10s");
 }

@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use tauri::AppHandle;
 use tokio::sync::Mutex;
@@ -9,13 +11,14 @@ use super::backends::{
     github_install, go_install_package, http_archive_install, npm_install_packages,
 };
 use super::managed::{managed_bin_path, version_key_for_spec};
+use super::named_lock::named_lock_for;
 use super::node::ensure_portable_node;
 use super::paths::{auto_download_enabled, lsp_root, managed_server_dir};
 use super::progress::emit_progress;
 
 lazy_static::lazy_static! {
-  static ref INSTALL_LOCKS: Mutex<std::collections::HashMap<String, ()>> =
-    Mutex::new(std::collections::HashMap::new());
+  static ref INSTALL_LOCKS: Mutex<HashMap<String, Arc<Mutex<()>>>> =
+    Mutex::new(HashMap::new());
 }
 
 pub async fn ensure_server_installed(
@@ -39,13 +42,8 @@ pub async fn ensure_server_installed(
         return Ok(which::which(bin).ok());
     }
 
-    {
-        let mut locks = INSTALL_LOCKS.lock().await;
-        if locks.contains_key(server_id) {
-            // another install in progress; fall through after release
-        }
-        locks.insert(server_id.to_string(), ());
-    }
+    let install_lock = named_lock_for(&INSTALL_LOCKS, server_id).await;
+    let _install_guard = install_lock.lock().await;
 
     let result = match spec.install {
         LspInstallKind::Npm => npm_install_packages(app, spec).await.map(Some),
@@ -88,8 +86,6 @@ pub async fn ensure_server_installed(
         },
         _ => Ok(None),
     };
-
-    INSTALL_LOCKS.lock().await.remove(server_id);
 
     match &result {
         Ok(Some(_)) => emit_progress(app, server_id, "ready", None),

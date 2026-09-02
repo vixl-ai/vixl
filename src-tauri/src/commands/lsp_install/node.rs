@@ -6,6 +6,7 @@ use tauri::AppHandle;
 use super::archive::{extract_tar_gz_bytes, extract_zip_bytes};
 use super::paths::runtime_node_dir;
 use super::progress::emit_progress;
+use super::timeout::{with_timeout, INSTALL_TIMEOUT};
 
 fn node_dist_name() -> Result<String, String> {
     let version = "v22.14.0";
@@ -103,17 +104,27 @@ pub async fn ensure_portable_node(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 pub(crate) async fn download_bytes(url: &str) -> Result<Vec<u8>, String> {
-    let client = reqwest::Client::builder()
-        .user_agent("vixl-lsp-installer")
-        .build()
-        .map_err(|e| e.to_string())?;
-    let response = client.get(url).send().await.map_err(|e| e.to_string())?;
-    if !response.status().is_success() {
-        return Err(format!("Download failed ({}) for {url}", response.status()));
-    }
-    response
-        .bytes()
-        .await
-        .map(|b| b.to_vec())
-        .map_err(|e| e.to_string())
+    with_timeout(
+        INSTALL_TIMEOUT,
+        async {
+            let client = reqwest::Client::builder()
+                .user_agent("vixl-lsp-installer")
+                .build()
+                .map_err(|e| e.to_string())?;
+            let response = client.get(url).send().await.map_err(|e| e.to_string())?;
+            if !response.status().is_success() {
+                return Err(format!("Download failed ({}) for {url}", response.status()));
+            }
+            response
+                .bytes()
+                .await
+                .map(|b| b.to_vec())
+                .map_err(|e| e.to_string())
+        },
+        &format!(
+            "Language server install timed out after {}s",
+            INSTALL_TIMEOUT.as_secs()
+        ),
+    )
+    .await
 }
