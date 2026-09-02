@@ -1,4 +1,4 @@
-export type McpAuthKind = 'oauth' | 'inputs' | 'trust' | 'drift'
+export type McpAuthKind = 'oauth' | 'inputs' | 'trust' | 'drift' | 'client'
 
 export type McpAuthResolution =
   | { action: 'authenticated' }
@@ -50,6 +50,23 @@ export const resolveMcpAuthForServer = (
 ): void => {
   for (const entry of listPendingMcpAuthForServer(serverId)) {
     resolveMcpAuth(entry.toolCallId, result)
+  }
+}
+
+export const patchPendingMcpAuthForServer = (
+  serverId: string,
+  patch: Partial<Pick<PendingMcpAuth, 'kind' | 'detail' | 'title'>>,
+): void => {
+  for (const entry of listPendingMcpAuthForServer(serverId)) {
+    if (patch.kind) {
+      entry.kind = patch.kind
+    }
+    if (patch.detail !== undefined) {
+      entry.detail = patch.detail
+    }
+    if (patch.title) {
+      entry.title = patch.title
+    }
   }
 }
 

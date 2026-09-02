@@ -131,7 +131,10 @@ const callMcpTool = (ctx: HarnessToolContext) =>
           title: ctx.subagentLabel
             ? `Authenticate ${serverId} (${ctx.subagentLabel})`
             : `Authenticate ${serverId}`,
-          detail: mcpAuthErrorMessage(error),
+          detail:
+            kind === 'client'
+              ? 'This authorization server needs a client ID. Enter the client ID from the server. Optional client secret is stored in the keychain only.'
+              : mcpAuthErrorMessage(error),
           subagentId: ctx.subagentId,
           subagentLabel: ctx.subagentLabel,
         })

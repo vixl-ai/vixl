@@ -1,10 +1,16 @@
 import { toast } from 'vue-sonner'
 import type { McpServerConfig } from '@/types/vixl/mcp-config'
+import { isMcpHttpServer } from '@/types/vixl/mcp-config'
 import { listEffectiveMcpServers } from '@/services/mcp/merge-mcp-config'
 import mcpRuntime, { type McpRuntimeOptions } from '@/services/mcp/mcp-runtime'
-import { resolveMcpAuthForServer } from '@/services/mcp/mcp-auth-gate'
+import {
+  patchPendingMcpAuthForServer,
+  resolveMcpAuthForServer,
+} from '@/services/mcp/mcp-auth-gate'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
 import { isMcpTrusted, sessionTrusts } from '@/services/mcp/mcp-trust'
+import { getHttpOauthChallenge } from '@/services/mcp/mcp-http-client'
+import { getLastOAuthChallenge, isDcrMissingClientError } from '@/services/mcp/oauth'
 import { isInternalMcpServer } from '@/types/codegraph/managed-codegraph'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import useVixlConfig from '@/composables/use-vixl-config'
@@ -20,7 +26,13 @@ import {
 export const createRuntimeOptions = (
   config: ReturnType<typeof useVixlConfig>,
 ) => (
-  extras?: Pick<McpRuntimeOptions, 'confirmAuthorizationServerOrigin' | 'skipTrustCheck'>,
+  extras?: Pick<
+    McpRuntimeOptions,
+    | 'confirmAuthorizationServerOrigin'
+    | 'skipTrustCheck'
+    | 'scope'
+    | 'resourceMetadataUrl'
+  >,
 ): McpRuntimeOptions => ({
   settings: config.effectiveSettings.value as VixlSettings,
   ...extras,
@@ -175,10 +187,20 @@ export const createAuthenticateServer = (
   await withServerLoading(serverId, async () => {
     try {
       assertTrustedOrThrow(serverId, serverConfig)
+      const stored = getHttpOauthChallenge(serverId)
+      const fromUrl =
+        isMcpHttpServer(serverConfig)
+          ? getLastOAuthChallenge(serverConfig.url)
+          : undefined
+      const challenge = stored ?? fromUrl
       const state = await mcpRuntime.authenticate(
         serverId,
         serverConfig,
-        runtimeOptions(extras),
+        runtimeOptions({
+          ...extras,
+          scope: challenge?.scope,
+          resourceMetadataUrl: challenge?.resourceMetadataUrl,
+        }),
       )
       patchServerState(serverId, state)
       resolveMcpAuthForServer(serverId, { action: 'authenticated' })
@@ -190,6 +212,13 @@ export const createAuthenticateServer = (
         tools: [],
         error: error instanceof Error ? error.message : String(error),
       })
+      if (isDcrMissingClientError(error)) {
+        patchPendingMcpAuthForServer(serverId, {
+          kind: 'client',
+          detail:
+            'This authorization server needs a client ID. Enter the client ID from the server. Optional client secret is stored in the keychain only.',
+        })
+      }
       toast.error('Authentication failed', {
         description: error instanceof Error ? error.message : 'Unknown error',
       })

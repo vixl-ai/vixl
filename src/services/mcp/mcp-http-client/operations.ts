@@ -1,5 +1,5 @@
 import type { McpServerState } from '@/services/vixl/vixl-tauri'
-import { httpServers, isUnauthorized, setEntryState } from './store'
+import { httpServers, isUnauthorized, setEntryState, syncHttpChallengeFromFetch } from './store'
 
 export const listHttpResources = async (serverId: string): Promise<unknown> => {
   const entry = httpServers.get(serverId)
@@ -59,6 +59,7 @@ export const callHttpTool = async (
       arguments: args,
     })
   } catch (error) {
+    syncHttpChallengeFromFetch(serverId)
     if (isUnauthorized(error)) {
       setEntryState(serverId, {
         status: 'auth_required',

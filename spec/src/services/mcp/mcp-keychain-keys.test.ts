@@ -5,6 +5,7 @@ import {
   mcpOAuthAsInfoKey,
   mcpOAuthClientKey,
   mcpOAuthStateKey,
+  mcpOAuthStaticClientKey,
   mcpOAuthTokensKey,
   mcpOAuthVerifierKey,
 } from '@/services/mcp/mcp-keychain-keys'
@@ -16,6 +17,7 @@ describe('mcp-keychain-keys', () => {
     expect(mcpOAuthClientKey('github')).toBe('vixl:mcp:github:oauth:client')
     expect(mcpOAuthStateKey('github')).toBe('vixl:mcp:github:oauth:state')
     expect(mcpOAuthAsInfoKey('github')).toBe('vixl:mcp:github:oauth:as')
+    expect(mcpOAuthStaticClientKey('github')).toBe('vixl:mcp:github:oauth:static')
     expect(mcpInputKey('github', 'token')).toBe('vixl:mcp:github:input:token')
   })
 
@@ -26,6 +28,7 @@ describe('mcp-keychain-keys', () => {
       'vixl:mcp:linear:oauth:client',
       'vixl:mcp:linear:oauth:state',
       'vixl:mcp:linear:oauth:as',
+      'vixl:mcp:linear:oauth:static',
     ])
 
     expect(mcpKnownSecretKeys('linear', ['apiKey', 'org'])).toEqual([
@@ -34,6 +37,7 @@ describe('mcp-keychain-keys', () => {
       'vixl:mcp:linear:oauth:client',
       'vixl:mcp:linear:oauth:state',
       'vixl:mcp:linear:oauth:as',
+      'vixl:mcp:linear:oauth:static',
       'vixl:mcp:linear:input:apiKey',
       'vixl:mcp:linear:input:org',
     ])

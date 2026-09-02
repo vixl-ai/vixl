@@ -15,6 +15,9 @@ export const mcpOAuthStateKey = (serverId: string): string =>
 export const mcpOAuthAsInfoKey = (serverId: string): string =>
   `${PREFIX}${serverId}:oauth:as`
 
+export const mcpOAuthStaticClientKey = (serverId: string): string =>
+  `${PREFIX}${serverId}:oauth:static`
+
 export const mcpInputKey = (serverId: string, inputId: string): string =>
   `${PREFIX}${serverId}:input:${inputId}`
 
@@ -27,5 +30,6 @@ export const mcpKnownSecretKeys = (
   mcpOAuthClientKey(serverId),
   mcpOAuthStateKey(serverId),
   mcpOAuthAsInfoKey(serverId),
+  mcpOAuthStaticClientKey(serverId),
   ...inputIds.map((inputId) => mcpInputKey(serverId, inputId)),
 ]

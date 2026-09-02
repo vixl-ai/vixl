@@ -4,6 +4,7 @@ import type {
   OAuthClientProvider,
   OAuthTokens,
 } from '@ai-sdk/mcp'
+import type { StoredOAuthAsInfo } from '@/types/mcp/stored-oauth-as-info'
 import {
   mcpOAuthAsInfoKey,
   mcpOAuthClientKey,
@@ -11,6 +12,15 @@ import {
   mcpOAuthTokensKey,
   mcpOAuthVerifierKey,
 } from '@/services/mcp/mcp-keychain-keys'
+import {
+  nativeClientMetadata,
+  createValidateAuthorizationServerUrl,
+  originOf,
+  parseJson,
+  readIssParameterSupported,
+  validateResourceUrl,
+  loadStaticOAuthClient,
+} from '@/services/mcp/oauth'
 import { deleteSecret, getSecret, setSecret } from '@/services/vixl/vixl-tauri'
 
 type CreateVixlOAuthProviderArgs = {
@@ -20,24 +30,7 @@ type CreateVixlOAuthProviderArgs = {
   allowedAuthorizationServers?: string[]
   redirectUrl: string
   openUrl: (url: string, allowedOrigin: string) => void | Promise<void>
-  /** Required when no allowlist and no pinned AS: user must confirm the AS origin. */
   confirmAuthorizationServerOrigin?: (origin: string) => Promise<boolean>
-}
-
-const originOf = (value: string | URL): string => {
-  const url = typeof value === 'string' ? new URL(value) : value
-  return url.origin
-}
-
-const parseJson = <T>(raw: string | null): T | undefined => {
-  if (raw === null || raw.length === 0) {
-    return undefined
-  }
-  try {
-    return JSON.parse(raw) as T
-  } catch {
-    return undefined
-  }
 }
 
 const randomHex = (bytes: number): string => {
@@ -46,11 +39,17 @@ const randomHex = (bytes: number): string => {
   return Array.from(buffer, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+const withIssuer = <T extends { issuer?: string }>(
+  value: T,
+  issuer: string | undefined,
+): T => (issuer && !value.issuer ? { ...value, issuer } : value)
+
 export const createVixlOAuthProvider = (
   args: CreateVixlOAuthProviderArgs,
 ): OAuthClientProvider => {
   const {
     serverId,
+    serverUrl,
     clientId,
     allowedAuthorizationServers,
     redirectUrl,
@@ -58,26 +57,37 @@ export const createVixlOAuthProvider = (
     confirmAuthorizationServerOrigin,
   } = args
 
+  const storedIssuer = async (): Promise<string | undefined> => {
+    const stored = parseJson<StoredOAuthAsInfo>(
+      await getSecret(mcpOAuthAsInfoKey(serverId)),
+    )
+    return stored?.issuer
+  }
+
+  const invalidateClientAndTokens = async (): Promise<void> => {
+    await deleteSecret(mcpOAuthTokensKey(serverId))
+    await deleteSecret(mcpOAuthClientKey(serverId))
+    await deleteSecret(mcpOAuthAsInfoKey(serverId))
+    await deleteSecret(mcpOAuthStateKey(serverId))
+  }
+
   const provider: OAuthClientProvider = {
     get redirectUrl() {
       return redirectUrl
     },
 
     get clientMetadata() {
-      return {
-        client_name: 'Vixl',
-        redirect_uris: [redirectUrl],
-        token_endpoint_auth_method: 'none',
-        grant_types: ['authorization_code', 'refresh_token'],
-        response_types: ['code'],
-      }
+      return nativeClientMetadata(redirectUrl)
     },
 
     tokens: async (): Promise<OAuthTokens | undefined> =>
       parseJson<OAuthTokens>(await getSecret(mcpOAuthTokensKey(serverId))),
 
     saveTokens: async (tokens: OAuthTokens): Promise<void> => {
-      await setSecret(mcpOAuthTokensKey(serverId), JSON.stringify(tokens))
+      await setSecret(
+        mcpOAuthTokensKey(serverId),
+        JSON.stringify(withIssuer(tokens, await storedIssuer())),
+      )
     },
 
     saveCodeVerifier: async (codeVerifier: string): Promise<void> => {
@@ -99,8 +109,22 @@ export const createVixlOAuthProvider = (
       if (stored) {
         return stored
       }
+      const staticClient = await loadStaticOAuthClient(serverId)
       if (clientId) {
-        return { client_id: clientId }
+        return {
+          client_id: clientId,
+          ...(staticClient?.client_secret
+            ? { client_secret: staticClient.client_secret }
+            : {}),
+        }
+      }
+      if (staticClient) {
+        return {
+          client_id: staticClient.client_id,
+          ...(staticClient.client_secret
+            ? { client_secret: staticClient.client_secret }
+            : {}),
+        }
       }
       return undefined
     },
@@ -108,90 +132,54 @@ export const createVixlOAuthProvider = (
     saveClientInformation: async (
       clientInformation: OAuthClientInformation,
     ): Promise<void> => {
-      await setSecret(mcpOAuthClientKey(serverId), JSON.stringify(clientInformation))
+      await setSecret(
+        mcpOAuthClientKey(serverId),
+        JSON.stringify(withIssuer(clientInformation, await storedIssuer())),
+      )
     },
 
     authorizationServerInformation: async (): Promise<
-      OAuthAuthorizationServerInformation | undefined
-    > =>
-      parseJson<OAuthAuthorizationServerInformation>(
-        await getSecret(mcpOAuthAsInfoKey(serverId)),
-      ),
+      StoredOAuthAsInfo | undefined
+    > => parseJson<StoredOAuthAsInfo>(await getSecret(mcpOAuthAsInfoKey(serverId))),
 
     saveAuthorizationServerInformation: async (
       authorizationServerInformation: OAuthAuthorizationServerInformation,
     ): Promise<void> => {
-      const existing = parseJson<{ origin?: string }>(
+      const existing = parseJson<StoredOAuthAsInfo>(
         await getSecret(mcpOAuthAsInfoKey(serverId)),
+      )
+      const issSupported = await readIssParameterSupported(
+        authorizationServerInformation.authorizationServerUrl,
       )
       await setSecret(
         mcpOAuthAsInfoKey(serverId),
         JSON.stringify({
+          ...existing,
           ...authorizationServerInformation,
           origin:
             existing?.origin ??
-            (authorizationServerInformation.authorizationServerUrl
-              ? originOf(authorizationServerInformation.authorizationServerUrl)
-              : undefined),
+            originOf(authorizationServerInformation.authorizationServerUrl),
+          issuer:
+            authorizationServerInformation.issuer ??
+            existing?.issuer ??
+            authorizationServerInformation.authorizationServerUrl,
+          authorization_response_iss_parameter_supported:
+            issSupported ??
+            existing?.authorization_response_iss_parameter_supported,
         }),
       )
     },
 
-    validateAuthorizationServerURL: async (
-      _serverUrl: string | URL,
-      authorizationServerUrl: string | URL,
-    ): Promise<void> => {
-      const asOrigin = originOf(authorizationServerUrl)
+    validateAuthorizationServerURL: createValidateAuthorizationServerUrl({
+      serverId,
+      clientId,
+      allowedAuthorizationServers,
+      confirmAuthorizationServerOrigin,
+      invalidateClientAndTokens,
+    }),
 
-      if (allowedAuthorizationServers && allowedAuthorizationServers.length > 0) {
-        const allowed = allowedAuthorizationServers.some(
-          (entry) => originOf(entry) === asOrigin,
-        )
-        if (!allowed) {
-          throw new Error(
-            `Authorization server origin ${asOrigin} is not in the allowlist`,
-          )
-        }
-        return
-      }
-
-      const stored = parseJson<
-        OAuthAuthorizationServerInformation & { origin?: string }
-      >(await getSecret(mcpOAuthAsInfoKey(serverId)))
-
-      const pinnedOrigin =
-        stored?.origin ??
-        (stored?.authorizationServerUrl
-          ? originOf(stored.authorizationServerUrl)
-          : undefined)
-
-      if (pinnedOrigin) {
-        if (pinnedOrigin !== asOrigin) {
-          throw new Error(
-            `Authorization server origin changed from ${pinnedOrigin} to ${asOrigin}`,
-          )
-        }
-        return
-      }
-
-      const confirmed = confirmAuthorizationServerOrigin
-        ? await confirmAuthorizationServerOrigin(asOrigin)
-        : false
-      if (!confirmed) {
-        throw new Error(
-          `Authorization server origin ${asOrigin} was not confirmed`,
-        )
-      }
-
-      await setSecret(
-        mcpOAuthAsInfoKey(serverId),
-        JSON.stringify({
-          origin: asOrigin,
-          authorizationServerUrl: String(authorizationServerUrl),
-          tokenEndpoint: '',
-        }),
-      )
-    },
+    validateResourceURL: async (requested, resource) =>
+      validateResourceUrl(requested || serverUrl, resource),
 
     state: async (): Promise<string> => randomHex(32),
 

@@ -26,6 +26,7 @@ export const createTokenProvider = (
 
 export const waitForOAuthCallback = async (
   signal: AbortSignal,
+  flowId: string,
 ): Promise<OAuthCallbackPayload> => {
   let unlisten: (() => void) | undefined
   let timeoutId: ReturnType<typeof setTimeout> | undefined
@@ -80,11 +81,18 @@ export const waitForOAuthCallback = async (
       }, OAUTH_CALLBACK_TIMEOUT_MS)
 
       listen<OAuthCallbackPayload>('oauth-callback', (event) => {
-        if (event.payload.error) {
-          settle('reject', new Error(event.payload.error))
+        if (event.payload.flowId && event.payload.flowId !== flowId) {
           return
         }
-        if (!event.payload.state) {
+        const hasState =
+          typeof event.payload.state === 'string' &&
+          event.payload.state.length > 0
+        const hasError =
+          typeof event.payload.error === 'string' &&
+          event.payload.error.length > 0
+        const hasIss =
+          typeof event.payload.iss === 'string' && event.payload.iss.length > 0
+        if (!hasState && !hasError && !hasIss) {
           settle('reject', new Error('OAuth callback missing state'))
           return
         }

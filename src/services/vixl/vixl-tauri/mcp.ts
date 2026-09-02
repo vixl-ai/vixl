@@ -6,10 +6,11 @@ export const openExternalUrl = (
   allowedOrigin: string,
 ): Promise<void> => call('open_external_url', { url, allowedOrigin })
 
-export const oauthBeginLoopback = (): Promise<OAuthLoopbackStart> =>
-  call('oauth_begin_loopback')
+export const oauthBeginLoopback = (flowId: string): Promise<OAuthLoopbackStart> =>
+  call('oauth_begin_loopback', { flowId })
 
-export const oauthCancelLoopback = (): Promise<void> => call('oauth_cancel_loopback')
+export const oauthCancelLoopback = (flowId: string): Promise<void> =>
+  call('oauth_cancel_loopback', { flowId })
 
 export const mcpStart = (
   serverId: string,

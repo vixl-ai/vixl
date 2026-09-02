@@ -1,4 +1,6 @@
 import proxyFetch from '@/services/providers/proxy-fetch'
+import parseWwwAuthenticate from '@/services/mcp/oauth/parse-www-authenticate'
+import { recordLastOAuthChallenge } from '@/services/mcp/oauth/last-challenge'
 
 /**
  * Hardened fetch for OAuth discovery / token / DCR.
@@ -40,10 +42,22 @@ export const mcpOAuthFetch = async (
     throw new Error(`OAuth fetch blocked for private host ${parsed.hostname}`)
   }
 
-  return proxyFetch()(input, {
+  const response = await proxyFetch()(input, {
     ...init,
     redirect: 'error',
   })
+
+  if (response.status === 401 || response.status === 403) {
+    const challenge = parseWwwAuthenticate(
+      response.headers.get('www-authenticate') ??
+        response.headers.get('WWW-Authenticate'),
+    )
+    if (challenge) {
+      recordLastOAuthChallenge(parsed, challenge)
+    }
+  }
+
+  return response
 }
 
 const isBlockedOAuthHost = (host: string): boolean => {

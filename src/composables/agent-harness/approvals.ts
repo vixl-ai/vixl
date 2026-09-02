@@ -166,6 +166,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
       syncPendingMcpAuth()
       attention.maybeClearAttentionWhenGatesEmpty()
     } catch (error) {
+      syncPendingMcpAuth()
       if (!(error instanceof Error)) {
         toast.error('MCP authentication failed', {
           description: String(error),

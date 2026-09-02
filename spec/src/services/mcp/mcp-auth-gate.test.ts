@@ -8,6 +8,7 @@ import {
   resetMcpAuthGateForTests,
   resolveMcpAuth,
   resolveMcpAuthForServer,
+  patchPendingMcpAuthForServer,
 } from '@/services/mcp/mcp-auth-gate'
 
 describe('mcp-auth-gate', () => {
@@ -105,5 +106,26 @@ describe('mcp-auth-gate', () => {
 
     resolveMcpAuth('tool-3', { action: 'authenticated' })
     await expect(other).resolves.toEqual({ action: 'authenticated' })
+  })
+
+  it('patches pending auth to client when DCR cannot register', async () => {
+    const pending = requestMcpAuth({
+      chatId: 'chat-1',
+      toolCallId: 'tool-client',
+      serverId: 'remote',
+      kind: 'oauth',
+      title: 'Authenticate remote',
+    })
+
+    patchPendingMcpAuthForServer('remote', {
+      kind: 'client',
+      detail: 'This authorization server needs a client ID.',
+    })
+
+    expect(getPendingMcpAuth('tool-client')?.kind).toBe('client')
+    expect(getPendingMcpAuth('tool-client')?.detail).toContain('client ID')
+
+    resolveMcpAuth('tool-client', { action: 'authenticated' })
+    await expect(pending).resolves.toEqual({ action: 'authenticated' })
   })
 })

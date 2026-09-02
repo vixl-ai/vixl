@@ -2,7 +2,6 @@ import { auth } from '@ai-sdk/mcp'
 import type { McpHttpServer, McpServerConfig } from '@/types/vixl/mcp-config'
 import { isMcpHttpServer } from '@/types/vixl/mcp-config'
 import {
-  callHttpTool,
   getHttpPrompt,
   getHttpState,
   hasHttpServer,
@@ -11,6 +10,8 @@ import {
   listHttpStates,
   markHttpAuthRequired,
   readHttpResource,
+  getHttpOauthChallenge,
+  setHttpLastRequestedScope,
 } from '@/services/mcp/mcp-http-client'
 import { mcpOAuthFetch } from '@/services/mcp/mcp-oauth-fetch'
 import {
@@ -22,10 +23,12 @@ import {
   openExternalUrl,
   type McpServerState,
 } from '@/services/vixl/vixl-tauri'
+import { applyOAuthCallback, getLastOAuthChallenge } from '@/services/mcp/oauth'
 import { assertServerTrusted } from './trust'
 import { createTokenProvider, waitForOAuthCallback } from './oauth'
 import { start, startHttp } from './lifecycle'
 import type { McpRuntimeOptions } from './types'
+import callHttpToolWithStepUp from './step-up'
 
 const oauthInFlight = new Map<string, Promise<McpServerState>>()
 
@@ -36,9 +39,9 @@ const runAuthenticateHttp = async (
 ): Promise<McpServerState> => {
   assertServerTrusted(serverId, config, options)
 
-  const loopback = await oauthBeginLoopback()
+  const loopback = await oauthBeginLoopback(serverId)
   const abort = new AbortController()
-  const callbackPromise = waitForOAuthCallback(abort.signal)
+  const callbackPromise = waitForOAuthCallback(abort.signal, serverId)
 
   try {
     const provider = createTokenProvider(
@@ -51,17 +54,31 @@ const runAuthenticateHttp = async (
       options?.confirmAuthorizationServerOrigin,
     )
 
-    const first = await auth(provider, {
+    const challenge =
+      getHttpOauthChallenge(serverId) ?? getLastOAuthChallenge(config.url)
+    const scope = options?.scope ?? challenge?.scope
+    const resourceMetadataUrl =
+      options?.resourceMetadataUrl ?? challenge?.resourceMetadataUrl
+    if (scope) {
+      setHttpLastRequestedScope(serverId, scope)
+    }
+
+    const authBase = {
       serverUrl: config.url,
       fetchFn: mcpOAuthFetch,
-    })
+      scope,
+      resourceMetadataUrl,
+    }
+
+    const first = await auth(provider, authBase)
     if (first === 'REDIRECT') {
       const callback = await callbackPromise
+      const exchange = await applyOAuthCallback(provider, callback)
       const second = await auth(provider, {
-        serverUrl: config.url,
-        authorizationCode: callback.code,
-        callbackState: callback.state,
-        fetchFn: mcpOAuthFetch,
+        ...authBase,
+        authorizationCode: exchange.authorizationCode,
+        callbackState: exchange.callbackState,
+        callbackIssuer: exchange.callbackIssuer,
       })
       if (second !== 'AUTHORIZED') {
         throw new Error('OAuth authorization did not complete')
@@ -98,7 +115,7 @@ const runAuthenticateHttp = async (
     throw error
   } finally {
     try {
-      await oauthCancelLoopback()
+      await oauthCancelLoopback(serverId)
     } catch {
       // Loopback may already be closed after a successful callback.
     }
@@ -133,7 +150,7 @@ export const callTool = async (
   config?: McpServerConfig,
 ): Promise<unknown> => {
   if (config ? isMcpHttpServer(config) : hasHttpServer(serverId)) {
-    return callHttpTool(serverId, tool, args)
+    return callHttpToolWithStepUp(serverId, tool, args, config, authenticate)
   }
   return mcpCallTool(serverId, tool, args)
 }

@@ -19,7 +19,12 @@ export const stopHttpServer = async (serverId: string): Promise<void> => {
   setEntryState(
     serverId,
     { status: 'stopped', tools: [], error: null },
-    { client: null, config: entry.config, authProvider: entry.authProvider },
+    {
+      client: null,
+      config: entry.config,
+      authProvider: entry.authProvider,
+      sessionId: null,
+    },
   )
 }
 
@@ -35,7 +40,7 @@ export const markHttpAuthRequired = (
       tools: [],
       error: error ?? null,
     },
-    { client: null, config, authProvider: undefined },
+    { client: null, config, authProvider: undefined, sessionId: null },
   )
 
 export const logoutHttpServer = async (
@@ -58,6 +63,7 @@ export const logoutHttpServer = async (
       client: null,
       config: config ?? entry?.config ?? { type: 'http', url: '' },
       authProvider: undefined,
+      sessionId: null,
     },
   )
 }

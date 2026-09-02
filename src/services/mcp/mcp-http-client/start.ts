@@ -1,23 +1,18 @@
-import {
-  createMCPClient,
-  ElicitationRequestSchema,
-  type OAuthClientProvider,
-} from '@ai-sdk/mcp'
+import type { OAuthClientProvider } from '@ai-sdk/mcp'
 import type { McpHttpServer } from '@/types/vixl/mcp-config'
 import { isAllowedMcpUrl } from '@/services/mcp/is-allowed-mcp-url'
-import { mcpOAuthFetch } from '@/services/mcp/mcp-oauth-fetch'
-import {
-  detectMcpToolDrift,
-  loadMcpToolBaseline,
-  saveMcpToolBaseline,
-} from '@/services/mcp/mcp-tool-baseline'
+import { detectMcpToolDrift } from '@/services/mcp/mcp-tool-baseline'
+import isDcrMissingClientError from '@/services/mcp/oauth/is-dcr-missing-client'
 import type { McpServerState } from '@/services/vixl/vixl-tauri'
+import { applyHttpClientTools } from './apply-http-tools'
+import { createHttpMcpClient } from './create-http-client'
+import { httpSessionTransportOptions } from './http-session-transport'
 import {
-  getMcpElicitationHandler,
   httpServers,
   iconsFromClient,
   isUnauthorized,
   setEntryState,
+  syncHttpChallengeFromFetch,
   toToolInfo,
 } from './store'
 import { stopHttpServer } from './stop'
@@ -37,77 +32,45 @@ export const startHttpServer = async (
   setEntryState(
     serverId,
     { status: 'starting', tools: [], error: null },
-    { client: null, config, authProvider: options?.authProvider },
+    {
+      client: null,
+      config,
+      authProvider: options?.authProvider,
+      sessionId: null,
+    },
   )
 
   try {
-    const client = await createMCPClient({
-      transport: {
-        type: config.type,
-        url: config.url,
-        headers: config.headers,
-        authProvider: options?.authProvider,
-        redirect: 'error',
-        fetch: mcpOAuthFetch,
-      },
-      maxRetries: 0,
-      clientName: 'Vixl',
-      capabilities: {
-        elicitation: {},
-      },
+    const client = await createHttpMcpClient(config, {
+      authProvider: options?.authProvider,
+      session:
+        config.type === 'http'
+          ? httpSessionTransportOptions(serverId)
+          : undefined,
     })
-
-    client.onElicitationRequest(ElicitationRequestSchema, async (request) => {
-      const handler = getMcpElicitationHandler()
-      if (!handler) {
-        return { action: 'cancel' }
-      }
-      return handler(request)
+    return await applyHttpClientTools(serverId, client, {
+      config,
+      authProvider: options?.authProvider,
     })
-
-    const listed = await client.listTools()
-    const tools = listed.tools.map(toToolInfo)
-    const icons = iconsFromClient(client)
-    const fingerprintSources = tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-    }))
-    const baseline = await loadMcpToolBaseline(serverId)
-    if (baseline) {
-      const drift = await detectMcpToolDrift(serverId, fingerprintSources)
-      if (drift.drifted) {
-        await client.close()
-        return setEntryState(
-          serverId,
-          {
-            status: 'error',
-            tools,
-            icons,
-            error: `Tool definitions changed (${[...drift.changed, ...drift.added].join(', ') || 'unknown'}). Re-trust this server in Settings.`,
-          },
-          { client: null, config, authProvider: options?.authProvider },
-        )
-      }
-    } else {
-      await saveMcpToolBaseline(serverId, fingerprintSources)
-    }
-
-    return setEntryState(
-      serverId,
-      { status: 'connected', tools, icons, error: null },
-      { client, config, authProvider: options?.authProvider },
-    )
   } catch (error) {
-    if (isUnauthorized(error)) {
+    syncHttpChallengeFromFetch(serverId)
+    if (isUnauthorized(error) || isDcrMissingClientError(error)) {
       return setEntryState(
         serverId,
         {
           status: 'auth_required',
           tools: [],
-          error: error instanceof Error ? error.message : 'Authentication required',
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Authentication required',
         },
-        { client: null, config, authProvider: options?.authProvider },
+        {
+          client: null,
+          config,
+          authProvider: options?.authProvider,
+          sessionId: null,
+        },
       )
     }
 
@@ -115,7 +78,12 @@ export const startHttpServer = async (
     setEntryState(
       serverId,
       { status: 'error', tools: [], error: message },
-      { client: null, config, authProvider: options?.authProvider },
+      {
+        client: null,
+        config,
+        authProvider: options?.authProvider,
+        sessionId: null,
+      },
     )
     throw error instanceof Error ? error : new Error(message)
   }
@@ -155,7 +123,7 @@ export const refreshHttpServer = async (
           icons,
           error: `Tool definitions changed (${[...drift.changed, ...drift.added].join(', ') || 'unknown'}). Re-trust this server in Settings.`,
         },
-        { client: null },
+        { client: null, sessionId: null },
       )
     }
     return setEntryState(serverId, {
@@ -165,11 +133,15 @@ export const refreshHttpServer = async (
       error: null,
     })
   } catch (error) {
+    syncHttpChallengeFromFetch(serverId)
     if (isUnauthorized(error)) {
       return setEntryState(serverId, {
         status: 'auth_required',
         tools: [],
-        error: error instanceof Error ? error.message : 'Authentication required',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Authentication required',
       })
     }
     const message = error instanceof Error ? error.message : 'Refresh failed'

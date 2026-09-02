@@ -96,5 +96,9 @@ name = "commands_mcp"
 path = "../spec/src-tauri/commands/mcp.rs"
 
 [[test]]
+name = "commands_oauth"
+path = "../spec/src-tauri/commands/oauth.rs"
+
+[[test]]
 name = "commands_codegraph"
 path = "../spec/src-tauri/commands/codegraph.rs"
