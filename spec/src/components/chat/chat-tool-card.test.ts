@@ -77,6 +77,7 @@ describe('approvalActionSpecs', () => {
     const firstCard = approvalActionSpecs({
       allowedScopes: ['once', 'session'],
       unsandboxed: false,
+      kind: 'shell',
     })
     expect(firstCard.map((action) => action.key)).toEqual([
       'once',
@@ -84,10 +85,10 @@ describe('approvalActionSpecs', () => {
       'deny',
     ])
     expect(firstCard.find((action) => action.key === 'once')?.tooltip).toBe(
-      'Allow once',
+      'Allow once. Jail retry is included.',
     )
     expect(firstCard.find((action) => action.key === 'session')?.tooltip).toBe(
-      'Allow session',
+      'Allow session. Jail retry is included.',
     )
   })
 

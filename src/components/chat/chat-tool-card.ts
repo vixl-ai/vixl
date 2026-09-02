@@ -1,4 +1,4 @@
-import type { PermissionScope } from '@/types/harness/permission'
+import type { ApprovalKind, PermissionScope } from '@/types/harness/permission'
 
 export const isNetworkSandboxApproval = (
   detail?: string,
@@ -46,6 +46,7 @@ const SCOPE_TOOLTIPS: Record<Exclude<PermissionScope, 'once' | 'never'>, string>
 export const approvalActionSpecs = (args: {
   allowedScopes: PermissionScope[]
   unsandboxed?: boolean
+  kind?: ApprovalKind
 }): ApprovalActionSpec[] => {
   const actions: ApprovalActionSpec[] = orderedApprovalScopes(
     args.allowedScopes,
@@ -54,6 +55,13 @@ export const approvalActionSpecs = (args: {
     let tooltip = onceApprovalLabel(args.unsandboxed)
     if (scope === 'session' || scope === 'workspace' || scope === 'always') {
       tooltip = SCOPE_TOOLTIPS[scope]
+    }
+    if (
+      args.kind === 'shell' &&
+      !args.unsandboxed &&
+      (scope === 'once' || scope === 'session')
+    ) {
+      tooltip = `${tooltip}. Jail retry is included.`
     }
     return {
       key: scope,

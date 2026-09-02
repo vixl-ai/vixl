@@ -41,6 +41,7 @@ const actions = computed(() =>
   approvalActionSpecs({
     allowedScopes: props.approval.allowedScopes,
     unsandboxed: props.approval.unsandboxed,
+    kind: props.approval.kind,
   }),
 )
 

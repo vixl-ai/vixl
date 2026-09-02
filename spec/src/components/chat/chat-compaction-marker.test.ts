@@ -12,7 +12,8 @@ describe('ChatCompactionMarker', () => {
     const wrapper = mount(ChatCompactionMarker)
     expect(wrapper.text()).toContain('Compacted')
     expect(wrapper.text()).not.toContain('Compacting')
-    expect(markerClass(wrapper)).toContain('border-b')
+    expect(markerClass(wrapper)).not.toContain('border-b')
+    expect(markerClass(wrapper)).not.toContain('pb-2')
   })
 
   it('shows Compacting when pending', () => {

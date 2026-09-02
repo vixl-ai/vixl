@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { effectScope, onWatcherCleanup, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { ContextMention } from '@/types/harness/context-mention'
@@ -18,12 +18,14 @@ const draftMentions = ref<ContextMention[]>([])
 
 let watchStarted = false
 let stopBudgetWatch: (() => void) | null = null
+let refreshImpl: (() => Promise<void>) | null = null
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     stopBudgetWatch?.()
     stopBudgetWatch = null
     watchStarted = false
+    refreshImpl = null
   })
 }
 
@@ -153,39 +155,53 @@ export default () => {
     })
   }
 
+  refreshImpl = refreshContextBudget
+
   if (!watchStarted) {
     watchStarted = true
-    stopBudgetWatch = watch(
-      [
-        draftModelRef,
-        draftMode,
-        draftMentions,
-        () => chatStore.loading.value,
-        () => timelineBudgetKey(chatStore.timeline.value),
-        () => chatStore.messages.value.length,
-        () => fleet.activeProject.value?.id,
-        () => chatStore.meta.value?.model,
-        () => chatStore.meta.value?.mode,
-        () => chatStore.meta.value?.prefixSnapshot?.hash,
-        () => chatStore.meta.value?.id,
-        () => chatStore.meta.value?.activeContext?.includeFromCreatedAt,
-        () => chatStore.meta.value?.activeContext?.summary,
-        () => mcpStatusKey(mcp.serverStates.value),
-        () => config.effectiveSettings.value['models.catalogOptions'],
-        () => config.effectiveSettings.value['models.catalogMeta'],
-      ],
-      () => {
-        const timer = window.setTimeout(() => {
-          refreshContextBudget().catch((error) => {
-            toast.error('Failed to refresh context usage', {
-              description: error instanceof Error ? error.message : 'Unknown error',
+    const scope = effectScope(true)
+    stopBudgetWatch = () => {
+      scope.stop()
+    }
+    scope.run(() => {
+      watch(
+        [
+          draftModelRef,
+          draftMode,
+          draftMentions,
+          () => chatStore.loading.value,
+          () => timelineBudgetKey(chatStore.timeline.value),
+          () => chatStore.messages.value.length,
+          () => fleet.activeProject.value?.id,
+          () => chatStore.meta.value?.model,
+          () => chatStore.meta.value?.mode,
+          () => chatStore.meta.value?.prefixSnapshot?.hash,
+          () => chatStore.meta.value?.id,
+          () => chatStore.meta.value?.activeContext?.includeFromCreatedAt,
+          () => chatStore.meta.value?.activeContext?.summary,
+          () => mcpStatusKey(mcp.serverStates.value),
+          () => config.effectiveSettings.value['models.catalogOptions'],
+          () => config.effectiveSettings.value['models.catalogMeta'],
+        ],
+        () => {
+          const timer = window.setTimeout(() => {
+            const refresh = refreshImpl
+            if (!refresh) {
+              return
+            }
+            refresh().catch((error: unknown) => {
+              toast.error('Failed to refresh context usage', {
+                description: error instanceof Error ? error.message : 'Unknown error',
+              })
             })
+          }, 0)
+          onWatcherCleanup(() => {
+            window.clearTimeout(timer)
           })
-        }, 0)
-        return () => window.clearTimeout(timer)
-      },
-      { immediate: true },
-    )
+        },
+        { immediate: true },
+      )
+    })
   }
 
   return {

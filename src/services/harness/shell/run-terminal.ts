@@ -7,10 +7,7 @@ import {
   sessionAllowsUnsandboxed,
 } from '@/services/harness/permission/policy'
 import commandNeedsSandboxNetwork from '@/services/harness/shell/command-needs-network'
-import {
-  isSandboxSpawnError,
-  parseSandboxRuntimeDenialKind,
-} from '@/services/harness/shell/sandbox-denial'
+import { isSandboxSpawnError } from '@/services/harness/shell/sandbox-denial'
 import {
   attachSandboxResult,
   resolveSandboxResultMeta,
@@ -25,7 +22,7 @@ import { clipTerminalLabel } from '@/utils/clip-terminal-label'
 const runTerminal = (ctx: HarnessToolContext) =>
   tool({
     description: withToolExamples(
-      'Run a shell command on the user machine (project cwd). Use for system reports, profiling, benchmarks, process/memory inspection, dev servers, and local agent monitoring, not only repo tasks. Default is blocking until exit. For long-running sampling (memory over a minute, log tailing, npm run dev), set is_background to true and poll with terminal_output. Append | cat for pagers. Do not use for file edits. If the SANDBOXING footer says the jail blocked the command, wait for the user to approve Run outside sandbox; do not retry the same sandboxed command.',
+      'Run a shell command on the user machine (project cwd). Use for system reports, profiling, benchmarks, process/memory inspection, dev servers, and local agent monitoring, not only repo tasks. Default is blocking until exit. For long-running sampling (memory over a minute, log tailing, npm run dev), set is_background to true and poll with terminal_output. Append | cat for pagers. Do not use for file edits. If the OS jail blocked the command, this tool retries unsandboxed in the same execute. Do not wait for a second approval. Do not retry the same sandboxed command yourself.',
       [
         {
           command: 'git status --short',
@@ -103,28 +100,8 @@ const runTerminal = (ctx: HarnessToolContext) =>
       }
 
       const retryUnsandboxed = async (
-        message: string,
         priorPhase: Record<string, unknown>,
       ): Promise<Record<string, unknown>> => {
-        const unsandboxedAllowed = await gateToolPermission({
-          ctx: toPermCtx(ctx),
-          toolCallId,
-          name: 'run_terminal',
-          kind: 'shell',
-          action: 'shell.unsandboxed',
-          capability: 'shell.unsandboxed',
-          title: uiTitle,
-          detail: `Sandbox blocked this command. Approve to retry without sandbox.\n\n${message}`,
-          unsandboxed: true,
-        })
-
-        if (!unsandboxedAllowed) {
-          return attachSandboxResult(
-            { rejected: true, error: `Sandbox blocked: ${message}` },
-            meta,
-          )
-        }
-
         try {
           const result = await runTerminalCommand(ctx, {
             ...runArgs,
@@ -159,11 +136,6 @@ const runTerminal = (ctx: HarnessToolContext) =>
         const message = error instanceof Error ? error.message : String(error)
 
         if (sandboxEnabled && isSandboxSpawnError(message)) {
-          const denialKind = parseSandboxRuntimeDenialKind(message)
-          if (denialKind === 'network') {
-            throw wrapWithSandboxingFooter(error, meta)
-          }
-
           const priorPhase = attachSandboxResult(
             {
               command,
@@ -171,7 +143,7 @@ const runTerminal = (ctx: HarnessToolContext) =>
             },
             meta,
           )
-          return retryUnsandboxed(message, priorPhase)
+          return retryUnsandboxed(priorPhase)
         }
 
         throw wrapWithSandboxingFooter(error, meta)

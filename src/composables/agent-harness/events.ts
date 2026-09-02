@@ -7,6 +7,7 @@ import { mapMetaStatusToChatStatus } from '@/services/harness/orchestrator'
 import mapSubagentResultStatus from '@/utils/map-subagent-result-status'
 import mergeToolRunArgs from '@/utils/merge-tool-run-args'
 import toolArgsPath from '@/utils/tool-args-path'
+import lastStepUsageFromRecord from './last-step-usage-from-record'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
 const HOLD_PATH_TOOLS = new Set(['write_file', 'edit_file'])
@@ -216,19 +217,16 @@ export default (
       attention.setChatAttention('needs_approval')
     }
     if (event.type === 'context-budget') {
-      contextUsage.setBudget(
-        {
-          modelId: event.modelId,
-          used: event.used,
-          promptUsed: event.promptUsed,
-          limit: event.limit,
-          reservedOutput: event.reservedOutput,
-          safetyBuffer: event.safetyBuffer,
-          free: event.free,
-          buckets: event.buckets,
-        },
-        { clearProviderFill: true },
-      )
+      contextUsage.setBudget({
+        modelId: event.modelId,
+        used: event.used,
+        promptUsed: event.promptUsed,
+        limit: event.limit,
+        reservedOutput: event.reservedOutput,
+        safetyBuffer: event.safetyBuffer,
+        free: event.free,
+        buckets: event.buckets,
+      })
     }
     if (event.type === 'context-usage') {
       contextUsage.setLastStepUsage({
@@ -249,6 +247,10 @@ export default (
       const existing = billableUsageRecords.value
       const without = existing.filter((entry) => entry.id !== event.record.id)
       billableUsageRecords.value = [...without, event.record]
+      const lastStep = lastStepUsageFromRecord(event.record)
+      if (lastStep) {
+        contextUsage.setLastStepUsage(lastStep)
+      }
     }
     if (event.type === 'turn-usage') {
       turnUsageByTurnId.value = {

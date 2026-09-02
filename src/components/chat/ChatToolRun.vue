@@ -214,7 +214,12 @@ const diffCounts = computed(() => {
         <pre class="max-h-40 overflow-auto whitespace-pre-wrap wrap-break-word">{{ argsText }}</pre>
       </div>
       <div v-if="hasDiffs" class="space-y-2">
-        <ChatInlineFileDiff v-for="diff in diffs" :key="diff.path" :diff="diff" />
+        <ChatInlineFileDiff
+          v-for="diff in diffs"
+          :key="diff.path"
+          :diff="diff"
+          :show-path="diffs.length > 1"
+        />
       </div>
       <div v-if="codebaseArtifacts.length > 0" class="space-y-1">
         <p class="mb-1 font-medium text-foreground/80">Locations</p>

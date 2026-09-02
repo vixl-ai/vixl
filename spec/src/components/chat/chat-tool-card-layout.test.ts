@@ -1,9 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
+import ChatInlineFileDiff from '@/components/chat/InlineFileDiff.vue'
 import ChatToolCard from '@/components/chat/ChatToolCard.vue'
 import { CollapsibleTrigger } from '@/components/shadcn/ui/collapsible'
+import type { FileDiff } from '@/types/harness/file-diff'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import { WifiIcon } from '@lucide/vue'
+
+const fileDiff = (path: string): FileDiff => ({
+  path,
+  operation: 'update',
+  hunks: [
+    {
+      oldStart: 1,
+      newStart: 1,
+      lines: [{ kind: 'add', content: 'added' }],
+    },
+  ],
+})
 
 const approval: PendingApprovalView = {
   toolCallId: 'tc-write',
@@ -97,5 +111,42 @@ describe('ChatToolCard layout', () => {
     expect(wrapper.html()).toContain('Allow once')
     expect(wrapper.html()).toContain('Allow session')
     expect(wrapper.html()).not.toContain('Allow network in sandbox')
+  })
+
+  it('hides the path line for a single-file fs approval', () => {
+    const wrapper = shallowMount(ChatToolCard, {
+      props: {
+        approval: {
+          ...approval,
+          diff: [fileDiff('src/foo.ts')],
+        },
+      },
+      global: {
+        renderStubDefaultSlot: true,
+      },
+    })
+    const diffs = wrapper.findAllComponents(ChatInlineFileDiff)
+
+    expect(diffs).toHaveLength(1)
+    expect(diffs[0]?.props('showPath')).toBe(false)
+  })
+
+  it('shows a path line on each diff for multi-file fs approval', () => {
+    const wrapper = shallowMount(ChatToolCard, {
+      props: {
+        approval: {
+          ...approval,
+          diff: [fileDiff('src/a.ts'), fileDiff('src/b.ts')],
+        },
+      },
+      global: {
+        renderStubDefaultSlot: true,
+      },
+    })
+    const diffs = wrapper.findAllComponents(ChatInlineFileDiff)
+
+    expect(diffs).toHaveLength(2)
+    expect(diffs[0]?.props('showPath')).toBe(true)
+    expect(diffs[1]?.props('showPath')).toBe(true)
   })
 })

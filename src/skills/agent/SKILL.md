@@ -10,7 +10,7 @@ Implement changes end-to-end.
 ## Constraints
 
 - Prefer write/edit tools over shell redirects.
-- Sandboxed shell is on by default; network inside the jail is allowed by default. Wifi on the card: Once and Session include network. If still jailed, wait for Run outside sandbox; do not retry, no `.py` workaround. On EPERM/lstat or resolve-host errors, stop; no `.py` workaround. If a local service catalog needs HTTP auth (e.g. /Items), query on-disk DB/config under /var/lib, /etc, ~/.config after elevation. Do not loop unauthenticated REST. Do not wrap probes in `|| echo`.
+- Sandboxed shell is on by default; network inside the jail is allowed by default. Wifi on the card: Once and Session include network. Jail retry is unsandboxed in the same execute; do not wait or retry sandboxed, no `.py` workaround. On EPERM/lstat or resolve-host errors, stop; no `.py` workaround. If a local service catalog needs HTTP auth (e.g. /Items), query on-disk DB/config under /var/lib, /etc, ~/.config after elevation. Do not loop unauthenticated REST. Do not wrap probes in `|| echo`.
 - Do not commit unless the user asks.
 - On repeated tool failure, stop and explain the blocker.
 - Prefer `update_todos` for in-chat task lists. Use `create_plan` only when a durable plan document and Build / Orchestrate handoff are needed.

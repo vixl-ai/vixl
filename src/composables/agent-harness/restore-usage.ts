@@ -1,37 +1,26 @@
 import { toast } from 'vue-sonner'
+import type { LastStepUsage } from '@/composables/use-context-usage'
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
 import type { TurnUsageAggregate } from '@/types/billing/turn-usage-aggregate'
 import aggregateTurnUsage from '@/services/billing/aggregate-turn-usage'
 import readUsageLedger from '@/services/billing/read-usage-ledger'
+import lastStepUsageFromRecord from './last-step-usage-from-record'
 import type { AgentHarnessState } from './types'
 
-const recordHasTokens = (record: BillableUsageRecord): boolean => {
-  const usage = record.usage
-  return (
-    (usage.inputTokens ?? 0) > 0 ||
-    (usage.outputTokens ?? 0) > 0 ||
-    (usage.cacheReadTokens ?? 0) > 0 ||
-    (usage.cacheWriteTokens ?? 0) > 0 ||
-    (usage.noCacheTokens ?? 0) > 0 ||
-    (usage.reasoningTokens ?? 0) > 0 ||
-    (usage.textTokens ?? 0) > 0 ||
-    (usage.totalTokens ?? 0) > 0
-  )
-}
-
-const latestMainWithTokens = (
-  records: BillableUsageRecord[],
-): BillableUsageRecord | null => {
-  let latest: BillableUsageRecord | null = null
+const latestMainLastStep = (records: BillableUsageRecord[]): LastStepUsage | null => {
+  let latestAt: string | null = null
+  let lastStep: LastStepUsage | null = null
   for (const record of records) {
-    if (record.source !== 'main' || !recordHasTokens(record)) {
+    const mapped = lastStepUsageFromRecord(record)
+    if (!mapped) {
       continue
     }
-    if (!latest || record.at >= latest.at) {
-      latest = record
+    if (!latestAt || record.at >= latestAt) {
+      latestAt = record.at
+      lastStep = mapped
     }
   }
-  return latest
+  return lastStep
 }
 
 const mergeRecords = (
@@ -70,23 +59,13 @@ export default (state: AgentHarnessState) => {
       billableUsageRecords.value = merged
       turnUsageByTurnId.value = aggregatesByTurnId(merged)
 
-      const latestMain = latestMainWithTokens(merged)
+      const lastStep = latestMainLastStep(merged)
       const isActive = chatStore.isSessionActive(options.projectSlug, options.chatId)
-      if (!latestMain || !isActive || status.value !== 'ready') {
+      if (!lastStep || !isActive || status.value !== 'ready') {
         return
       }
 
-      const usage = latestMain.usage
-      const inputTokens = usage.inputTokens ?? 0
-      const cacheReadTokens = usage.cacheReadTokens ?? 0
-      const cacheWriteTokens = usage.cacheWriteTokens ?? 0
-      contextUsage.setLastStepUsage({
-        promptTokens: inputTokens,
-        inputTokens,
-        outputTokens: usage.outputTokens ?? 0,
-        cacheReadTokens,
-        cacheWriteTokens,
-      })
+      contextUsage.setLastStepUsage(lastStep)
     } catch (error) {
       toast.error('Failed to restore usage', {
         description: error instanceof Error ? error.message : 'Unknown error',

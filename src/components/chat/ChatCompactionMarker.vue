@@ -9,7 +9,7 @@ defineProps<{
 
 <template>
   <Marker
-    :variant="pending ? 'default' : 'border'"
+    variant="default"
     class="w-full"
   >
     <MarkerContent>

@@ -242,7 +242,7 @@ describe('build-tools run_terminal', () => {
       'SANDBOXING:',
     )
     expect(String((result as { sandboxing: string }).sandboxing)).toContain(
-      'Run outside sandbox',
+      'the harness retries outside the sandbox if the user already approved this command',
     )
   })
 
@@ -264,7 +264,7 @@ describe('build-tools run_terminal', () => {
       /Command failed \(killed by signal 6\): Aborted/,
     )
     await expect(runTool(tools.run_terminal.execute, { command: 'false' })).rejects.toThrow(
-      /SANDBOXING:[\s\S]*Run outside sandbox/,
+      /SANDBOXING:[\s\S]*harness retries outside the sandbox/,
     )
   })
 
@@ -323,22 +323,18 @@ describe('build-tools run_terminal', () => {
     const tools = buildTools(ctx)
     const result = await runTool(tools.run_terminal.execute, { command: 'echo hello' })
 
-    expect(gateToolPermission).toHaveBeenCalledTimes(2)
-    expect(gateToolPermission).toHaveBeenNthCalledWith(
-      1,
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'shell',
         capability: 'shell',
         unsandboxed: false,
       }),
     )
-    expect(gateToolPermission).toHaveBeenNthCalledWith(
-      2,
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'shell.unsandboxed',
         capability: 'shell.unsandboxed',
-        unsandboxed: true,
-        title: 'echo hello',
       }),
     )
     expect(createAgentShell).toHaveBeenNthCalledWith(
@@ -435,23 +431,20 @@ describe('build-tools run_terminal', () => {
     )
   })
 
-  it('returns a sandboxed denial when the unsandboxed retry is refused', async () => {
-    createAgentShell.mockRejectedValueOnce(new Error('SANDBOX_FAILED: bwrap'))
-    gateToolPermission
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false)
+  it('does not retry unsandboxed when the first gate is denied', async () => {
+    gateToolPermission.mockResolvedValueOnce(false)
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(ctx)
     const result = await runTool(tools.run_terminal.execute, { command: 'echo hello' })
 
-    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).not.toHaveBeenCalled()
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
     expect(result).toMatchObject({
       rejected: true,
       sandboxed: true,
-      network: 'allow',
+      error: 'Shell access denied',
     })
-    expect(String((result as { error: string }).error)).toContain('SANDBOX_FAILED')
   })
 
   it('gates npm audit as shell.network once and spawns with allowNetwork true', async () => {
@@ -482,24 +475,33 @@ describe('build-tools run_terminal', () => {
     )
   })
 
-  it('does not prompt shell.network after a network jail when first gate was shell', async () => {
+  it('retries unsandboxed after a network jail when first gate was shell', async () => {
     const denyNetworkCtx = {
       ...ctx,
       settings: { version: 1, 'agent.sandbox.network': 'deny' } as VixlSettings,
     }
 
-    createAgentShell.mockRejectedValueOnce(
-      new Error(
-        'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
-      ),
-    )
+    createAgentShell
+      .mockRejectedValueOnce(
+        new Error(
+          'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
+        ),
+      )
+      .mockResolvedValueOnce({
+        shellId: 'shell-1',
+        status: 'running',
+        stdout: '',
+        stderr: '',
+        exitCode: null,
+        chatId: 'chat-1',
+        projectRoot: '/project',
+        command: 'git status',
+        startedAt: new Date().toISOString(),
+      })
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(denyNetworkCtx)
-
-    await expect(
-      runTool(tools.run_terminal.execute, { command: 'git status' }),
-    ).rejects.toThrow(/SANDBOXING:/)
+    const result = await runTool(tools.run_terminal.execute, { command: 'git status' })
 
     expect(gateToolPermission).toHaveBeenCalledTimes(1)
     expect(gateToolPermission).toHaveBeenCalledWith(
@@ -515,14 +517,37 @@ describe('build-tools run_terminal', () => {
         capability: 'shell.network',
       }),
     )
-    expect(createAgentShell).toHaveBeenCalledTimes(1)
-    expect(createAgentShell).toHaveBeenCalledWith(
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'shell.unsandboxed',
+        capability: 'shell.unsandboxed',
+      }),
+    )
+    expect(createAgentShell).toHaveBeenCalledTimes(2)
+    expect(createAgentShell).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
         command: 'git status',
         sandboxed: true,
         allowNetwork: false,
       }),
     )
+    expect(createAgentShell).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        command: 'git status',
+        sandboxed: false,
+        allowNetwork: true,
+      }),
+    )
+    expect(result).toMatchObject({
+      sandboxed: false,
+      network: 'allow',
+      priorPhase: {
+        sandboxed: true,
+        network: 'deny',
+      },
+    })
   })
 
   it('skips the network hop for isolated devices and goes unsandboxed', async () => {
@@ -548,13 +573,11 @@ describe('build-tools run_terminal', () => {
     const tools = buildTools(ctx)
     const result = await runTool(tools.run_terminal.execute, { command: 'lsblk' })
 
-    expect(gateToolPermission).toHaveBeenCalledTimes(2)
-    expect(gateToolPermission).toHaveBeenNthCalledWith(
-      2,
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'shell.unsandboxed',
         capability: 'shell.unsandboxed',
-        unsandboxed: true,
       }),
     )
     expect(createAgentShell).toHaveBeenNthCalledWith(
@@ -597,12 +620,11 @@ describe('build-tools run_terminal', () => {
     const tools = buildTools(ctx)
     await runTool(tools.run_terminal.execute, { command: 'find /srv' })
 
-    expect(gateToolPermission).toHaveBeenNthCalledWith(
-      2,
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'shell.unsandboxed',
         capability: 'shell.unsandboxed',
-        unsandboxed: true,
       }),
     )
     expect(createAgentShell).toHaveBeenNthCalledWith(
@@ -614,7 +636,7 @@ describe('build-tools run_terminal', () => {
     )
   })
 
-  it('fails a network jail when sandbox network is already allow', async () => {
+  it('retries unsandboxed after a network jail when sandbox network is already allow', async () => {
     const networkCtx = {
       ...ctx,
       settings: {
@@ -624,25 +646,42 @@ describe('build-tools run_terminal', () => {
       } as VixlSettings,
     }
 
-    createAgentShell.mockRejectedValueOnce(
-      new Error(
-        'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
-      ),
-    )
+    createAgentShell
+      .mockRejectedValueOnce(
+        new Error(
+          'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
+        ),
+      )
+      .mockResolvedValueOnce({
+        shellId: 'shell-1',
+        status: 'running',
+        stdout: '',
+        stderr: '',
+        exitCode: null,
+        chatId: 'chat-1',
+        projectRoot: '/project',
+        command: 'curl -s https://example.com',
+        startedAt: new Date().toISOString(),
+      })
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(networkCtx)
+    const result = await runTool(tools.run_terminal.execute, {
+      command: 'curl -s https://example.com',
+    })
 
-    await expect(
-      runTool(tools.run_terminal.execute, {
-        command: 'curl -s https://example.com',
-      }),
-    ).rejects.toThrow(/SANDBOXING:/)
-
-    expect(createAgentShell).toHaveBeenCalledTimes(1)
-    expect(createAgentShell).toHaveBeenCalledWith(
+    expect(createAgentShell).toHaveBeenCalledTimes(2)
+    expect(createAgentShell).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
         sandboxed: true,
+        allowNetwork: true,
+      }),
+    )
+    expect(createAgentShell).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        sandboxed: false,
         allowNetwork: true,
       }),
     )
@@ -653,6 +692,14 @@ describe('build-tools run_terminal', () => {
         capability: 'shell.unsandboxed',
       }),
     )
+    expect(result).toMatchObject({
+      sandboxed: false,
+      network: 'allow',
+      priorPhase: {
+        sandboxed: true,
+        network: 'allow',
+      },
+    })
   })
 
   it('spawns with allowNetwork when sessionAllows has shell.network', async () => {
@@ -714,21 +761,12 @@ describe('build-tools run_terminal', () => {
     )
   })
 
-  it('keeps later /var/lib and sqlite commands unsandboxed after elevation', async () => {
+  it('does not add shell.unsandboxed to sessionAllows after a silent retry', async () => {
     const sessionAllows = new Set<string>()
     const stickyCtx = {
       ...ctx,
       sessionAllows,
     }
-    const sqliteCommand =
-      'python3 -c "import sqlite3; sqlite3.connect(\'/var/lib/jellyfin/data/jellyfin.db\').execute(\'select 1\')"'
-
-    gateToolPermission.mockImplementation(async (args: { capability: string }) => {
-      if (args.capability === 'shell.unsandboxed') {
-        sessionAllows.add('shell.unsandboxed')
-      }
-      return true
-    })
 
     createAgentShell.mockRejectedValueOnce(new Error('SANDBOX_FAILED: bwrap'))
 
@@ -739,7 +777,8 @@ describe('build-tools run_terminal', () => {
       command: 'cat /var/lib/jellyfin/config.xml',
     })
 
-    expect(sessionAllows.has('shell.unsandboxed')).toBe(true)
+    expect(sessionAllows.has('shell.unsandboxed')).toBe(false)
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
     expect(createAgentShell).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
@@ -773,53 +812,17 @@ describe('build-tools run_terminal', () => {
     expect(createAgentShell).toHaveBeenCalledWith(
       expect.objectContaining({
         command: 'ls /var/lib/jellyfin',
-        sandboxed: false,
+        sandboxed: true,
         allowNetwork: true,
       }),
     )
     expect(gateToolPermission).toHaveBeenCalledTimes(1)
     expect(gateToolPermission).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'shell.unsandboxed',
-        capability: 'shell.unsandboxed',
-        unsandboxed: true,
+        action: 'shell',
+        capability: 'shell',
+        unsandboxed: false,
       }),
-    )
-    expect(gateToolPermission).not.toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'shell' }),
-    )
-
-    gateToolPermission.mockClear()
-    createAgentShell.mockClear()
-    createAgentShell.mockResolvedValue({
-      shellId: 'shell-1',
-      status: 'running',
-      stdout: '',
-      stderr: '',
-      exitCode: null,
-      chatId: 'chat-1',
-      projectRoot: '/project',
-      command: sqliteCommand,
-      startedAt: new Date().toISOString(),
-    })
-
-    await runTool(
-      tools.run_terminal.execute,
-      { command: sqliteCommand },
-      'tc-sqlite-var-lib',
-    )
-
-    expect(createAgentShell).toHaveBeenCalledTimes(1)
-    expect(createAgentShell).toHaveBeenCalledWith(
-      expect.objectContaining({
-        command: sqliteCommand,
-        sandboxed: false,
-        allowNetwork: true,
-      }),
-    )
-    expect(gateToolPermission).toHaveBeenCalledTimes(1)
-    expect(gateToolPermission).not.toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'shell' }),
     )
   })
 })

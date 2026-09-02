@@ -21,7 +21,7 @@ describe('enrich-tool-error', () => {
 
   it('does not attach edit_file when the SANDBOXING footer is present', () => {
     const result = enrichToolError(
-      'Command failed (exit 1): operation not permitted\n\nSANDBOXING: If this failed due to the jail, the user will get a Run outside sandbox prompt.',
+      'Command failed (exit 1): operation not permitted\n\nSANDBOXING: If this failed due to the jail, the harness retries outside the sandbox if the user already approved this command.',
     )
     expect(result).not.toContain('edit_file')
   })

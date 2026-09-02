@@ -136,6 +136,25 @@ describe('restoreUsageLedger', () => {
     })
   })
 
+  it('skips last-step when only subagent rows have tokens', async () => {
+    readUsageLedger.mockResolvedValue([
+      record({
+        id: 'row-sub',
+        turnId: 'turn-a',
+        source: 'subagent',
+        subagentId: 'sub-1',
+        at: '2026-01-01T00:01:00.000Z',
+      }),
+    ])
+
+    const state = buildState()
+    const { restoreUsageLedger } = createRestoreUsage(state)
+    await restoreUsageLedger()
+
+    expect(state.turnUsageByTurnId.value['turn-a']?.inputTokens).toBe(100)
+    expect(state.contextUsage.setLastStepUsage).not.toHaveBeenCalled()
+  })
+
   it('skips last-step when the session is not active', async () => {
     readUsageLedger.mockResolvedValue([
       record({

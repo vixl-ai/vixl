@@ -20,12 +20,15 @@ describe('sandbox-result', () => {
     ).toEqual({ sandboxed: false, network: 'allow' })
   })
 
-  it('tells the model to wait for Run outside sandbox and not write a py workaround', () => {
+  it('tells the model the harness retries unsandboxed and not to write a py workaround', () => {
     const footer = sandboxingFooter({ sandboxed: true, network: 'deny' })
     expect(footer.startsWith('SANDBOXING:')).toBe(true)
     expect(footer).toContain('Network: deny')
-    expect(footer).toContain('Run outside sandbox')
-    expect(footer).toContain('Do not retry the same sandboxed command')
+    expect(footer).toContain(
+      'the harness retries outside the sandbox if the user already approved this command',
+    )
+    expect(footer).not.toContain('Run outside sandbox')
+    expect(footer).toContain('Do not retry the same sandboxed command yourself')
     expect(footer).toContain('Do not write a .py workaround')
     expect(footer).not.toContain('required_permissions')
   })

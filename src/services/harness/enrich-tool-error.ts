@@ -26,7 +26,9 @@ const ERROR_HINTS: Array<{ pattern: RegExp; hint: string }> = [
 ]
 
 const isSandboxJailMessage = (message: string): boolean =>
-  /SANDBOX_|isolated devices|isolated \/dev|Run outside sandbox/i.test(message)
+  /SANDBOX_|isolated devices|isolated \/dev|Run outside sandbox|SANDBOXING:/i.test(
+    message,
+  )
 
 export default (message: string): string => {
   const hint = ERROR_HINTS.find((entry) => entry.pattern.test(message))?.hint

@@ -34,7 +34,7 @@ export const sandboxingFooter = (meta: SandboxResultMeta): string => {
     'SANDBOXING: This command ran in a sandbox with the following restrictions:',
     '- Filesystem: writes limited to the project; devices are isolated (no /dev/disk)',
     `- Network: ${meta.network}`,
-    'If this failed due to the jail, the user will get a Run outside sandbox prompt. Do not retry the same sandboxed command. Do not write a .py workaround.',
+    'If this failed due to the jail, the harness retries outside the sandbox if the user already approved this command. Do not retry the same sandboxed command yourself. Do not write a .py workaround.',
   ].join('\n')
 }
 

@@ -95,6 +95,7 @@ const open = ref(false)
           v-for="diff in approval.diff"
           :key="diff.path"
           :diff="diff"
+          :show-path="approval.diff.length > 1"
         />
       </div>
     </CollapsibleContent>
