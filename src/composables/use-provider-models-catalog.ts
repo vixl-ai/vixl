@@ -6,6 +6,7 @@ import type { ProviderModelGroup } from '@/types/models/provider-model-group'
 import listAllProviderModels from '@/services/providers/list-all-provider-models'
 import collapseProviderModelGroups from '@/services/models/collapse-provider-model-groups'
 import mergeCatalogMetaFromGroups from '@/services/models/merge-catalog-meta-from-groups'
+import mergeExtraModels from '@/services/models/merge-extra-models'
 import { getModelCatalogMetaMap } from '@/services/models/model-catalog-meta'
 import { filterProviderModelGroups } from '@/services/models/search'
 import serializeModelRef from '@/utils/serialize-model-ref'
@@ -19,58 +20,10 @@ export type UseProviderModelsCatalogOptions = {
   extraModelRefs?: Ref<string[]> | ComputedRef<string[]>
 }
 
-const mergeExtraModels = (
-  groups: ProviderModelGroup[],
-  extraRefs: string[],
-): ProviderModelGroup[] => {
-  if (extraRefs.length === 0) {
-    return groups
-  }
-
-  const next = groups.map((group) => ({
-    ...group,
-    models: [...group.models],
-  }))
-  const groupByProvider = new Map(next.map((group) => [group.providerId, group]))
-
-  for (const serialized of extraRefs) {
-    const separatorIndex = serialized.indexOf('::')
-    if (separatorIndex <= 0) {
-      continue
-    }
-    const providerId = serialized.slice(0, separatorIndex)
-    const modelId = serialized.slice(separatorIndex + 2)
-    if (!providerId || !modelId) {
-      continue
-    }
-
-    const existing = groupByProvider.get(providerId)
-    const modelRef = { providerId, modelId }
-    if (existing) {
-      const alreadyPresent = existing.models.some(
-        (model) => model.providerId === providerId && model.modelId === modelId,
-      )
-      if (!alreadyPresent) {
-        existing.models.unshift(modelRef)
-      }
-      continue
-    }
-
-    const created: ProviderModelGroup = {
-      providerId,
-      providerName: providerId,
-      models: [modelRef],
-    }
-    next.push(created)
-    groupByProvider.set(providerId, created)
-  }
-
-  return next.sort((left, right) => left.providerName.localeCompare(right.providerName))
-}
-
 export default (options: UseProviderModelsCatalogOptions) => {
   const config = useVixlConfig()
   const groups = ref<ProviderModelGroup[]>([])
+  const listedGroups = ref<ProviderModelGroup[]>([])
   const loading = ref(false)
   let loadGeneration = 0
 
@@ -112,6 +65,13 @@ export default (options: UseProviderModelsCatalogOptions) => {
     return `${providerKeys.join('|')}::${customPayload}`
   })
 
+  const applyGroups = (): void => {
+    const extra = options.extraModelRefs?.value ?? []
+    groups.value = collapseProviderModelGroups(
+      mergeExtraModels(listedGroups.value, extra),
+    )
+  }
+
   const refresh = async (): Promise<void> => {
     const generation = ++loadGeneration
     loading.value = true
@@ -121,8 +81,8 @@ export default (options: UseProviderModelsCatalogOptions) => {
       if (generation !== loadGeneration) {
         return
       }
-      const extra = options.extraModelRefs?.value ?? []
-      groups.value = collapseProviderModelGroups(mergeExtraModels(loaded, extra))
+      listedGroups.value = loaded
+      applyGroups()
       await persistCatalogMeta(loaded, generation)
     } finally {
       if (generation === loadGeneration) {
@@ -160,7 +120,7 @@ export default (options: UseProviderModelsCatalogOptions) => {
     serializeModelRef({ providerId, modelId })
 
   watch(
-    [settingsFingerprint, () => options.extraModelRefs?.value],
+    settingsFingerprint,
     async () => {
       try {
         await refresh()
@@ -169,7 +129,15 @@ export default (options: UseProviderModelsCatalogOptions) => {
         loading.value = false
       }
     },
-    { immediate: true, deep: true },
+    { immediate: true },
+  )
+
+  watch(
+    () => options.extraModelRefs?.value,
+    () => {
+      applyGroups()
+    },
+    { deep: true },
   )
 
   return {
