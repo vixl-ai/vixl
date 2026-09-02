@@ -3,6 +3,7 @@ import { shallowMount } from '@vue/test-utils'
 import ChatToolCard from '@/components/chat/ChatToolCard.vue'
 import { CollapsibleTrigger } from '@/components/shadcn/ui/collapsible'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
+import { WifiIcon } from '@lucide/vue'
 
 const approval: PendingApprovalView = {
   toolCallId: 'tc-write',
@@ -10,6 +11,15 @@ const approval: PendingApprovalView = {
   kind: 'fs',
   title: 'Write src/foo.ts',
   allowedScopes: [],
+}
+
+const networkApproval: PendingApprovalView = {
+  toolCallId: 'tc-curl',
+  name: 'run_terminal',
+  kind: 'shell',
+  title: 'curl example.com',
+  allowedScopes: ['once', 'session'],
+  needsNetwork: true,
 }
 
 const mountCard = () =>
@@ -38,5 +48,54 @@ describe('ChatToolCard layout', () => {
     expect(triggerClass).toContain('items-center')
     expect(triggerClass).toContain('gap-2')
     expect(triggerClass).not.toContain('border-b')
+  })
+
+  it('shows a wifi icon next to the title when needsNetwork is set', () => {
+    const wrapper = shallowMount(ChatToolCard, {
+      props: { approval: networkApproval },
+      global: {
+        renderStubDefaultSlot: true,
+      },
+    })
+    expect(wrapper.findComponent(WifiIcon).exists()).toBe(true)
+    expect(wrapper.html()).toContain('This command uses network in the sandbox')
+  })
+
+  it('hides the wifi icon when the approval does not need network', () => {
+    const wrapper = mountCard()
+    expect(wrapper.findComponent(WifiIcon).exists()).toBe(false)
+  })
+
+  it('shows the wifi icon from the network-denied detail fallback', () => {
+    const wrapper = shallowMount(ChatToolCard, {
+      props: {
+        approval: {
+          ...networkApproval,
+          needsNetwork: undefined,
+          detail:
+            'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
+        },
+      },
+      global: {
+        renderStubDefaultSlot: true,
+      },
+    })
+    expect(wrapper.findComponent(WifiIcon).exists()).toBe(true)
+  })
+
+  it('does not put a wifi action on the approval buttons when needsNetwork is set', async () => {
+    const { default: ChatApprovalActions } = await import(
+      '@/components/chat/ChatApprovalActions.vue'
+    )
+    const wrapper = shallowMount(ChatApprovalActions, {
+      props: { approval: networkApproval },
+      global: {
+        renderStubDefaultSlot: true,
+      },
+    })
+    expect(wrapper.findComponent(WifiIcon).exists()).toBe(false)
+    expect(wrapper.html()).toContain('Allow once')
+    expect(wrapper.html()).toContain('Allow session')
+    expect(wrapper.html()).not.toContain('Allow network in sandbox')
   })
 })

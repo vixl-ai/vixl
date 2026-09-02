@@ -26,6 +26,7 @@ export type HarnessEvent =
       title: string
       detail?: string
       unsandboxed?: boolean
+      needsNetwork?: boolean
       allowedScopes: PermissionScope[]
       diff: FileDiff[]
       subagentId?: string

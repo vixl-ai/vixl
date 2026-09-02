@@ -141,6 +141,12 @@ const hasSandboxedConnectFail = (
   )
 }
 
+const hasNpmRegistryNetworkFailure = (text: string): boolean =>
+  text.includes('getaddrinfo ENOTFOUND') ||
+  /npm error audit endpoint returned an error/i.test(text) ||
+  /audit request to https:\/\//i.test(text) ||
+  /npm error network/i.test(text)
+
 const detectEmptySs = (text: string, command: string | undefined): boolean => {
   if (isSsHeaderOnly(text)) {
     return true
@@ -150,6 +156,10 @@ const detectEmptySs = (text: string, command: string | undefined): boolean => {
 
 const isSandboxedContext = (options?: DetectSandboxRuntimeDenialOptions): boolean =>
   options?.sandboxed !== false
+
+const isNetworkDeniedSandbox = (
+  options?: DetectSandboxRuntimeDenialOptions,
+): boolean => isSandboxedContext(options) && options?.allowNetwork !== true
 
 const OUT_OF_WORKSPACE_ROOTS = ['/srv', '/mnt', '/media', '/opt'] as const
 
@@ -276,6 +286,10 @@ const detectSandboxRuntimeDenial = (
     isSandboxedContext(options) &&
     hasSandboxedConnectFail(text, options?.command)
   ) {
+    return 'network'
+  }
+
+  if (isNetworkDeniedSandbox(options) && hasNpmRegistryNetworkFailure(text)) {
     return 'network'
   }
 

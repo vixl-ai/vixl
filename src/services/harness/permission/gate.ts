@@ -22,6 +22,7 @@ export type PendingApprovalView = {
   title: string
   detail?: string
   unsandboxed?: boolean
+  needsNetwork?: boolean
   allowedScopes: PermissionScope[]
   diff?: FileDiff[]
   serverId?: string
@@ -78,6 +79,8 @@ export const gateToolPermission = async (args: {
     return false
   }
 
+  const needsNetwork = args.capability === 'shell.network' ? true : undefined
+
   args.ctx.onPendingApproval({
     toolCallId: args.toolCallId,
     name: args.name,
@@ -85,6 +88,7 @@ export const gateToolPermission = async (args: {
     title: args.title,
     detail: args.detail ?? decision.reason,
     unsandboxed: args.unsandboxed,
+    needsNetwork,
     allowedScopes: decision.allowedScopes,
     diff: args.diff,
     serverId: args.serverId,
@@ -102,6 +106,7 @@ export const gateToolPermission = async (args: {
     title: args.title,
     detail: args.detail ?? decision.reason,
     unsandboxed: args.unsandboxed,
+    needsNetwork,
     allowedScopes: decision.allowedScopes,
     diff: args.diff,
     subagentId: args.ctx.subagentId,

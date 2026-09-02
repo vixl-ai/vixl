@@ -41,14 +41,21 @@ export const createEmptyModel = (): ModelDraft => ({
 /** Custom openai-compatible providers have no gateway/OpenRouter cost path. */
 export const hasProviderCostPath = false
 
+const toDraftText = (value: string | number | null | undefined): string => {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  return String(value)
+}
+
 export const modelHasPricingConfigured = (draft: ModelDraft): boolean => {
   const pricing = draft.pricing
   return (
-    pricing.inputPerMillion.trim().length > 0 ||
-    pricing.outputPerMillion.trim().length > 0 ||
-    pricing.cacheReadPerMillion.trim().length > 0 ||
-    pricing.cacheWritePerMillion.trim().length > 0 ||
-    pricing.reasoningPerMillion.trim().length > 0
+    toDraftText(pricing.inputPerMillion).trim().length > 0 ||
+    toDraftText(pricing.outputPerMillion).trim().length > 0 ||
+    toDraftText(pricing.cacheReadPerMillion).trim().length > 0 ||
+    toDraftText(pricing.cacheWritePerMillion).trim().length > 0 ||
+    toDraftText(pricing.reasoningPerMillion).trim().length > 0
   )
 }
 
@@ -68,8 +75,8 @@ export const pricingToDraft = (pricing?: ModelPricingRates): PricingDraft => {
   }
 }
 
-export const parseOptionalNumber = (value: string): number | undefined => {
-  const trimmed = value.trim()
+export const parseOptionalNumber = (value: string | number): number | undefined => {
+  const trimmed = toDraftText(value).trim()
   if (!trimmed) {
     return undefined
   }
@@ -82,11 +89,11 @@ export const parseOptionalNumber = (value: string): number | undefined => {
 
 export const draftToPricing = (draft: PricingDraft): ModelPricingRates | undefined => {
   if (
-    !draft.inputPerMillion.trim() &&
-    !draft.outputPerMillion.trim() &&
-    !draft.cacheReadPerMillion.trim() &&
-    !draft.cacheWritePerMillion.trim() &&
-    !draft.reasoningPerMillion.trim()
+    !toDraftText(draft.inputPerMillion).trim() &&
+    !toDraftText(draft.outputPerMillion).trim() &&
+    !toDraftText(draft.cacheReadPerMillion).trim() &&
+    !toDraftText(draft.cacheWritePerMillion).trim() &&
+    !toDraftText(draft.reasoningPerMillion).trim()
   ) {
     return undefined
   }

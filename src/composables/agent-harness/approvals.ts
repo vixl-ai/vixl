@@ -186,6 +186,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
       title: entry.title,
       detail: entry.detail,
       unsandboxed: entry.unsandboxed,
+      needsNetwork: entry.needsNetwork,
       allowedScopes: entry.allowedScopes,
       diff: entry.diff,
       subagentId: entry.subagentId,

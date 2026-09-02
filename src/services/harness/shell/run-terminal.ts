@@ -1,10 +1,12 @@
 import { tool } from 'ai'
 import { z } from 'zod'
+import { SANDBOX_NETWORK_DEFAULT } from '@/schemas/vixl-settings'
 import { gateToolPermission } from '@/services/harness/permission/gate'
 import {
   sessionAllowsNetwork,
   sessionAllowsUnsandboxed,
 } from '@/services/harness/permission/policy'
+import commandNeedsSandboxNetwork from '@/services/harness/shell/command-needs-network'
 import {
   isSandboxSpawnError,
   parseSandboxRuntimeDenialKind,
@@ -54,29 +56,44 @@ const runTerminal = (ctx: HarnessToolContext) =>
       const sandboxEnabled =
         (ctx.settings['agent.sandbox.enabled'] ?? true) &&
         !sessionAllowsUnsandboxed(ctx.sessionAllows)
-      const allowNetwork =
-        (ctx.settings['agent.sandbox.network'] ?? 'deny') === 'allow' ||
-        sessionAllowsNetwork(ctx.sessionAllows)
-      const meta = resolveSandboxResultMeta({
-        sandboxed: sandboxEnabled,
-        allowNetwork,
-      })
+      const needsNetwork =
+        sandboxEnabled && commandNeedsSandboxNetwork(command)
+      const settingsAllowNetwork =
+        (ctx.settings['agent.sandbox.network'] ?? SANDBOX_NETWORK_DEFAULT) ===
+          'allow' || sessionAllowsNetwork(ctx.sessionAllows)
+      const firstCapability = needsNetwork
+        ? 'shell.network'
+        : sandboxEnabled
+          ? 'shell'
+          : 'shell.unsandboxed'
       const allowed = await gateToolPermission({
         ctx: toPermCtx(ctx),
         toolCallId,
         name: 'run_terminal',
         kind: 'shell',
-        action: sandboxEnabled ? 'shell' : 'shell.unsandboxed',
-        capability: sandboxEnabled ? 'shell' : 'shell.unsandboxed',
+        action: firstCapability,
+        capability: firstCapability,
         title: uiTitle,
         unsandboxed: !sandboxEnabled,
       })
       if (!allowed) {
         return attachSandboxResult(
           { rejected: true, error: 'Shell access denied' },
-          meta,
+          resolveSandboxResultMeta({
+            sandboxed: sandboxEnabled,
+            allowNetwork: settingsAllowNetwork,
+          }),
         )
       }
+
+      const allowNetwork =
+        needsNetwork ||
+        settingsAllowNetwork ||
+        sessionAllowsNetwork(ctx.sessionAllows)
+      const meta = resolveSandboxResultMeta({
+        sandboxed: sandboxEnabled,
+        allowNetwork,
+      })
 
       const runArgs = {
         command,
@@ -143,78 +160,8 @@ const runTerminal = (ctx: HarnessToolContext) =>
 
         if (sandboxEnabled && isSandboxSpawnError(message)) {
           const denialKind = parseSandboxRuntimeDenialKind(message)
-          const shouldOfferNetwork =
-            denialKind === 'network' && !allowNetwork
-
-          if (shouldOfferNetwork) {
-            const networkAllowed = await gateToolPermission({
-              ctx: toPermCtx(ctx),
-              toolCallId,
-              name: 'run_terminal',
-              kind: 'shell',
-              action: 'shell.network',
-              capability: 'shell.network',
-              title: uiTitle,
-              detail: `Sandbox blocked this command. Approve to allow network in the sandbox.\n\n${message}`,
-              unsandboxed: false,
-            })
-
-            if (!networkAllowed) {
-              return attachSandboxResult(
-                { rejected: true, error: `Sandbox blocked: ${message}` },
-                meta,
-              )
-            }
-
-            const priorPhase = attachSandboxResult(
-              {
-                command,
-                error: message,
-              },
-              meta,
-            )
-            const networkMeta = resolveSandboxResultMeta({
-              sandboxed: true,
-              allowNetwork: true,
-            })
-
-            try {
-              const result = await runTerminalCommand(ctx, {
-                ...runArgs,
-                sandboxed: true,
-                allowNetwork: true,
-              })
-              return {
-                ...result,
-                priorPhase,
-              }
-            } catch (networkRetryError) {
-              const networkRetryMessage =
-                networkRetryError instanceof Error
-                  ? networkRetryError.message
-                  : String(networkRetryError)
-              const networkPriorPhase = attachSandboxResult(
-                {
-                  command,
-                  error: networkRetryMessage,
-                  priorPhase,
-                },
-                networkMeta,
-              )
-
-              if (isSandboxSpawnError(networkRetryMessage)) {
-                return retryUnsandboxed(networkRetryMessage, networkPriorPhase)
-              }
-
-              return attachSandboxResult(
-                {
-                  command,
-                  error: networkRetryMessage,
-                  priorPhase,
-                },
-                networkMeta,
-              )
-            }
+          if (denialKind === 'network') {
+            throw wrapWithSandboxingFooter(error, meta)
           }
 
           const priorPhase = attachSandboxResult(

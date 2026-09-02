@@ -9,11 +9,11 @@ export type KeyValueRow = {
 }
 
 export type PricingDraft = {
-  inputPerMillion: string
-  outputPerMillion: string
-  cacheReadPerMillion: string
-  cacheWritePerMillion: string
-  reasoningPerMillion: string
+  inputPerMillion: string | number
+  outputPerMillion: string | number
+  cacheReadPerMillion: string | number
+  cacheWritePerMillion: string | number
+  reasoningPerMillion: string | number
 }
 
 export type ModelDraft = {

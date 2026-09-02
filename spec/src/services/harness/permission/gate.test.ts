@@ -116,6 +116,7 @@ describe('gateToolPermission sticky shell elevation', () => {
         name: 'edit_file',
         kind: 'fs',
         title: 'Edit file',
+        needsNetwork: undefined,
       }),
     )
     resolveApproval('tc-edit', { approved: true, scope: 'once' })
@@ -150,6 +151,29 @@ describe('gateToolPermission sticky shell elevation', () => {
     expect(listed[0]?.subagentId).toBe('sa-1')
     expect(listed[0]?.subagentLabel).toBe('Explorer')
     resolveApproval('tc-sub', { approved: true, scope: 'once' })
+    await expect(pending).resolves.toBe(true)
+  })
+
+  it('sets needsNetwork on the view when capability is shell.network', async () => {
+    const ctx = makeCtx()
+    const pending = gateToolPermission({
+      ctx,
+      toolCallId: 'tc-net-view',
+      name: 'run_terminal',
+      kind: 'shell',
+      action: 'shell.network',
+      capability: 'shell.network',
+      title: 'curl example.com',
+    })
+    await waitForPending('tc-net-view')
+    expect(ctx.onPendingApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCallId: 'tc-net-view',
+        needsNetwork: true,
+      }),
+    )
+    expect(getPendingApproval('tc-net-view')?.needsNetwork).toBe(true)
+    resolveApproval('tc-net-view', { approved: true, scope: 'once' })
     await expect(pending).resolves.toBe(true)
   })
 })

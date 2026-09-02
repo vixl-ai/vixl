@@ -105,6 +105,9 @@ export const validateVixlSettings = (
   }
   return { success: true, data: parsed.data as VixlSettings }
 }
+
+export const SANDBOX_NETWORK_DEFAULT = 'allow' as const
+
 export const defaultVixlSettings = (): VixlSettings => ({
   version: 1,
   'appearance.theme': 'system',
@@ -113,7 +116,7 @@ export const defaultVixlSettings = (): VixlSettings => ({
   'agent.permissions': [],
   'agent.mcp.trust': [],
   'agent.sandbox.enabled': true,
-  'agent.sandbox.network': 'deny',
+  'agent.sandbox.network': SANDBOX_NETWORK_DEFAULT,
   'lsp.autoDownload': true,
   'workspace.trust': [],
   'chat.autoTitle': true,

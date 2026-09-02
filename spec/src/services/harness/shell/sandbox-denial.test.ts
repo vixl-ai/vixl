@@ -204,6 +204,52 @@ LISTEN 0 128 0.0.0.0:22 0.0.0.0:*`,
     ).toBeNull()
   })
 
+  it('classifies sandboxed npm registry failures as network when network is denied', () => {
+    const npmAudit = `npm warn audit request to https://registry.npmjs.org/-/npm/v1/security/advisories/bulk failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org
+npm error audit endpoint returned an error`
+
+    expect(
+      detectSandboxRuntimeDenial(npmAudit, {
+        command: 'npm install',
+        sandboxed: true,
+        allowNetwork: false,
+      }),
+    ).toBe('network')
+    expect(
+      detectSandboxRuntimeDenial('npm error network', {
+        command: 'npm install',
+        sandboxed: true,
+        allowNetwork: false,
+      }),
+    ).toBe('network')
+  })
+
+  it('does not treat unsandboxed npm failures as a sandbox jail', () => {
+    const npmAudit = `npm warn audit request to https://registry.npmjs.org/-/npm/v1/security/advisories/bulk failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org
+npm error audit endpoint returned an error`
+
+    expect(
+      detectSandboxRuntimeDenial(npmAudit, {
+        command: 'npm install',
+        sandboxed: false,
+        allowNetwork: false,
+      }),
+    ).toBeNull()
+    expect(
+      detectSandboxRuntimeDenial(npmAudit, {
+        command: 'npm install',
+        sandboxed: true,
+        allowNetwork: true,
+      }),
+    ).toBeNull()
+    expect(
+      detectSandboxRuntimeDenial('npm error network', {
+        command: 'npm install',
+        sandboxed: false,
+      }),
+    ).toBeNull()
+  })
+
   it('classifies silent curl localhost as a network denial (exit 0 trap)', () => {
     expect(
       detectSandboxRuntimeDenial('', {
@@ -288,6 +334,8 @@ describe('sandboxRuntimeDenialError', () => {
       expect(error.message).toContain('Do not rewrite this as a Python script')
     }
 
+    expect(network.message).toContain('Sandboxed shell has no network.')
+    expect(network.message).not.toContain('by default')
     expect(isSandboxSpawnError(devices.message)).toBe(true)
   })
 })

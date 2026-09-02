@@ -8,18 +8,13 @@ import {
 } from '@/components/chat/chat-tool-card'
 
 describe('onceApprovalLabel', () => {
-  it('uses Allow once for sandboxed approvals', () => {
+  it('uses Allow once for sandboxed approvals including network', () => {
     expect(onceApprovalLabel()).toBe('Allow once')
     expect(onceApprovalLabel(false)).toBe('Allow once')
   })
 
-  it('uses Allow network in sandbox for the network hop', () => {
-    expect(onceApprovalLabel(false, true)).toBe('Allow network in sandbox')
-  })
-
   it('uses Run outside sandbox when the approval is unsandboxed', () => {
     expect(onceApprovalLabel(true)).toBe('Run outside sandbox')
-    expect(onceApprovalLabel(true, true)).toBe('Run outside sandbox')
   })
 })
 
@@ -36,6 +31,12 @@ describe('isNetworkSandboxApproval', () => {
       ),
     ).toBe(false)
   })
+
+  it('uses needsNetwork as the primary signal without sniffing detail', () => {
+    expect(isNetworkSandboxApproval(undefined, true)).toBe(true)
+    expect(isNetworkSandboxApproval('curl example.com', true)).toBe(true)
+    expect(isNetworkSandboxApproval(undefined, false)).toBe(false)
+  })
 })
 
 describe('orderedApprovalScopes', () => {
@@ -46,14 +47,9 @@ describe('orderedApprovalScopes', () => {
     expect(orderedApprovalScopes([...scopes], false)).toEqual(['once', 'session'])
   })
 
-  it('puts session first for the network hop', () => {
-    const detail =
-      'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).'
-    expect(prefersSessionApproval(false, detail)).toBe(true)
-    expect(orderedApprovalScopes([...scopes], false, detail)).toEqual([
-      'session',
-      'once',
-    ])
+  it('keeps once first when the command needs network', () => {
+    expect(prefersSessionApproval(false)).toBe(false)
+    expect(orderedApprovalScopes([...scopes], false)).toEqual(['once', 'session'])
   })
 
   it('puts session first for unsandboxed approvals', () => {
@@ -77,21 +73,31 @@ describe('approvalActionSpecs', () => {
     ])
   })
 
-  it('labels the once action for unsandboxed and network hops', () => {
+  it('labels once as Allow once when the command needs network', () => {
+    const firstCard = approvalActionSpecs({
+      allowedScopes: ['once', 'session'],
+      unsandboxed: false,
+    })
+    expect(firstCard.map((action) => action.key)).toEqual([
+      'once',
+      'session',
+      'deny',
+    ])
+    expect(firstCard.find((action) => action.key === 'once')?.tooltip).toBe(
+      'Allow once',
+    )
+    expect(firstCard.find((action) => action.key === 'session')?.tooltip).toBe(
+      'Allow session',
+    )
+  })
+
+  it('labels the once action for unsandboxed hops', () => {
     const unsandboxed = approvalActionSpecs({
       allowedScopes: ['once', 'session'],
       unsandboxed: true,
     })
     expect(unsandboxed.find((action) => action.key === 'once')?.tooltip).toBe(
       'Run outside sandbox',
-    )
-    const network = approvalActionSpecs({
-      allowedScopes: ['once', 'session'],
-      unsandboxed: false,
-      detail: 'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
-    })
-    expect(network.find((action) => action.key === 'once')?.tooltip).toBe(
-      'Allow network in sandbox',
     )
   })
 })

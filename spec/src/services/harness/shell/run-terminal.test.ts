@@ -227,7 +227,7 @@ describe('build-tools run_terminal', () => {
       projectRoot: '/project',
       command: 'echo hello',
       sandboxed: true,
-      allowNetwork: false,
+      allowNetwork: true,
     })
     expect(waitForShellExit).toHaveBeenCalledWith('shell-1', undefined)
     expect(result).toMatchObject({
@@ -236,7 +236,7 @@ describe('build-tools run_terminal', () => {
       exitCode: 0,
       timedOut: false,
       sandboxed: true,
-      network: 'deny',
+      network: 'allow',
     })
     expect(String((result as { sandboxing: string }).sandboxing)).toContain(
       'SANDBOXING:',
@@ -283,10 +283,10 @@ describe('build-tools run_terminal', () => {
       command: 'npm run dev',
       description: null,
       sandboxed: true,
-      network: 'deny',
+      network: 'allow',
     })
     expect(String((result as { sandboxing: string }).sandboxing)).toContain(
-      'Network: deny',
+      'Network: allow',
     )
   })
 
@@ -354,7 +354,7 @@ describe('build-tools run_terminal', () => {
       network: 'allow',
       priorPhase: {
         sandboxed: true,
-        network: 'deny',
+        network: 'allow',
         command: 'echo hello',
       },
     })
@@ -430,7 +430,7 @@ describe('build-tools run_terminal', () => {
     expect(createAgentShell).toHaveBeenCalledWith(
       expect.objectContaining({
         sandboxed: false,
-        allowNetwork: false,
+        allowNetwork: true,
       }),
     )
   })
@@ -449,71 +449,80 @@ describe('build-tools run_terminal', () => {
     expect(result).toMatchObject({
       rejected: true,
       sandboxed: true,
-      network: 'deny',
+      network: 'allow',
     })
     expect(String((result as { error: string }).error)).toContain('SANDBOX_FAILED')
   })
 
-  it('prompts shell.network then retries sandboxed with allowNetwork true', async () => {
-    createAgentShell
-      .mockRejectedValueOnce(
-        new Error(
-          'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
-        ),
-      )
-      .mockResolvedValueOnce({
-        shellId: 'shell-1',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
-        command: 'curl -s https://example.com',
-        startedAt: new Date().toISOString(),
-      })
+  it('gates npm audit as shell.network once and spawns with allowNetwork true', async () => {
+    const denyNetworkCtx = {
+      ...ctx,
+      settings: { version: 1, 'agent.sandbox.network': 'deny' } as VixlSettings,
+    }
 
     const buildTools = (await import('@/services/harness/build-tools')).default
-    const tools = buildTools(ctx)
-    const result = await runTool(tools.run_terminal.execute, {
-      command: 'curl -s https://example.com',
-    })
+    const tools = buildTools(denyNetworkCtx)
+    await runTool(tools.run_terminal.execute, { command: 'npm audit' })
 
-    expect(gateToolPermission).toHaveBeenCalledTimes(2)
-    expect(gateToolPermission).toHaveBeenNthCalledWith(
-      1,
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'shell.network',
+        capability: 'shell.network',
+        unsandboxed: false,
+      }),
+    )
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'npm audit',
+        sandboxed: true,
+        allowNetwork: true,
+      }),
+    )
+  })
+
+  it('does not prompt shell.network after a network jail when first gate was shell', async () => {
+    const denyNetworkCtx = {
+      ...ctx,
+      settings: { version: 1, 'agent.sandbox.network': 'deny' } as VixlSettings,
+    }
+
+    createAgentShell.mockRejectedValueOnce(
+      new Error(
+        'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
+      ),
+    )
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(denyNetworkCtx)
+
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'git status' }),
+    ).rejects.toThrow(/SANDBOXING:/)
+
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'shell',
         capability: 'shell',
         unsandboxed: false,
       }),
     )
-    expect(gateToolPermission).toHaveBeenNthCalledWith(
-      2,
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'shell.network',
         capability: 'shell.network',
-        unsandboxed: false,
-        title: 'curl -s https://example.com',
       }),
     )
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      2,
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
       expect.objectContaining({
-        command: 'curl -s https://example.com',
+        command: 'git status',
         sandboxed: true,
-        allowNetwork: true,
+        allowNetwork: false,
       }),
     )
-    expect(result).toMatchObject({
-      sandboxed: true,
-      network: 'allow',
-      priorPhase: {
-        sandboxed: true,
-        network: 'deny',
-        command: 'curl -s https://example.com',
-      },
-    })
   })
 
   it('skips the network hop for isolated devices and goes unsandboxed', async () => {
@@ -560,7 +569,7 @@ describe('build-tools run_terminal', () => {
       network: 'allow',
       priorPhase: {
         sandboxed: true,
-        network: 'deny',
+        network: 'allow',
       },
     })
   })
@@ -605,7 +614,7 @@ describe('build-tools run_terminal', () => {
     )
   })
 
-  it('skips the network hop when sandbox network is already allow', async () => {
+  it('fails a network jail when sandbox network is already allow', async () => {
     const networkCtx = {
       ...ctx,
       settings: {
@@ -615,131 +624,41 @@ describe('build-tools run_terminal', () => {
       } as VixlSettings,
     }
 
-    createAgentShell
-      .mockRejectedValueOnce(
-        new Error(
-          'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
-        ),
-      )
-      .mockResolvedValueOnce({
-        shellId: 'shell-1',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
-        command: 'curl -s https://example.com',
-        startedAt: new Date().toISOString(),
-      })
+    createAgentShell.mockRejectedValueOnce(
+      new Error(
+        'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
+      ),
+    )
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(networkCtx)
-    await runTool(tools.run_terminal.execute, {
-      command: 'curl -s https://example.com',
-    })
 
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        sandboxed: true,
-        allowNetwork: true,
-      }),
-    )
-    expect(gateToolPermission).toHaveBeenCalledTimes(2)
-    expect(gateToolPermission).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        action: 'shell.unsandboxed',
-        capability: 'shell.unsandboxed',
-      }),
-    )
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        sandboxed: false,
-        allowNetwork: true,
-      }),
-    )
-  })
-
-  it('hops to unsandboxed when sandboxed network retry is still blocked', async () => {
-    createAgentShell
-      .mockRejectedValueOnce(
-        new Error(
-          'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
-        ),
-      )
-      .mockRejectedValueOnce(
-        new Error(
-          'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (filesystem EPERM).',
-        ),
-      )
-      .mockResolvedValueOnce({
-        shellId: 'shell-1',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
+    await expect(
+      runTool(tools.run_terminal.execute, {
         command: 'curl -s https://example.com',
-        startedAt: new Date().toISOString(),
-      })
+      }),
+    ).rejects.toThrow(/SANDBOXING:/)
 
-    const buildTools = (await import('@/services/harness/build-tools')).default
-    const tools = buildTools(ctx)
-    const result = await runTool(tools.run_terminal.execute, {
-      command: 'curl -s https://example.com',
-    })
-
-    expect(gateToolPermission).toHaveBeenCalledTimes(3)
-    expect(gateToolPermission).toHaveBeenNthCalledWith(
-      2,
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'shell.network',
-        capability: 'shell.network',
+        sandboxed: true,
+        allowNetwork: true,
       }),
     )
-    expect(gateToolPermission).toHaveBeenNthCalledWith(
-      3,
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'shell.unsandboxed',
         capability: 'shell.unsandboxed',
-        unsandboxed: true,
       }),
     )
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        sandboxed: true,
-        allowNetwork: true,
-      }),
-    )
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      3,
-      expect.objectContaining({
-        sandboxed: false,
-        allowNetwork: true,
-      }),
-    )
-    expect(result).toMatchObject({
-      sandboxed: false,
-      network: 'allow',
-      priorPhase: {
-        sandboxed: true,
-        network: 'allow',
-        priorPhase: {
-          sandboxed: true,
-          network: 'deny',
-        },
-      },
-    })
   })
 
   it('spawns with allowNetwork when sessionAllows has shell.network', async () => {
     const networkCtx = {
       ...ctx,
+      settings: { version: 1, 'agent.sandbox.network': 'deny' } as VixlSettings,
       sessionAllows: new Set(['shell.network']),
     }
 
@@ -760,8 +679,9 @@ describe('build-tools run_terminal', () => {
     expect(gateToolPermission).toHaveBeenCalledTimes(1)
     expect(gateToolPermission).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'shell',
-        capability: 'shell',
+        action: 'shell.network',
+        capability: 'shell.network',
+        unsandboxed: false,
       }),
     )
   })

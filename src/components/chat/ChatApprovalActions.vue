@@ -6,7 +6,6 @@ import {
   FolderIcon,
   InfinityIcon,
   UnlockIcon,
-  WifiIcon,
   XIcon,
 } from '@lucide/vue'
 import type { ApprovalResolution } from '@/services/harness/permission/approval-gate'
@@ -42,16 +41,12 @@ const actions = computed(() =>
   approvalActionSpecs({
     allowedScopes: props.approval.allowedScopes,
     unsandboxed: props.approval.unsandboxed,
-    detail: props.approval.detail,
   }),
 )
 
 const iconFor = (key: ApprovalActionKey) => {
   if (key === 'once' && props.approval.unsandboxed) {
     return UnlockIcon
-  }
-  if (key === 'once' && props.approval.detail?.includes('(network denied)')) {
-    return WifiIcon
   }
   if (key === 'once') {
     return CheckIcon

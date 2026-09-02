@@ -4,13 +4,22 @@ import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import { ref } from 'vue'
 import ChatApprovalActions from '@/components/chat/ChatApprovalActions.vue'
 import ChatInlineFileDiff from '@/components/chat/InlineFileDiff.vue'
+import { isNetworkSandboxApproval } from '@/components/chat/chat-tool-card'
 import McpServerIcon from '@/components/mcp/ServerIcon.vue'
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/shadcn/ui/collapsible'
-import { ChevronRightIcon } from '@lucide/vue'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { ChevronRightIcon, WifiIcon } from '@lucide/vue'
+
+const NETWORK_TOOLTIP = 'This command uses network in the sandbox'
 
 defineProps<{
   approval: PendingApprovalView
@@ -39,6 +48,25 @@ const open = ref(false)
           :server-id="approval.serverId"
         />
         <span class="min-w-0 truncate">{{ approval.title }}</span>
+        <TooltipProvider
+          v-if="isNetworkSandboxApproval(approval.detail, approval.needsNetwork)"
+        >
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span
+                class="inline-flex shrink-0"
+                tabindex="0"
+                :aria-label="NETWORK_TOOLTIP"
+                @click.stop
+              >
+                <WifiIcon class="size-3.5 text-muted-foreground" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent class="z-60">
+              {{ NETWORK_TOOLTIP }}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <span
           v-if="subagentLabel"
           class="shrink-0 text-xs text-muted-foreground"

@@ -1,11 +1,22 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, nextTick, ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import { Checkbox } from '@/components/shadcn/ui/checkbox'
+import { Input } from '@/components/shadcn/ui/input'
 import { TooltipProvider } from '@/components/shadcn/ui/tooltip'
 import ManageProviderDialog from '@/components/settings/providers/ManageProviderDialog.vue'
 import type { VixlCustomProvider } from '@/types/vixl/vixl-settings'
+
+vi.mock('vue-sonner', () => ({
+  toast: {
+    success: vi.fn<(...args: unknown[]) => void>(),
+    error: vi.fn<(...args: unknown[]) => void>(),
+    info: vi.fn<(...args: unknown[]) => string | number>(),
+    dismiss: vi.fn<(id?: string | number) => void>(),
+  },
+}))
 
 type SavePayload = {
   providerId: string
@@ -67,6 +78,23 @@ const setVisionChecked = async (wrapper: VueWrapper): Promise<void> => {
   await nextTick()
 }
 
+const setPricingNumber = async (
+  wrapper: VueWrapper,
+  id: string,
+  value: number,
+): Promise<void> => {
+  const inputRoot = document.body.querySelector(`#${id}`)
+  const input = wrapper.findAllComponents(Input).find((component) => {
+    const el = component.element
+    return el === inputRoot || (el instanceof Node && inputRoot !== null && el.contains(inputRoot))
+  })
+  if (!input) {
+    throw new Error(`Pricing input ${id} was not found`)
+  }
+  input.vm.$emit('update:modelValue', value)
+  await nextTick()
+}
+
 const clickSave = async (wrapper: VueWrapper): Promise<void> => {
   const saveButton = wrapper
     .findAllComponents(Button)
@@ -85,6 +113,8 @@ describe('ManageProviderDialog', () => {
     wrapper?.unmount()
     wrapper = undefined
     document.body.innerHTML = ''
+    vi.mocked(toast.error).mockClear()
+    vi.mocked(toast.success).mockClear()
   })
 
   it('persists Vision checkbox into the emitted provider payload', async () => {
@@ -98,5 +128,20 @@ describe('ManageProviderDialog', () => {
 
     expect(mounted.saved).toHaveLength(1)
     expect(mounted.saved[0]?.provider.models?.[0]?.vision).toBe(true)
+  })
+
+  it('persists number pricing inputs into the emitted provider payload', async () => {
+    const mounted = await mountDialog()
+    wrapper = mounted.wrapper
+
+    await setPricingNumber(wrapper, 'model-price-input-0', 3)
+    await setPricingNumber(wrapper, 'model-price-output-0', 15)
+    await clickSave(wrapper)
+
+    expect(mounted.saved).toHaveLength(1)
+    expect(mounted.saved[0]?.provider.models?.[0]?.pricing?.inputPerMillion).toBe(3)
+    expect(mounted.saved[0]?.provider.models?.[0]?.pricing?.outputPerMillion).toBe(15)
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(toast.success).not.toHaveBeenCalled()
   })
 })

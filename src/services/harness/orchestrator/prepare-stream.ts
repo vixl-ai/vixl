@@ -246,6 +246,7 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
         title: entry.title,
         detail: entry.detail,
         unsandboxed: entry.unsandboxed,
+        needsNetwork: entry.needsNetwork,
         allowedScopes: entry.allowedScopes,
         diff: entry.diff ?? [],
         subagentId: entry.subagentId,

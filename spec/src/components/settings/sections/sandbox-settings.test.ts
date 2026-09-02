@@ -7,11 +7,11 @@ import {
 } from '@/components/settings/sections/sandbox-settings'
 
 describe('sandbox-settings', () => {
-  it('defaults sandbox on and network deny', () => {
+  it('defaults sandbox on and network allow', () => {
     expect(SANDBOX_ENABLED_DEFAULT).toBe(true)
-    expect(SANDBOX_NETWORK_DEFAULT).toBe('deny')
+    expect(SANDBOX_NETWORK_DEFAULT).toBe('allow')
     expect(sandboxEnabledFromSettings({ version: 1 })).toBe(true)
-    expect(sandboxNetworkFromSettings({ version: 1 })).toBe('deny')
+    expect(sandboxNetworkFromSettings({ version: 1 })).toBe('allow')
   })
 
   it('reads stored sandbox values', () => {
@@ -21,5 +21,8 @@ describe('sandbox-settings', () => {
     expect(
       sandboxNetworkFromSettings({ version: 1, 'agent.sandbox.network': 'allow' }),
     ).toBe('allow')
+    expect(
+      sandboxNetworkFromSettings({ version: 1, 'agent.sandbox.network': 'deny' }),
+    ).toBe('deny')
   })
 })

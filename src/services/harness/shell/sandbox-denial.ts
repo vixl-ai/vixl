@@ -69,7 +69,7 @@ const sandboxRuntimeDenialError = (
     )
   }
   return new Error(
-    `SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied). Sandboxed shell has no network by default. ${SANDBOX_JAIL_RETRY_HINT} Detail: ${trimmed}`,
+    `SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied). Sandboxed shell has no network. ${SANDBOX_JAIL_RETRY_HINT} Detail: ${trimmed}`,
   )
 }
 

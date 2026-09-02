@@ -149,7 +149,7 @@ onMounted(() => {
         <div class="space-y-1">
           <Label>Sandbox network</Label>
           <p class="text-sm text-muted-foreground">
-            Network access for sandboxed commands. Deny is the default.
+            Network access for sandboxed commands. Allow is the default.
           </p>
         </div>
         <div class="flex items-center gap-1">

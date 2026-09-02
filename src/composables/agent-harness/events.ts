@@ -171,6 +171,7 @@ export default (
         title: event.title,
         detail: event.detail,
         unsandboxed: event.unsandboxed,
+        needsNetwork: event.needsNetwork,
         allowedScopes: event.allowedScopes,
         diff: event.diff,
         subagentId: event.subagentId,

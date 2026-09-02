@@ -60,8 +60,18 @@ describe('migrateVixlSettings', () => {
     expect(migrated['workbench.duplicateTabBehavior']).toBe('ask')
   })
 
-  it('defaults sandbox enabled with network deny', () => {
+  it('defaults sandbox enabled with network allow', () => {
     const migrated = migrateVixlSettings({ version: 1 })
+
+    expect(migrated['agent.sandbox.enabled']).toBe(true)
+    expect(migrated['agent.sandbox.network']).toBe('allow')
+  })
+
+  it('keeps stored sandbox network deny', () => {
+    const migrated = migrateVixlSettings({
+      version: 1,
+      'agent.sandbox.network': 'deny',
+    })
 
     expect(migrated['agent.sandbox.enabled']).toBe(true)
     expect(migrated['agent.sandbox.network']).toBe('deny')

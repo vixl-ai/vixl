@@ -1,29 +1,26 @@
 import type { PermissionScope } from '@/types/harness/permission'
 
-export const isNetworkSandboxApproval = (detail?: string): boolean =>
-  typeof detail === 'string' && detail.includes('(network denied)')
+export const isNetworkSandboxApproval = (
+  detail?: string,
+  needsNetwork?: boolean,
+): boolean =>
+  needsNetwork === true ||
+  (typeof detail === 'string' && detail.includes('(network denied)'))
 
-export const onceApprovalLabel = (
-  unsandboxed?: boolean,
-  network?: boolean,
-): string => {
+export const onceApprovalLabel = (unsandboxed?: boolean): string => {
   if (unsandboxed) return 'Run outside sandbox'
-  if (network) return 'Allow network in sandbox'
   return 'Allow once'
 }
 
-export const prefersSessionApproval = (
-  unsandboxed?: boolean,
-  detail?: string,
-): boolean => unsandboxed === true || isNetworkSandboxApproval(detail)
+export const prefersSessionApproval = (unsandboxed?: boolean): boolean =>
+  unsandboxed === true
 
 export const orderedApprovalScopes = (
   allowedScopes: PermissionScope[],
   unsandboxed?: boolean,
-  detail?: string,
 ): PermissionScope[] => {
   const scopes = allowedScopes.filter((scope) => scope !== 'never')
-  if (!prefersSessionApproval(unsandboxed, detail)) {
+  if (!prefersSessionApproval(unsandboxed)) {
     return scopes
   }
   return [
@@ -49,17 +46,12 @@ const SCOPE_TOOLTIPS: Record<Exclude<PermissionScope, 'once' | 'never'>, string>
 export const approvalActionSpecs = (args: {
   allowedScopes: PermissionScope[]
   unsandboxed?: boolean
-  detail?: string
 }): ApprovalActionSpec[] => {
   const actions: ApprovalActionSpec[] = orderedApprovalScopes(
     args.allowedScopes,
     args.unsandboxed,
-    args.detail,
   ).map((scope) => {
-    let tooltip = onceApprovalLabel(
-      args.unsandboxed,
-      !args.unsandboxed && isNetworkSandboxApproval(args.detail),
-    )
+    let tooltip = onceApprovalLabel(args.unsandboxed)
     if (scope === 'session' || scope === 'workspace' || scope === 'always') {
       tooltip = SCOPE_TOOLTIPS[scope]
     }
