@@ -17,6 +17,7 @@ defineProps<{
   personalMcp?: McpConfig
   projectMcp?: McpConfig
   readOnly?: boolean
+  compacting?: boolean
 }>()
 
 defineEmits<{
@@ -45,6 +46,7 @@ defineEmits<{
       :personal-mcp="personalMcp"
       :project-mcp="projectMcp"
       :read-only="readOnly"
+      :compacting="compacting"
       @submit-answer="(toolCallId, answer) => $emit('submitAnswer', toolCallId, answer)"
       @authenticate-mcp="(toolCallId) => $emit('authenticateMcp', toolCallId)"
       @skip-mcp-auth="(toolCallId) => $emit('skipMcpAuth', toolCallId)"

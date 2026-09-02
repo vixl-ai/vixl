@@ -167,6 +167,10 @@ const applyHydrateHarnessEvent = (
     return true
   }
 
+  if (type === 'compaction-started' || type === 'compaction-ended') {
+    return true
+  }
+
   if (type === 'compaction') {
     flushTurn()
     const summary = typeof harnessEvent.summary === 'string' ? harnessEvent.summary : ''

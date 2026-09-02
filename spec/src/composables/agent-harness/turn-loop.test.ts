@@ -68,6 +68,8 @@ const buildState = (): AgentHarnessState =>
     lastRunConfig: ref(null),
     resumingBackgroundBatch: ref(false),
     sessionPermissionLevel: ref(null),
+    sessionAllows: new Set<string>(),
+    sessionDenies: new Set<string>(),
     fleetSidebar: {
       refreshSlug: vi.fn<(slug: string) => Promise<void>>(),
     },

@@ -19,6 +19,8 @@ vi.mock('@/services/harness/plan-execution-session', () => ({
   setSubagentModelLock: vi.fn<(...args: unknown[]) => void>(),
 }))
 
+import useAgentHarness from '@/composables/use-agent-harness'
+
 describe('createSessionOps flushPendingChatMessage', () => {
   beforeEach(() => {
     sessionStorage.clear()
@@ -86,5 +88,37 @@ describe('createSessionOps flushPendingChatMessage', () => {
       files,
     })
     expect(refreshSlug).toHaveBeenCalledWith('home')
+  })
+})
+
+describe('createSessionOps initHarness', () => {
+  it('restores pending approvals and usage when a harness is bound', async () => {
+    const { createSessionOps } = await import('@/composables/agent-thread-view/session')
+
+    const restoreUsageLedger = vi
+      .fn<() => Promise<void>>()
+      .mockResolvedValue(undefined)
+    const restorePendingApprovals = vi.fn<() => void>()
+    const setPermissionLevel = vi.fn<(level: string) => void>()
+    vi.mocked(useAgentHarness).mockReturnValue({
+      restoreUsageLedger,
+      restorePendingApprovals,
+      setPermissionLevel,
+    } as unknown as ReturnType<typeof useAgentHarness>)
+
+    const state = {
+      chatId: computed(() => 'chat-1'),
+      projectSlug: computed(() => 'proj'),
+      isStandalone: computed(() => false),
+      sessionPermissionLevel: ref('ask'),
+      harness: shallowRef(null),
+    } as unknown as AgentThreadViewState
+
+    const session = createSessionOps(state)
+    await session.initHarness('/tmp/proj', 'Proj')
+
+    expect(restorePendingApprovals).toHaveBeenCalledTimes(1)
+    expect(restoreUsageLedger).toHaveBeenCalledTimes(1)
+    expect(setPermissionLevel).toHaveBeenCalledWith('ask')
   })
 })

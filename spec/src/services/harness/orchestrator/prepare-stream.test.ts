@@ -40,8 +40,14 @@ vi.mock('@/services/context/count-context-budget', () => ({
   default: (...args: unknown[]) => countContextBudget(...args),
 }))
 
+const buildTools = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => { read_file: { description: string } }>(() => ({
+    read_file: { description: 'r' },
+  })),
+)
+
 vi.mock('@/services/harness/build-tools', () => ({
-  default: () => ({ read_file: { description: 'r' } }),
+  default: (...args: unknown[]) => buildTools(...args),
 }))
 
 vi.mock('@/services/harness/resolve-model-vision', () => ({
@@ -97,7 +103,15 @@ const frozen = (mode: PrefixSnapshot['mode'], systemMode = mode): PrefixSnapshot
   parts: promptParts(systemMode ?? 'agent'),
 })
 
-const buildInput = (mode: HarnessStreamInput['mode']): HarnessStreamInput =>
+type SessionSets = {
+  sessionAllows?: Set<string>
+  sessionDenies?: Set<string>
+}
+
+const buildInput = (
+  mode: HarnessStreamInput['mode'],
+  sets?: SessionSets,
+): HarnessStreamInput =>
   ({
     projectSlug: 'proj',
     chatId: 'chat-1',
@@ -115,7 +129,14 @@ const buildInput = (mode: HarnessStreamInput['mode']): HarnessStreamInput =>
     onEvent: vi.fn<(...args: unknown[]) => void>(),
     assistantId: 'asst-1',
     captureTurnMessages: false,
+    sessionAllows: sets?.sessionAllows ?? new Set<string>(),
+    sessionDenies: sets?.sessionDenies ?? new Set<string>(),
   }) as HarnessStreamInput
+
+type BuildToolsCtx = {
+  sessionAllows: Set<string>
+  sessionDenies: Set<string>
+}
 
 describe('prepare-stream prefix freeze vs rebuild', () => {
   beforeEach(() => {
@@ -185,5 +206,55 @@ describe('prepare-stream prefix freeze vs rebuild', () => {
 
     expect(assembleSystemPromptParts).toHaveBeenCalled()
     expect(prepared.system).toContain('in plan mode')
+  })
+})
+
+describe('prepare-stream session permission sets', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    assembleSystemPromptParts.mockImplementation(async (...args: unknown[]) =>
+      promptParts(String((args[0] as { mode: string }).mode)),
+    )
+    countContextBudget.mockResolvedValue({
+      modelId: 'gpt',
+      used: 1,
+      promptUsed: 1,
+      limit: 100,
+      reservedOutput: 1,
+      safetyBuffer: 1,
+      free: 1,
+      buckets: [],
+    })
+    updateChatMeta.mockResolvedValue(undefined)
+    readChatMeta.mockResolvedValue(null)
+  })
+
+  it('passes the provided session sets into buildTools with the same identity', async () => {
+    const sessionAllows = new Set<string>(['fs.write'])
+    const sessionDenies = new Set<string>(['fs.delete'])
+
+    await prepareStream(buildInput('agent', { sessionAllows, sessionDenies }))
+
+    expect(buildTools).toHaveBeenCalledTimes(1)
+    const ctx = buildTools.mock.calls[0]?.[0] as BuildToolsCtx
+    expect(ctx.sessionAllows).toBe(sessionAllows)
+    expect(ctx.sessionDenies).toBe(sessionDenies)
+    expect(ctx.sessionAllows.has('fs.write')).toBe(true)
+  })
+
+  it('keeps session allow mutations across a second prepare-stream', async () => {
+    const sessionAllows = new Set<string>()
+    const sessionDenies = new Set<string>()
+
+    await prepareStream(buildInput('agent', { sessionAllows, sessionDenies }))
+    const first = buildTools.mock.calls[0]?.[0] as BuildToolsCtx
+    first.sessionAllows.add('fs.write')
+
+    await prepareStream(buildInput('agent', { sessionAllows, sessionDenies }))
+    const second = buildTools.mock.calls[1]?.[0] as BuildToolsCtx
+
+    expect(second.sessionAllows).toBe(sessionAllows)
+    expect(second.sessionDenies).toBe(sessionDenies)
+    expect(second.sessionAllows.has('fs.write')).toBe(true)
   })
 })

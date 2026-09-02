@@ -33,7 +33,12 @@ const kindFor = (capability: PermissionCapabilityKey): ApprovalKind => {
   ) {
     return 'git'
   }
-  if (capability.startsWith('fs.write:') || capability.startsWith('fs.delete:')) {
+  if (
+    capability === 'fs.write' ||
+    capability === 'fs.delete' ||
+    capability.startsWith('fs.write:') ||
+    capability.startsWith('fs.delete:')
+  ) {
     return 'fs'
   }
   if (capability.startsWith('mcp:')) return 'mcp'
@@ -44,8 +49,12 @@ const kindFor = (capability: PermissionCapabilityKey): ApprovalKind => {
 const subgroupFor = (
   capability: PermissionCapabilityKey,
 ): { key: string; label: string | null } => {
-  if (capability.startsWith('fs.write:')) return { key: 'write', label: 'Write' }
-  if (capability.startsWith('fs.delete:')) return { key: 'delete', label: 'Delete' }
+  if (capability === 'fs.write' || capability.startsWith('fs.write:')) {
+    return { key: 'write', label: 'Write' }
+  }
+  if (capability === 'fs.delete' || capability.startsWith('fs.delete:')) {
+    return { key: 'delete', label: 'Delete' }
+  }
   if (capability.startsWith('mcp:')) {
     const rest = capability.slice('mcp:'.length)
     const serverId = rest.split(':')[0] || rest

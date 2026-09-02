@@ -113,6 +113,7 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
       }
     },
     startAgentTurn: (turnId: string): void => {
+      session.turnIdRemap.clear()
       session.activeTurnId.value = turnId
       session.activeStepId.value = null
       session.pendingStepText.value = ''
@@ -120,6 +121,7 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
         id: turnId,
         steps: [],
         text: '',
+        createdAt: new Date().toISOString(),
       }
       session.timeline.value = [...session.timeline.value, { type: 'agent-turn', turn }]
     },
@@ -250,10 +252,19 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
       return null
     },
     appendLocalCompaction: (summary: string, focus: string | null): void => {
+      const closingTurnId = session.activeTurnId.value
+      agent.finishAgentTurn()
       session.timeline.value = [
         ...session.timeline.value,
         { type: 'compaction', summary, focus },
       ]
+      if (closingTurnId) {
+        const nextTurnId = crypto.randomUUID()
+        session.turnIdRemap.set(closingTurnId, nextTurnId)
+        session.activeTurnId.value = nextTurnId
+        session.activeStepId.value = null
+        session.pendingStepText.value = ''
+      }
     },
     patchMetaActiveContext: (activeContext: {
       checkpointLineId: string

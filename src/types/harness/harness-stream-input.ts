@@ -36,4 +36,6 @@ export type HarnessStreamInput = {
     verdict: 'allow' | 'deny',
     scope: 'workspace' | 'always',
   ) => Promise<void>
+  sessionAllows: Set<string>
+  sessionDenies: Set<string>
 }

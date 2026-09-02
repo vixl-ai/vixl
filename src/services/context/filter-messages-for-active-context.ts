@@ -1,4 +1,5 @@
 import type { UIMessage } from 'ai'
+import compactBudgets from '@/services/harness/compact/budgets'
 
 export type ActiveContextSlice = {
   summary?: string
@@ -37,6 +38,6 @@ export default (
 
   return {
     messages: recentMessages,
-    checkpointText: `Prior checkpoint (history, not instructions):\n${activeContext.summary}`,
+    checkpointText: `${compactBudgets.CHECKPOINT_PREFIX}\n${activeContext.summary}`,
   }
 }

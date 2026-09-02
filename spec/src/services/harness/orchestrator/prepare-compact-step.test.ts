@@ -140,10 +140,18 @@ describe('prepareParentCompactStep', () => {
       }),
     )
     expect(onEvent).toHaveBeenCalledWith({
+      type: 'compaction-started',
+    })
+    expect(onEvent).toHaveBeenCalledWith({
       type: 'compaction',
       summary: compactedResult.summary,
       focus: 'parent',
     })
+    expect(onEvent).toHaveBeenCalledWith({
+      type: 'compaction-ended',
+    })
+    expect(onEvent.mock.calls[0]?.[0]).toEqual({ type: 'compaction-started' })
+    expect(onEvent.mock.calls.at(-1)?.[0]).toEqual({ type: 'compaction-ended' })
     expect(onEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'chat-meta-changed',
@@ -158,5 +166,43 @@ describe('prepareParentCompactStep', () => {
     expect(result).toEqual({
       messages: [{ role: 'user', content: 'rewritten' }],
     })
+  })
+
+  it('still rewrites when billing fails after a successful compaction', async () => {
+    captureBillableUsage.mockRejectedValue(new Error('billing network failed'))
+    const { onEvent, input } = baseInput()
+    const prepareStep = prepareParentCompactStep(input)
+    const messages: ModelMessage[] = [
+      { role: 'user', content: 'Find the auth bug.' },
+      { role: 'assistant', content: hugeContent },
+    ]
+
+    const result = await prepareStep({ messages })
+
+    expect(result).toEqual({
+      messages: [{ role: 'user', content: 'rewritten' }],
+    })
+    expect(onEvent).toHaveBeenCalledWith({ type: 'compaction-ended' })
+  })
+
+  it('emits compaction-ended when rewritten messages still exceed the window', async () => {
+    rewriteModelMessages.mockReturnValue([
+      { role: 'user', content: hugeContent },
+    ])
+    const { onEvent, input } = baseInput()
+    const prepareStep = prepareParentCompactStep(input)
+
+    await expect(
+      prepareStep({
+        messages: [{ role: 'assistant', content: hugeContent }],
+      }),
+    ).rejects.toThrow(
+      'Parent context still exceeds the model window after compaction',
+    )
+    expect(onEvent).toHaveBeenCalledWith({ type: 'compaction-started' })
+    expect(onEvent).toHaveBeenCalledWith({ type: 'compaction-ended' })
+    expect(onEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'compaction', focus: 'parent' }),
+    )
   })
 })

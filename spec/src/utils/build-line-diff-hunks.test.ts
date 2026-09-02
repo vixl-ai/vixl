@@ -117,7 +117,7 @@ describe('formatToolRunLabel', () => {
           args: { path: 'content/posts/building-durable-chats.md' },
         }),
       ),
-    ).toBe('Edited content/posts/building-durable-chats.md')
+    ).toBe('Edited building-durable-chats.md')
   })
 
   it('uses present tense while running', () => {
@@ -129,7 +129,56 @@ describe('formatToolRunLabel', () => {
           args: { path: 'src/a.ts' },
         }),
       ),
-    ).toBe('Editing src/a.ts…')
+    ).toBe('Editing a.ts')
+  })
+
+  it('does not show a bare Editing label before a path is known', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'write_file',
+          status: 'running',
+        }),
+      ),
+    ).toBe('')
+  })
+
+  it('uses basename for write, delete, and move', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'write_file',
+          args: { path: 'src/utils/a.ts' },
+        }),
+      ),
+    ).toBe('Edited a.ts')
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'delete_file',
+          args: { path: 'src/old.ts' },
+        }),
+      ),
+    ).toBe('Deleted old.ts')
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'move_file',
+          args: { from: 'src/from.ts', to: 'src/to.ts' },
+        }),
+      ),
+    ).toBe('Moved from.ts')
+  })
+
+  it('keeps full paths for read tools', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'read_file',
+          args: { path: 'src/utils/a.ts' },
+        }),
+      ),
+    ).toBe('Read src/utils/a.ts')
   })
 
   it('labels create_plan as Writing plan while running', () => {

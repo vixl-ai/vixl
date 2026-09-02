@@ -37,13 +37,49 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     return item?.type === 'agent-turn' ? item.turn : null
   }
 
+  const resolveTurnId = (id: string): string => {
+    const visited = new Set<string>()
+    let current = id
+    while (session.turnIdRemap.has(current)) {
+      if (visited.has(current)) {
+        return current
+      }
+      visited.add(current)
+      const mapped = session.turnIdRemap.get(current)
+      if (!mapped) {
+        return current
+      }
+      current = mapped
+    }
+    return current
+  }
+
+  const ensureActiveTurn = (): AgentTurn | null => {
+    const existing = getActiveTurn()
+    if (existing) {
+      return existing
+    }
+    const activeTurnId = session.activeTurnId.value
+    if (!activeTurnId) {
+      return null
+    }
+    const turn: AgentTurn = {
+      id: activeTurnId,
+      steps: [],
+      text: '',
+      createdAt: new Date().toISOString(),
+    }
+    session.timeline.value = [...session.timeline.value, { type: 'agent-turn', turn }]
+    return turn
+  }
+
   const patchActiveTurn = (turn: AgentTurn): void => {
     updateTimelineTurn(session, turn)
     updateAssistantMessage(session, turn)
   }
 
   const startAgentStep = (stepId: string): void => {
-    const current = getActiveTurn()
+    const current = ensureActiveTurn()
     if (!current) {
       return
     }
@@ -100,10 +136,11 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     messageId?: string,
     stepId?: string,
   ): void => {
-    const turnId = messageId ?? session.activeTurnId.value
-    if (!turnId) {
+    const unresolvedId = messageId ?? session.activeTurnId.value
+    if (!unresolvedId) {
       return
     }
+    const turnId = resolveTurnId(unresolvedId)
     if (turnId !== session.activeTurnId.value) {
       session.activeTurnId.value = turnId
     }
@@ -113,6 +150,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
         id: turnId,
         steps: [],
         text: '',
+        createdAt: new Date().toISOString(),
       } satisfies AgentTurn)
 
     const targetStepId = stepId ?? session.activeStepId.value
@@ -136,10 +174,11 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     messageId?: string,
     stepId?: string,
   ): void => {
-    const turnId = messageId ?? session.activeTurnId.value
-    if (!turnId) {
+    const unresolvedId = messageId ?? session.activeTurnId.value
+    if (!unresolvedId) {
       return
     }
+    const turnId = resolveTurnId(unresolvedId)
     if (turnId !== session.activeTurnId.value) {
       session.activeTurnId.value = turnId
     }
@@ -153,6 +192,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
         id: turnId,
         steps: [],
         text: '',
+        createdAt: new Date().toISOString(),
       } satisfies AgentTurn)
     const withStep = ensureStep(current, targetStepId)
     const step =
@@ -189,7 +229,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
       updateTimelineTurn(session, updatedTurn)
       return
     }
-    const current = getActiveTurn()
+    const current = ensureActiveTurn()
     if (!current) {
       return
     }

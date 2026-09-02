@@ -11,21 +11,28 @@ import type { AgentHarnessState } from './types'
 
 type SessionOpsDeps = {
   handleEvent: (event: HarnessEvent) => void
-  stop: () => Promise<void>
+  maybeDrainQueue: () => Promise<void>
 }
 
 export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
-  const { options, session, config, status, contextUsage } = state
+  const { options, session, config, status, contextUsage, compacting } = state
 
-  const abortParentTurnIfNeeded = async (): Promise<void> => {
-    if (status.value !== 'streaming' && status.value !== 'submitted') {
-      return
-    }
-    await deps.stop()
+  const isParentStreaming = (): boolean =>
+    status.value === 'streaming' || status.value === 'submitted'
+
+  const toastStopGeneratingFirst = (): void => {
+    toast.error('Stop generating first')
   }
 
   const compactChat = async (focus?: string): Promise<void> => {
-    await abortParentTurnIfNeeded()
+    if (isParentStreaming()) {
+      toastStopGeneratingFirst()
+      return
+    }
+
+    if (compacting.value) {
+      return
+    }
 
     const meta = session.meta.value
     if (!meta) {
@@ -39,6 +46,7 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
       return
     }
 
+    compacting.value = true
     try {
       const result = await compactSession({
         projectSlug: options.projectSlug,
@@ -46,6 +54,7 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
         projectRoot,
         settings: config.effectiveSettings.value,
         messages: session.messages.value,
+        timeline: session.timeline.value,
         focus,
         frozenSystem: undefined,
         chatModel: meta.model,
@@ -66,11 +75,22 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
       toast.error('Compaction failed', {
         description: formatUnknownError(err),
       })
+    } finally {
+      compacting.value = false
     }
+
+    await deps.maybeDrainQueue()
   }
 
   const createHandoff = async (): Promise<void> => {
-    await abortParentTurnIfNeeded()
+    if (isParentStreaming()) {
+      toastStopGeneratingFirst()
+      return
+    }
+
+    if (compacting.value) {
+      return
+    }
 
     const meta = session.meta.value
     if (!meta) {
@@ -80,32 +100,34 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
 
     const projectRoot = options.projectRoot
 
-    let summary = meta.activeContext?.summary
-    if (!summary) {
-      try {
-        const compactResult = await compactSession({
-          projectSlug: options.projectSlug,
-          chatId: options.chatId,
-          projectRoot,
-          settings: config.effectiveSettings.value,
-          messages: session.messages.value,
-          chatModel: meta.model,
-          turnId: session.activeTurnId.value ?? `session:${options.chatId}`,
-          onEvent: deps.handleEvent,
-        })
-        summary = compactResult.summary
-        session.appendLocalCompaction(compactResult.summary, null)
-        session.patchMetaActiveContext({
-          checkpointLineId: compactResult.checkpointLineId,
-          includeFromCreatedAt: compactResult.includeFromCreatedAt,
-          summary: compactResult.summary,
-        })
-      } catch (err) {
-        toast.error('Handoff failed: could not generate summary', {
-          description: formatUnknownError(err),
-        })
-        return
-      }
+    compacting.value = true
+    let summary = ''
+    try {
+      const compactResult = await compactSession({
+        projectSlug: options.projectSlug,
+        chatId: options.chatId,
+        projectRoot,
+        settings: config.effectiveSettings.value,
+        messages: session.messages.value,
+        timeline: session.timeline.value,
+        chatModel: meta.model,
+        turnId: session.activeTurnId.value ?? `session:${options.chatId}`,
+        onEvent: deps.handleEvent,
+      })
+      summary = compactResult.summary
+      session.appendLocalCompaction(compactResult.summary, null)
+      session.patchMetaActiveContext({
+        checkpointLineId: compactResult.checkpointLineId,
+        includeFromCreatedAt: compactResult.includeFromCreatedAt,
+        summary: compactResult.summary,
+      })
+    } catch (err) {
+      toast.error('Handoff failed: could not generate summary', {
+        description: formatUnknownError(err),
+      })
+      return
+    } finally {
+      compacting.value = false
     }
 
     try {

@@ -160,4 +160,152 @@ describe('serializeTimelineForBudget', () => {
     expect(serialized).toContain('found things')
     expect(serialized).not.toContain('NESTED_ONLY_CONTENT')
   })
+
+  it('cuts at the compaction marker and drops pre-compaction tool I/O', () => {
+    const precompactPayload = 'PRECOMPACT_' + 'x'.repeat(4000)
+    const u1CreatedAt = '2026-01-01T00:00:00.000Z'
+    const timeline: ChatTimelineItem[] = [
+      {
+        type: 'user',
+        message: userMessage('u1', 'before prompt with unique text', u1CreatedAt),
+      },
+      {
+        type: 'agent-turn',
+        turn: {
+          id: 'a1',
+          text: 'precompact reply',
+          steps: [
+            {
+              id: 's1',
+              text: '',
+              reasoning: '',
+              tools: [
+                {
+                  toolCallId: 't1',
+                  name: 'read_file',
+                  status: 'done',
+                  args: { path: '/tmp/big.txt' },
+                  result: { content: precompactPayload },
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        type: 'compaction',
+        summary: 'SUMMARY_TEXT',
+        focus: 'parent',
+      },
+      {
+        type: 'user',
+        message: userMessage('u2', 'after prompt', '2026-01-02T00:00:00.000Z'),
+      },
+      {
+        type: 'agent-turn',
+        turn: {
+          id: 'a2',
+          text: 'after reply',
+          steps: [
+            {
+              id: 's2',
+              text: '',
+              reasoning: '',
+              tools: [
+                {
+                  toolCallId: 't2',
+                  name: 'read_file',
+                  status: 'done',
+                  args: { path: '/tmp/after.txt' },
+                  result: { content: 'POSTCOMPACT_CONTENT' },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]
+
+    const serialized = serializeTimelineForBudget({
+      timeline,
+      checkpointText: 'Prior checkpoint: SUMMARY_TEXT',
+      includeFromCreatedAt: u1CreatedAt,
+    })
+
+    expect(serialized).toContain('Prior checkpoint: SUMMARY_TEXT')
+    expect(serialized).toContain('after prompt')
+    expect(serialized).toContain('after reply')
+    expect(serialized).toContain('POSTCOMPACT_CONTENT')
+    expect(serialized).not.toContain('PRECOMPACT_')
+    expect(serialized).not.toContain('before prompt with unique text')
+  })
+
+  it('falls back to the marker summary when checkpointText is empty', () => {
+    const timeline: ChatTimelineItem[] = [
+      {
+        type: 'user',
+        message: userMessage('u1', 'before prompt'),
+      },
+      {
+        type: 'agent-turn',
+        turn: {
+          id: 'a1',
+          text: 'precompact reply',
+          steps: [
+            {
+              id: 's1',
+              text: '',
+              reasoning: '',
+              tools: [
+                {
+                  toolCallId: 't1',
+                  name: 'read_file',
+                  status: 'done',
+                  args: { path: '/tmp/big.txt' },
+                  result: { content: 'PRECOMPACT_' + 'x'.repeat(4000) },
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        type: 'compaction',
+        summary: 'SUMMARY_TEXT',
+        focus: 'parent',
+      },
+      {
+        type: 'user',
+        message: userMessage('u2', 'after prompt'),
+      },
+      {
+        type: 'agent-turn',
+        turn: {
+          id: 'a2',
+          text: 'after reply',
+          steps: [
+            {
+              id: 's2',
+              text: '',
+              reasoning: '',
+              tools: [
+                {
+                  toolCallId: 't2',
+                  name: 'read_file',
+                  status: 'done',
+                  args: { path: '/tmp/after.txt' },
+                  result: { content: 'POSTCOMPACT_CONTENT' },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]
+
+    const serialized = serializeTimelineForBudget({ timeline })
+    expect(serialized).toContain('SUMMARY_TEXT')
+    expect(serialized).toContain('POSTCOMPACT_CONTENT')
+    expect(serialized).not.toContain('PRECOMPACT_')
+  })
 })

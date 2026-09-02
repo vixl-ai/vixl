@@ -17,6 +17,7 @@ export type HarnessEvent =
   | { type: 'text-delta'; delta: string; messageId?: string; stepId?: string }
   | { type: 'reasoning-delta'; delta: string; messageId?: string; stepId?: string }
   | { type: 'tool-input-start'; toolCallId: string; name: string }
+  | { type: 'tool-input-delta'; toolCallId: string; name: string; args: unknown }
   | { type: 'tool-start'; toolCallId: string; name: string; args: unknown }
   | {
       type: 'tool-pending-approval'
@@ -95,4 +96,6 @@ export type HarnessEvent =
   | { type: 'chat-status-changed'; projectSlug: string; chatId: string; status: 'idle' | 'running' }
   | { type: 'turn-aborted'; reason: 'user-stop' | 'error'; partialSteps: number }
   | { type: 'question-request'; toolCallId: string; question: string; options?: string[] }
+  | { type: 'compaction-started' }
+  | { type: 'compaction-ended' }
   | { type: 'compaction'; summary: string; focus: string | null }

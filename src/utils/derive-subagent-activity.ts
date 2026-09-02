@@ -6,6 +6,10 @@ export default (subagent: SubagentTimelineItem): string | null => {
     return null
   }
 
+  if (subagent.compacting) {
+    return 'Compacting'
+  }
+
   const tools = subagent.tools
   if (tools.length === 0) {
     return 'Working'

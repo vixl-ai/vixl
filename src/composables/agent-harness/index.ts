@@ -22,6 +22,7 @@ import createEvents from './events'
 import createHelpers, { makeHarnessKey } from './helpers'
 import createLifecycle from './lifecycle'
 import createPersistence from './persistence'
+import createRestoreUsage from './restore-usage'
 import createSessionOps from './session-ops'
 import createTurnLoop from './turn-loop'
 import type { AgentHarnessState, LastRunConfig } from './types'
@@ -76,9 +77,12 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     sessionPermissionLevel: ref<PermissionLevel | null>(null),
     lastRunConfig: ref<LastRunConfig | null>(null),
     resumingBackgroundBatch: ref(false),
+    compacting: ref(false),
     billableUsageRecords: shallowRef<BillableUsageRecord[]>([]),
     turnUsageByTurnId: shallowRef<Record<string, TurnUsageAggregate>>({}),
     mcpAuthPollTimer: { current: null },
+    sessionAllows: new Set<string>(),
+    sessionDenies: new Set<string>(),
   }
 
   const attention = createHelpers(state)
@@ -110,8 +114,9 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
   })
   const sessionOps = createSessionOps(state, {
     handleEvent: events.handleEvent,
-    stop: lifecycle.stop,
+    maybeDrainQueue: turnLoop.maybeDrainQueue,
   })
+  const restoreUsage = createRestoreUsage(state)
 
   return {
     status: state.status,
@@ -126,6 +131,7 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     billableUsageRecords: state.billableUsageRecords,
     turnUsageByTurnId: state.turnUsageByTurnId,
     queuedMessages: messageQueue.items,
+    compacting: state.compacting,
     isWaitingOnBackground: attention.isWaitingOnBackground,
     send: turnLoop.send,
     submitEditMessage: persistence.submitEditMessage,
@@ -145,6 +151,7 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     compactChat: sessionOps.compactChat,
     createHandoff: sessionOps.createHandoff,
     restorePendingApprovals: approvals.restorePendingApprovals,
+    restoreUsageLedger: restoreUsage.restoreUsageLedger,
     forceSendQueued: lifecycle.forceSendQueued,
     cancelQueued: lifecycle.cancelQueued,
     editQueued: lifecycle.editQueued,

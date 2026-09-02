@@ -148,7 +148,11 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     })
     updateChatMeta(projectSlug, chatId, {
       prefixSnapshot: snapshot as unknown as Record<string, unknown>,
-    }).catch(() => {})
+    }).catch(() => {
+      // Prefix snapshot persist is best-effort and non-fatal. The in-memory
+      // prefix is already assembled for this turn; the next turn reassembles
+      // the system prompt if this write did not land.
+    })
     onEvent({
       type: 'chat-meta-changed',
       projectSlug,
@@ -220,8 +224,8 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     onEvent(event)
   }
 
-  const sessionAllows = new Set<string>()
-  const sessionDenies = new Set<string>()
+  const sessionAllows = input.sessionAllows
+  const sessionDenies = input.sessionDenies
 
   const allTools = buildTools({
     projectRoot,

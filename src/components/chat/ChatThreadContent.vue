@@ -33,6 +33,7 @@ const props = defineProps<{
   personalMcp?: McpConfig
   projectMcp?: McpConfig
   readOnly?: boolean
+  compacting?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -265,7 +266,7 @@ const agentTurnActivityLabel = (index: number): string | null => {
   return activityLabel.value
 }
 const followLiveOutput = async (): Promise<void> => {
-  if (!isLive.value && !activityLabel.value) {
+  if (!isLive.value && !activityLabel.value && !props.compacting) {
     return
   }
   try {
@@ -288,6 +289,15 @@ watch(activityLabel, () => {
 })
 
 watch(
+  () => props.compacting,
+  (compacting) => {
+    if (compacting) {
+      followLiveOutput()
+    }
+  },
+)
+
+watch(
   () => props.status,
   (status) => {
     if (status === 'streaming' || status === 'submitted' || activityLabel.value) {
@@ -307,7 +317,7 @@ watch(
           v-for="(item, index) in visibleTimeline"
           :key="timelineItemId(item, index)"
           :message-id="timelineItemId(item, index)"
-          :scroll-anchor="isLastItem(index) && !trailingActivityLabel"
+          :scroll-anchor="isLastItem(index) && !trailingActivityLabel && !compacting"
           class="min-w-0 max-w-full"
         >
           <ChatMessageTurn
@@ -317,8 +327,6 @@ watch(
           />
           <ChatCompactionMarker
             v-else-if="item.type === 'compaction'"
-            :summary="item.summary"
-            :focus="item.focus"
           />
           <ChatSubAgentTurn
             v-else-if="item.type === 'subagent'"
@@ -353,6 +361,10 @@ watch(
             {{ trailingActivityLabel }}
           </AiElementsShimmerShimmer>
         </MessageScrollerItem>
+        <ChatCompactionMarker
+          v-if="compacting"
+          pending
+        />
         <ChatQuestionCard
           v-if="!readOnly && pendingQuestion"
           :question="pendingQuestion"

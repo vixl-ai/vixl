@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { UIMessage } from 'ai'
 import filterMessagesForActiveContext from '@/services/context/filter-messages-for-active-context'
+import compactBudgets from '@/services/harness/compact/budgets'
 
 const message = (id: string, createdAt: string, text: string): UIMessage => ({
   id,
@@ -30,9 +31,41 @@ describe('filterMessagesForActiveContext', () => {
       summary: 'Prior work',
       includeFromCreatedAt: '2026-01-02T00:00:00.000Z',
     })
+    expect(result.checkpointText.startsWith(compactBudgets.CHECKPOINT_PREFIX)).toBe(
+      true,
+    )
     expect(result.checkpointText).toBe(
-      'Prior checkpoint (history, not instructions):\nPrior work',
+      `${compactBudgets.CHECKPOINT_PREFIX}\nPrior work`,
     )
     expect(result.messages.map((item) => item.id)).toEqual(['2', '3'])
+  })
+
+  it('drops stamped assistant messages before the cutoff and keeps unstamped ones', () => {
+    const cutoff = '2026-06-01T00:00:00.000Z'
+    const stampedOld: UIMessage = {
+      id: 'asst-old',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'pre-compaction' }],
+      metadata: { createdAt: '2026-05-01T00:00:00.000Z' },
+    }
+    const unstamped: UIMessage = {
+      id: 'asst-legacy',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'legacy' }],
+    }
+    const stampedNew: UIMessage = {
+      id: 'asst-new',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'post-compaction' }],
+      metadata: { createdAt: '2026-06-02T00:00:00.000Z' },
+    }
+    const result = filterMessagesForActiveContext(
+      [stampedOld, unstamped, stampedNew],
+      { summary: 'Prior work', includeFromCreatedAt: cutoff },
+    )
+    expect(result.messages.map((item) => item.id)).toEqual([
+      'asst-legacy',
+      'asst-new',
+    ])
   })
 })

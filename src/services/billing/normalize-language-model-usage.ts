@@ -1,28 +1,38 @@
 import type { LanguageModelUsage } from 'ai'
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
+import readLanguageModelUsageTokens from '@/services/billing/read-language-model-usage-tokens'
 
 type NormalizedUsage = BillableUsageRecord['usage'] & { usageMissing: boolean }
 
 const isAbsentOrZero = (value: number | undefined): boolean =>
   value === undefined || value === 0
 
+const finiteNumber = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) ? value : undefined
+
 /**
  * Flatten AI SDK LanguageModelUsage into the billable usage snapshot.
- * Copies fields verbatim. Never invents or re-tokenizes.
+ * Copies fields verbatim when present. Fills input/output from raw when
+ * flattened counts are missing. Never invents tokens.
  */
 export default (usage: LanguageModelUsage | undefined): NormalizedUsage => {
   if (!usage) {
     return { usageMissing: true }
   }
 
-  const inputTokens = usage.inputTokens
-  const noCacheTokens = usage.inputTokenDetails.noCacheTokens
-  const cacheReadTokens = usage.inputTokenDetails.cacheReadTokens
-  const cacheWriteTokens = usage.inputTokenDetails.cacheWriteTokens
-  const outputTokens = usage.outputTokens
-  const textTokens = usage.outputTokenDetails.textTokens
-  const reasoningTokens = usage.outputTokenDetails.reasoningTokens
-  const totalTokens = usage.totalTokens
+  const tokens = readLanguageModelUsageTokens(usage)
+  const inputTokens = tokens.inputTokens ?? finiteNumber(usage.inputTokens)
+  const noCacheTokens = finiteNumber(usage.inputTokenDetails?.noCacheTokens)
+  const cacheReadTokens =
+    tokens.cacheReadTokens ??
+    finiteNumber(usage.inputTokenDetails?.cacheReadTokens)
+  const cacheWriteTokens =
+    tokens.cacheWriteTokens ??
+    finiteNumber(usage.inputTokenDetails?.cacheWriteTokens)
+  const outputTokens = tokens.outputTokens ?? finiteNumber(usage.outputTokens)
+  const textTokens = finiteNumber(usage.outputTokenDetails?.textTokens)
+  const reasoningTokens = finiteNumber(usage.outputTokenDetails?.reasoningTokens)
+  const totalTokens = finiteNumber(usage.totalTokens)
   const raw = usage.raw
 
   const usageMissing =

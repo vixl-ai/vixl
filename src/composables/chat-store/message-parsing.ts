@@ -119,6 +119,7 @@ export const updateAssistantMessage = (session: ChatSession, turn: AgentTurn): v
     id: turn.id,
     role: 'assistant',
     parts,
+    ...(turn.createdAt ? { metadata: { createdAt: turn.createdAt } } : {}),
   }
   if (index >= 0) {
     session.messages.value = session.messages.value.map((item, itemIndex) =>
@@ -213,6 +214,7 @@ export const rebuildMessagesFromTimeline = (items: ChatTimelineItem[]): UIMessag
         ...(reasoning ? [{ type: 'reasoning' as const, text: reasoning }] : []),
         { type: 'text' as const, text },
       ],
+      ...(turn.createdAt ? { metadata: { createdAt: turn.createdAt } } : {}),
     })
   }
   return nextMessages

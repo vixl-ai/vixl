@@ -12,7 +12,12 @@ export const bindAgentThreadLifecycle = (
   handlers: AgentThreadHandlers,
 ): void => {
   watch(
-    [state.threadReady, state.isSubagentView],
+    [
+      state.threadReady,
+      state.isSubagentView,
+      () => state.harness.value?.compacting.value ?? false,
+      () => state.harness.value?.status.value,
+    ],
     () => {
       syncContextActions(state, handlers)
     },

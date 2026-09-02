@@ -174,6 +174,109 @@ describe('decidePermission shell', () => {
   })
 })
 
+const fsInput = (
+  action: 'fs.write' | 'fs.delete',
+  capability: `fs.write:${string}` | `fs.delete:${string}`,
+  options: {
+    paths?: string[]
+    sessionAllows?: string[]
+    permissions?: VixlSettings['agent.permissions']
+    permissionLevel?: 'ask' | 'allowlist' | 'bypass'
+  } = {},
+) => ({
+  action,
+  capability,
+  paths: options.paths ?? [capability.slice(capability.indexOf(':') + 1)],
+  settings: baseSettings(options.permissions),
+  permissionLevel: options.permissionLevel ?? ('ask' as const),
+  sessionAllows: new Set(options.sessionAllows ?? []),
+  sessionDenies: new Set<string>(),
+  sandboxEnabled: true,
+})
+
+describe('decidePermission fs broad grants', () => {
+  it('allows a different path when sessionAllows has broad fs.write', () => {
+    const decision = decidePermission(
+      fsInput('fs.write', 'fs.write:src/b.ts', {
+        sessionAllows: ['fs.write'],
+      }),
+    )
+    expect(decision.verdict).toBe('allow')
+  })
+
+  it('allows a different path when persisted allow is broad fs.write', () => {
+    const decision = decidePermission(
+      fsInput('fs.write', 'fs.write:src/b.ts', {
+        permissions: [
+          { capability: 'fs.write', verdict: 'allow', scope: 'workspace' },
+        ],
+      }),
+    )
+    expect(decision.verdict).toBe('allow')
+  })
+
+  it('still allows the exact persisted path', () => {
+    const decision = decidePermission(
+      fsInput('fs.write', 'fs.write:src/a.ts', {
+        permissions: [
+          {
+            capability: 'fs.write:src/a.ts',
+            verdict: 'allow',
+            scope: 'workspace',
+          },
+        ],
+      }),
+    )
+    expect(decision.verdict).toBe('allow')
+  })
+
+  it('asks for a sensitive path even with a broad fs.write grant', () => {
+    const decision = decidePermission(
+      fsInput('fs.write', 'fs.write:.env', {
+        paths: ['.env'],
+        sessionAllows: ['fs.write'],
+        permissions: [
+          { capability: 'fs.write', verdict: 'allow', scope: 'always' },
+        ],
+      }),
+    )
+    expect(decision.verdict).toBe('ask')
+    expect(decision.reason).toBe('Sensitive path')
+  })
+
+  it('does not let fs.write cover fs.delete', () => {
+    const decision = decidePermission(
+      fsInput('fs.delete', 'fs.delete:src/a.ts', {
+        sessionAllows: ['fs.write'],
+        permissions: [
+          { capability: 'fs.write', verdict: 'allow', scope: 'workspace' },
+        ],
+      }),
+    )
+    expect(decision.verdict).toBe('ask')
+  })
+
+  it('covers apply_patch capability fs.write:* with broad fs.write', () => {
+    const sessionDecision = decidePermission(
+      fsInput('fs.write', 'fs.write:*', {
+        paths: ['src/a.ts', 'src/b.ts'],
+        sessionAllows: ['fs.write'],
+      }),
+    )
+    expect(sessionDecision.verdict).toBe('allow')
+
+    const persistedDecision = decidePermission(
+      fsInput('fs.write', 'fs.write:*', {
+        paths: ['src/a.ts'],
+        permissions: [
+          { capability: 'fs.write', verdict: 'allow', scope: 'always' },
+        ],
+      }),
+    )
+    expect(persistedDecision.verdict).toBe('allow')
+  })
+})
+
 describe('isStickyShellElevation', () => {
   it('is true only for network and unsandboxed hops', () => {
     expect(isStickyShellElevation('shell.network')).toBe(true)

@@ -214,4 +214,22 @@ describe('runSubagentGenerate pending approval tagging', () => {
       }),
     )
   })
+
+  it('reuses the parent sessionAllows and sessionDenies sets', async () => {
+    const ctx = baseCtx()
+    await runSubagentGenerate({
+      ctx,
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'edit the auth helper',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'write',
+    })
+
+    const nestedCtx = buildHarnessTools.mock.calls[0]?.[0] as HarnessToolContext
+    expect(nestedCtx.sessionAllows).toBe(ctx.sessionAllows)
+    expect(nestedCtx.sessionDenies).toBe(ctx.sessionDenies)
+  })
 })

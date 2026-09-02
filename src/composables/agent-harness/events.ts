@@ -5,7 +5,11 @@ import type { ToolRun } from '@/types/harness/tool-run'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import { mapMetaStatusToChatStatus } from '@/services/harness/orchestrator'
 import mapSubagentResultStatus from '@/utils/map-subagent-result-status'
+import mergeToolRunArgs from '@/utils/merge-tool-run-args'
+import toolArgsPath from '@/utils/tool-args-path'
 import type { AgentHarnessState, AttentionHelpers } from './types'
+
+const HOLD_PATH_TOOLS = new Set(['write_file', 'edit_file'])
 
 type EventDeps = {
   startMcpAuthPolling: () => void
@@ -30,6 +34,7 @@ export default (
     turnUsageByTurnId,
     contextUsage,
     contextBudgetSync,
+    compacting,
   } = state
 
   const handleEvent = (event: HarnessEvent): void => {
@@ -43,15 +48,42 @@ export default (
       status.value = 'streaming'
     }
     if (event.type === 'tool-input-start') {
+      if (HOLD_PATH_TOOLS.has(event.name)) {
+        status.value = 'streaming'
+      } else {
+        const existing = toolRuns.value.find(
+          (item) => item.toolCallId === event.toolCallId,
+        )
+        if (!existing || existing.status === 'running') {
+          const run: ToolRun = {
+            toolCallId: event.toolCallId,
+            name: event.name,
+            status: 'running',
+            args: existing?.args,
+          }
+          toolRuns.value = [
+            ...toolRuns.value.filter((item) => item.toolCallId !== event.toolCallId),
+            run,
+          ]
+          session.upsertLocalToolRun(run)
+          status.value = 'streaming'
+        }
+      }
+    }
+    if (event.type === 'tool-input-delta') {
       const existing = toolRuns.value.find(
         (item) => item.toolCallId === event.toolCallId,
       )
-      if (!existing || existing.status === 'running') {
+      const name = event.name || existing?.name || 'tool'
+      const args = mergeToolRunArgs(existing?.args, event.args)
+      if (HOLD_PATH_TOOLS.has(name) && !toolArgsPath(args)) {
+        status.value = 'streaming'
+      } else if (!existing || existing.status === 'running') {
         const run: ToolRun = {
           toolCallId: event.toolCallId,
-          name: event.name,
+          name,
           status: 'running',
-          args: existing?.args,
+          args,
         }
         toolRuns.value = [
           ...toolRuns.value.filter((item) => item.toolCallId !== event.toolCallId),
@@ -62,11 +94,14 @@ export default (
       }
     }
     if (event.type === 'tool-start') {
+      const existing = toolRuns.value.find(
+        (item) => item.toolCallId === event.toolCallId,
+      )
       const run: ToolRun = {
         toolCallId: event.toolCallId,
         name: event.name,
         status: 'running',
-        args: event.args,
+        args: mergeToolRunArgs(existing?.args, event.args),
       }
       toolRuns.value = [
         ...toolRuns.value.filter((item) => item.toolCallId !== event.toolCallId),
@@ -238,9 +273,21 @@ export default (
       }
       attention.refreshSidebar()
     }
+    if (event.type === 'compaction-started') {
+      compacting.value = true
+    }
+    if (event.type === 'compaction-ended') {
+      compacting.value = false
+    }
     if (event.type === 'compaction') {
       session.appendLocalCompaction(event.summary, event.focus)
       contextUsage.clearLastStepUsage()
+      compacting.value = false
+      contextBudgetSync.refreshContextBudget().catch((error) => {
+        toast.error('Failed to refresh context usage', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        })
+      })
     }
     if (event.type === 'turn-aborted') {
       status.value = 'ready'

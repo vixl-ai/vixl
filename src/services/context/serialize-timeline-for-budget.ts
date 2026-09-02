@@ -70,7 +70,49 @@ export type SerializeTimelineForBudgetInput = {
  * Skips subagent nested tool streams (parent context only sees spawn summaries)
  * and todo markers.
  */
+const combinePrefixAndBody = (prefix: string, body: string): string => {
+  if (!prefix) {
+    return body
+  }
+  if (!body) {
+    return prefix
+  }
+  return `${prefix}\n\n${body}`
+}
+
 export default (input: SerializeTimelineForBudgetInput): string => {
+  let lastCompactionIndex = -1
+  for (let i = input.timeline.length - 1; i >= 0; i -= 1) {
+    if (input.timeline[i]?.type === 'compaction') {
+      lastCompactionIndex = i
+      break
+    }
+  }
+
+  if (lastCompactionIndex >= 0) {
+    const marker = input.timeline[lastCompactionIndex]
+    const checkpointText = input.checkpointText ?? ''
+    const prefix =
+      checkpointText ||
+      (marker?.type === 'compaction' ? marker.summary : '')
+    const chunks: string[] = []
+
+    for (const item of input.timeline.slice(lastCompactionIndex + 1)) {
+      if (item.type === 'user') {
+        chunks.push(serializeMessageParts(item.message))
+        continue
+      }
+      if (item.type === 'agent-turn') {
+        chunks.push(serializeAgentTurn(item.turn))
+      }
+    }
+
+    return combinePrefixAndBody(
+      prefix,
+      chunks.filter((chunk) => chunk.length > 0).join('\n\n'),
+    )
+  }
+
   const cutoff = input.includeFromCreatedAt
   const chunks: string[] = []
   let pastCutoff = !cutoff
@@ -104,12 +146,5 @@ export default (input: SerializeTimelineForBudgetInput): string => {
   }
 
   const body = chunks.filter((chunk) => chunk.length > 0).join('\n\n')
-  const checkpointText = input.checkpointText ?? ''
-  if (!checkpointText) {
-    return body
-  }
-  if (!body) {
-    return checkpointText
-  }
-  return `${checkpointText}\n\n${body}`
+  return combinePrefixAndBody(input.checkpointText ?? '', body)
 }

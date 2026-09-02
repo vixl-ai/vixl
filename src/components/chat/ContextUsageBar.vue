@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { AlertTriangle } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import {
   Popover,
   PopoverContent,
@@ -124,12 +126,27 @@ const showManageActions = computed(
     Boolean(contextActions.onHandoff.value),
 )
 
-const handleCompact = (): void => {
-  contextActions.onCompact.value?.()
+const handleCompact = async (): Promise<void> => {
+  if (contextActions.compacting.value) {
+    return
+  }
+  try {
+    await contextActions.onCompact.value?.()
+  } catch (error) {
+    toast.error('Failed to compact chat', {
+      description: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
 }
 
-const handleHandoff = (): void => {
-  contextActions.onHandoff.value?.()
+const handleHandoff = async (): Promise<void> => {
+  try {
+    await contextActions.onHandoff.value?.()
+  } catch (error) {
+    toast.error('Failed to hand off chat', {
+      description: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
 }
 </script>
 
@@ -142,7 +159,11 @@ const handleHandoff = (): void => {
         size="sm"
         class="h-7 gap-1.5 px-2 text-xs"
         :class="statusClass"
-        :disabled="contextActions.triggerDisabled.value || contextUsage.pending.value"
+        :disabled="
+          contextActions.triggerDisabled.value ||
+            contextUsage.pending.value ||
+            contextActions.compacting.value
+        "
       >
         <svg
           aria-hidden="true"
@@ -347,10 +368,18 @@ const handleHandoff = (): void => {
           variant="outline"
           size="sm"
           class="h-7 px-2 text-xs"
-          :disabled="contextActions.actionsDisabled.value"
+          :disabled="
+            contextActions.actionsDisabled.value || contextActions.compacting.value
+          "
+          :aria-busy="contextActions.compacting.value"
+          :aria-label="contextActions.compacting.value ? 'Compacting...' : undefined"
           @click="handleCompact"
         >
-          Compact
+          <Spinner
+            v-if="contextActions.compacting.value"
+            class="size-3"
+          />
+          {{ contextActions.compacting.value ? 'Compacting...' : 'Compact' }}
         </Button>
         <Button
           v-if="contextActions.onHandoff.value"
@@ -358,7 +387,9 @@ const handleHandoff = (): void => {
           variant="outline"
           size="sm"
           class="h-7 px-2 text-xs"
-          :disabled="contextActions.actionsDisabled.value"
+          :disabled="
+            contextActions.actionsDisabled.value || contextActions.compacting.value
+          "
           @click="handleHandoff"
         >
           Handoff

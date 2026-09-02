@@ -31,6 +31,7 @@ export const createSession = (projectSlug: string, chatId: string): ChatSession 
   loading: ref(false),
   activeTurnId: ref<string | null>(null),
   activeStepId: ref<string | null>(null),
+  turnIdRemap: new Map(),
   pendingStepText: ref(''),
   pendingQuestion: ref<PendingQuestionState | null>(null),
   editingMessageId: ref<string | null>(null),
@@ -157,6 +158,7 @@ export const clearActiveTurnState = (session: ChatSession): void => {
   session.activeStepId.value = null
   session.pendingStepText.value = ''
   session.pendingQuestion.value = null
+  session.turnIdRemap.clear()
 }
 
 export const extractUserMessageText = (message: UIMessage): string =>

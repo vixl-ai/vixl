@@ -1,7 +1,5 @@
 import type { UIMessage } from 'ai'
 import { appendChatLine, updateChatMeta } from '@/services/vixl/vixl-tauri'
-import estimateTextTokens from '@/utils/estimate-text-tokens'
-import compactBudgets from './budgets'
 
 export type PersistCompactionCheckpointInput = {
   projectSlug: string
@@ -17,63 +15,13 @@ export type PersistCompactionCheckpointResult = {
   checkpointLineId: string
 }
 
-const serializeMessageText = (message: UIMessage): string =>
-  message.parts
-    .map((part) => {
-      if (part.type === 'text' || part.type === 'reasoning') {
-        return part.text
-      }
-      return JSON.stringify(part)
-    })
-    .join('\n')
-    .trim()
-
-const buildActiveWindowMessages = (
-  messages: UIMessage[],
-  summary: string,
-): UIMessage[] => {
-  const reversed = [...messages].reverse()
-  const kept: UIMessage[] = []
-  let tokens = 0
-
-  for (const message of reversed) {
-    const text = serializeMessageText(message)
-    const estimate = estimateTextTokens(text)
-    if (tokens + estimate > compactBudgets.ACTIVE_WINDOW_TOKEN_BUDGET) {
-      break
-    }
-    tokens += estimate
-    kept.unshift(message)
-  }
-
-  if (kept.length === 0 && messages.length > 0) {
-    const last = messages[messages.length - 1]
-    if (last) {
-      kept.push(last)
-    }
-  }
-
-  const checkpointMessage: UIMessage = {
-    id: crypto.randomUUID(),
-    role: 'user',
-    parts: [
-      {
-        type: 'text',
-        text: `${compactBudgets.CHECKPOINT_PREFIX}\n${summary}`,
-      },
-    ],
-    metadata: { createdAt: new Date().toISOString() },
-  }
-
-  return [checkpointMessage, ...kept]
-}
-
 export default async (
   input: PersistCompactionCheckpointInput,
 ): Promise<PersistCompactionCheckpointResult> => {
-  const { projectSlug, chatId, summary, focus, messages } = input
+  const { projectSlug, chatId, summary, focus } = input
   const checkpointLineId = crypto.randomUUID()
   const nowIso = new Date().toISOString()
+  const includeFromCreatedAt = nowIso
 
   await appendChatLine(projectSlug, chatId, {
     id: checkpointLineId,
@@ -86,27 +34,6 @@ export default async (
       focus: focus ?? null,
     },
   })
-
-  const activeMessages = buildActiveWindowMessages(messages, summary)
-
-  const firstRealMessage = activeMessages.find(
-    (m) =>
-      !(
-        m.role === 'user' &&
-        m.parts.some(
-          (p) =>
-            p.type === 'text' &&
-            p.text.startsWith(compactBudgets.CHECKPOINT_PREFIX),
-        )
-      ),
-  )
-  const includeFromCreatedAt =
-    (firstRealMessage?.metadata &&
-    typeof (firstRealMessage.metadata as Record<string, unknown>).createdAt ===
-      'string'
-      ? ((firstRealMessage.metadata as Record<string, unknown>)
-          .createdAt as string)
-      : null) ?? nowIso
 
   await updateChatMeta(projectSlug, chatId, {
     activeContext: {

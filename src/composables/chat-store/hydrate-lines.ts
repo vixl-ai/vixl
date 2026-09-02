@@ -55,6 +55,9 @@ export const createFlushTurn = (acc: HydrateAccumulator): (() => void) => {
             : []),
           { type: 'text' as const, text: normalizedTurn.text },
         ],
+        ...(normalizedTurn.createdAt
+          ? { metadata: { createdAt: normalizedTurn.createdAt } }
+          : {}),
       })
     }
     if (acc.pendingSubagents.length > 0) {
@@ -110,6 +113,7 @@ export const applyHydrateLine = (
           ? [{ id: parsed.id, text: '', reasoning, tools: [] }]
           : [],
         text,
+        createdAt: parsed.createdAt,
       }
     } else {
       let nextTurn: AgentTurn = acc.pendingTurn
@@ -138,6 +142,7 @@ export const applyHydrateLine = (
         id: parsed.id,
         text: duplicated ? '' : text || nextTurn.text,
         steps: nextTurn.steps,
+        createdAt: nextTurn.createdAt ?? parsed.createdAt,
       }
     }
     flushTurn()

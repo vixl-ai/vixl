@@ -20,6 +20,7 @@ export type ChatSession = {
   loading: Ref<boolean>
   activeTurnId: Ref<string | null>
   activeStepId: Ref<string | null>
+  turnIdRemap: Map<string, string>
   pendingStepText: Ref<string>
   pendingQuestion: Ref<PendingQuestionState | null>
   editingMessageId: Ref<string | null>

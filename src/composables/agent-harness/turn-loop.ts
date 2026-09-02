@@ -128,6 +128,8 @@ export default (
         permissionLevel: sessionPermissionLevel.value ?? undefined,
         persistPermission: deps.persistPermission,
         reasoning: cfg.reasoning,
+        sessionAllows: state.sessionAllows,
+        sessionDenies: state.sessionDenies,
       })
       status.value = 'ready'
       session.finishAgentTurn()

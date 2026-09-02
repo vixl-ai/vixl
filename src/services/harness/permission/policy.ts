@@ -175,12 +175,22 @@ export const decidePermission = (input: PermissionDecisionInput): PermissionDeci
     }
   }
 
+  const fsBroad =
+    action === 'fs.write' || action === 'fs.delete' ? action : undefined
+
   if (persisted?.verdict === 'allow') {
     return { verdict: 'allow', allowedScopes: defaultScopes() }
   }
 
-  if (sessionAllows.has(capability)) {
+  if (sessionAllows.has(capability) || (fsBroad && sessionAllows.has(fsBroad))) {
     return { verdict: 'allow', allowedScopes: defaultScopes() }
+  }
+
+  if (fsBroad) {
+    const broadPersisted = findPersisted(fsBroad, settings)
+    if (broadPersisted?.verdict === 'allow') {
+      return { verdict: 'allow', allowedScopes: defaultScopes() }
+    }
   }
 
   if (permissionLevel === 'bypass') {

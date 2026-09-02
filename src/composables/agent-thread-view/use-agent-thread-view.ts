@@ -104,6 +104,12 @@ export default () => {
   const chatPromptInputRef = ref<{
     hydrateQueuedMessage: (item: QueuedChatMessage) => Promise<void>
   } | null>(null)
+  const compacting = computed(() => {
+    if (isSubagentView.value) {
+      return paintedSession.value?.getSubagent(subagentId.value)?.compacting === true
+    }
+    return harness.value?.compacting.value ?? false
+  })
   const pendingQuestion = computed(
     () => paintedSession.value?.pendingQuestion.value ?? null,
   )
@@ -189,6 +195,7 @@ export default () => {
     isWaitingOnBackground,
     chatPromptInputRef,
     pendingQuestion,
+    compacting,
     timeline,
     todos,
     runningShells,

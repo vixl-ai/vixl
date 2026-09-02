@@ -1,4 +1,5 @@
 import { isLoopFinished, smoothStream, streamText } from 'ai'
+import { toast } from 'vue-sonner'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import { rejectPendingForChat } from '@/services/harness/permission/approval-gate'
 import { rejectPendingQuestionsForChat } from '@/services/harness/permission/question-gate'
@@ -12,14 +13,16 @@ import {
 } from '@/services/harness/subagent/registry'
 import { getPlanExecutionSession } from '@/services/harness/plan-execution-session'
 import toCachedInstructions from '@/services/models/to-cached-instructions'
+import emitContextUsage from './emit-context-usage'
+import extractPartialToolPath from './extract-partial-tool-path'
 import {
   nowIso,
   resolveStreamError,
   resolveToolErrorMessage,
 } from './helpers'
 import { persistLine } from './persistence'
-import type { PreparedHarnessStream } from './prepare-stream'
 import prepareParentCompactStep from './prepare-compact-step'
+import type { PreparedHarnessStream } from './prepare-stream'
 
 export default async (prepared: PreparedHarnessStream): Promise<void> => {
   const {
@@ -42,6 +45,28 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
   } = prepared
 
   let streamError: Error | null = null
+  let lastStepHadTokens = false
+  const toolInputBuffers = new Map<string, string>()
+  const toolInputNames = new Map<string, string>()
+
+  const captureStepUsage = async (
+    usage: Parameters<typeof captureBillableUsage>[0]['usage'],
+    extras?: { providerMetadata?: unknown; responseId?: string },
+  ): Promise<void> => {
+    await captureBillableUsage({
+      projectSlug,
+      chatId,
+      turnId: assistantId,
+      source: 'main',
+      providerId: callModel.createRef.providerId,
+      modelId: callModel.createRef.modelId,
+      usage,
+      providerMetadata: extras?.providerMetadata,
+      responseId: extras?.responseId,
+      settings,
+      onEvent,
+    })
+  }
 
   const result = streamText({
     model,
@@ -114,36 +139,10 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
 
     if (part.type === 'finish-step') {
       const usage = part.usage
-      const inputTokens = usage?.inputTokens ?? 0
-      const cacheReadTokens = usage?.inputTokenDetails?.cacheReadTokens ?? 0
-      const cacheWriteTokens = usage?.inputTokenDetails?.cacheWriteTokens ?? 0
-      const outputTokens = usage?.outputTokens ?? 0
-      // Last-step billing stats for the footer only. Ring fill uses the local
-      // budget estimate from context-budget, not these provider counts.
-      const promptTokens = inputTokens > 0
-        ? inputTokens
-        : cacheReadTokens + cacheWriteTokens
-      onEvent({
-        type: 'context-usage',
-        modelId,
-        promptTokens,
-        inputTokens,
-        outputTokens,
-        cacheReadTokens,
-        cacheWriteTokens,
-      })
-      await captureBillableUsage({
-        projectSlug,
-        chatId,
-        turnId: assistantId,
-        source: 'main',
-        providerId: callModel.createRef.providerId,
-        modelId: callModel.createRef.modelId,
-        usage,
+      lastStepHadTokens = emitContextUsage(usage, modelId, onEvent)
+      await captureStepUsage(usage, {
         providerMetadata: part.providerMetadata,
         responseId: part.response?.id,
-        settings,
-        onEvent,
       })
       await steps.finishStep()
       continue
@@ -183,6 +182,8 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
 
     if (part.type === 'tool-input-start') {
       await steps.ensureStepOpen()
+      toolInputNames.set(part.id, part.toolName)
+      toolInputBuffers.set(part.id, '')
       onEvent({
         type: 'tool-input-start',
         toolCallId: part.id,
@@ -191,7 +192,22 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
       continue
     }
 
+    if (part.type === 'tool-input-delta') {
+      const path = extractPartialToolPath(toolInputBuffers, part.id, part.delta)
+      if (path) {
+        onEvent({
+          type: 'tool-input-delta',
+          toolCallId: part.id,
+          name: toolInputNames.get(part.id) ?? '',
+          args: { path },
+        })
+      }
+      continue
+    }
+
     if (part.type === 'tool-call') {
+      toolInputBuffers.delete(part.toolCallId)
+      toolInputNames.delete(part.toolCallId)
       await steps.ensureStepOpen()
       await steps.emitToolStart(part.toolCallId, part.toolName, part.input)
       continue
@@ -229,6 +245,19 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
 
   if (steps.stepOpen && !signal.aborted) {
     await steps.finishStep()
+  }
+
+  if (!lastStepHadTokens && !signal.aborted && !streamError) {
+    try {
+      const totalUsage = await result.usage
+      if (emitContextUsage(totalUsage, modelId, onEvent)) {
+        await captureStepUsage(totalUsage)
+      }
+    } catch (error) {
+      toast.error('Failed to read model usage', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
   }
 
   // Prefer text already streamed into steps. Only fall back to result.text when

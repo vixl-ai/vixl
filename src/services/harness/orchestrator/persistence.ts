@@ -87,6 +87,13 @@ export const persistSubagentHarnessEvent = async (
     | Extract<HarnessEvent, { type: 'subagent-result' }>
     | Extract<HarnessEvent, { type: 'subagent-event' }>,
 ): Promise<void> => {
+  if (
+    event.type === 'subagent-event' &&
+    (event.event.type === 'compaction-started' ||
+      event.event.type === 'compaction-ended')
+  ) {
+    return
+  }
   const lineId =
     event.type === 'subagent-start'
       ? event.subagentId

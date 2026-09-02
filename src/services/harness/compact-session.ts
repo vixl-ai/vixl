@@ -1,8 +1,13 @@
 import type { UIMessage } from 'ai'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
-import { buildTranscript, persistCompactionCheckpoint, summarizeTranscript } from '@/services/harness/compact'
+import {
+  buildTimelineTranscript,
+  persistCompactionCheckpoint,
+  summarizeTranscript,
+} from '@/services/harness/compact'
 import formatUnknownError from '@/utils/format-unknown-error'
 
 export type CompactSessionInput = {
@@ -11,6 +16,7 @@ export type CompactSessionInput = {
   projectRoot: string
   settings: VixlSettings
   messages: UIMessage[]
+  timeline: ChatTimelineItem[]
   focus?: string
   signal?: AbortSignal
   frozenSystem?: string
@@ -32,6 +38,7 @@ export default async (input: CompactSessionInput): Promise<CompactSessionResult>
     chatId,
     settings,
     messages,
+    timeline,
     focus,
     signal,
     frozenSystem,
@@ -39,7 +46,10 @@ export default async (input: CompactSessionInput): Promise<CompactSessionResult>
   } = input
 
   try {
-    const transcript = buildTranscript(messages)
+    const transcript = buildTimelineTranscript(timeline)
+    if (!transcript.trim()) {
+      throw new Error('Nothing to compact')
+    }
     const compacted = await summarizeTranscript({
       settings,
       transcript,

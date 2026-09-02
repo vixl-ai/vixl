@@ -31,6 +31,7 @@ vi.mock('@/services/context/system-prompt-parts', async () => {
 })
 
 import countContextBudget from '@/services/context/count-context-budget'
+import { mcpListStatuses, readMcpConfig } from '@/services/vixl/vixl-tauri'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
@@ -201,5 +202,36 @@ describe('countContextBudget', () => {
       withTimeline.buckets.find((b) => b.id === 'messages')?.tokens ?? 0
     expect(messagesWith).toBeGreaterThan(messagesWithout)
     expect(messagesWith).toBeGreaterThan(1000)
+  })
+
+  it('still computes a budget when mcpListStatuses rejects', async () => {
+    vi.mocked(readMcpConfig).mockResolvedValue({
+      servers: {
+        github: {
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-github'],
+        },
+      },
+    })
+    vi.mocked(mcpListStatuses).mockRejectedValue(new Error('mcp statuses unavailable'))
+
+    try {
+      const budget = await countContextBudget({
+        modelId: 'gpt-4.1',
+        mode: 'agent',
+        projectName: 'demo',
+        projectRoot: '/tmp/demo',
+        mentions: [],
+        messages: [message('1', '2026-01-01T00:00:00.000Z', 'hi')],
+      })
+
+      const mcpTokens = budget.buckets.find((b) => b.id === 'mcp')?.tokens
+      expect(typeof mcpTokens).toBe('number')
+      expect(mcpTokens).toBeGreaterThanOrEqual(0)
+      expect(budget.promptUsed).toBeGreaterThan(0)
+    } finally {
+      vi.mocked(readMcpConfig).mockResolvedValue({ servers: {} })
+      vi.mocked(mcpListStatuses).mockResolvedValue({})
+    }
   })
 })

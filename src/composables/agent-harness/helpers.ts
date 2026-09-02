@@ -17,7 +17,8 @@ export default (state: AgentHarnessState): AttentionHelpers => {
   const isParentBusy = (): boolean =>
     status.value === 'streaming' ||
     status.value === 'submitted' ||
-    state.resumingBackgroundBatch.value
+    state.resumingBackgroundBatch.value ||
+    state.compacting.value
 
   const isWaitingOnBackground = (): boolean =>
     hasPendingBackgroundResume(options.chatId) ||

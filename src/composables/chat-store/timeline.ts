@@ -40,6 +40,7 @@ export const upsertSubagentStart = (
         prompt: subagent.prompt ?? existing.prompt,
         model: subagent.model ?? existing.model,
         tools: subagent.tools ?? existing.tools,
+        compacting: subagent.compacting ?? existing.compacting,
         compactions: subagent.compactions ?? existing.compactions ?? [],
       }
     }
@@ -57,6 +58,7 @@ export const upsertSubagentStart = (
       model: subagent.model,
       status: 'running',
       tools: subagent.tools ?? [],
+      compacting: subagent.compacting,
       compactions: subagent.compactions ?? [],
     },
   ]
@@ -79,6 +81,7 @@ export const completeSubagentTimelineItem = (
         ...existing,
         status,
         summary,
+        compacting: false,
         compactions: existing.compactions ?? [],
       }
     }
@@ -94,6 +97,7 @@ export const completeSubagentTimelineItem = (
       status,
       summary,
       tools: [],
+      compacting: false,
       compactions: [],
     },
   ]
@@ -115,17 +119,33 @@ export const appendSubagentToolEvent = (
     return items
   }
   const next = [...items]
+  if (event.type === 'compaction-started') {
+    next[index] = {
+      ...existing,
+      compacting: true,
+    }
+    return next
+  }
+  if (event.type === 'compaction-ended') {
+    next[index] = {
+      ...existing,
+      compacting: false,
+    }
+    return next
+  }
   if (event.type === 'compaction') {
     const summary = event.summary
     if (typeof summary === 'string' && summary.length > 0) {
       next[index] = {
         ...existing,
         tools: existing.tools,
+        compacting: false,
         compactions: [
           ...(existing.compactions ?? []),
           {
             summary,
             focus: typeof event.focus === 'string' ? event.focus : null,
+            toolBoundary: existing.tools.length,
           },
         ],
       }

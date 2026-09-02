@@ -5,5 +5,6 @@ export type AgentTurn = {
   id: string
   steps: AgentStep[]
   text: string
+  createdAt?: string
   error?: AgentTurnError
 }

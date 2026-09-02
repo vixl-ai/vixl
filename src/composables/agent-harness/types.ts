@@ -56,9 +56,12 @@ export type AgentHarnessState = {
   sessionPermissionLevel: Ref<PermissionLevel | null>
   lastRunConfig: Ref<LastRunConfig | null>
   resumingBackgroundBatch: Ref<boolean>
+  compacting: Ref<boolean>
   billableUsageRecords: ShallowRef<BillableUsageRecord[]>
   turnUsageByTurnId: ShallowRef<Record<string, TurnUsageAggregate>>
   mcpAuthPollTimer: { current: ReturnType<typeof setInterval> | null }
+  sessionAllows: Set<string>
+  sessionDenies: Set<string>
 }
 
 export type AttentionHelpers = {

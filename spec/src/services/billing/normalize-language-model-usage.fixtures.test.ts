@@ -176,6 +176,7 @@ describe('normalizeLanguageModelUsage fixtures', () => {
       inputTokens: 100,
       noCacheTokens: 80,
       cacheReadTokens: 20,
+      cacheWriteTokens: 10,
       outputTokens: 50,
       reasoningTokens: 15,
       textTokens: 35,
@@ -205,6 +206,40 @@ describe('normalizeLanguageModelUsage fixtures', () => {
 
     expect(normalizeLanguageModelUsage(usage)).toEqual({
       usageMissing: true,
+    })
+  })
+
+  it('OpenAI raw-only (no flattened counts) => tokens from prompt/completion', () => {
+    const raw = {
+      prompt_tokens: 100,
+      completion_tokens: 50,
+      total_tokens: 150,
+    }
+    const usage = { raw } as unknown as LanguageModelUsage
+
+    expect(normalizeLanguageModelUsage(usage)).toEqual({
+      inputTokens: 100,
+      outputTokens: 50,
+      raw,
+      usageMissing: false,
+    })
+  })
+
+  it('Anthropic raw-only (no flattened counts) => tokens from input/output', () => {
+    const raw = {
+      input_tokens: 1000,
+      cache_creation_input_tokens: 50,
+      cache_read_input_tokens: 50,
+      output_tokens: 200,
+    }
+    const usage = { raw } as unknown as LanguageModelUsage
+
+    expect(normalizeLanguageModelUsage(usage)).toEqual({
+      inputTokens: 1000,
+      outputTokens: 200,
+      cacheReadTokens: 50,
+      raw,
+      usageMissing: false,
     })
   })
 

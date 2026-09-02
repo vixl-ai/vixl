@@ -121,17 +121,22 @@ export const gateToolPermission = async (args: {
     return false
   }
 
+  const rememberKey =
+    args.action === 'fs.write' || args.action === 'fs.delete'
+      ? args.action
+      : args.capability
+
   if (
     result.scope === 'session' ||
     result.scope === 'workspace' ||
     result.scope === 'always' ||
     (result.scope === 'once' && isStickyShellElevation(args.capability))
   ) {
-    args.ctx.sessionAllows.add(args.capability)
+    args.ctx.sessionAllows.add(rememberKey)
   }
   if (result.scope === 'workspace' || result.scope === 'always') {
     await args.ctx.persistPermission?.(
-      args.capability,
+      rememberKey,
       'allow',
       result.scope === 'workspace' ? 'workspace' : 'always',
     )

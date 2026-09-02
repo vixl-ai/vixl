@@ -1,12 +1,13 @@
 import { ref } from 'vue'
 
-type ContextAction = () => void
+type ContextAction = () => void | Promise<void>
 
 const onCompact = ref<ContextAction | null>(null)
 const onHandoff = ref<ContextAction | null>(null)
 const actionsDisabled = ref(false)
 const triggerDisabled = ref(false)
 const available = ref(false)
+const compacting = ref(false)
 
 const register = (handlers: {
   onCompact?: ContextAction
@@ -23,6 +24,7 @@ const clear = (): void => {
   available.value = false
   actionsDisabled.value = false
   triggerDisabled.value = false
+  compacting.value = false
 }
 
 const setDisabled = (next: {
@@ -43,6 +45,7 @@ export default () => ({
   actionsDisabled,
   triggerDisabled,
   available,
+  compacting,
   register,
   clear,
   setDisabled,

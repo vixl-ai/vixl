@@ -46,7 +46,7 @@ describe('appendSubagentToolEvent compaction', () => {
       },
     ])
     expect(item.compactions).toEqual([
-      { summary: 'Kept the file reads', focus: 'auth' },
+      { summary: 'Kept the file reads', focus: 'auth', toolBoundary: 1 },
     ])
   })
 
@@ -84,7 +84,7 @@ describe('appendSubagentToolEvent compaction', () => {
     }
     expect(item.status).toBe('done')
     expect(item.compactions).toEqual([
-      { summary: 'Prior work summarized', focus: null },
+      { summary: 'Prior work summarized', focus: null, toolBoundary: 0 },
     ])
   })
 
@@ -114,6 +114,51 @@ describe('appendSubagentToolEvent compaction', () => {
     }
     expect(item.tools).toHaveLength(1)
     expect(item.tools[0]?.status).toBe('done')
-    expect(item.compactions).toHaveLength(1)
+    expect(item.compactions).toEqual([
+      { summary: 'Trimmed earlier reads', focus: null, toolBoundary: 1 },
+    ])
+  })
+
+  it('sets compacting on started and clears it on ended', () => {
+    const startedFlag = appendSubagentToolEvent(started(), 'sub-1', {
+      type: 'compaction-started',
+    })
+    const startedItem = startedFlag[0]
+    expect(startedItem?.type).toBe('subagent')
+    if (startedItem?.type !== 'subagent') {
+      return
+    }
+    expect(startedItem.compacting).toBe(true)
+
+    const ended = appendSubagentToolEvent(startedFlag, 'sub-1', {
+      type: 'compaction-ended',
+    })
+    const endedItem = ended[0]
+    expect(endedItem?.type).toBe('subagent')
+    if (endedItem?.type !== 'subagent') {
+      return
+    }
+    expect(endedItem.compacting).toBe(false)
+    expect(endedItem.compactions).toEqual([])
+  })
+
+  it('clears compacting when a nested compaction lands', () => {
+    const pending = appendSubagentToolEvent(started(), 'sub-1', {
+      type: 'compaction-started',
+    })
+    const next = appendSubagentToolEvent(pending, 'sub-1', {
+      type: 'compaction',
+      summary: 'Kept the file reads',
+      focus: 'auth',
+    })
+    const item = next[0]
+    expect(item?.type).toBe('subagent')
+    if (item?.type !== 'subagent') {
+      return
+    }
+    expect(item.compacting).toBe(false)
+    expect(item.compactions).toEqual([
+      { summary: 'Kept the file reads', focus: 'auth', toolBoundary: 0 },
+    ])
   })
 })

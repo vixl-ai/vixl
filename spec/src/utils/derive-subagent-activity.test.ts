@@ -67,6 +67,25 @@ describe('deriveSubagentActivity', () => {
     ).toBe('Reading app/pages/index.vue…')
   })
 
+  it('returns Compacting while the subagent is compacting', () => {
+    expect(
+      deriveSubagentActivity(
+        base({
+          status: 'running',
+          compacting: true,
+          tools: [
+            {
+              toolCallId: 't1',
+              name: 'read_file',
+              status: 'running',
+              args: { path: 'a.ts' },
+            },
+          ],
+        }),
+      ),
+    ).toBe('Compacting')
+  })
+
   it('falls back to the last tool when none are running', () => {
     expect(
       deriveSubagentActivity(

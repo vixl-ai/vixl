@@ -1,5 +1,9 @@
 import type { ToolRun } from '@/types/harness/tool-run'
 import { clipTerminalLabel } from '@/utils/clip-terminal-label'
+import filePathBasename from '@/utils/file-path-basename'
+
+const PATH_BASENAME_TOOLS = new Set(['write_file', 'edit_file', 'delete_file', 'move_file'])
+const HOLD_PATH_TOOLS = new Set(['write_file', 'edit_file'])
 
 const TOOL_LABELS_DONE: Record<string, string> = {
   read_file: 'Read',
@@ -73,14 +77,21 @@ const TOOL_LABELS_RUNNING: Record<string, string> = {
   resolve_models: 'Looking up models',
 }
 
-const formatArgsHint = (args: unknown, options?: { omitPathHint?: boolean }): string | null => {
+const formatPathHint = (path: string, toolName: string): string =>
+  PATH_BASENAME_TOOLS.has(toolName) ? filePathBasename(path) : path
+
+const formatArgsHint = (
+  args: unknown,
+  toolName: string,
+  options?: { omitPathHint?: boolean },
+): string | null => {
   if (!args || typeof args !== 'object') {
     return null
   }
   const record = args as Record<string, unknown>
   const omitPath = options?.omitPathHint === true
   if (!omitPath && typeof record.path === 'string' && record.path.length > 0) {
-    return record.path
+    return formatPathHint(record.path, toolName)
   }
   if (typeof record.pattern === 'string' && record.pattern.length > 0) {
     return record.pattern
@@ -107,13 +118,13 @@ const formatArgsHint = (args: unknown, options?: { omitPathHint?: boolean }): st
     return record.symbol
   }
   if (!omitPath && typeof record.from === 'string' && record.from.length > 0) {
-    return record.from
+    return formatPathHint(record.from, toolName)
   }
   return null
 }
 
 const formatSpawnSubagentLabel = (run: ToolRun): string => {
-  const hint = formatArgsHint(run.args)
+  const hint = formatArgsHint(run.args, run.name)
   const name = hint?.trim() || 'Sub-agent'
   if (run.status === 'running') {
     return `Starting ${name}…`
@@ -170,10 +181,16 @@ export default (run: ToolRun, options?: { omitPathHint?: boolean }): string => {
   const mapped = isRunning ? TOOL_LABELS_RUNNING[run.name] : TOOL_LABELS_DONE[run.name]
   const prefix =
     mapped ?? (isRunning ? `Calling ${humanizeToolName(run.name)}` : humanizeToolName(run.name))
-  const hint = formatArgsHint(run.args, options)
+  const hint = formatArgsHint(run.args, run.name, options)
   const target = hint ? ` ${hint}` : ''
 
   if (isRunning) {
+    if (HOLD_PATH_TOOLS.has(run.name) && !hint) {
+      return ''
+    }
+    if (HOLD_PATH_TOOLS.has(run.name)) {
+      return `${prefix}${target}`
+    }
     return `${prefix}${target}…`
   }
   if (run.status === 'rejected') {

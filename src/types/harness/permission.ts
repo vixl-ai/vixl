@@ -17,6 +17,8 @@ export type PermissionScope = 'once' | 'session' | 'workspace' | 'always' | 'nev
 export type PermissionLevel = 'ask' | 'allowlist' | 'bypass'
 
 export type PermissionCapabilityKey =
+  | 'fs.write'
+  | 'fs.delete'
   | `fs.write:${string}`
   | `fs.delete:${string}`
   | 'shell'

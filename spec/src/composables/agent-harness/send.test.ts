@@ -33,6 +33,11 @@ vi.mock('@/services/skills/skill-registry', () => ({
   listSlashSkillIndex: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
 }))
 
+vi.mock('@/services/harness/subagent/registry', () => ({
+  hasPendingBackgroundResume: () => false,
+  hasRunningSubagentsForChat: () => false,
+}))
+
 vi.mock('vue-sonner', () => ({
   toast: {
     error: (...args: unknown[]) => toastError(...args),
@@ -40,6 +45,7 @@ vi.mock('vue-sonner', () => ({
 }))
 
 import createSend from '@/composables/agent-harness/send'
+import createHelpers from '@/composables/agent-harness/helpers'
 
 const settings = (): VixlSettings => ({ version: 1 })
 
@@ -81,6 +87,10 @@ const buildState = (): AgentHarnessState => {
     abortController: ref(null),
     lastRunConfig: ref(null),
     sessionPermissionLevel: ref(null),
+    sessionAllows: new Set<string>(),
+    sessionDenies: new Set<string>(),
+    compacting: ref(false),
+    resumingBackgroundBatch: ref(false),
     contextBudgetSync: {
       setDraftMentions,
     },
@@ -171,5 +181,63 @@ describe('agent-harness send persist model/mode', () => {
     )
     expect(state.session.patchMeta).not.toHaveBeenCalled()
     expect(runOrchestrator).toHaveBeenCalledTimes(1)
+  })
+
+  it('enqueues a user send while compacting', async () => {
+    const state = buildState()
+    state.compacting.value = true
+    const attention = createHelpers(state)
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+    })
+
+    expect(state.messageQueue.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'hello' }),
+    )
+    expect(runOrchestrator).not.toHaveBeenCalled()
+  })
+
+  it('reuses the same session allow and deny sets on a second send', async () => {
+    const state = buildState()
+    const { send } = createSend(state, buildAttention(), {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    const payload = {
+      text: 'hello',
+      mode: 'agent' as const,
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+      internal: true,
+    }
+
+    await send(payload)
+    state.sessionAllows.add('fs.write')
+    await send(payload)
+
+    expect(runOrchestrator).toHaveBeenCalledTimes(2)
+    const first = runOrchestrator.mock.calls[0]?.[0] as {
+      sessionAllows: Set<string>
+      sessionDenies: Set<string>
+    }
+    const second = runOrchestrator.mock.calls[1]?.[0] as {
+      sessionAllows: Set<string>
+      sessionDenies: Set<string>
+    }
+    expect(first.sessionAllows).toBe(state.sessionAllows)
+    expect(first.sessionDenies).toBe(state.sessionDenies)
+    expect(second.sessionAllows).toBe(state.sessionAllows)
+    expect(second.sessionDenies).toBe(state.sessionDenies)
+    expect(second.sessionAllows.has('fs.write')).toBe(true)
   })
 })

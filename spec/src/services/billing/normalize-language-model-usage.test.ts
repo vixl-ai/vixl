@@ -147,4 +147,31 @@ describe('normalizeLanguageModelUsage', () => {
       usageMissing: false,
     })
   })
+
+  it('fills inputTokens and outputTokens from raw when flattened counts are missing', () => {
+    const raw = { prompt_tokens: 100, completion_tokens: 50 }
+    const usage = {
+      raw,
+    } as unknown as LanguageModelUsage
+
+    expect(normalizeLanguageModelUsage(usage)).toEqual({
+      inputTokens: 100,
+      outputTokens: 50,
+      raw,
+      usageMissing: false,
+    })
+  })
+
+  it('does not throw when token details are missing', () => {
+    const usage = {
+      inputTokens: 10,
+      outputTokens: 4,
+    } as unknown as LanguageModelUsage
+
+    expect(normalizeLanguageModelUsage(usage)).toEqual({
+      inputTokens: 10,
+      outputTokens: 4,
+      usageMissing: false,
+    })
+  })
 })

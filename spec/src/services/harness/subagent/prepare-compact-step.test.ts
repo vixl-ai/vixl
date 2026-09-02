@@ -132,9 +132,21 @@ describe('prepareCompactStep', () => {
       compactedResult.summary,
     )
     expect(emitNestedEvent).toHaveBeenCalledWith({
+      type: 'compaction-started',
+    })
+    expect(emitNestedEvent).toHaveBeenCalledWith({
       type: 'compaction',
       summary: compactedResult.summary,
       focus: 'subagent',
+    })
+    expect(emitNestedEvent).toHaveBeenCalledWith({
+      type: 'compaction-ended',
+    })
+    expect(emitNestedEvent.mock.calls[0]?.[0]).toEqual({
+      type: 'compaction-started',
+    })
+    expect(emitNestedEvent.mock.calls.at(-1)?.[0]).toEqual({
+      type: 'compaction-ended',
     })
     expect(captureBillableUsage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -157,11 +169,28 @@ describe('prepareCompactStep', () => {
     })
   })
 
+  it('still rewrites when billing fails after a successful compaction', async () => {
+    captureBillableUsage.mockRejectedValue(new Error('billing network failed'))
+    const { emitNestedEvent, input } = baseInput()
+    const prepareStep = prepareCompactStep(input)
+    const messages: ModelMessage[] = [
+      { role: 'user', content: 'Spawn: find the auth bug.' },
+      { role: 'assistant', content: hugeContent },
+    ]
+
+    const result = await prepareStep({ messages })
+
+    expect(result).toEqual({
+      messages: [{ role: 'user', content: 'rewritten' }],
+    })
+    expect(emitNestedEvent).toHaveBeenCalledWith({ type: 'compaction-ended' })
+  })
+
   it('throws when rewritten messages still exceed the window', async () => {
     rewriteModelMessages.mockReturnValue([
       { role: 'user', content: hugeContent },
     ])
-    const { input } = baseInput()
+    const { emitNestedEvent, input } = baseInput()
     const prepareStep = prepareCompactStep(input)
 
     await expect(
@@ -173,5 +202,7 @@ describe('prepareCompactStep', () => {
     )
     expect(summarizeTranscript).toHaveBeenCalledTimes(1)
     expect(captureBillableUsage).not.toHaveBeenCalled()
+    expect(emitNestedEvent).toHaveBeenCalledWith({ type: 'compaction-started' })
+    expect(emitNestedEvent).toHaveBeenCalledWith({ type: 'compaction-ended' })
   })
 })

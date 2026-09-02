@@ -11,7 +11,7 @@ import { isReasoningLevel } from '@/types/models/reasoning-level'
 import type { AgentThreadViewState } from './types'
 
 export const createSessionOps = (state: AgentThreadViewState) => {
-  const initHarness = (root: string, name: string): void => {
+  const initHarness = async (root: string, name: string): Promise<void> => {
     if (!state.chatId.value) {
       state.harness.value = null
       return
@@ -26,6 +26,7 @@ export const createSessionOps = (state: AgentThreadViewState) => {
     state.harness.value = nextHarness
     nextHarness.setPermissionLevel(state.sessionPermissionLevel.value)
     nextHarness.restorePendingApprovals()
+    await nextHarness.restoreUsageLedger()
   }
 
   const flushPendingChatMessage = async (): Promise<void> => {
@@ -95,6 +96,7 @@ export const createSessionOps = (state: AgentThreadViewState) => {
     const nextThreadKey = state.threadKey.value
     if (state.loadedThreadKey.value === nextThreadKey && state.harness.value) {
       state.harness.value.restorePendingApprovals()
+      await state.harness.value.restoreUsageLedger()
       await flushPendingChatMessage()
       return
     }
@@ -118,12 +120,18 @@ export const createSessionOps = (state: AgentThreadViewState) => {
 
     if (state.isStandalone.value) {
       if (state.homeRoot.value) {
-        initHarness(state.homeRoot.value, 'Home')
+        await initHarness(state.homeRoot.value, 'Home')
+        if (isStale()) {
+          return
+        }
       } else {
         state.harness.value = null
       }
     } else if (state.project.value) {
-      initHarness(state.project.value.rootPath, state.project.value.name)
+      await initHarness(state.project.value.rootPath, state.project.value.name)
+      if (isStale()) {
+        return
+      }
     }
 
     // Resolve home root if needed (timeline already paints without it).
@@ -132,7 +140,10 @@ export const createSessionOps = (state: AgentThreadViewState) => {
       if (isStale()) {
         return
       }
-      initHarness(state.homeRoot.value, 'Home')
+      await initHarness(state.homeRoot.value, 'Home')
+      if (isStale()) {
+        return
+      }
     }
 
     const hydratePath = await state.chatStore.ensureChatHydrated(slug, state.chatId.value)

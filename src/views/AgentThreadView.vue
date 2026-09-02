@@ -27,6 +27,7 @@ const {
   isWaitingOnBackground,
   chatPromptInputRef,
   pendingQuestion,
+  compacting,
   timeline,
   todos,
   runningShells,
@@ -90,6 +91,7 @@ const {
       :personal-mcp="mcpPersonalConfig"
       :project-mcp="mcpProjectConfig"
       :read-only="isSubagentView"
+      :compacting="compacting"
       @resolve-approval="handleResolveApproval"
       @submit-answer="handleSubmitAnswer"
       @authenticate-mcp="handleAuthenticateMcp"
