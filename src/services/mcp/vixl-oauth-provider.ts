@@ -5,6 +5,7 @@ import type {
   OAuthTokens,
 } from '@ai-sdk/mcp'
 import type { StoredOAuthAsInfo } from '@/types/mcp/stored-oauth-as-info'
+import type { StoredOAuthDcrClient } from '@/types/mcp/stored-oauth-dcr-client'
 import {
   mcpOAuthAsInfoKey,
   mcpOAuthClientKey,
@@ -14,6 +15,7 @@ import {
 } from '@/services/mcp/mcp-keychain-keys'
 import {
   nativeClientMetadata,
+  clientAllowsRedirect,
   createValidateAuthorizationServerUrl,
   originOf,
   parseJson,
@@ -31,6 +33,7 @@ type CreateVixlOAuthProviderArgs = {
   redirectUrl: string
   openUrl: (url: string, allowedOrigin: string) => void | Promise<void>
   confirmAuthorizationServerOrigin?: (origin: string) => Promise<boolean>
+  allowDynamicRegistration?: boolean
 }
 
 const randomHex = (bytes: number): string => {
@@ -55,6 +58,7 @@ export const createVixlOAuthProvider = (
     redirectUrl,
     openUrl,
     confirmAuthorizationServerOrigin,
+    allowDynamicRegistration = true,
   } = args
 
   const storedIssuer = async (): Promise<string | undefined> => {
@@ -103,11 +107,20 @@ export const createVixlOAuthProvider = (
     },
 
     clientInformation: async (): Promise<OAuthClientInformation | undefined> => {
-      const stored = parseJson<OAuthClientInformation>(
+      const stored = parseJson<StoredOAuthDcrClient>(
         await getSecret(mcpOAuthClientKey(serverId)),
       )
       if (stored) {
-        return stored
+        if (
+          allowDynamicRegistration &&
+          !clientAllowsRedirect(stored, redirectUrl)
+        ) {
+          await deleteSecret(mcpOAuthTokensKey(serverId))
+          await deleteSecret(mcpOAuthClientKey(serverId))
+          await deleteSecret(mcpOAuthStateKey(serverId))
+        } else {
+          return stored
+        }
       }
       const staticClient = await loadStaticOAuthClient(serverId)
       if (clientId) {
@@ -129,14 +142,28 @@ export const createVixlOAuthProvider = (
       return undefined
     },
 
-    saveClientInformation: async (
-      clientInformation: OAuthClientInformation,
-    ): Promise<void> => {
-      await setSecret(
-        mcpOAuthClientKey(serverId),
-        JSON.stringify(withIssuer(clientInformation, await storedIssuer())),
-      )
-    },
+    ...(allowDynamicRegistration
+      ? {
+          saveClientInformation: async (
+            clientInformation: OAuthClientInformation,
+          ): Promise<void> => {
+            const incoming = clientInformation as StoredOAuthDcrClient
+            const existingUris = Array.isArray(incoming.redirect_uris)
+              ? incoming.redirect_uris.filter(
+                  (uri): uri is string => typeof uri === 'string',
+                )
+              : []
+            const redirectUris = existingUris.includes(redirectUrl)
+              ? existingUris
+              : [...existingUris, redirectUrl]
+            const stored: StoredOAuthDcrClient = {
+              ...withIssuer(clientInformation, await storedIssuer()),
+              redirect_uris: redirectUris,
+            }
+            await setSecret(mcpOAuthClientKey(serverId), JSON.stringify(stored))
+          },
+        }
+      : {}),
 
     authorizationServerInformation: async (): Promise<
       StoredOAuthAsInfo | undefined

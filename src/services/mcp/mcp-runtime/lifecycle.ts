@@ -67,6 +67,7 @@ export const startHttp = async (
         throw new Error('OAuth redirect requires authenticate()')
       },
       options?.confirmAuthorizationServerOrigin,
+      false,
     )
 
   try {

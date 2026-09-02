@@ -1,4 +1,5 @@
 export { default as nativeClientMetadata } from './client-metadata'
+export { default as clientAllowsRedirect } from './client-allows-redirect'
 export { default as originOf } from './origin-of'
 export { default as parseJson } from './parse-json'
 export { default as validateResourceUrl } from './validate-resource-url'

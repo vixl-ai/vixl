@@ -13,6 +13,7 @@ export const createTokenProvider = (
   redirectUrl: string,
   openUrl: (url: string, allowedOrigin: string) => Promise<void>,
   confirmAuthorizationServerOrigin?: (origin: string) => Promise<boolean>,
+  allowDynamicRegistration = true,
 ): OAuthClientProvider =>
   createVixlOAuthProvider({
     serverId,
@@ -22,6 +23,7 @@ export const createTokenProvider = (
     redirectUrl,
     openUrl,
     confirmAuthorizationServerOrigin,
+    allowDynamicRegistration,
   })
 
 export const waitForOAuthCallback = async (

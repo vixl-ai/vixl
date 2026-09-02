@@ -262,6 +262,98 @@ describe('vixl oauth provider', () => {
     expect(stored.issuer).toBe('https://auth.example')
     expect(stored.authorization_response_iss_parameter_supported).toBe(true)
   })
+
+  it('stores the current redirect uri with DCR client information', async () => {
+    const provider = createProvider({
+      redirectUrl: 'http://127.0.0.1:4242/callback',
+    })
+    await provider.saveClientInformation?.({ client_id: 'dcr' })
+
+    const stored = JSON.parse(
+      (await secrets.getSecret(mcpOAuthClientKey('demo'))) ?? '{}',
+    ) as { redirect_uris?: string[] }
+    expect(stored.redirect_uris).toEqual(['http://127.0.0.1:4242/callback'])
+  })
+
+  it('reuses a DCR client registered for the current redirect uri', async () => {
+    const provider = createProvider({
+      redirectUrl: 'http://127.0.0.1:4242/callback',
+    })
+    await secrets.setSecret(
+      mcpOAuthClientKey('demo'),
+      JSON.stringify({
+        client_id: 'dcr',
+        redirect_uris: ['http://127.0.0.1:4242/callback'],
+      }),
+    )
+
+    await expect(provider.clientInformation()).resolves.toMatchObject({
+      client_id: 'dcr',
+    })
+  })
+
+  it('drops a DCR client whose redirect uri does not match the loopback url', async () => {
+    const provider = createProvider({
+      redirectUrl: 'http://127.0.0.1:5555/callback',
+    })
+    await secrets.setSecret(
+      mcpOAuthClientKey('demo'),
+      JSON.stringify({
+        client_id: 'stale',
+        redirect_uris: ['http://127.0.0.1/oauth-pending'],
+      }),
+    )
+    await secrets.setSecret(
+      mcpOAuthTokensKey('demo'),
+      JSON.stringify({ access_token: 'tok', token_type: 'Bearer' }),
+    )
+    await secrets.setSecret(
+      mcpOAuthAsInfoKey('demo'),
+      JSON.stringify({
+        origin: 'https://auth.example',
+        issuer: 'https://auth.example',
+        authorizationServerUrl: 'https://auth.example',
+        tokenEndpoint: 'https://auth.example/token',
+      }),
+    )
+
+    await expect(provider.clientInformation()).resolves.toBeUndefined()
+    expect(await secrets.getSecret(mcpOAuthClientKey('demo'))).toBeNull()
+    expect(await secrets.getSecret(mcpOAuthTokensKey('demo'))).toBeNull()
+    expect(await secrets.getSecret(mcpOAuthAsInfoKey('demo'))).not.toBeNull()
+  })
+
+  it('drops a legacy DCR client that has no stored redirect uris', async () => {
+    const provider = createProvider({
+      redirectUrl: 'http://127.0.0.1:5555/callback',
+    })
+    await secrets.setSecret(
+      mcpOAuthClientKey('demo'),
+      JSON.stringify({ client_id: 'legacy' }),
+    )
+
+    await expect(provider.clientInformation()).resolves.toBeUndefined()
+    expect(await secrets.getSecret(mcpOAuthClientKey('demo'))).toBeNull()
+  })
+
+  it('does not register during start when dynamic registration is disabled', async () => {
+    const provider = createProvider({
+      redirectUrl: 'http://127.0.0.1/oauth-pending',
+      allowDynamicRegistration: false,
+    })
+    expect(provider.saveClientInformation).toBeUndefined()
+    await secrets.setSecret(
+      mcpOAuthClientKey('demo'),
+      JSON.stringify({
+        client_id: 'keep-me',
+        redirect_uris: ['http://127.0.0.1:4242/callback'],
+      }),
+    )
+
+    await expect(provider.clientInformation()).resolves.toMatchObject({
+      client_id: 'keep-me',
+    })
+  })
 })
 
 describe('RFC 9207 authorization response', () => {

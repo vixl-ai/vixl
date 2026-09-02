@@ -1,4 +1,5 @@
 export type { McpIcon } from './mcp-icon'
 export type { StoredOAuthAsInfo } from './stored-oauth-as-info'
+export type { StoredOAuthDcrClient } from './stored-oauth-dcr-client'
 export type { StoredOAuthStaticClient } from './stored-oauth-static-client'
 export type { WwwAuthenticateChallenge } from './www-authenticate-challenge'
