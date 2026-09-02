@@ -61,7 +61,7 @@ const createValidateAuthorizationServerUrl = (
   } = args
 
   return async (
-    _serverUrl: string | URL,
+    mcpServerUrl: string | URL,
     authorizationServerUrl: string | URL,
   ): Promise<void> => {
     const asOrigin = originOf(authorizationServerUrl)
@@ -90,6 +90,12 @@ const createValidateAuthorizationServerUrl = (
     }
 
     if (allowlisted) {
+      await pinAuthorizationServerOrigin(serverId, asOrigin, authorizationServerUrl)
+      return
+    }
+
+    const mcpOrigin = originOf(mcpServerUrl)
+    if (mcpOrigin === asOrigin) {
       await pinAuthorizationServerOrigin(serverId, asOrigin, authorizationServerUrl)
       return
     }

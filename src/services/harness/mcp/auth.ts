@@ -23,6 +23,8 @@ export const isMcpAuthError = (error: unknown): boolean => {
   return (
     message.includes('unauthorized') ||
     message.includes('auth_required') ||
+    message.includes('not confirmed') ||
+    message.includes('oauth redirect requires authenticate') ||
     message.includes('401')
   )
 }

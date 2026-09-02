@@ -96,6 +96,26 @@ describe('vixl oauth AS confirm', () => {
     ).rejects.toThrow(/not confirmed/)
     expect(confirm).toHaveBeenCalledWith('https://auth.evil.example')
   })
+
+  it('pins a same-origin authorization server without confirmation', async () => {
+    const confirm = vi.fn<(origin: string) => Promise<boolean>>(async () => false)
+    const provider = createProvider({
+      confirmAuthorizationServerOrigin: confirm,
+    })
+
+    await provider.validateAuthorizationServerURL?.(
+      'https://durabull-production-g7zyw.ondigitalocean.app/mcp',
+      'https://durabull-production-g7zyw.ondigitalocean.app',
+    )
+
+    expect(confirm).not.toHaveBeenCalled()
+    const stored = JSON.parse(
+      secrets.store.get(mcpOAuthAsInfoKey('demo')) ?? '{}',
+    ) as { origin?: string }
+    expect(stored.origin).toBe(
+      'https://durabull-production-g7zyw.ondigitalocean.app',
+    )
+  })
 })
 
 describe('vixl oauth provider', () => {

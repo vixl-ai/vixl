@@ -161,4 +161,6 @@ export const isUnauthorized = (error: unknown): boolean =>
   error instanceof UnauthorizedError ||
   (error instanceof Error &&
     (error.name === 'UnauthorizedError' ||
-      /401|unauthorized/i.test(error.message)))
+      /401|unauthorized|auth_required|not confirmed|oauth redirect requires authenticate/i.test(
+        error.message,
+      )))

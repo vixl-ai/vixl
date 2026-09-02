@@ -76,7 +76,9 @@ export const startHttp = async (
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (
-      /unauthorized|401|auth_required/i.test(message) ||
+      /unauthorized|401|auth_required|not confirmed|oauth redirect requires authenticate/i.test(
+        message,
+      ) ||
       error instanceof Error && error.name === 'UnauthorizedError'
     ) {
       return markHttpAuthRequired(serverId, resolvedConfig, message)
