@@ -4,6 +4,7 @@ import pluginVue from 'eslint-plugin-vue'
 import pluginVitest from '@vitest/eslint-plugin'
 import pluginOxlint from 'eslint-plugin-oxlint'
 import skipFormatting from 'eslint-config-prettier/flat'
+import noEmptyCatch from './eslint-rules/no-empty-catch'
 
 // To allow more languages other than `ts` in `.vue` files, uncomment the following lines:
 // import { configureVueProject } from '@vue/eslint-config-typescript'
@@ -37,7 +38,7 @@ export default defineConfigWithVueTs(
 
   {
     ...pluginVitest.configs.recommended,
-    files: ['spec/src/**/*.test.ts'],
+    files: ['spec/src/**/*.test.ts', 'spec/eslint-rules/**/*.test.ts'],
   },
 
   ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
@@ -81,6 +82,24 @@ export default defineConfigWithVueTs(
     ],
     rules: {
       'max-lines': 'off',
+    },
+  },
+
+  {
+    name: 'app/no-empty-catch',
+    files: ['src/**/*.{ts,vue}'],
+    plugins: {
+      vixl: {
+        meta: {
+          name: 'vixl',
+        },
+        rules: {
+          'no-empty-catch': noEmptyCatch,
+        },
+      },
+    },
+    rules: {
+      'vixl/no-empty-catch': 'error',
     },
   },
 )

@@ -3,7 +3,12 @@
 
   // Override to include only test files and clear exclusions.
   // Application code imported in tests is automatically included via module resolution.
-  "include": ["spec/src/**/*.test.ts", "spec/src/test-utils/**/*.ts", "env.d.ts"],
+  "include": [
+    "spec/src/**/*.test.ts",
+    "spec/src/test-utils/**/*.ts",
+    "spec/eslint-rules/**/*.test.ts",
+    "env.d.ts"
+  ],
   "exclude": [],
 
   "compilerOptions": {

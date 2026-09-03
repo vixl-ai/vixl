@@ -8,7 +8,7 @@ export default mergeConfig(
     test: {
       environment: 'jsdom',
       exclude: [...configDefaults.exclude, 'e2e/**'],
-      include: ['spec/src/**/*.{test,spec}.ts'],
+      include: ['spec/src/**/*.{test,spec}.ts', 'spec/eslint-rules/**/*.{test,spec}.ts'],
       root: fileURLToPath(new URL('./', import.meta.url)),
       coverage: {
         provider: 'v8',
