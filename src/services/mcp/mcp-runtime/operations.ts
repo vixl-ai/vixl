@@ -46,6 +46,9 @@ const runAuthenticateHttp = async (
   const abort = new AbortController()
   const callbackPromise = waitForOAuthCallback(abort.signal, serverId)
 
+  let result: McpServerState | undefined
+  let failure: unknown
+
   try {
     const provider = createTokenProvider(
       serverId,
@@ -99,31 +102,43 @@ const runAuthenticateHttp = async (
       }
     }
 
-    return startHttp(serverId, config, options, provider)
+    result = await startHttp(serverId, config, options, provider)
   } catch (error) {
     abort.abort()
     try {
       await callbackPromise
     } catch (callbackError) {
       if (!isOAuthCallbackAborted(callbackError)) {
-        throw callbackError
+        failure = callbackError
       }
     }
-    markHttpAuthRequired(
-      serverId,
-      config,
-      error instanceof Error ? error.message : 'Authentication failed',
-    )
-    throw error
+    if (failure === undefined) {
+      markHttpAuthRequired(
+        serverId,
+        config,
+        error instanceof Error ? error.message : 'Authentication failed',
+      )
+      failure = error
+    }
   } finally {
     try {
       await oauthCancelLoopback(serverId)
     } catch (cancelError) {
-      if (!(cancelError instanceof Error)) {
-        throw cancelError
+      if (!(cancelError instanceof Error) && failure === undefined) {
+        failure = cancelError
       }
     }
   }
+
+  if (failure !== undefined) {
+    throw failure
+  }
+
+  if (result === undefined) {
+    throw new Error('OAuth authorization did not complete')
+  }
+
+  return result
 }
 
 export const authenticate = async (
