@@ -1,4 +1,5 @@
 import { toast } from 'vue-sonner'
+import formatUnknownError from '@/utils/format-unknown-error'
 import type { McpConfig, McpServerConfig } from '@/types/vixl/mcp-config'
 import type { McpInputDefinition } from '@/types/vixl/mcp-config'
 import { listEffectiveMcpServers } from '@/services/mcp/merge-mcp-config'
@@ -21,6 +22,23 @@ type AssertTrustedFn = (
 ) => void
 
 type StartServerFn = ReturnType<typeof createStartServer>
+
+const removeMcpSecrets = async (keys: string[]): Promise<void> => {
+  const failures: string[] = []
+  for (const key of keys) {
+    try {
+      await deleteSecret(key)
+    } catch (error) {
+      failures.push(formatUnknownError(error))
+    }
+  }
+  if (failures.length === 0) {
+    return
+  }
+  toast.error('Failed to remove MCP secret', {
+    description: failures.join(', '),
+  })
+}
 
 export const addServer = async (
   tab: SettingsTab,
@@ -58,6 +76,7 @@ export const upsertServer = async (
   const scoped = tab === 'personal' ? personalMcp.value : projectMcp.value
   const nextServers = { ...scoped.servers }
   const previousId = options?.previousId
+  const secretKeys = new Set<string>()
 
   if (previousId && previousId !== serverId) {
     delete nextServers[previousId]
@@ -68,11 +87,7 @@ export const upsertServer = async (
         previousId,
         listRequiredInputIdsForServer(previous),
       )) {
-        try {
-          await deleteSecret(key)
-        } catch {
-          // Best-effort.
-        }
+        secretKeys.add(key)
       }
     }
   }
@@ -88,17 +103,15 @@ export const upsertServer = async (
       previousId && previousId !== serverId ? previousId : serverId,
       listRequiredInputIdsForServer(existing),
     )) {
-      try {
-        await deleteSecret(key)
-      } catch {
-        // Best-effort on fingerprint change.
-      }
+      secretKeys.add(key)
     }
     sessionTrusts.delete(serverId)
     if (previousId) {
       sessionTrusts.delete(previousId)
     }
   }
+
+  await removeMcpSecrets([...secretKeys])
 
   nextServers[serverId] = serverConfig
 
@@ -133,14 +146,9 @@ export const deleteServer = async (
   await saveScopedConfig(tab, { servers: rest }, rootPath)
   await mcpRuntime.stop(serverId, removed)
   if (removed) {
-    const inputIds = listRequiredInputIdsForServer(removed)
-    for (const key of mcpKnownSecretKeys(serverId, inputIds)) {
-      try {
-        await deleteSecret(key)
-      } catch {
-        // Best-effort keychain cleanup.
-      }
-    }
+    await removeMcpSecrets(
+      mcpKnownSecretKeys(serverId, listRequiredInputIdsForServer(removed)),
+    )
   }
   await refreshStates()
 }

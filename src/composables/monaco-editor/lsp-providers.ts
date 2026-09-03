@@ -58,7 +58,7 @@ export const createLspProviders = (ctx: MonacoEditorContext, lsp: MonacoLsp) => 
                       return candidate
                     }
                   } catch {
-                    // Try the next capable server (Vue hybrid: TS then Vue).
+                    continue
                   }
                 }
                 return null
@@ -119,7 +119,7 @@ export const createLspProviders = (ctx: MonacoEditorContext, lsp: MonacoLsp) => 
                   break
                 }
               } catch {
-                // Try the next capable server.
+                continue
               }
             }
             if (locations.length === 0) {
@@ -173,7 +173,7 @@ export const createLspProviders = (ctx: MonacoEditorContext, lsp: MonacoLsp) => 
                   return { suggestions }
                 }
               } catch {
-                // Try the next capable server.
+                continue
               }
             }
             return { suggestions: [] }

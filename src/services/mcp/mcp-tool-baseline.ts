@@ -123,15 +123,11 @@ export const saveMcpToolBaseline = async (
 }
 
 export const clearMcpToolBaseline = async (serverId: string): Promise<void> => {
-  try {
-    await writeJsonFile(await baselinePath(serverId), {
-      serverId,
-      fingerprints: null,
-      updatedAt: new Date().toISOString(),
-    })
-  } catch {
-    // Baseline file may not exist yet.
-  }
+  await writeJsonFile(await baselinePath(serverId), {
+    serverId,
+    fingerprints: null,
+    updatedAt: new Date().toISOString(),
+  })
 }
 
 export const detectMcpToolDrift = async (

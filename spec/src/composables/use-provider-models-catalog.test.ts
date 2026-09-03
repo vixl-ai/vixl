@@ -34,12 +34,22 @@ vi.mock('@/composables/use-vixl-config', async () => {
   }
 })
 
+vi.mock('vue-sonner', () => ({
+  toast: {
+    error: vi.fn<(...args: unknown[]) => void>(),
+    success: vi.fn<(...args: unknown[]) => void>(),
+  },
+}))
+
+import { toast } from 'vue-sonner'
+
 describe('use-provider-models-catalog', () => {
   beforeEach(() => {
     listAllProviderModels.mockReset()
     listAllProviderModels.mockResolvedValue(openaiListed())
     updateSetting.mockReset()
     updateSetting.mockResolvedValue(undefined)
+    vi.mocked(toast.error).mockClear()
   })
 
   it('merges extraModelRefs locally without relisting or setting loading', async () => {
@@ -99,5 +109,26 @@ describe('use-provider-models-catalog', () => {
     await vi.waitFor(() => {
       expect(listAllProviderModels).toHaveBeenCalledTimes(2)
     })
+  })
+
+  it('toasts and clears groups when listing models fails', async () => {
+    listAllProviderModels.mockRejectedValue(new Error('catalog down'))
+    const { default: useProviderModelsCatalog } = await import(
+      '@/composables/use-provider-models-catalog'
+    )
+    const settings = ref<VixlSettings>({
+      version: 1,
+      'providers.openai.apiKeyRef': 'openai',
+    })
+    const { groups, loading } = useProviderModelsCatalog({ settings })
+
+    await vi.waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to load models', {
+        description: 'catalog down',
+      })
+    })
+
+    expect(groups.value).toEqual([])
+    expect(loading.value).toBe(false)
   })
 })

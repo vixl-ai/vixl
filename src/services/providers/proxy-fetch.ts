@@ -215,8 +215,13 @@ const bufferedProxyFetch = async (
   const aborted = new Promise<never>((_, reject) => {
     rejectAborted = reject
   })
-  // Request may win the race; ignore a late abort rejection.
-  aborted.catch(() => undefined)
+  // Request may win the race; ignore a late abort rejection only.
+  aborted.catch((error: unknown) => {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return
+    }
+    throw error
+  })
 
   const onAbort = (): void => {
     cancelUpstream()

@@ -32,7 +32,11 @@ const parseErrorMessage = (status: number, body: string): string => {
       return message
     }
   } catch {
-    // Response body is not JSON.
+    const trimmed = body.trim()
+    if (trimmed) {
+      return trimmed.slice(0, 200)
+    }
+    return `Request failed with status ${status}`
   }
 
   const trimmed = body.trim()

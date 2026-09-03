@@ -14,6 +14,7 @@ import {
   registryRemoveProject,
   registrySetActiveProject,
 } from '@/services/vixl/vixl-tauri'
+import formatUnknownError from '@/utils/format-unknown-error'
 
 const projects = ref<FleetProject[]>([])
 const activeProjectId = ref<string | null>(null)
@@ -118,8 +119,10 @@ export default () => {
       if (project) {
         // Project MCP was stopped above; reload configs for the new root via ensure.
         // Do not block activation on CodeGraph connect; Graph UI polls status itself.
-        ensureGraphQuietly(project.rootPath).catch(() => {
-          return
+        ensureGraphQuietly(project.rootPath).catch((error: unknown) => {
+          toast.error('Failed to check project configuration', {
+            description: formatUnknownError(error),
+          })
         })
       }
     }

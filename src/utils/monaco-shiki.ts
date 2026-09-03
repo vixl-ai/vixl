@@ -208,6 +208,6 @@ export const ensureMonacoLanguage = async (
     // subsequent editor mounts. Preloaded langs cover the common set; rare langs
     // keep Monaco's default tokenization until a full remount path is added.
   } catch {
-    // Unknown / unsupported Shiki language: leave as registered plaintext-like id.
+    return
   }
 }

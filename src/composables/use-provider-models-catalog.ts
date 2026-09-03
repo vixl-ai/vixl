@@ -124,9 +124,12 @@ export default (options: UseProviderModelsCatalogOptions) => {
     async () => {
       try {
         await refresh()
-      } catch {
+      } catch (error) {
         groups.value = []
         loading.value = false
+        toast.error('Failed to load models', {
+          description: formatUnknownError(error),
+        })
       }
     },
     { immediate: true },

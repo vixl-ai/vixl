@@ -191,8 +191,10 @@ export default () => {
           })
         }
       })
-    } catch {
-      // Event listen unavailable outside Tauri
+    } catch (error) {
+      toast.error('Failed to listen for language server installs', {
+        description: formatUnknownError(error),
+      })
     }
   })
 

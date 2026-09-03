@@ -1,4 +1,5 @@
 import { ref, shallowRef } from 'vue'
+import { toast } from 'vue-sonner'
 import type { ChatStatus } from 'ai'
 import type { AgentHarnessOptions } from '@/types/harness/agent-harness-options'
 import type { HarnessEvent } from '@/types/harness/harness-event'
@@ -9,6 +10,7 @@ import type { TurnUsageAggregate } from '@/types/billing/turn-usage-aggregate'
 import type { PermissionLevel } from '@/types/harness/permission'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import type { PendingMcpAuthView } from '@/types/chat/pending-mcp-auth'
+import formatUnknownError from '@/utils/format-unknown-error'
 import useChatStore from '@/composables/use-chat-store'
 import useContextUsage from '@/composables/use-context-usage'
 import useChatContextBudgetSync from '@/composables/use-chat-context-budget-sync'
@@ -36,7 +38,11 @@ export const dropAgentHarness = (projectSlug: string, chatId: string): void => {
   const existing = harnessCache.get(key)
   harnessCache.delete(key)
   if (existing) {
-    existing.dispose().catch(() => undefined)
+    existing.dispose().catch((error: unknown) => {
+      toast.error('Failed to stop chat session', {
+        description: formatUnknownError(error),
+      })
+    })
   }
 }
 

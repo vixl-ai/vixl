@@ -88,7 +88,7 @@ export const createModels = (ctx: MonacoEditorContext, deps: ModelsDeps) => {
     const model = monaco.editor.createModel(content, languageId, uri)
     ctx.originalModels.set(path, model)
     ensureMonacoLanguage(monaco, languageId).catch(() => {
-      // Highlighting is best-effort; the model already has content.
+      return
     })
     return model
   }
@@ -135,7 +135,7 @@ export const createModels = (ctx: MonacoEditorContext, deps: ModelsDeps) => {
 
     // Upgrade highlighting in the background; do not block showing file contents.
     ensureMonacoLanguage(monaco, languageId).catch(() => {
-      // Highlighting is best-effort; the model already has content.
+      return
     })
 
     return model

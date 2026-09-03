@@ -243,7 +243,7 @@ const handleLogin = async (server: EffectiveMcpServer): Promise<void> => {
   try {
     await authenticateServer(server.id, server.config)
   } catch {
-    // authenticateServer already toasts.
+    return
   }
 }
 </script>

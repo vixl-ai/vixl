@@ -73,6 +73,28 @@ describe('proxyFetch buffered abort', () => {
     expect(invoke).toHaveBeenCalledWith('http_proxy_stream_cancel', { requestId })
   })
 
+  it('does not reject a finished buffered request when abort fires late', async () => {
+    httpProxyRequest.mockResolvedValue({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+
+    const controller = new AbortController()
+    const fetch = createProxyFetch()
+    const response = await fetch('http://127.0.0.1:11434/v1/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'test', messages: [] }),
+      signal: controller.signal,
+    })
+
+    expect(response.status).toBe(200)
+    controller.abort()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(response.status).toBe(200)
+  })
+
   it('uses http_proxy_stream when Accept includes text/event-stream', async () => {
     invoke.mockImplementation(async (cmd, args) => {
       if (cmd !== 'http_proxy_stream') {

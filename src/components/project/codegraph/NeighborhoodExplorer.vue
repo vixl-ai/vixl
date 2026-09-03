@@ -278,15 +278,14 @@ const callCodegraphTool = async (
   args: Record<string, unknown>,
 ): Promise<unknown> => mcpRuntime.callTool(CODEGRAPH_SERVER_ID, tool, args)
 
-const settleTool = async (
-  tool: string,
-  args: Record<string, unknown>,
-): Promise<unknown> => {
-  try {
-    return await callCodegraphTool(tool, args)
-  } catch {
-    return null
+const valuesOrThrow = <T>(results: PromiseSettledResult<T>[]): T[] => {
+  const failed = results.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected',
+  )
+  if (failed) {
+    throw failed.reason
   }
+  return results.map((result) => (result as PromiseFulfilledResult<T>).value)
 }
 
 const matchIndexedFiles = (
@@ -355,33 +354,29 @@ const runSearch = async (rawQuery: string): Promise<void> => {
       return
     }
 
-    const [searchRaw, filesRaw] = await Promise.all([
-      settleTool('codegraph_search', {
-        query,
-        limit: 12,
-        projectPath: project.rootPath,
-      }),
-      settleTool('codegraph_files', {
-        format: 'flat',
-        includeMetadata: true,
-        projectPath: project.rootPath,
-      }),
-    ])
+    const [searchRaw, filesRaw] = valuesOrThrow(
+      await Promise.allSettled([
+        callCodegraphTool('codegraph_search', {
+          query,
+          limit: 12,
+          projectPath: project.rootPath,
+        }),
+        callCodegraphTool('codegraph_files', {
+          format: 'flat',
+          includeMetadata: true,
+          projectPath: project.rootPath,
+        }),
+      ]),
+    )
     if (generation !== searchGeneration.value) {
       return
     }
 
-    const search =
-      searchRaw === null
-        ? { results: [] as CodebaseToolSpan[] }
-        : normalizeCodegraphResult.tool(searchRaw)
-    const fileHits =
-      filesRaw === null
-        ? []
-        : matchIndexedFiles(
-            normalizeCodegraphResult.files(filesRaw).results,
-            query,
-          ).slice(0, 12)
+    const search = normalizeCodegraphResult.tool(searchRaw)
+    const fileHits = matchIndexedFiles(
+      normalizeCodegraphResult.files(filesRaw).results,
+      query,
+    ).slice(0, 12)
 
     const preferFiles = looksLikeFilePath(query) || search.results.length === 0
     const results =
@@ -402,7 +397,7 @@ const runSearch = async (rawQuery: string): Promise<void> => {
 
     if (fileFocus) {
       const filePath = focus.path
-      const nodeRaw = await settleTool('codegraph_node', {
+      const nodeRaw = await callCodegraphTool('codegraph_node', {
         file: filePath,
         symbolsOnly: true,
         projectPath: project.rootPath,
@@ -410,10 +405,7 @@ const runSearch = async (rawQuery: string): Promise<void> => {
       if (generation !== searchGeneration.value) {
         return
       }
-      const fileSymbols =
-        nodeRaw === null
-          ? []
-          : normalizeCodegraphResult.node(nodeRaw, filePath).results
+      const fileSymbols = normalizeCodegraphResult.node(nodeRaw, filePath).results
       const related =
         fileSymbols.length > 0
           ? fileSymbols.slice(0, 24)
@@ -446,28 +438,25 @@ const runSearch = async (rawQuery: string): Promise<void> => {
       toolArgs.file = fileHint
     }
 
-    const [callersRaw, calleesRaw, impactRaw] = await Promise.all([
-      settleTool('codegraph_callers', toolArgs),
-      settleTool('codegraph_callees', toolArgs),
-      settleTool('codegraph_impact', {
-        symbol,
-        ...(fileHint ? { file: fileHint } : {}),
-        depth: 2,
-        projectPath: project.rootPath,
-      }),
-    ])
+    const [callersRaw, calleesRaw, impactRaw] = valuesOrThrow(
+      await Promise.allSettled([
+        callCodegraphTool('codegraph_callers', toolArgs),
+        callCodegraphTool('codegraph_callees', toolArgs),
+        callCodegraphTool('codegraph_impact', {
+          symbol,
+          ...(fileHint ? { file: fileHint } : {}),
+          depth: 2,
+          projectPath: project.rootPath,
+        }),
+      ]),
+    )
     if (generation !== searchGeneration.value) {
       return
     }
 
-    const callers =
-      callersRaw === null ? [] : normalizeCodegraphResult.tool(callersRaw).results
-    const callees =
-      calleesRaw === null ? [] : normalizeCodegraphResult.tool(calleesRaw).results
-    const impact =
-      impactRaw === null
-        ? { results: [] as CodebaseToolSpan[] }
-        : normalizeCodegraphResult.impact(impactRaw)
+    const callers = normalizeCodegraphResult.tool(callersRaw).results
+    const callees = normalizeCodegraphResult.tool(calleesRaw).results
+    const impact = normalizeCodegraphResult.impact(impactRaw)
     const related =
       callers.length === 0 && callees.length === 0
         ? results.filter((span) => spanKey(span) !== spanKey(focus))

@@ -12,7 +12,7 @@ export const stopHttpServer = async (serverId: string): Promise<void> => {
     try {
       await entry.client.close()
     } catch {
-      // Client may already be closed.
+      entry.client = null
     }
   }
 
@@ -52,7 +52,7 @@ export const logoutHttpServer = async (
     try {
       await entry.client.close()
     } catch {
-      // Client may already be closed.
+      entry.client = null
     }
   }
 

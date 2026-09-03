@@ -32,6 +32,7 @@ import {
 } from '@/services/models/resolve-reasoning-for-call'
 import resolveModelRefForCall from '@/services/models/resolve-model-ref-for-call'
 import { toast } from 'vue-sonner'
+import formatUnknownError from '@/utils/format-unknown-error'
 import resolveModelVision from '@/services/harness/resolve-model-vision'
 import {
   filterToolsForMode,
@@ -148,10 +149,10 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     })
     updateChatMeta(projectSlug, chatId, {
       prefixSnapshot: snapshot as unknown as Record<string, unknown>,
-    }).catch(() => {
-      // Prefix snapshot persist is best-effort and non-fatal. The in-memory
-      // prefix is already assembled for this turn; the next turn reassembles
-      // the system prompt if this write did not land.
+    }).catch((error: unknown) => {
+      toast.error('Failed to persist chat prefix', {
+        description: formatUnknownError(error),
+      })
     })
     onEvent({
       type: 'chat-meta-changed',

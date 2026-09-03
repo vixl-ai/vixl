@@ -88,6 +88,23 @@ const toastLoadError = (error: unknown): void => {
   })
 }
 
+const isAlreadyExistsError = (error: unknown): boolean => {
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : ''
+  const message = raw.toLowerCase()
+  return (
+    message.includes('already exists') ||
+    message.includes('eexist') ||
+    message.includes('file exists') ||
+    message.includes('os error 17') ||
+    message.includes('os error 183')
+  )
+}
+
 const load = async (): Promise<void> => {
   if (props.tab === 'project' && !config.activeRootPath.value) {
     files.value = []
@@ -113,9 +130,13 @@ const revealRoot = async (): Promise<void> => {
   try {
     const dir = await getVixlDir(scope.value, config.activeRootPath.value)
     const folderPath = `${dir}/${props.folderLabel}`
-    await fsMkdir({ projectRoot: dir, path: props.folderLabel }).catch(() => {
-      // Best-effort create; reveal will surface real errors.
-    })
+    try {
+      await fsMkdir({ projectRoot: dir, path: props.folderLabel })
+    } catch (error) {
+      if (!isAlreadyExistsError(error)) {
+        throw error
+      }
+    }
     await revealInFolder(folderPath)
   } catch (error) {
     toast.error('Failed to reveal folder', {

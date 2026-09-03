@@ -330,7 +330,7 @@ const handleAuthAction = async (
           confirmAuthorizationServerOrigin: confirmAsOrigin,
         })
       } catch {
-        // authenticateServer already toasts.
+        return
       }
     })
     return
