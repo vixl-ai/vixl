@@ -18,6 +18,7 @@ declare module 'vue' {
     AgentInstructions: typeof import('./components/ai-elements/agent/AgentInstructions.vue')['default']
     AgentOutput: typeof import('./components/ai-elements/agent/AgentOutput.vue')['default']
     AgentShellTab: typeof import('./components/workbench/tabs/AgentShellTab.vue')['default']
+    AgentsMdFileCard: typeof import('./components/settings/agents-md/AgentsMdFileCard.vue')['default']
     AgentsSection: typeof import('./components/settings/sections/AgentsSection.vue')['default']
     AgentTool: typeof import('./components/ai-elements/agent/AgentTool.vue')['default']
     AgentTools: typeof import('./components/ai-elements/agent/AgentTools.vue')['default']

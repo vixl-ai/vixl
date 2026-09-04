@@ -138,11 +138,50 @@ fn vixl_base_dir(
 fn list_files_for_kind(base: &Path, kind: &str) -> Result<Vec<ProjectFileEntry>, String> {
     match kind {
         "agents" | "rules" => list_flat_markdown_files(&base.join(kind)),
+        "agents-md" => list_agents_md_file(base),
         "skills" => list_skill_files(&base.join("skills")),
         "plans" => list_nested_markdown_files(&base.join("plans"), "PLAN.md"),
         "studio" => list_studio_files(&base.join("studio")),
         _ => Err(format!("unknown kind: {kind}")),
     }
+}
+
+/// Singleton `.vixl/AGENTS.md` (preferred) or `.vixl/agents.md`. No recursion.
+pub(crate) fn list_agents_md_file(base: &Path) -> Result<Vec<ProjectFileEntry>, String> {
+    if !base.is_dir() {
+        return Ok(vec![]);
+    }
+
+    let mut found_upper: Option<PathBuf> = None;
+    let mut found_lower: Option<PathBuf> = None;
+
+    for entry in fs::read_dir(base).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if !entry.file_type().map_err(|e| e.to_string())?.is_file() {
+            continue;
+        }
+        let name = entry.file_name();
+        if name == "AGENTS.md" {
+            found_upper = Some(entry.path());
+        } else if name == "agents.md" {
+            found_lower = Some(entry.path());
+        }
+    }
+
+    let Some(path) = found_upper.or(found_lower) else {
+        return Ok(vec![]);
+    };
+
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "AGENTS.md".to_string());
+    let description = read_first_description(&path);
+    Ok(vec![ProjectFileEntry {
+        name,
+        path: path.to_string_lossy().to_string(),
+        description,
+    }])
 }
 
 fn list_skill_files(dir: &Path) -> Result<Vec<ProjectFileEntry>, String> {
@@ -324,4 +363,104 @@ fn read_first_description(path: &Path) -> Option<String> {
         return Some(trimmed.chars().take(120).collect());
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    struct TempVixlDir {
+        path: PathBuf,
+    }
+
+    impl TempVixlDir {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!("vixl-agents-md-{}", Uuid::new_v4()));
+            fs::create_dir_all(&path).expect("temp vixl dir");
+            Self { path }
+        }
+    }
+
+    impl Drop for TempVixlDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn write_file(dir: &Path, name: &str, body: &str) {
+        fs::write(dir.join(name), body).expect("write test file");
+    }
+
+    #[test]
+    fn missing_returns_empty() {
+        let dir = TempVixlDir::new();
+        let entries = list_agents_md_file(&dir.path).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn lists_agents_md_uppercase() {
+        let dir = TempVixlDir::new();
+        write_file(&dir.path, "AGENTS.md", "Use tabs.");
+        let entries = list_agents_md_file(&dir.path).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "AGENTS.md");
+        assert!(entries[0].path.ends_with("AGENTS.md"));
+    }
+
+    #[test]
+    fn falls_back_to_lowercase_agents_md() {
+        let dir = TempVixlDir::new();
+        write_file(&dir.path, "agents.md", "Use spaces.");
+        let entries = list_agents_md_file(&dir.path).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "agents.md");
+    }
+
+    #[test]
+    fn prefers_uppercase_when_both_exist_as_distinct_files() {
+        let dir = TempVixlDir::new();
+        write_file(&dir.path, "AGENTS.md", "upper");
+        write_file(&dir.path, "agents.md", "lower");
+
+        let distinct_names: Vec<String> = fs::read_dir(&dir.path)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .filter(|name| name == "AGENTS.md" || name == "agents.md")
+            .collect();
+
+        let entries = list_agents_md_file(&dir.path).unwrap();
+        assert_eq!(entries.len(), 1);
+        if distinct_names.len() >= 2 {
+            assert_eq!(entries[0].name, "AGENTS.md");
+        } else {
+            assert!(
+                entries[0].name == "AGENTS.md" || entries[0].name == "agents.md",
+                "case-insensitive FS should still return the singleton"
+            );
+        }
+    }
+
+    #[test]
+    fn does_not_return_file_inside_agents_dir() {
+        let dir = TempVixlDir::new();
+        let agents_dir = dir.path.join("agents");
+        fs::create_dir_all(&agents_dir).unwrap();
+        write_file(&agents_dir, "AGENTS.md", "subagent file");
+        write_file(&agents_dir, "reviewer.md", "a subagent");
+        let entries = list_agents_md_file(&dir.path).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn does_not_return_nested_subdir_agents_md() {
+        let dir = TempVixlDir::new();
+        let nested = dir.path.join("subdir");
+        fs::create_dir_all(&nested).unwrap();
+        write_file(&nested, "AGENTS.md", "nested");
+        let entries = list_agents_md_file(&dir.path).unwrap();
+        assert!(entries.is_empty());
+    }
 }

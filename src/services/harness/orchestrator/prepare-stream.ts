@@ -116,8 +116,31 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
   })
 
   const frozenSnapshot = existingMeta ? getFrozenPrefix(existingMeta) : null
+
+  const freshParts = await assembleSystemPromptParts({
+    mode,
+    projectName,
+    projectRoot,
+    mentions: [],
+    agentCatalog: [],
+    standalone: input.standalone,
+  })
+  // Mentions are injected into the last user message, not the frozen prefix.
+  const prefixParts: SystemPromptParts = { ...freshParts, mentions: '' }
+  const candidateSystem = joinSystemPromptParts(prefixParts)
+  const candidate = buildPrefixSnapshot({
+    systemString: candidateSystem,
+    toolSchemasJson: freshParts.tools,
+    mcpCatalogSnapshot: freshParts.mcp,
+    rulesBodies: [freshParts.agentsMd, freshParts.rules].filter(Boolean).join('\n\n'),
+    mode,
+    parts: prefixParts,
+  })
+
   const reuseFrozen =
-    frozenSnapshot !== null && frozenPrefixMatchesMode(frozenSnapshot, mode)
+    frozenSnapshot !== null &&
+    frozenPrefixMatchesMode(frozenSnapshot, mode) &&
+    frozenSnapshot.hash === candidate.hash
 
   let system: string
   let parts: SystemPromptParts
@@ -126,29 +149,11 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     system = frozenSnapshot.systemString
     parts = partsFromFrozenPrefix(frozenSnapshot)
   } else {
-    const freshParts = await assembleSystemPromptParts({
-      mode,
-      projectName,
-      projectRoot,
-      mentions: [],
-      agentCatalog: [],
-      standalone: input.standalone,
-    })
-    // Mentions are injected into the last user message, not the frozen prefix.
-    const prefixParts: SystemPromptParts = { ...freshParts, mentions: '' }
-    system = joinSystemPromptParts(prefixParts)
+    system = candidateSystem
     parts = prefixParts
 
-    const snapshot = buildPrefixSnapshot({
-      systemString: system,
-      toolSchemasJson: freshParts.tools,
-      mcpCatalogSnapshot: freshParts.mcp,
-      rulesBodies: freshParts.rules,
-      mode,
-      parts: prefixParts,
-    })
     updateChatMeta(projectSlug, chatId, {
-      prefixSnapshot: snapshot as unknown as Record<string, unknown>,
+      prefixSnapshot: candidate as unknown as Record<string, unknown>,
     }).catch((error: unknown) => {
       toast.error('Failed to persist chat prefix', {
         description: formatUnknownError(error),
@@ -158,7 +163,7 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
       type: 'chat-meta-changed',
       projectSlug,
       chatId,
-      patch: { prefixSnapshot: snapshot },
+      patch: { prefixSnapshot: candidate },
     })
   }
 

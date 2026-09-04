@@ -6,7 +6,15 @@ import useMcpServers from '@/composables/use-mcp-servers'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import { watchVixlPaths } from '@/services/vixl/vixl-tauri'
 
-export type VixlFileKind = 'settings' | 'mcp' | 'agents' | 'rules' | 'skills' | 'plans' | 'studio'
+export type VixlFileKind =
+  | 'settings'
+  | 'mcp'
+  | 'agents'
+  | 'agents-md'
+  | 'rules'
+  | 'skills'
+  | 'plans'
+  | 'studio'
 
 export type VixlFileChange = {
   scope: 'personal' | 'project'

@@ -4,6 +4,7 @@ import {
   frozenPrefixMatchesMode,
   getFrozenPrefix,
   inferPrefixMode,
+  partsFromFrozenPrefix,
 } from '@/services/harness/prefix-contract'
 import type { PrefixSnapshot } from '@/types/harness/prefix-snapshot'
 
@@ -87,5 +88,30 @@ describe('prefix-contract mode freeze', () => {
         'agent',
       ),
     ).toBe(false)
+  })
+})
+
+describe('prefix-contract agentsMd', () => {
+  it('treats missing agentsMd on legacy parts as empty', () => {
+    const parts = partsFromFrozenPrefix(
+      snapshot({
+        parts: {
+          base: 'base',
+          tools: 'tools',
+          mcp: '',
+          rules: '',
+          subagents: '',
+          mentions: '',
+          skills: '',
+        } as never,
+      }),
+    )
+    expect(parts.agentsMd).toBe('')
+  })
+
+  it('returns empty agentsMd when reconstructing without snap.parts', () => {
+    const parts = partsFromFrozenPrefix(snapshot())
+    expect(parts.agentsMd).toBe('')
+    expect(parts.base).toBe(snapshot().systemString)
   })
 })

@@ -16,6 +16,7 @@ export type SystemPromptParts = {
   base: string
   tools: string
   mcp: string
+  agentsMd: string
   rules: string
   subagents: string
   mentions: string

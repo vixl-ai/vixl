@@ -60,14 +60,23 @@ const isSystemPromptParts = (value: unknown): value is SystemPromptParts => {
     typeof record.rules === 'string' &&
     typeof record.subagents === 'string' &&
     typeof record.mentions === 'string' &&
-    typeof record.skills === 'string'
+    typeof record.skills === 'string' &&
+    (record.agentsMd === undefined || typeof record.agentsMd === 'string')
   )
+}
+
+const withAgentsMd = (parts: SystemPromptParts): SystemPromptParts => {
+  const raw = parts as SystemPromptParts & { agentsMd?: string }
+  return {
+    ...parts,
+    agentsMd: raw.agentsMd ?? '',
+  }
 }
 
 /** Rebuild bucket parts from a frozen snapshot (new or legacy). */
 export const partsFromFrozenPrefix = (snap: PrefixSnapshot): SystemPromptParts => {
   if (snap.parts && isSystemPromptParts(snap.parts)) {
-    return { ...snap.parts }
+    return withAgentsMd({ ...snap.parts })
   }
 
   // Legacy snapshots only stored catalog slices; keep systemString as base so
@@ -76,6 +85,7 @@ export const partsFromFrozenPrefix = (snap: PrefixSnapshot): SystemPromptParts =
     base: snap.systemString,
     tools: '',
     mcp: '',
+    agentsMd: '',
     rules: '',
     subagents: '',
     mentions: '',
@@ -108,7 +118,9 @@ export const getFrozenPrefix = (meta: { prefixSnapshot?: unknown }): PrefixSnaps
     return null
   }
   const record = snap as Record<string, unknown>
-  const parts = isSystemPromptParts(record.parts) ? record.parts : undefined
+  const parts = isSystemPromptParts(record.parts)
+    ? withAgentsMd(record.parts)
+    : undefined
   const mode = isChatMode(record.mode) ? record.mode : undefined
   return {
     systemString: record.systemString as string,

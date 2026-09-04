@@ -229,7 +229,7 @@ export default async (input: CountContextBudgetInput): Promise<ContextBudget> =>
     system: estimateTextTokens(parts.base) + estimateTextTokens(parts.tools),
     tools: builtinToolSchemas,
     mcp: estimateTextTokens(parts.mcp) + mcpToolSchemas,
-    rules: estimateTextTokens(parts.rules),
+    rules: estimateTextTokens(parts.rules) + estimateTextTokens(parts.agentsMd),
     skills: estimateTextTokens(parts.skills),
     mentions: resolveMentionsTokens(parts, input.mentions),
     subagentDefinitions: estimateTextTokens(parts.subagents),

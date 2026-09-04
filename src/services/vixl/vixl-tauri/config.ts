@@ -151,5 +151,5 @@ export const listVixlFiles = (
 
 export const listProjectFiles = (
   rootPath: string,
-  kind: 'agents' | 'rules' | 'skills',
+  kind: 'agents' | 'agents-md' | 'rules' | 'skills',
 ): Promise<ProjectFileEntry[]> => call('list_project_files', { rootPath, kind })

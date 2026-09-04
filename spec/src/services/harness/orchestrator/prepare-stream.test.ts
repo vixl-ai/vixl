@@ -81,11 +81,14 @@ vi.mock('vue-sonner', () => ({
 }))
 
 import prepareStream from '@/services/harness/orchestrator/prepare-stream'
+import { joinSystemPromptParts } from '@/services/context/system-prompt-parts'
+import { buildPrefixSnapshot } from '@/services/harness/prefix-contract'
 
 const promptParts = (mode: string): SystemPromptParts => ({
   base: `You are Vixl, an AI coding agent in ${mode} mode.`,
   tools: 'tools',
   mcp: '',
+  agentsMd: '',
   rules: '',
   subagents: '',
   mentions: '',
@@ -102,6 +105,21 @@ const frozen = (mode: PrefixSnapshot['mode'], systemMode = mode): PrefixSnapshot
   mode,
   parts: promptParts(systemMode ?? 'agent'),
 })
+
+const snapshotFromParts = (
+  mode: PrefixSnapshot['mode'],
+  parts: SystemPromptParts,
+): PrefixSnapshot => {
+  const prefixParts = { ...parts, mentions: '' }
+  return buildPrefixSnapshot({
+    systemString: joinSystemPromptParts(prefixParts),
+    toolSchemasJson: parts.tools,
+    mcpCatalogSnapshot: parts.mcp,
+    rulesBodies: [parts.agentsMd, parts.rules].filter(Boolean).join('\n\n'),
+    mode,
+    parts: prefixParts,
+  })
+}
 
 type SessionSets = {
   sessionAllows?: Set<string>
@@ -158,15 +176,90 @@ describe('prepare-stream prefix freeze vs rebuild', () => {
   })
 
   it('reuses frozen prefix when mode is unchanged', async () => {
+    const frozenSnapshot = snapshotFromParts('agent', promptParts('agent'))
     readChatMeta.mockResolvedValue({
-      prefixSnapshot: frozen('agent'),
+      prefixSnapshot: frozenSnapshot,
     })
+    const onEvent = vi.fn<(...args: unknown[]) => void>()
 
-    const prepared = await prepareStream(buildInput('agent'))
+    const prepared = await prepareStream({ ...buildInput('agent'), onEvent })
 
-    expect(prepared.system).toBe('You are Vixl, an AI coding agent in agent mode.')
-    expect(assembleSystemPromptParts).not.toHaveBeenCalled()
+    expect(assembleSystemPromptParts).toHaveBeenCalledWith(
+      expect.objectContaining({ mentions: [] }),
+    )
+    expect(prepared.system).toBe(frozenSnapshot.systemString)
     expect(updateChatMeta).not.toHaveBeenCalled()
+    expect(onEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'chat-meta-changed' }),
+    )
+  })
+
+  it('rebuilds frozen prefix when content hash differs', async () => {
+    const frozenSnapshot = snapshotFromParts('agent', promptParts('agent'))
+    readChatMeta.mockResolvedValue({
+      prefixSnapshot: frozenSnapshot,
+    })
+    assembleSystemPromptParts.mockImplementation(async () => ({
+      ...promptParts('agent'),
+      agentsMd: 'AGENTS.md guidance:\n\nFollow project conventions.',
+    }))
+    const onEvent = vi.fn<(...args: unknown[]) => void>()
+
+    const prepared = await prepareStream({ ...buildInput('agent'), onEvent })
+
+    expect(assembleSystemPromptParts).toHaveBeenCalled()
+    expect(prepared.system).toContain('Follow project conventions.')
+    expect(prepared.system).not.toBe(frozenSnapshot.systemString)
+    expect(updateChatMeta).toHaveBeenCalledWith(
+      'proj',
+      'chat-1',
+      expect.objectContaining({
+        prefixSnapshot: expect.objectContaining({ mode: 'agent' }),
+      }),
+    )
+    const stored = updateChatMeta.mock.calls[0]?.[2] as {
+      prefixSnapshot: PrefixSnapshot
+    }
+    expect(stored.prefixSnapshot.hash).not.toBe(frozenSnapshot.hash)
+    expect(onEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'chat-meta-changed',
+        patch: expect.objectContaining({
+          prefixSnapshot: expect.objectContaining({ mode: 'agent' }),
+        }),
+      }),
+    )
+  })
+
+  it('rebuilds frozen prefix when rules change', async () => {
+    const frozenSnapshot = snapshotFromParts('agent', promptParts('agent'))
+    readChatMeta.mockResolvedValue({
+      prefixSnapshot: frozenSnapshot,
+    })
+    assembleSystemPromptParts.mockImplementation(async () => ({
+      ...promptParts('agent'),
+      rules: 'Always use kebab-case filenames.',
+    }))
+    const onEvent = vi.fn<(...args: unknown[]) => void>()
+
+    const prepared = await prepareStream({ ...buildInput('agent'), onEvent })
+
+    expect(prepared.system).toContain('Always use kebab-case filenames.')
+    expect(prepared.system).not.toBe(frozenSnapshot.systemString)
+    expect(updateChatMeta).toHaveBeenCalled()
+    const stored = updateChatMeta.mock.calls[0]?.[2] as {
+      prefixSnapshot: PrefixSnapshot
+    }
+    expect(stored.prefixSnapshot.hash).not.toBe(frozenSnapshot.hash)
+    expect(stored.prefixSnapshot.systemString).not.toBe(frozenSnapshot.systemString)
+    expect(onEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'chat-meta-changed',
+        patch: expect.objectContaining({
+          prefixSnapshot: expect.objectContaining({ mode: 'agent' }),
+        }),
+      }),
+    )
   })
 
   it('rebuilds frozen prefix when mode changes', async () => {

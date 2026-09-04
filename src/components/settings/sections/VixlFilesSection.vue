@@ -77,6 +77,7 @@ const NEW_ITEM_TOOLTIPS: Record<VixlFilesKind, string> = {
   studio: 'New studio',
   skills: 'New skill',
   agents: 'New agent',
+  'agents-md': 'New AGENTS.md',
   rules: 'New rule',
 }
 

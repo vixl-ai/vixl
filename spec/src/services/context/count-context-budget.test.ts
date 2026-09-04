@@ -22,6 +22,7 @@ vi.mock('@/services/context/system-prompt-parts', async () => {
       base: 'base-system',
       tools: 'Tools are provided as function calls; do not grep the repo for them.',
       mcp: 'mcp-catalog',
+      agentsMd: '',
       rules: 'rules-body',
       subagents: 'subagents',
       mentions: '',
@@ -33,6 +34,7 @@ vi.mock('@/services/context/system-prompt-parts', async () => {
 import countContextBudget from '@/services/context/count-context-budget'
 import { mcpListStatuses, readMcpConfig } from '@/services/vixl/vixl-tauri'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
+import type { SystemPromptParts } from '@/services/context/system-prompt-parts'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const message = (id: string, createdAt: string, text: string): UIMessage => ({
@@ -233,5 +235,42 @@ describe('countContextBudget', () => {
       vi.mocked(readMcpConfig).mockResolvedValue({ servers: {} })
       vi.mocked(mcpListStatuses).mockResolvedValue({})
     }
+  })
+
+  it('folds agentsMd tokens into the rules bucket', async () => {
+    const baseParts: SystemPromptParts = {
+      base: 'base-system',
+      tools: 'tools',
+      mcp: '',
+      agentsMd: '',
+      rules: 'rules-body',
+      subagents: '',
+      mentions: '',
+      skills: '',
+    }
+    const withoutAgentsMd = await countContextBudget({
+      modelId: 'gpt-4.1',
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [message('1', '2026-01-01T00:00:00.000Z', 'hi')],
+      parts: baseParts,
+    })
+    const withAgentsMd = await countContextBudget({
+      modelId: 'gpt-4.1',
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [message('1', '2026-01-01T00:00:00.000Z', 'hi')],
+      parts: { ...baseParts, agentsMd: 'x'.repeat(400) },
+    })
+
+    const rulesWithout =
+      withoutAgentsMd.buckets.find((bucket) => bucket.id === 'rules')?.tokens ?? 0
+    const rulesWith =
+      withAgentsMd.buckets.find((bucket) => bucket.id === 'rules')?.tokens ?? 0
+    expect(rulesWith).toBeGreaterThan(rulesWithout)
   })
 })

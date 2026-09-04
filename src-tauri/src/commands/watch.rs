@@ -60,6 +60,8 @@ fn classify_change(
         "settings"
     } else if file_name == "mcp.json" {
         "mcp"
+    } else if file_name == "AGENTS.md" || file_name == "agents.md" {
+        "agents-md"
     } else if has_path_segment(path, "plans") {
         "plans"
     } else if has_path_segment(path, "studio") {
@@ -154,4 +156,86 @@ pub fn watch_vixl_paths(app: AppHandle, project_root: Option<String>) -> Result<
 
     *guard = Some(watcher);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn personal_dir() -> PathBuf {
+        PathBuf::from("/home/user/.vixl")
+    }
+
+    fn project_vixl_dir() -> PathBuf {
+        PathBuf::from("/repo/.vixl")
+    }
+
+    fn classify_project(relative: &str) -> Option<VixlFileChange> {
+        let project_dir = project_vixl_dir();
+        classify_change(
+            &project_dir.join(relative),
+            &personal_dir(),
+            Some(&project_dir),
+            Some("/repo"),
+        )
+    }
+
+    fn classify_personal(relative: &str) -> Option<VixlFileChange> {
+        let personal = personal_dir();
+        classify_change(
+            &personal.join(relative),
+            &personal,
+            Some(&project_vixl_dir()),
+            Some("/repo"),
+        )
+    }
+
+    #[test]
+    fn classifies_uppercase_agents_md() {
+        let change = classify_project("AGENTS.md").expect("classified");
+        assert_eq!(change.kind, "agents-md");
+        assert_eq!(change.scope, "project");
+        assert_eq!(change.root_path.as_deref(), Some("/repo"));
+    }
+
+    #[test]
+    fn classifies_lowercase_agents_md() {
+        let change = classify_project("agents.md").expect("classified");
+        assert_eq!(change.kind, "agents-md");
+        assert_eq!(change.scope, "project");
+    }
+
+    #[test]
+    fn classifies_personal_agents_md() {
+        let change = classify_personal("AGENTS.md").expect("classified");
+        assert_eq!(change.kind, "agents-md");
+        assert_eq!(change.scope, "personal");
+        assert!(change.root_path.is_none());
+    }
+
+    #[test]
+    fn classifies_subagent_file_as_agents() {
+        let change = classify_project("agents/foo.md").expect("classified");
+        assert_eq!(change.kind, "agents");
+        assert_eq!(change.scope, "project");
+    }
+
+    #[test]
+    fn classifies_rule_file_as_rules() {
+        let change = classify_project("rules/x.md").expect("classified");
+        assert_eq!(change.kind, "rules");
+        assert_eq!(change.scope, "project");
+    }
+
+    #[test]
+    fn ignores_paths_outside_watched_vixl_dirs() {
+        let change = classify_change(
+            Path::new("/other/AGENTS.md"),
+            &personal_dir(),
+            Some(&project_vixl_dir()),
+            Some("/repo"),
+        );
+        assert!(change.is_none());
+    }
 }

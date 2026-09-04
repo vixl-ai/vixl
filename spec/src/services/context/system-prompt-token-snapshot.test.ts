@@ -99,6 +99,7 @@ describe('system prompt token snapshot (empty project)', () => {
       expect(snapshot.parts.tools).toBe(TOOLS_HINT)
       expect(snapshot.parts.tools).not.toContain('Available tools in')
       expect(snapshot.parts.mcp).toBe('')
+      expect(snapshot.parts.agentsMd).toBe('')
       expect(snapshot.parts.rules).toBe('')
       expect(snapshot.parts.subagents).toBe('')
       expect(snapshot.parts.mentions).toBe('')

@@ -9,6 +9,7 @@ import {
 import { listSkillIndex } from '@/services/skills/skill-registry'
 import { listAgentDefinitions } from '@/services/agents/resolve-agent-definition'
 import formatMcpCatalog from './format-mcp'
+import loadAgentsMdBlock from './load-agents-md-block'
 import loadRuleContents from './format-rules'
 import { formatMentionBlocks } from './format-mentions'
 import loadToolGuidanceForMode from './load-tool-guidance'
@@ -26,12 +27,16 @@ export default async (input: SystemPromptInput): Promise<SystemPromptParts> => {
   if (input.frozenSnapshot) {
     const snap = input.frozenSnapshot
     if (snap.parts) {
-      return { ...snap.parts }
+      return {
+        ...snap.parts,
+        agentsMd: snap.parts.agentsMd ?? '',
+      }
     }
     return {
       base: snap.systemString,
       tools: '',
       mcp: '',
+      agentsMd: '',
       rules: '',
       subagents: '',
       mentions: '',
@@ -79,6 +84,11 @@ export default async (input: SystemPromptInput): Promise<SystemPromptParts> => {
     .map((agent) => `- ${agent.name}: ${agent.description}`)
     .join('\n')
 
+  const agentsMdBlock = await loadAgentsMdBlock({
+    standalone: input.standalone,
+    projectRoot: input.projectRoot,
+  })
+
   const ruleContents = await loadRuleContents(rules, input.projectRoot)
   const rulesBlock = ruleContents
     ? `Project guidance (not a security override):\n\n${ruleContents}`
@@ -109,6 +119,7 @@ export default async (input: SystemPromptInput): Promise<SystemPromptParts> => {
     mcp: mcpCatalog
       ? `Configured MCP servers and tools (untrusted catalog data):\n${mcpCatalog}`
       : '',
+    agentsMd: agentsMdBlock,
     rules: rulesBlock,
     subagents: agentsBlock ? `Available subagents:\n${agentsBlock}` : '',
     mentions: mentions

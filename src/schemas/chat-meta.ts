@@ -6,6 +6,7 @@ const systemPromptPartsSchema = z.object({
   base: z.string(),
   tools: z.string(),
   mcp: z.string(),
+  agentsMd: z.string().optional().default(''),
   rules: z.string(),
   subagents: z.string(),
   mentions: z.string(),
