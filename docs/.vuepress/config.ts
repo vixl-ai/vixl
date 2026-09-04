@@ -13,6 +13,11 @@ export default defineUserConfig({
   lang: 'en-US',
   title: 'vixl',
   description: 'Local-first BYOK Agents UI',
+  head: [
+    ['link', { rel: 'icon', href: '/favicon.ico', sizes: 'any' }],
+    ['link', { rel: 'icon', type: 'image/png', href: '/favicon.png' }],
+    ['link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }],
+  ],
 
   alias: {
     '@docs': vuepressDir,
