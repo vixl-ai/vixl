@@ -15,17 +15,27 @@ export const onceApprovalLabel = (unsandboxed?: boolean): string => {
 export const prefersSessionApproval = (unsandboxed?: boolean): boolean =>
   unsandboxed === true
 
+export const prefersWorkspaceApproval = (kind?: ApprovalKind): boolean =>
+  kind === 'fs'
+
 export const orderedApprovalScopes = (
   allowedScopes: PermissionScope[],
   unsandboxed?: boolean,
+  kind?: ApprovalKind,
 ): PermissionScope[] => {
   const scopes = allowedScopes.filter((scope) => scope !== 'never')
-  if (!prefersSessionApproval(unsandboxed)) {
+  if (prefersSessionApproval(unsandboxed)) {
+    return [
+      ...scopes.filter((scope) => scope === 'session'),
+      ...scopes.filter((scope) => scope !== 'session'),
+    ]
+  }
+  if (!prefersWorkspaceApproval(kind)) {
     return scopes
   }
   return [
-    ...scopes.filter((scope) => scope === 'session'),
-    ...scopes.filter((scope) => scope !== 'session'),
+    ...scopes.filter((scope) => scope === 'workspace'),
+    ...scopes.filter((scope) => scope !== 'workspace'),
   ]
 }
 
@@ -51,9 +61,14 @@ export const approvalActionSpecs = (args: {
   const actions: ApprovalActionSpec[] = orderedApprovalScopes(
     args.allowedScopes,
     args.unsandboxed,
+    args.kind,
   ).map((scope) => {
     let tooltip = onceApprovalLabel(args.unsandboxed)
-    if (scope === 'session' || scope === 'workspace' || scope === 'always') {
+    if (args.kind === 'fs' && scope === 'workspace') {
+      tooltip = 'Allow file edits in this workspace'
+    } else if (args.kind === 'fs' && scope === 'always') {
+      tooltip = 'Always allow file edits'
+    } else if (scope === 'session' || scope === 'workspace' || scope === 'always') {
       tooltip = SCOPE_TOOLTIPS[scope]
     }
     if (

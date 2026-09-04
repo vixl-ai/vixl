@@ -159,11 +159,6 @@ const handleHandoff = async (): Promise<void> => {
         size="sm"
         class="h-7 gap-1.5 px-2 text-xs"
         :class="statusClass"
-        :disabled="
-          contextActions.triggerDisabled.value ||
-            contextUsage.pending.value ||
-            contextActions.compacting.value
-        "
       >
         <svg
           aria-hidden="true"

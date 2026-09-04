@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ShieldIcon, ShieldCheckIcon, ShieldOffIcon } from '@lucide/vue'
+import { CheckIcon, ShieldIcon, ShieldCheckIcon, ShieldOffIcon } from '@lucide/vue'
 import type { PermissionLevel } from '@/types/harness/permission'
 import {
   AlertDialog,
@@ -17,8 +17,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from '@/components/shadcn/ui/dropdown-menu'
 import {
   Tooltip,
@@ -133,10 +131,6 @@ const cancelBypass = (): void => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" class="w-60">
-            <DropdownMenuLabel class="text-xs text-muted-foreground">
-              Permission level (this session)
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
             <DropdownMenuItem
               v-for="(meta, level) in LEVELS"
               :key="level"
@@ -155,12 +149,11 @@ const cancelBypass = (): void => {
                 >
                   {{ meta.label }}
                 </span>
-                <span
+                <CheckIcon
                   v-if="modelValue === level"
-                  class="ml-auto text-xs text-muted-foreground"
-                >
-                  active
-                </span>
+                  class="ml-auto size-3.5 shrink-0 text-foreground"
+                  aria-hidden="true"
+                />
               </div>
               <p class="ml-6 text-xs text-muted-foreground">{{ meta.description }}</p>
             </DropdownMenuItem>

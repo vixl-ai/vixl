@@ -80,12 +80,16 @@ export const gateToolPermission = async (args: {
   }
 
   const needsNetwork = args.capability === 'shell.network' ? true : undefined
+  const pendingTitle =
+    args.action === 'fs.write' && decision.reason !== 'Sensitive path'
+      ? 'Edit files in this workspace'
+      : args.title
 
   args.ctx.onPendingApproval({
     toolCallId: args.toolCallId,
     name: args.name,
     kind: args.kind,
-    title: args.title,
+    title: pendingTitle,
     detail: args.detail ?? decision.reason,
     unsandboxed: args.unsandboxed,
     needsNetwork,
@@ -103,7 +107,7 @@ export const gateToolPermission = async (args: {
     kind: args.kind,
     action: args.action,
     capability: args.capability,
-    title: args.title,
+    title: pendingTitle,
     detail: args.detail ?? decision.reason,
     unsandboxed: args.unsandboxed,
     needsNetwork,

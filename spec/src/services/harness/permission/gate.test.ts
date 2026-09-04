@@ -116,7 +116,7 @@ describe('gateToolPermission sticky shell elevation', () => {
         toolCallId: 'tc-edit',
         name: 'edit_file',
         kind: 'fs',
-        title: 'Edit file',
+        title: 'Edit files in this workspace',
         needsNetwork: undefined,
       }),
     )
@@ -258,7 +258,7 @@ describe('gateToolPermission fs broad grants', () => {
     expect(ctx.sessionAllows.has('fs.write:src/a.ts')).toBe(false)
   })
 
-  it('persists broad fs.write on workspace, not the exact path', async () => {
+  it('asks a non-sensitive write with a workspace title and persists broad fs.write', async () => {
     const ctx = makeCtx()
     const pending = gateToolPermission({
       ctx,
@@ -267,10 +267,21 @@ describe('gateToolPermission fs broad grants', () => {
       kind: 'fs',
       action: 'fs.write',
       capability: 'fs.write:src/a.ts',
-      title: 'Edit file',
+      title: 'Edit src/a.ts',
       paths: ['src/a.ts'],
     })
     await waitForPending('tc-fs-ws')
+    expect(ctx.onPendingApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Edit files in this workspace',
+      }),
+    )
+    expect(getPendingApproval('tc-fs-ws')?.title).toBe(
+      'Edit files in this workspace',
+    )
+    expect(getPendingApproval('tc-fs-ws')?.capability).toBe(
+      'fs.write:src/a.ts',
+    )
     resolveApproval('tc-fs-ws', { approved: true, scope: 'workspace' })
     await expect(pending).resolves.toBe(true)
     expect(ctx.sessionAllows.has('fs.write')).toBe(true)
@@ -284,6 +295,89 @@ describe('gateToolPermission fs broad grants', () => {
       'allow',
       'workspace',
     )
+  })
+
+  it('persists broad fs.write on always, not the exact path', async () => {
+    const ctx = makeCtx()
+    const pending = gateToolPermission({
+      ctx,
+      toolCallId: 'tc-fs-always',
+      name: 'edit_file',
+      kind: 'fs',
+      action: 'fs.write',
+      capability: 'fs.write:src/a.ts',
+      title: 'Edit src/a.ts',
+      paths: ['src/a.ts'],
+    })
+    await waitForPending('tc-fs-always')
+    expect(getPendingApproval('tc-fs-always')?.title).toBe(
+      'Edit files in this workspace',
+    )
+    resolveApproval('tc-fs-always', { approved: true, scope: 'always' })
+    await expect(pending).resolves.toBe(true)
+    expect(ctx.sessionAllows.has('fs.write')).toBe(true)
+    expect(ctx.persistPermission).toHaveBeenCalledWith(
+      'fs.write',
+      'allow',
+      'always',
+    )
+    expect(ctx.persistPermission).not.toHaveBeenCalledWith(
+      'fs.write:src/a.ts',
+      'allow',
+      'always',
+    )
+  })
+
+  it('keeps the per-file title for a sensitive write', async () => {
+    const ctx = makeCtx()
+    const pending = gateToolPermission({
+      ctx,
+      toolCallId: 'tc-fs-env',
+      name: 'edit_file',
+      kind: 'fs',
+      action: 'fs.write',
+      capability: 'fs.write:.env',
+      title: 'Edit .env',
+      paths: ['.env'],
+    })
+    await waitForPending('tc-fs-env')
+    expect(ctx.onPendingApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Edit .env',
+      }),
+    )
+    expect(getPendingApproval('tc-fs-env')?.title).toBe('Edit .env')
+    expect(getPendingApproval('tc-fs-env')?.capability).toBe('fs.write:.env')
+    resolveApproval('tc-fs-env', { approved: true, scope: 'workspace' })
+    await expect(pending).resolves.toBe(true)
+    expect(ctx.persistPermission).toHaveBeenCalledWith(
+      'fs.write',
+      'allow',
+      'workspace',
+    )
+  })
+
+  it('skips the prompt when persisted workspace fs.write exists and sessionAllows is empty', async () => {
+    const ctx = makeCtx()
+    ctx.settings = {
+      version: 1,
+      'agent.permissions': [
+        { capability: 'fs.write', verdict: 'allow', scope: 'workspace' },
+      ],
+    } as VixlSettings
+    const allowed = await gateToolPermission({
+      ctx,
+      toolCallId: 'tc-fs-new-chat',
+      name: 'edit_file',
+      kind: 'fs',
+      action: 'fs.write',
+      capability: 'fs.write:src/a.ts',
+      title: 'Edit src/a.ts',
+      paths: ['src/a.ts'],
+    })
+    expect(allowed).toBe(true)
+    expect(ctx.onPendingApproval).not.toHaveBeenCalled()
+    expect(ctx.persistPermission).not.toHaveBeenCalled()
   })
 
   it('does not add fs.write to sessionAllows on once', async () => {
@@ -334,7 +428,11 @@ describe('gateToolPermission fs broad grants', () => {
       paths: ['src/a.ts'],
     })
     await waitForPending('tc-fs-del')
-    expect(ctx.onPendingApproval).toHaveBeenCalled()
+    expect(ctx.onPendingApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Delete file',
+      }),
+    )
     resolveApproval('tc-fs-del', { approved: true, scope: 'once' })
     await expect(pending).resolves.toBe(true)
     expect(ctx.sessionAllows.has('fs.delete')).toBe(false)

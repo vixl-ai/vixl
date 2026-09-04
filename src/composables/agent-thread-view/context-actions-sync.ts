@@ -41,7 +41,6 @@ export default (
     },
   })
   state.contextActions.setDisabled({
-    triggerDisabled: !state.threadReady.value,
     actionsDisabled:
       !state.threadReady.value || compacting || parentStreaming,
   })

@@ -24,6 +24,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from '@/components/shadcn/ui/alert'
+import formatToolGroupHeader from '@/utils/format-tool-group-header'
 import resolveSpawnSubagent from '@/utils/resolve-spawn-subagent'
 import segmentStepTools from '@/utils/segment-step-tools'
 import { aggregateTurnFileDiffs } from '@/services/harness/restore-file-checkpoints'
@@ -81,12 +82,8 @@ const isStepStreaming = (index: number): boolean => {
   return index === props.turn.steps.length - 1
 }
 
-const toolHeaderLabel = (count: number, index: number): string => {
-  if (isStepStreaming(index)) {
-    return `Using ${count} tools`
-  }
-  return `Used ${count} tools`
-}
+const hasRunningTool = (tools: ToolRun[]): boolean =>
+  tools.some((tool) => tool.status === 'running')
 
 const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
   resolveSpawnSubagent(
@@ -156,13 +153,13 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
         >
           <AiElementsChainOfThoughtChainOfThoughtHeader>
             <AiElementsShimmerShimmer
-              v-if="isStepStreaming(index)"
+              v-if="hasRunningTool(segment.tools)"
               :duration="1"
               as="span"
             >
-              {{ toolHeaderLabel(segment.tools.length, index) }}
+              {{ formatToolGroupHeader(segment.tools) }}
             </AiElementsShimmerShimmer>
-            <span v-else>{{ toolHeaderLabel(segment.tools.length, index) }}</span>
+            <span v-else>{{ formatToolGroupHeader(segment.tools) }}</span>
           </AiElementsChainOfThoughtChainOfThoughtHeader>
           <AiElementsChainOfThoughtChainOfThoughtContent class="space-y-2">
             <div class="flex flex-col gap-0.5">

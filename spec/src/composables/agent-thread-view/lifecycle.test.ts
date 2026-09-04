@@ -26,14 +26,12 @@ const buildState = (overrides?: {
   state: AgentThreadViewState
   setDisabled: ReturnType<typeof vi.fn<(next: {
     actionsDisabled?: boolean
-    triggerDisabled?: boolean
   }) => void>>
   register: ReturnType<typeof vi.fn<(handlers: RegisteredHandlers) => void>>
   compacting: ReturnType<typeof ref<boolean>>
 } => {
   const setDisabled = vi.fn<(next: {
     actionsDisabled?: boolean
-    triggerDisabled?: boolean
   }) => void>()
   const register = vi.fn<(handlers: RegisteredHandlers) => void>()
   const compacting = ref(overrides?.compacting ?? false)
@@ -72,7 +70,6 @@ describe('syncContextActions', () => {
 
     expect(register).toHaveBeenCalled()
     expect(setDisabled).toHaveBeenCalledWith({
-      triggerDisabled: false,
       actionsDisabled: false,
     })
   })
@@ -86,7 +83,6 @@ describe('syncContextActions', () => {
     } as never)
 
     expect(setDisabled).toHaveBeenCalledWith({
-      triggerDisabled: true,
       actionsDisabled: true,
     })
   })
@@ -101,7 +97,6 @@ describe('syncContextActions', () => {
 
     expect(compacting.value).toBe(true)
     expect(setDisabled).toHaveBeenCalledWith({
-      triggerDisabled: false,
       actionsDisabled: true,
     })
   })
@@ -115,7 +110,6 @@ describe('syncContextActions', () => {
     } as never)
 
     expect(setDisabled).toHaveBeenCalledWith({
-      triggerDisabled: false,
       actionsDisabled: true,
     })
   })

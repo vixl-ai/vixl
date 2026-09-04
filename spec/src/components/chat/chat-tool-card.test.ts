@@ -5,6 +5,7 @@ import {
   onceApprovalLabel,
   orderedApprovalScopes,
   prefersSessionApproval,
+  prefersWorkspaceApproval,
 } from '@/components/chat/chat-tool-card'
 
 describe('onceApprovalLabel', () => {
@@ -41,20 +42,70 @@ describe('isNetworkSandboxApproval', () => {
 
 describe('orderedApprovalScopes', () => {
   const scopes = ['once', 'session', 'never'] as const
+  const fsScopes = [
+    'once',
+    'session',
+    'workspace',
+    'always',
+    'never',
+  ] as const
 
   it('keeps once first for ordinary sandboxed shell', () => {
     expect(prefersSessionApproval(false)).toBe(false)
-    expect(orderedApprovalScopes([...scopes], false)).toEqual(['once', 'session'])
+    expect(orderedApprovalScopes([...scopes], false, 'shell')).toEqual([
+      'once',
+      'session',
+    ])
   })
 
   it('keeps once first when the command needs network', () => {
     expect(prefersSessionApproval(false)).toBe(false)
-    expect(orderedApprovalScopes([...scopes], false)).toEqual(['once', 'session'])
+    expect(orderedApprovalScopes([...scopes], false, 'shell')).toEqual([
+      'once',
+      'session',
+    ])
   })
 
   it('puts session first for unsandboxed approvals', () => {
     expect(prefersSessionApproval(true)).toBe(true)
-    expect(orderedApprovalScopes([...scopes], true)).toEqual(['session', 'once'])
+    expect(orderedApprovalScopes([...scopes], true, 'shell')).toEqual([
+      'session',
+      'once',
+    ])
+  })
+
+  it('puts workspace first for filesystem approvals', () => {
+    expect(prefersWorkspaceApproval('fs')).toBe(true)
+    expect(orderedApprovalScopes([...fsScopes], false, 'fs')).toEqual([
+      'workspace',
+      'once',
+      'session',
+      'always',
+    ])
+  })
+
+  it('keeps once first for git, mcp, and web', () => {
+    expect(prefersWorkspaceApproval('git')).toBe(false)
+    expect(prefersWorkspaceApproval('mcp')).toBe(false)
+    expect(prefersWorkspaceApproval('web')).toBe(false)
+    expect(orderedApprovalScopes([...fsScopes], false, 'git')).toEqual([
+      'once',
+      'session',
+      'workspace',
+      'always',
+    ])
+    expect(orderedApprovalScopes([...fsScopes], false, 'mcp')).toEqual([
+      'once',
+      'session',
+      'workspace',
+      'always',
+    ])
+    expect(orderedApprovalScopes([...fsScopes], false, 'web')).toEqual([
+      'once',
+      'session',
+      'workspace',
+      'always',
+    ])
   })
 })
 
@@ -96,9 +147,30 @@ describe('approvalActionSpecs', () => {
     const unsandboxed = approvalActionSpecs({
       allowedScopes: ['once', 'session'],
       unsandboxed: true,
+      kind: 'shell',
     })
     expect(unsandboxed.find((action) => action.key === 'once')?.tooltip).toBe(
       'Run outside sandbox',
     )
+  })
+
+  it('leads filesystem approvals with workspace and file-edit tooltips', () => {
+    expect(
+      approvalActionSpecs({
+        allowedScopes: ['once', 'session', 'workspace', 'always', 'never'],
+        kind: 'fs',
+      }),
+    ).toEqual([
+      {
+        key: 'workspace',
+        tooltip: 'Allow file edits in this workspace',
+        tone: 'default',
+      },
+      { key: 'once', tooltip: 'Allow once', tone: 'default' },
+      { key: 'session', tooltip: 'Allow session', tone: 'default' },
+      { key: 'always', tooltip: 'Always allow file edits', tone: 'default' },
+      { key: 'deny', tooltip: 'Deny', tone: 'default' },
+      { key: 'never', tooltip: 'Never', tone: 'danger' },
+    ])
   })
 })

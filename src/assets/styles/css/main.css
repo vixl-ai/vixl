@@ -91,7 +91,7 @@
   }
 }
 
-/* Soft full-perimeter pastel ring (chat prompt while waiting) */
+/* Rotating conic waiting ring (chat prompt while the agent is replying) */
 @property --agent-aurora-angle {
   syntax: '<angle>';
   inherits: false;
@@ -105,16 +105,18 @@
     linear-gradient(var(--agent-aurora-fill), var(--agent-aurora-fill)) padding-box,
     conic-gradient(
       from var(--agent-aurora-angle),
-      color-mix(in oklab, #b89ad4 55%, var(--border)),
-      color-mix(in oklab, #7eb6d9 55%, var(--border)),
-      color-mix(in oklab, #7ec9a0 55%, var(--border)),
-      color-mix(in oklab, #a894d4 55%, var(--border)),
-      color-mix(in oklab, #b89ad4 55%, var(--border))
+      #b89ad4 0deg,
+      #7eb6d9 60deg,
+      #c4b5fd 120deg,
+      #7ec9a0 180deg,
+      #a894d4 240deg,
+      #7eb6d9 300deg,
+      #b89ad4 360deg
     )
     border-box !important;
   background-origin: border-box !important;
   background-clip: padding-box, border-box !important;
-  animation: agent-aurora-drift 14s linear infinite;
+  animation: agent-aurora-drift 3s linear infinite;
 }
 
 @keyframes agent-aurora-drift {
