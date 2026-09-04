@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { CircleAlert, GitFork, KeyRound, MessageCircleQuestion, Pencil, Pin, PinOff, ShieldAlert, Trash2 } from '@lucide/vue'
 import type { FleetSidebarChat } from '@/types/fleet/fleet-sidebar-chat'
+import NavigationAsideLeftChatRunningDots from '@/components/navigation/aside/left/ChatRunningDots.vue'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -236,47 +237,37 @@ watch(
         :title="statusLabel ?? props.chat.title"
         @click="openChat"
       >
-        <Shimmer
-          v-if="displayStatus === 'running'"
-          as="span"
-          :duration="8"
-          class="block min-w-0 flex-1 truncate text-left text-sm [--color-background:var(--color-sidebar)] [--shimmer-base:linear-gradient(90deg,#b89ad4,#7eb6d9,#7ec9a0,#a894d4,#b89ad4)]"
-        >
-          {{ chat.title }}
-        </Shimmer>
-        <span
-          v-else
-          class="block min-w-0 flex-1 truncate text-left text-sm"
-        >
+        <span class="block min-w-0 flex-1 truncate text-left text-sm">
           {{ chat.title }}
         </span>
-        <template v-if="displayStatus !== 'running'">
-          <ShieldAlert
-            v-if="displayAttention === 'needs_approval'"
-            class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
-            aria-label="Needs approval"
-          />
-          <MessageCircleQuestion
-            v-else-if="displayAttention === 'needs_input'"
-            class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
-            aria-label="Needs input"
-          />
-          <KeyRound
-            v-else-if="displayAttention === 'needs_mcp_auth'"
-            class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
-            aria-label="Needs MCP auth"
-          />
-          <span
-            v-else-if="displayAttention === 'completed'"
-            class="size-1.5 shrink-0 rounded-full bg-[#D4C1EC]"
-            aria-label="Done"
-          />
-          <CircleAlert
-            v-else-if="displayAttention === 'error'"
-            class="size-3.5 shrink-0 text-destructive"
-            aria-label="Error"
-          />
-        </template>
+        <NavigationAsideLeftChatRunningDots
+          v-if="displayStatus === 'running'"
+        />
+        <ShieldAlert
+          v-else-if="displayAttention === 'needs_approval'"
+          class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+          aria-label="Needs approval"
+        />
+        <MessageCircleQuestion
+          v-else-if="displayAttention === 'needs_input'"
+          class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+          aria-label="Needs input"
+        />
+        <KeyRound
+          v-else-if="displayAttention === 'needs_mcp_auth'"
+          class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+          aria-label="Needs MCP auth"
+        />
+        <span
+          v-else-if="displayAttention === 'completed'"
+          class="size-1.5 shrink-0 rounded-full bg-[#D4C1EC]"
+          aria-label="Done"
+        />
+        <CircleAlert
+          v-else-if="displayAttention === 'error'"
+          class="size-3.5 shrink-0 text-destructive"
+          aria-label="Error"
+        />
       </SidebarMenuSubButton>
     </ContextMenuTrigger>
     <ContextMenuContent class="w-48">

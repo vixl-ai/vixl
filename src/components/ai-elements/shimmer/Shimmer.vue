@@ -43,7 +43,7 @@ const componentClasses = computed(() => cn('relative inline-block bg-[length:250
 const componentStyle = computed((): CSSProperties => ({
   '--spread': `${dynamicSpread.value}px`,
   'backgroundImage':
-    'var(--bg), var(--shimmer-base, linear-gradient(var(--color-muted-foreground), var(--color-muted-foreground)))',
+    'var(--bg), linear-gradient(var(--color-muted-foreground), var(--color-muted-foreground))',
 }))
 
 const MotionComponent = computed(() => {

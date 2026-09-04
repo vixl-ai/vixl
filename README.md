@@ -1,4 +1,8 @@
-# Vixl
+<p align="center">
+  <img src="./docs/media/readme/logo.png" alt="vixl" width="160" />
+</p>
+
+<h1 align="center">vixl</h1>
 
 <p align="center">
   <a href="https://github.com/vixl-ai/vixl/actions/workflows/ci.yml"><img src="https://github.com/vixl-ai/vixl/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
