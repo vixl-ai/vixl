@@ -77,6 +77,7 @@ const activityLabel = computed(() =>
     hasPendingApproval: props.pendingApprovals.length > 0,
     hasPendingQuestion: Boolean(props.pendingQuestion),
     hasPendingMcpAuth: (props.pendingMcpAuth?.length ?? 0) > 0,
+    compacting: props.compacting === true,
   }),
 )
 

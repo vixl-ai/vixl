@@ -195,7 +195,7 @@ describe('deriveAgentActivity', () => {
     ).toBe('Working')
   })
 
-  it('shows Writing only before the first text tokens', () => {
+  it('shows Processing request after last-step tools finish', () => {
     expect(
       deriveAgentActivity({
         status: 'streaming',
@@ -205,15 +205,49 @@ describe('deriveAgentActivity', () => {
               id: 'step-1',
               text: '',
               reasoning: '',
-              tools: [],
+              tools: [
+                {
+                  toolCallId: 't0',
+                  name: 'read_file',
+                  status: 'done',
+                  args: { path: 'a.ts' },
+                },
+              ],
             },
           ],
-          text: '',
         }),
         runningSubagents: [],
       }),
-    ).toBe('Working')
+    ).toBe('Processing request')
+  })
 
+  it('shows Processing request after last-step tools finish with preamble', () => {
+    expect(
+      deriveAgentActivity({
+        status: 'streaming',
+        turn: turn({
+          steps: [
+            {
+              id: 'step-1',
+              text: 'Let me check that file.',
+              reasoning: 'Need the current contents.',
+              tools: [
+                {
+                  toolCallId: 't0',
+                  name: 'read_file',
+                  status: 'done',
+                  args: { path: 'a.ts' },
+                },
+              ],
+            },
+          ],
+        }),
+        runningSubagents: [],
+      }),
+    ).toBe('Processing request')
+  })
+
+  it('shows Processing request on an empty next step after done tools', () => {
     expect(
       deriveAgentActivity({
         status: 'streaming',
@@ -242,8 +276,10 @@ describe('deriveAgentActivity', () => {
         }),
         runningSubagents: [],
       }),
-    ).toBe('Writing')
+    ).toBe('Processing request')
+  })
 
+  it('hides sticky activity while streaming text with no completed-tool wait', () => {
     expect(
       deriveAgentActivity({
         status: 'streaming',
@@ -260,6 +296,54 @@ describe('deriveAgentActivity', () => {
         runningSubagents: [],
       }),
     ).toBeNull()
+  })
+
+  it('hides Working and Processing request while compacting', () => {
+    expect(
+      deriveAgentActivity({
+        status: 'streaming',
+        turn: turn({
+          steps: [
+            {
+              id: 'step-1',
+              text: '',
+              reasoning: '',
+              tools: [
+                {
+                  toolCallId: 't0',
+                  name: 'read_file',
+                  status: 'done',
+                  args: { path: 'a.ts' },
+                },
+              ],
+            },
+          ],
+        }),
+        runningSubagents: [],
+        compacting: true,
+      }),
+    ).toBeNull()
+
+    expect(
+      deriveAgentActivity({
+        status: 'submitted',
+        turn: turn({}),
+        runningSubagents: [],
+        compacting: true,
+      }),
+    ).toBeNull()
+  })
+
+  it('still prefers pending approval while compacting', () => {
+    expect(
+      deriveAgentActivity({
+        status: 'streaming',
+        turn: turn({}),
+        runningSubagents: [],
+        hasPendingApproval: true,
+        compacting: true,
+      }),
+    ).toBe('Waiting for approval')
   })
 
   it('hides sticky activity once reasoning is visible', () => {

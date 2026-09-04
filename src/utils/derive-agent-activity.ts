@@ -11,6 +11,7 @@ type DeriveAgentActivityArgs = {
   hasPendingApproval?: boolean
   hasPendingQuestion?: boolean
   hasPendingMcpAuth?: boolean
+  compacting?: boolean
 }
 
 const waitForSubagentsLabel = (subagents: SubagentTimelineItem[]): string => {
@@ -89,6 +90,11 @@ export default (args: DeriveAgentActivityArgs): string | null => {
     return null
   }
 
+  // ChatCompactionMarker owns this wait. Gates above still win.
+  if (args.compacting) {
+    return null
+  }
+
   if (!args.turn || !hasTurnContent(args.turn)) {
     return 'Working'
   }
@@ -101,12 +107,17 @@ export default (args: DeriveAgentActivityArgs): string | null => {
   const hasText =
     lastStep.text.trim().length > 0 || args.turn.text.trim().length > 0
   const hasReasoning = lastStep.reasoning.trim().length > 0
-  const hasTools = lastStep.tools.length > 0
 
-  // Preamble only: once text, reasoning, or tools are visible, drop the label.
-  if (hasText || hasReasoning || hasTools) {
+  if (lastStep.tools.some((tool) => tool.status === 'running')) {
     return null
   }
 
-  return 'Writing'
+  // Tools finished and the model is being called again, including an empty
+  // next step after prior content. Streaming text or reasoning with no
+  // completed-tool wait owns the UI instead.
+  if (lastStep.tools.length > 0 || (!hasText && !hasReasoning)) {
+    return 'Processing request'
+  }
+
+  return null
 }
