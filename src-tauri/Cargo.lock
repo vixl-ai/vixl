@@ -77,45 +77,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
-name = "app"
-version = "0.1.0-alpha.10"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "flate2",
- "futures-util",
- "keyring",
- "lazy_static",
- "libc",
- "log",
- "notify",
- "objc2 0.6.4",
- "objc2-app-kit 0.3.2",
- "objc2-foundation 0.3.2",
- "open",
- "portable-pty",
- "reqwest 0.12.28",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "similar",
- "tar",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-log",
- "tauri-plugin-mcp-bridge",
- "tauri-plugin-process",
- "tauri-plugin-updater",
- "tokio",
- "url",
- "uuid",
- "which",
-]
-
-[[package]]
 name = "arbitrary"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4231,6 +4192,7 @@ dependencies = [
  "gtk",
  "heck 0.5.0",
  "http",
+ "image",
  "jni 0.21.1",
  "libc",
  "log",
@@ -5136,6 +5098,45 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vixl"
+version = "0.1.0-alpha.10"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "flate2",
+ "futures-util",
+ "keyring",
+ "lazy_static",
+ "libc",
+ "log",
+ "notify",
+ "objc2 0.6.4",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "open",
+ "portable-pty",
+ "reqwest 0.12.28",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "similar",
+ "tar",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-log",
+ "tauri-plugin-mcp-bridge",
+ "tauri-plugin-process",
+ "tauri-plugin-updater",
+ "tokio",
+ "url",
+ "uuid",
+ "which",
+]
 
 [[package]]
 name = "vswhom"

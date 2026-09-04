@@ -1,23 +1,23 @@
 use tauri::{
+    image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, Window,
 };
 
 const MAIN_WINDOW_LABEL: &str = "main";
+const TRAY_ICON_PNG: &[u8] = include_bytes!("../icons/tray.png");
 
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "show", "Show Vixl", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit Vixl", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
-    let Some(icon) = app.default_window_icon().cloned() else {
-        log::error!("No default window icon available for system tray");
-        return Ok(());
-    };
+    let icon = load_tray_icon()?;
 
     let _tray = TrayIconBuilder::with_id("main-tray")
         .icon(icon)
+        .icon_as_template(false)
         .menu(&menu)
         .show_menu_on_left_click(false)
         .tooltip("Vixl")
@@ -55,6 +55,10 @@ pub fn handle_close_requested(window: &Window) {
     if let Err(error) = window.hide() {
         log::error!("Failed to hide window to tray: {error}");
     }
+}
+
+fn load_tray_icon() -> tauri::Result<Image<'static>> {
+    Ok(Image::from_bytes(TRAY_ICON_PNG)?.to_owned())
 }
 
 fn show_main_window(app: &AppHandle) {
