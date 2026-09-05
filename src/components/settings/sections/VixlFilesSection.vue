@@ -22,6 +22,7 @@ import {
 } from '@/components/shadcn/ui/tooltip'
 import VixlFileCreateHost from '@/components/settings/vixl-files/VixlFileCreateHost.vue'
 import VixlFileListItem from '@/components/settings/vixl-files/VixlFileListItem.vue'
+import SettingsCollapsibleSection from '@/components/settings/SettingsCollapsibleSection.vue'
 import SettingsSectionScroll from '@/components/settings/SettingsSectionScroll.vue'
 import useVixlConfig from '@/composables/use-vixl-config'
 import useFleetRegistry from '@/composables/use-fleet-registry'
@@ -47,6 +48,7 @@ const props = defineProps<{
   title: string
   emptyMessage: string
   folderLabel: string
+  collapsible?: boolean
 }>()
 
 const config = useVixlConfig()
@@ -82,6 +84,10 @@ const NEW_ITEM_TOOLTIPS: Record<VixlFilesKind, string> = {
 }
 
 const newItemTooltip = computed(() => NEW_ITEM_TOOLTIPS[props.kind] ?? 'New')
+
+const sectionShell = computed(() =>
+  props.collapsible ? SettingsCollapsibleSection : SettingsSectionScroll,
+)
 
 const toastLoadError = (error: unknown): void => {
   toast.error('Failed to load files', {
@@ -226,10 +232,7 @@ watch(vixlFileChangeToken, async () => {
 </script>
 
 <template>
-  <SettingsSectionScroll :title="title">
-    <template v-if="$slots.title" #title>
-      <slot name="title" />
-    </template>
+  <component :is="sectionShell" :title="title">
     <template #actions>
       <Tooltip v-if="usesCreateMenu" :disable-closing-trigger="true">
         <TooltipTrigger as-child>
@@ -294,7 +297,8 @@ watch(vixlFileChangeToken, async () => {
 
     <Empty
       v-if="files.length === 0"
-      class="flex-1 min-h-0 border border-border/60"
+      class="min-h-0 border border-border/60"
+      :class="collapsible ? 'flex-none p-4 md:p-4' : 'flex-1'"
     >
       <EmptyHeader>
         <EmptyMedia variant="icon">
@@ -304,7 +308,11 @@ watch(vixlFileChangeToken, async () => {
       </EmptyHeader>
     </Empty>
 
-    <div v-else class="flex flex-1 min-h-0 flex-col gap-2">
+    <div
+      v-else
+      class="flex flex-col gap-2"
+      :class="collapsible ? undefined : 'flex-1 min-h-0'"
+    >
       <VixlFileListItem
         v-for="file in files"
         :key="file.path"
@@ -321,5 +329,5 @@ watch(vixlFileChangeToken, async () => {
       :project-root="projectRoot"
       @submitted="handleSubmitted"
     />
-  </SettingsSectionScroll>
+  </component>
 </template>

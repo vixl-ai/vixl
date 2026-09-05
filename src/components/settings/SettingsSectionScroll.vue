@@ -6,7 +6,10 @@ defineProps<{
 
 <template>
   <section class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-    <div class="shrink-0 pb-4">
+    <div
+      v-if="$slots.header || title || $slots.title"
+      class="shrink-0 pb-4"
+    >
       <slot name="header">
         <div
           v-if="title || $slots.title"
