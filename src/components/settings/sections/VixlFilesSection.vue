@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, watch } from 'vue'
-import { FileText, Folder, MessageSquare, Plus } from '@lucide/vue'
+import { FileText, Folder, FolderSymlink, MessageSquare, Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import {
@@ -227,6 +227,9 @@ watch(vixlFileChangeToken, async () => {
 
 <template>
   <SettingsSectionScroll :title="title">
+    <template v-if="$slots.title" #title>
+      <slot name="title" />
+    </template>
     <template #actions>
       <Tooltip v-if="usesCreateMenu" :disable-closing-trigger="true">
         <TooltipTrigger as-child>
@@ -282,7 +285,7 @@ watch(vixlFileChangeToken, async () => {
             aria-label="Reveal in folder"
             @click="revealRoot"
           >
-            <Folder class="h-4 w-4" />
+            <FolderSymlink class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Reveal in folder</TooltipContent>

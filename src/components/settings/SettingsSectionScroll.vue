@@ -8,8 +8,13 @@ defineProps<{
   <section class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
     <div class="shrink-0 pb-4">
       <slot name="header">
-        <div v-if="title" class="flex items-center justify-between gap-4">
-          <h2 class="text-lg font-medium">{{ title }}</h2>
+        <div
+          v-if="title || $slots.title"
+          class="flex items-center justify-between gap-4"
+        >
+          <slot name="title">
+            <h2 class="text-lg font-medium">{{ title }}</h2>
+          </slot>
           <div v-if="$slots.actions" class="flex items-center gap-2">
             <slot name="actions" />
           </div>

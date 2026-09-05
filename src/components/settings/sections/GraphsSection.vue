@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Folder, Trash2 } from '@lucide/vue'
+import { Folder, FolderSymlink, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
   AlertDialog,
@@ -176,16 +176,12 @@ const handleConfirmDelete = async (): Promise<void> => {
             :disabled="revealingRoot"
             @click="revealGraphsFolder"
           >
-            <Folder class="h-4 w-4" />
+            <FolderSymlink class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Open in folder</TooltipContent>
       </Tooltip>
     </template>
-
-    <p class="mb-4 text-sm text-muted-foreground">
-      Indexes live in the vixl user folder, not in project repos.
-    </p>
 
     <Empty
       v-if="!pending && graphRows.length === 0"
@@ -207,7 +203,6 @@ const handleConfirmDelete = async (): Promise<void> => {
         <TableHeader>
           <TableRow class="hover:bg-transparent">
             <TableHead class="h-9 px-3 text-xs">Name</TableHead>
-            <TableHead class="h-9 px-3 text-xs">Project path</TableHead>
             <TableHead class="h-9 px-3 text-xs">Storage size</TableHead>
             <TableHead class="h-9 w-28 px-3 text-right text-xs">
               Actions
@@ -227,9 +222,6 @@ const handleConfirmDelete = async (): Promise<void> => {
             >
               {{ graph.name }}
             </TableCell>
-            <TableCell class="max-w-xs truncate px-3 py-2.5 text-muted-foreground">
-              {{ graph.projectRoot || 'Missing project' }}
-            </TableCell>
             <TableCell class="px-3 py-2.5">
               {{ formatBytes(graph.bytes) }}
             </TableCell>
@@ -244,7 +236,7 @@ const handleConfirmDelete = async (): Promise<void> => {
                       :aria-label="`Reveal ${graph.name}`"
                       @click="revealGraphStore(graph)"
                     >
-                      <Folder class="size-3.5" />
+                      <FolderSymlink class="size-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Reveal in folder</TooltipContent>

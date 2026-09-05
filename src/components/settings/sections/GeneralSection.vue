@@ -124,28 +124,22 @@ const handleDownloadAndRestart = async (): Promise<void> => {
         </Tooltip>
       </div>
 
-      <div class="space-y-2">
-        <div class="flex items-center gap-1">
-          <Label>Keyboard shortcuts</Label>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-7 w-7"
-                aria-label="View shortcuts"
-                @click="shortcutsOpen = true"
-              >
-                <Keyboard class="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>View shortcuts</TooltipContent>
-          </Tooltip>
-        </div>
-        <p class="text-sm text-muted-foreground">
-          Cmd/Ctrl+K command palette, Cmd/Ctrl+N new agent, Cmd/Ctrl+B left sidebar,
-          Cmd/Ctrl+Shift+B right workbench
-        </p>
+      <div class="flex items-center gap-1">
+        <Label>Keyboard shortcuts</Label>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-7 w-7"
+              aria-label="View shortcuts"
+              @click="shortcutsOpen = true"
+            >
+              <Keyboard class="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>View shortcuts</TooltipContent>
+        </Tooltip>
       </div>
 
       <div class="space-y-2">

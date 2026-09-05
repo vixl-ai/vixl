@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ExternalLink, Folder } from '@lucide/vue'
+import { ExternalLink, FolderSymlink } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   Tooltip,
@@ -56,7 +56,7 @@ const emit = defineEmits<{
             aria-label="Reveal in folder"
             @click="revealInFolder(file.path)"
           >
-            <Folder class="h-4 w-4" />
+            <FolderSymlink class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Reveal in folder</TooltipContent>

@@ -384,6 +384,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     RuleCreateForm: typeof import('./components/settings/vixl-files/RuleCreateForm.vue')['default']
+    RulesKindSelect: typeof import('./components/settings/rules/RulesKindSelect.vue')['default']
     RulesSection: typeof import('./components/settings/sections/RulesSection.vue')['default']
     RunningTerminalsPanel: typeof import('./components/chat/RunningTerminalsPanel.vue')['default']
     Sandbox: typeof import('./components/ai-elements/sandbox/Sandbox.vue')['default']

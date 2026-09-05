@@ -23,6 +23,7 @@ import {
 
 const props = defineProps<{
   tab: SettingsTab
+  hideHeading?: boolean
 }>()
 
 const config = useVixlConfig()
@@ -159,8 +160,11 @@ watch(vixlFileChangeToken, async () => {
 </script>
 
 <template>
-  <div class="flex shrink-0 flex-col gap-2 pb-4">
-    <h3 class="text-sm font-medium">AGENTS.md</h3>
+  <div
+    class="flex flex-col gap-2"
+    :class="hideHeading ? 'min-h-0' : 'shrink-0 pb-4'"
+  >
+    <h3 v-if="!hideHeading" class="text-sm font-medium">AGENTS.md</h3>
 
     <Empty
       v-if="!file"

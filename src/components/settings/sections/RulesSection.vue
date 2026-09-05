@@ -1,21 +1,31 @@
 <script setup lang="ts">
-import VixlFilesSection from '@/components/settings/sections/VixlFilesSection.vue'
+import { ref } from 'vue'
 import type { SettingsTab } from '@/composables/use-vixl-config'
 
 defineProps<{
   tab: SettingsTab
 }>()
+
+const view = ref<'agents-md' | 'rules'>('agents-md')
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-    <AgentsMdFileCard :tab="tab" />
-    <VixlFilesSection
-      :tab="tab"
-      kind="rules"
-      folder-label="rules"
-      title="Rules"
-      empty-message="No rules"
-    />
-  </div>
+  <SettingsSectionScroll v-if="view === 'agents-md'">
+    <template #title>
+      <RulesKindSelect v-model="view" />
+    </template>
+    <AgentsMdFileCard :tab="tab" hide-heading />
+  </SettingsSectionScroll>
+  <VixlFilesSection
+    v-else
+    :tab="tab"
+    kind="rules"
+    folder-label="rules"
+    title="Rules"
+    empty-message="No rules"
+  >
+    <template #title>
+      <RulesKindSelect v-model="view" />
+    </template>
+  </VixlFilesSection>
 </template>
