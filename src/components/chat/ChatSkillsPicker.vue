@@ -87,7 +87,7 @@ const handleSkillSelect = (name: string): void => {
         <DropdownMenuItem
           v-for="skill in filteredSkills"
           :key="`${skill.scope}:${skill.name}`"
-          class="flex-col items-start gap-1 py-2"
+          class="items-center"
           @select="handleSkillSelect(skill.name)"
         >
           <div class="flex w-full items-center gap-2">
@@ -97,12 +97,6 @@ const handleSkillSelect = (name: string): void => {
               {{ scopeLabel(skill) }}
             </Badge>
           </div>
-          <p
-            v-if="skill.description"
-            class="w-full truncate pl-5 text-xs text-muted-foreground"
-          >
-            {{ skill.description }}
-          </p>
         </DropdownMenuItem>
         <p
           v-if="!pending && filteredSkills.length === 0"

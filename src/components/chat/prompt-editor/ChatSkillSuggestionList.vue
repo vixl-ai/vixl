@@ -94,7 +94,7 @@ defineExpose({
       v-for="(item, index) in highlightedItems"
       :key="`${item.skill.scope}:${item.skill.name}`"
       type="button"
-      class="flex w-full min-w-0 flex-col items-start gap-0.5 px-2.5 py-1.5 text-left text-sm"
+      class="flex w-full min-w-0 items-center px-2.5 py-1.5 text-left text-sm"
       :class="
         index === selectedIndex
           ? 'bg-accent text-accent-foreground'
@@ -114,12 +114,6 @@ defineExpose({
           v-if="item.skill.scope === 'internal'"
           class="ml-1.5 text-[10px] font-sans text-muted-foreground"
         >internal</span>
-      </span>
-      <span
-        v-if="item.skill.description"
-        class="w-full truncate text-xs text-muted-foreground"
-      >
-        {{ item.skill.description }}
       </span>
     </button>
   </div>

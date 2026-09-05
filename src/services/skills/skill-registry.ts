@@ -52,9 +52,13 @@ export const listSkillIndex = async (
   projectRoot: string,
 ): Promise<SkillIndexEntry[]> => {
   const internal = listInternalSkillIndex(mode)
+  const user = await discoverUserSkillIndex()
   const project = await discoverProjectSkillIndex(projectRoot)
   const byName = new Map<string, SkillIndexEntry>()
   for (const skill of internal) {
+    byName.set(skill.name.toLowerCase(), skill)
+  }
+  for (const skill of user) {
     byName.set(skill.name.toLowerCase(), skill)
   }
   for (const skill of project) {
