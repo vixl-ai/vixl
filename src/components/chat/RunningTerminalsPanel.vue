@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { AgentShellRecord } from '@/types/harness/agent-shell'
-import { SquareIcon, TerminalIcon } from '@lucide/vue'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import {
   Queue,
@@ -12,11 +12,7 @@ import {
   QueueSectionTrigger,
 } from '@/components/ai-elements/queue'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 defineProps<{
   shells: AgentShellRecord[]
@@ -35,21 +31,15 @@ const truncateCommand = (command: string, max = 60): string =>
   <Queue v-if="shells.length > 0">
     <QueueSection :default-open="true">
       <QueueSectionTrigger>
-        <QueueSectionLabel
-          :count="shells.length"
-          label="running"
-        >
+        <QueueSectionLabel :count="shells.length" label="running">
           <template #icon>
-            <TerminalIcon class="size-3.5" />
+            <AppIcon name="terminal" class="size-3.5" />
           </template>
         </QueueSectionLabel>
       </QueueSectionTrigger>
       <QueueSectionContent>
         <ul class="flex flex-col gap-1">
-          <QueueItem
-            v-for="shell in shells"
-            :key="shell.shellId"
-          >
+          <QueueItem v-for="shell in shells" :key="shell.shellId">
             <div class="flex w-full items-center gap-2">
               <button
                 type="button"
@@ -70,7 +60,7 @@ const truncateCommand = (command: string, max = 60): string =>
                       aria-label="Stop terminal"
                       @click.stop="emit('stopShell', shell.shellId)"
                     >
-                      <SquareIcon class="size-3" />
+                      <AppIcon name="square" class="size-3" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Stop terminal</TooltipContent>

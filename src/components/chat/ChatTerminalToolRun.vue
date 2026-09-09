@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { AppIcon, type AppIconName } from '@/icons'
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { CheckIcon, ChevronRightIcon, ExternalLinkIcon, ShieldIcon, ShieldOffIcon, TerminalIcon, XIcon } from '@lucide/vue'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import { toast } from 'vue-sonner'
 import type { ToolRun } from '@/types/harness/tool-run'
@@ -13,18 +13,9 @@ import {
   terminalPhaseStatusKind,
   terminalPhaseStatusTooltip,
 } from '@/components/chat/chat-terminal-status'
-import {
-  Terminal,
-  TerminalContent,
-  TerminalCopyButton,
-} from '@/components/ai-elements/terminal'
+import { Terminal, TerminalContent, TerminalCopyButton } from '@/components/ai-elements/terminal'
 import { Button } from '@/components/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Collapsible,
   CollapsibleContent,
@@ -55,10 +46,7 @@ const phaseOutput = (output: string): string => {
   return output.length > 0 ? `$ ${command}\n${output}` : `$ ${command}`
 }
 
-const phaseStatus = (
-  phase: TerminalToolPhaseView,
-  phaseIndex: number,
-) => {
+const phaseStatus = (phase: TerminalToolPhaseView, phaseIndex: number) => {
   const isLast = phaseIndex === (view.value?.phases.length ?? 0) - 1
   const kind = terminalPhaseStatusKind({
     phase,
@@ -66,12 +54,7 @@ const phaseStatus = (
     isRunning: isRunning.value,
     isError: isError.value,
   })
-  const icon =
-    kind === 'ok'
-      ? CheckIcon
-      : kind === 'fail'
-        ? XIcon
-        : TerminalIcon
+  const icon: AppIconName = kind === 'ok' ? 'check' : kind === 'fail' ? 'x' : 'terminal'
   return {
     icon,
     tooltip: terminalPhaseStatusTooltip(kind, phase.exitCode),
@@ -116,16 +99,13 @@ const handleShowTerminal = (): void => {
         class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm transition-colors hover:text-foreground"
         :class="isError ? 'text-destructive/90' : 'text-muted-foreground'"
       >
-        <ChevronRightIcon
+        <AppIcon
+          name="chevron-right"
           class="size-3.5 shrink-0 transition-transform"
           :class="open ? 'rotate-90' : ''"
         />
         <span class="min-w-0 truncate text-xs">
-          <AiElementsShimmerShimmer
-            v-if="isRunning"
-            :duration="1"
-            as="span"
-          >
+          <AiElementsShimmerShimmer v-if="isRunning" :duration="1" as="span">
             {{ headline }}
           </AiElementsShimmerShimmer>
           <template v-else>{{ headline }}</template>
@@ -140,13 +120,13 @@ const handleShowTerminal = (): void => {
           />
           <ChatTipIcon
             v-if="phase.badge === 'sandboxed'"
-            :icon="ShieldIcon"
+            icon="shield"
             tooltip="Sandboxed"
             icon-class="size-3.5 text-sky-400"
           />
           <ChatTipIcon
             v-else-if="phase.badge === 'unsandboxed'"
-            :icon="ShieldOffIcon"
+            icon="shield-off"
             tooltip="Unsandboxed"
             icon-class="size-3.5 text-red-400"
           />
@@ -162,7 +142,7 @@ const handleShowTerminal = (): void => {
                 aria-label="Show terminal"
                 @click.stop="handleShowTerminal"
               >
-                <ExternalLinkIcon class="size-3.5" />
+                <AppIcon name="external-link" class="size-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent class="z-60">Show terminal</TooltipContent>

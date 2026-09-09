@@ -3,15 +3,6 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import {
-  Bot,
-  FileCode,
-  Folder,
-  MessageSquare,
-  Pin,
-  Settings,
-  Terminal,
-} from '@lucide/vue'
-import {
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -45,9 +36,7 @@ const filteredItems = computed(() => {
     return items.value
   }
 
-  return items.value.filter(
-    (item) => getCommandPaletteTab(item) === activeTab.value,
-  )
+  return items.value.filter((item) => getCommandPaletteTab(item) === activeTab.value)
 })
 
 const groupedItems = computed(() =>
@@ -59,24 +48,24 @@ const groupedItems = computed(() =>
 
 const itemIcon = (item: CommandPaletteItem) => {
   if (item.action === 'new-agent') {
-    return Bot
+    return 'bot'
   }
   if (item.action === 'open-settings' || item.settingsSection) {
-    return Settings
+    return 'settings'
   }
   if (item.action === 'open-terminal') {
-    return Terminal
+    return 'terminal'
   }
   if (item.action === 'open-editor') {
-    return FileCode
+    return 'file-code'
   }
   if (item.group === 'Projects') {
-    return Folder
+    return 'folder'
   }
   if (item.group === 'Pinned') {
-    return Pin
+    return 'pin'
   }
-  return MessageSquare
+  return 'message-square'
 }
 
 const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
@@ -107,10 +96,7 @@ const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
     if (item.action === 'open-editor') {
       try {
         const projectId = workbench.resolveWorkspaceProjectId()
-        await workbench.openEditor(
-          projectId,
-          fleet.activeProjectId.value ? 'README.md' : '',
-        )
+        await workbench.openEditor(projectId, fleet.activeProjectId.value ? 'README.md' : '')
       } catch (error) {
         toast.error('Could not open editor', {
           description: error instanceof Error ? error.message : 'Unknown error',
@@ -133,9 +119,7 @@ const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
     }
 
     if (item.projectSlug) {
-      const project = fleet.projects.value.find(
-        (entry) => entry.slug === item.projectSlug,
-      )
+      const project = fleet.projects.value.find((entry) => entry.slug === item.projectSlug)
       if (!project) {
         toast.error('Project not found')
         return
@@ -156,14 +140,14 @@ const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
     <Tabs
       :model-value="activeTab"
       class="px-2 pt-2 pb-1"
-      @update:model-value="(value) => { activeTab = value as CommandPaletteTab }"
+      @update:model-value="
+        (value) => {
+          activeTab = value as CommandPaletteTab
+        }
+      "
     >
       <TabsList class="grid w-full grid-cols-4">
-        <TabsTrigger
-          v-for="tab in COMMAND_PALETTE_TABS"
-          :key="tab"
-          :value="tab"
-        >
+        <TabsTrigger v-for="tab in COMMAND_PALETTE_TABS" :key="tab" :value="tab">
           {{ tab }}
         </TabsTrigger>
       </TabsList>
@@ -171,11 +155,7 @@ const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
     <CommandList>
       <CommandEmpty>No results found.</CommandEmpty>
       <template v-if="activeTab === 'All'">
-        <CommandGroup
-          v-for="section in groupedItems"
-          :key="section.group"
-          :heading="section.group"
-        >
+        <CommandGroup v-for="section in groupedItems" :key="section.group" :heading="section.group">
           <CommandItem
             v-for="item in section.items"
             :key="item.id"
@@ -184,10 +164,7 @@ const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
           >
             <component :is="itemIcon(item)" />
             <span class="truncate">{{ item.label }}</span>
-            <span
-              v-if="item.subtitle"
-              class="ml-auto truncate text-xs text-muted-foreground"
-            >
+            <span v-if="item.subtitle" class="ml-auto truncate text-xs text-muted-foreground">
               {{ item.subtitle }}
             </span>
           </CommandItem>
@@ -202,10 +179,7 @@ const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
         >
           <component :is="itemIcon(item)" />
           <span class="truncate">{{ item.label }}</span>
-          <span
-            v-if="item.subtitle"
-            class="ml-auto truncate text-xs text-muted-foreground"
-          >
+          <span v-if="item.subtitle" class="ml-auto truncate text-xs text-muted-foreground">
             {{ item.subtitle }}
           </span>
         </CommandItem>

@@ -1,17 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, type Component } from 'vue'
+import { AppIcon, type AppIconName } from '@/icons'
+import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  Ban,
-  CircleAlert,
-  CircleCheck,
-  CircleOff,
-  Loader2,
-  Pause,
-  Settings,
-  ShieldAlert,
-  TriangleAlert,
-} from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import {
@@ -21,20 +11,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import WorkbenchFileEntryIcon from '@/components/workbench/FileEntryIcon.vue'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useLspStatus from '@/composables/use-lsp-status'
 import useWorkbenchStore from '@/composables/use-workbench-store'
-import type {
-  LspHealth,
-  LspProblemItem,
-  LspServerDisplayState,
-} from '@/types/lsp/lsp-status'
+import type { LspHealth, LspProblemItem, LspServerDisplayState } from '@/types/lsp/lsp-status'
 import lspServerIconName from '@/utils/lsp-server-icon-name'
 
 const router = useRouter()
@@ -58,9 +40,7 @@ const healthClass = (health: LspHealth): string => {
   }
 }
 
-const triggerClass = computed(
-  (): string => `h-6 w-6 ${healthClass(lsp.health.value)}`,
-)
+const triggerClass = computed((): string => `h-6 w-6 ${healthClass(lsp.health.value)}`)
 
 const errorsTooltip = computed((): string => {
   const count = lsp.errorCount.value
@@ -80,59 +60,59 @@ const warningsTooltip = computed((): string => {
 
 const stateMeta = (
   state: LspServerDisplayState,
-): { icon: Component; label: string; className: string } => {
+): { icon: AppIconName; label: string; className: string } => {
   switch (state) {
     case 'installing':
       return {
-        icon: Loader2,
+        icon: 'loader',
         label: 'Installing',
         className: 'text-muted-foreground animate-spin',
       }
     case 'starting':
       return {
-        icon: Loader2,
+        icon: 'loader',
         label: 'Starting',
         className: 'text-muted-foreground animate-spin',
       }
     case 'running':
       return {
-        icon: CircleCheck,
+        icon: 'circle-check',
         label: 'Running',
         className: 'text-emerald-600 dark:text-emerald-400',
       }
     case 'stopped':
       return {
-        icon: Pause,
+        icon: 'pause',
         label: 'Stopped',
         className: 'text-muted-foreground',
       }
     case 'error':
       return {
-        icon: CircleAlert,
+        icon: 'circle-alert',
         label: 'Error',
         className: 'text-destructive',
       }
     case 'needs_trust':
       return {
-        icon: ShieldAlert,
+        icon: 'shield-alert',
         label: 'Needs trust',
         className: 'text-amber-600 dark:text-amber-400',
       }
     case 'disabled':
       return {
-        icon: Ban,
+        icon: 'ban',
         label: 'Disabled',
         className: 'text-muted-foreground',
       }
     case 'missing':
       return {
-        icon: CircleOff,
+        icon: 'circle-off',
         label: 'Not installed',
         className: 'text-muted-foreground',
       }
     default:
       return {
-        icon: CircleOff,
+        icon: 'circle-off',
         label: 'Unknown',
         className: 'text-muted-foreground',
       }
@@ -156,8 +136,7 @@ const handleOpenProblem = async (problem: LspProblemItem): Promise<void> => {
     toast.error('No active project')
     return
   }
-  const relative =
-    lsp.fileUriToProjectPath(problem.uri, project.rootPath) ?? problem.path
+  const relative = lsp.fileUriToProjectPath(problem.uri, project.rootPath) ?? problem.path
   try {
     await afterMenuClosed()
     await workbench.openEditor(project.id, relative)
@@ -189,34 +168,26 @@ const handleOpenSettings = async (): Promise<void> => {
       <span class="inline-flex shrink-0">
         <DropdownMenu v-model:open="open">
           <DropdownMenuTrigger as-child>
-            <Button
-              variant="ghost"
-              size="icon"
-              :class="triggerClass"
-              aria-label="Language servers"
-            >
-              <Loader2
+            <Button variant="ghost" size="icon" :class="triggerClass" aria-label="Language servers">
+              <AppIcon
+                name="loader"
                 v-if="lsp.health.value === 'busy'"
                 class="h-3.5 w-3.5 animate-spin"
               />
-              <CircleAlert
+              <AppIcon
+                name="circle-alert"
                 v-else-if="lsp.health.value === 'error'"
                 class="h-3.5 w-3.5"
               />
-              <TriangleAlert
+              <AppIcon
+                name="triangle-alert"
                 v-else-if="lsp.health.value === 'warning'"
                 class="h-3.5 w-3.5"
               />
-              <CircleCheck
-                v-else
-                class="h-3.5 w-3.5"
-              />
+              <AppIcon name="circle-check" v-else class="h-3.5 w-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            class="w-72"
-          >
+          <DropdownMenuContent align="end" class="w-72">
             <DropdownMenuLabel class="font-normal">
               <div class="flex items-center justify-between gap-2">
                 <span class="min-w-0 truncate text-sm font-medium">Language servers</span>
@@ -229,7 +200,7 @@ const handleOpenSettings = async (): Promise<void> => {
                     :title="warningsTooltip"
                     :aria-label="warningsTooltip"
                   >
-                    <TriangleAlert class="h-3.5 w-3.5" />
+                    <AppIcon name="triangle-alert" class="h-3.5 w-3.5" />
                   </Button>
 
                   <Button
@@ -240,7 +211,7 @@ const handleOpenSettings = async (): Promise<void> => {
                     :title="errorsTooltip"
                     :aria-label="errorsTooltip"
                   >
-                    <CircleAlert class="h-3.5 w-3.5" />
+                    <AppIcon name="circle-alert" class="h-3.5 w-3.5" />
                   </Button>
 
                   <Button
@@ -251,7 +222,7 @@ const handleOpenSettings = async (): Promise<void> => {
                     aria-label="Manage installs in Settings, Language servers"
                     @click="handleOpenSettings"
                   >
-                    <Settings class="h-3.5 w-3.5" />
+                    <AppIcon name="settings" class="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
@@ -268,11 +239,13 @@ const handleOpenSettings = async (): Promise<void> => {
                   @click="handleOpenProblem(problem)"
                 >
                   <div class="flex items-center gap-1.5">
-                    <CircleAlert
+                    <AppIcon
+                      name="circle-alert"
                       v-if="problem.severity === 'error'"
                       class="h-3 w-3 shrink-0 text-destructive"
                     />
-                    <TriangleAlert
+                    <AppIcon
+                      name="triangle-alert"
                       v-else
                       class="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400"
                     />
@@ -318,10 +291,7 @@ const handleOpenSettings = async (): Promise<void> => {
                   />
                 </span>
               </div>
-              <p
-                v-if="row.error"
-                class="truncate text-xs text-destructive"
-              >
+              <p v-if="row.error" class="truncate text-xs text-destructive">
                 {{ row.error }}
               </p>
             </div>

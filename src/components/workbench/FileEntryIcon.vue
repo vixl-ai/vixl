@@ -28,5 +28,5 @@ const icon = computed(() =>
     height="16"
     :class="cn('block size-4 shrink-0 object-contain', props.class)"
     draggable="false"
-  >
+  />
 </template>

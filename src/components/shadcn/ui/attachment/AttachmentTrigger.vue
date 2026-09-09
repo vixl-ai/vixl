@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { PrimitiveProps } from "reka-ui"
-import type { HTMLAttributes } from "vue"
-import { cn } from "@/lib/utils"
+import type { PrimitiveProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
+import { cn } from '@/lib/utils'
 
 interface Props extends PrimitiveProps {
-  class?: HTMLAttributes["class"]
+  class?: HTMLAttributes['class']
 }
 const props = withDefaults(defineProps<Props>(), {
-  as: "button",
+  as: 'button',
 })
 </script>
 

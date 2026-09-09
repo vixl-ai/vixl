@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref } from 'vue'
-import { ChevronRightIcon, XIcon } from '@lucide/vue'
 import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { FileDiff } from '@/types/harness/file-diff'
@@ -156,28 +156,25 @@ const diffCounts = computed(() => {
 </script>
 
 <template>
-  <ChatTerminalToolRun
-    v-if="isTerminalRun"
-    :run="run"
-  />
-  <Collapsible v-else-if="hasCollapsibleContent" v-model:open="open" class="w-full min-w-0 max-w-full">
+  <ChatTerminalToolRun v-if="isTerminalRun" :run="run" />
+  <Collapsible
+    v-else-if="hasCollapsibleContent"
+    v-model:open="open"
+    class="w-full min-w-0 max-w-full"
+  >
     <div class="flex w-full min-w-0 items-center gap-1">
       <CollapsibleTrigger
         class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm transition-colors hover:text-foreground"
         :class="isError ? 'text-destructive/90' : 'text-muted-foreground'"
       >
-        <XIcon v-if="isError" class="size-3.5 shrink-0 text-destructive" />
-        <ChevronRightIcon
+        <AppIcon name="x" v-if="isError" class="size-3.5 shrink-0 text-destructive" />
+        <AppIcon
+          name="chevron-right"
           v-else
           class="size-3.5 shrink-0 transition-transform"
           :class="open ? 'rotate-90' : ''"
         />
-        <AiElementsShimmerShimmer
-          v-if="isRunning"
-          :duration="1"
-          as="span"
-          class="min-w-0 truncate"
-        >
+        <AiElementsShimmerShimmer v-if="isRunning" :duration="1" as="span" class="min-w-0 truncate">
           {{ label }}
         </AiElementsShimmerShimmer>
         <span v-else class="min-w-0 truncate">{{ label }}</span>
@@ -245,13 +242,8 @@ const diffCounts = computed(() => {
     class="flex w-full min-w-0 items-center gap-2 py-0.5 text-left text-sm"
     :class="isError ? 'text-destructive/90' : 'text-muted-foreground'"
   >
-    <XIcon v-if="isError" class="size-3.5 shrink-0 text-destructive" />
-    <AiElementsShimmerShimmer
-      v-if="isRunning"
-      :duration="1"
-      as="span"
-      class="min-w-0 truncate"
-    >
+    <AppIcon name="x" v-if="isError" class="size-3.5 shrink-0 text-destructive" />
+    <AiElementsShimmerShimmer v-if="isRunning" :duration="1" as="span" class="min-w-0 truncate">
       {{ label }}
     </AiElementsShimmerShimmer>
     <span v-else class="min-w-0 truncate">{{ label }}</span>

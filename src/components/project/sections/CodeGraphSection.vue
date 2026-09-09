@@ -1,21 +1,11 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import {
-  CircleAlert,
-  CircleCheck,
-  Database,
-  Loader2,
-  RefreshCw,
-} from '@lucide/vue'
 import ProjectCodegraphNeighborhoodExplorer from '@/components/project/codegraph/NeighborhoodExplorer.vue'
 import WorkbenchFileEntryIcon from '@/components/workbench/FileEntryIcon.vue'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import useCodegraphStatus from '@/composables/use-codegraph-status'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import { isTauri, codegraphCli } from '@/services/vixl/vixl-tauri'
@@ -48,10 +38,7 @@ const statusTooltip = computed(() => {
     return codegraph.errorMessage.value
   }
   const detail = codegraph.detail.value
-  if (
-    detail &&
-    (codegraph.state.value === 'indexing' || codegraph.state.value === 'syncing')
-  ) {
+  if (detail && (codegraph.state.value === 'indexing' || codegraph.state.value === 'syncing')) {
     return detail
   }
   return statusLabel.value
@@ -101,9 +88,7 @@ const languages = computed(() => codegraph.statusResult.value?.languages ?? [])
 const languageIconName = (language: string): string =>
   lspServerIconName(language.trim().toLowerCase(), [])
 
-const hasStats = computed(
-  () => statusStats.value.length > 0 || languages.value.length > 0,
-)
+const hasStats = computed(() => statusStats.value.length > 0 || languages.value.length > 0)
 
 const handleRebuild = async (): Promise<void> => {
   const root = projectRoot.value
@@ -138,26 +123,25 @@ const handleRebuild = async (): Promise<void> => {
               :class="statusClass"
               :aria-label="`Graph status: ${statusLabel}`"
             >
-              <Loader2
+              <AppIcon
+                name="loader"
                 v-if="rebuilding || codegraph.isBusy.value"
                 class="size-4 animate-spin"
                 aria-hidden="true"
               />
-              <CircleAlert
+              <AppIcon
+                name="circle-alert"
                 v-else-if="codegraph.state.value === 'error'"
                 class="size-4"
                 aria-hidden="true"
               />
-              <CircleCheck
+              <AppIcon
+                name="circle-check"
                 v-else-if="codegraph.state.value === 'ready'"
                 class="size-4"
                 aria-hidden="true"
               />
-              <Database
-                v-else
-                class="size-4"
-                aria-hidden="true"
-              />
+              <AppIcon name="database" v-else class="size-4" aria-hidden="true" />
             </span>
           </TooltipTrigger>
           <TooltipContent>{{ statusTooltip }}</TooltipContent>
@@ -173,36 +157,23 @@ const handleRebuild = async (): Promise<void> => {
             aria-label="Rebuild graph index"
             @click="handleRebuild"
           >
-            <Loader2 v-if="rebuilding" class="size-4 animate-spin" />
-            <RefreshCw v-else class="size-4" />
+            <AppIcon name="loader" v-if="rebuilding" class="size-4 animate-spin" />
+            <AppIcon name="refresh-cw" v-else class="size-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Rebuild index</TooltipContent>
       </Tooltip>
     </div>
 
-    <div
-      v-if="hasStats"
-      class="flex shrink-0 flex-wrap items-end gap-x-6 gap-y-2 text-sm"
-    >
-      <div
-        v-for="stat in statusStats"
-        :key="stat.label"
-        class="min-w-24"
-      >
+    <div v-if="hasStats" class="flex shrink-0 flex-wrap items-end gap-x-6 gap-y-2 text-sm">
+      <div v-for="stat in statusStats" :key="stat.label" class="min-w-24">
         <p class="text-xs text-muted-foreground">{{ stat.label }}</p>
         <p class="font-medium tabular-nums">{{ stat.value }}</p>
       </div>
-      <div
-        v-if="languages.length > 0"
-        class="min-w-24"
-      >
+      <div v-if="languages.length > 0" class="min-w-24">
         <p class="text-xs text-muted-foreground">Languages</p>
         <div class="flex h-5 items-center gap-1.5">
-          <Tooltip
-            v-for="language in languages"
-            :key="language"
-          >
+          <Tooltip v-for="language in languages" :key="language">
             <TooltipTrigger as-child>
               <span
                 class="inline-flex size-4 shrink-0 items-center justify-center"

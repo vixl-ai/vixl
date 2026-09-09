@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { ChevronDownIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 interface QueueSectionLabelProps {
@@ -14,7 +14,8 @@ const props = defineProps<QueueSectionLabelProps>()
 
 <template>
   <span :class="cn('flex items-center gap-2', props.class)">
-    <ChevronDownIcon
+    <AppIcon
+      name="chevron-down"
       class="group-data-[state=closed]:-rotate-90 size-4 transition-transform"
     />
     <slot name="icon" />

@@ -9,8 +9,9 @@ import {
   vixlCodeThemeLight,
 } from '@/components/ai-elements/code-block/vixl-code-theme'
 import {
+  applyMonacoTheme,
+  ensureMonacoAppearanceBridge,
   markVixlMonacoThemesRegistered,
-  resolveMonacoThemeId,
 } from '@/utils/monaco-theme'
 
 type MonacoApi = typeof monaco
@@ -167,8 +168,9 @@ const wireShikiToMonaco = (monacoApi: MonacoApi, highlighter: VixlHighlighter): 
   }
   shikiToMonaco(highlighter, monacoApi)
   hardenVixlMonacoThemes(monacoApi, highlighter)
-  // shikiToMonaco sets themeIds[0]; force the active mode so we never flash light/dark.
-  monacoApi.editor.setTheme(resolveMonacoThemeId())
+  // shikiToMonaco sets themeIds[0]; force the active effective theme (built-in
+  // or generated) so we never flash light/dark or the wrong palette.
+  applyMonacoTheme(monacoApi)
   shikiWired = true
 }
 
@@ -182,6 +184,9 @@ export const ensureMonacoShiki = async (monacoApi: MonacoApi): Promise<void> => 
     registerLanguageId(monacoApi, languageId)
   }
 
+  // Attach the shared appearance bridge once so live theme changes keep the
+  // generated Monaco/Shiki themes and every mounted editor in sync.
+  ensureMonacoAppearanceBridge(monacoApi)
   wireShikiToMonaco(monacoApi, highlighter)
 }
 

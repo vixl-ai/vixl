@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { GitCommitIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 interface Props extends /* @vue-ignore */ HTMLAttributes {
@@ -12,7 +12,7 @@ const props = defineProps<Props>()
 
 <template>
   <span :class="cn('font-mono text-xs', props.class)" v-bind="$attrs">
-    <GitCommitIcon class="mr-1 inline-block size-3" />
+    <AppIcon name="git-commit" class="mr-1 inline-block size-3" />
     <slot />
   </span>
 </template>

@@ -1,6 +1,4 @@
-type ParsedFetchUrl =
-  | { ok: true; href: string; hostname: string }
-  | { ok: false; error: string }
+type ParsedFetchUrl = { ok: true; href: string; hostname: string } | { ok: false; error: string }
 
 const parseFetchUrl = (raw: string): ParsedFetchUrl => {
   let url: URL

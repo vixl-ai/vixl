@@ -160,8 +160,20 @@ export const removeSettingsKeys = (
 
 export const PERSONAL_ONLY_PROJECT_KEY_PREFIXES = ['providers.', 'models.', 'lsp.'] as const
 
+/**
+ * Exact appearance keys that are personal platform preferences. Project
+ * overrides must not embed or replace a user's theme library or active
+ * custom theme. The legacy `appearance.theme` color mode stays
+ * project-overridable for backward compatibility.
+ */
+export const PERSONAL_ONLY_PROJECT_KEYS = [
+  'appearance.themeLibrary',
+  'appearance.activeThemeId',
+] as const
+
 export const isPersonalOnlyProjectKey = (key: string): boolean =>
-  PERSONAL_ONLY_PROJECT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
+  PERSONAL_ONLY_PROJECT_KEY_PREFIXES.some((prefix) => key.startsWith(prefix)) ||
+  (PERSONAL_ONLY_PROJECT_KEYS as readonly string[]).includes(key)
 
 export const stripPersonalOnlyProjectOverrides = (
   settings: VixlSettings,

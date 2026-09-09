@@ -22,9 +22,7 @@ import {
 import { getSecret } from '@/services/vixl/vixl-tauri'
 import { createProviderActions } from './provider-actions'
 
-export default (props: {
-  tab: SettingsTab
-}) => {
+export default (props: { tab: SettingsTab }) => {
   const config = useVixlConfig()
   const testingProviderId = ref<string | null>(null)
   const apiKeyConfigured = ref<Record<string, boolean>>({})
@@ -38,8 +36,9 @@ export default (props: {
 
   let apiKeyStatusGeneration = 0
 
-  const dialogSurfaceClass =
-    'border-border/80 bg-zinc-50 shadow-2xl backdrop-blur-none dark:bg-zinc-900'
+  // Semantic surface tokens only; glass surfaces come from the centralized
+  // `glass-surface-*` utilities, never ad-hoc blur or hard-coded Zinc colors.
+  const dialogSurfaceClass = 'border-border/80 bg-popover text-popover-foreground shadow-2xl'
 
   const settings = computed(() => config.getScopeSettings(props.tab))
 
@@ -55,8 +54,7 @@ export default (props: {
       return AI_SDK_PROVIDER_CATALOG
     }
     return AI_SDK_PROVIDER_CATALOG.filter(
-      (entry) =>
-        entry.name.toLowerCase().includes(query) || entry.id.toLowerCase().includes(query),
+      (entry) => entry.name.toLowerCase().includes(query) || entry.id.toLowerCase().includes(query),
     )
   })
 
@@ -66,15 +64,13 @@ export default (props: {
       return OPENAI_COMPATIBLE_PROVIDER_CATALOG
     }
     return OPENAI_COMPATIBLE_PROVIDER_CATALOG.filter(
-      (entry) =>
-        entry.name.toLowerCase().includes(query) || entry.id.toLowerCase().includes(query),
+      (entry) => entry.name.toLowerCase().includes(query) || entry.id.toLowerCase().includes(query),
     )
   })
 
   const hasProviderSearchResults = computed(
     () =>
-      filteredAiSdkProviders.value.length > 0 ||
-      filteredOpenAiCompatibleProviders.value.length > 0,
+      filteredAiSdkProviders.value.length > 0 || filteredOpenAiCompatibleProviders.value.length > 0,
   )
 
   const manageInitialProvider = computed((): VixlCustomProvider | null => {
@@ -208,27 +204,22 @@ export default (props: {
     }
   }
 
-  const {
-    handleManageSave,
-    saveApiKey,
-    clearApiKey,
-    removeProvider,
-    testConnection,
-  } = createProviderActions({
-    props,
-    config,
-    testingProviderId,
-    manageDialogOpen,
-    manageMode,
-    manageProviderId,
-    editApiKeyProviderId,
-    apiKeyInput,
-    settings,
-    setApiKeyConfigured,
-    getApiKeyRef,
-    isCustomProvider,
-    refreshApiKeyStatus,
-  })
+  const { handleManageSave, saveApiKey, clearApiKey, removeProvider, testConnection } =
+    createProviderActions({
+      props,
+      config,
+      testingProviderId,
+      manageDialogOpen,
+      manageMode,
+      manageProviderId,
+      editApiKeyProviderId,
+      apiKeyInput,
+      settings,
+      setApiKeyConfigured,
+      getApiKeyRef,
+      isCustomProvider,
+      refreshApiKeyStatus,
+    })
 
   watch(
     [configuredProviders, () => props.tab],

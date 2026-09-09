@@ -34,9 +34,7 @@ export type McpConfig = {
   inputs?: McpInputDefinition[]
 }
 
-export type ParseMcpConfigResult =
-  | { ok: true; config: McpConfig }
-  | { ok: false; error: string }
+export type ParseMcpConfigResult = { ok: true; config: McpConfig } | { ok: false; error: string }
 
 export type McpServerScope = 'personal' | 'project' | 'overridden'
 
@@ -55,10 +53,8 @@ export type McpToolDescriptor = {
   meta?: Record<string, unknown>
 }
 
-export const isMcpStdioServer = (
-  config: McpServerConfig,
-): config is McpStdioServer => 'command' in config
+export const isMcpStdioServer = (config: McpServerConfig): config is McpStdioServer =>
+  'command' in config
 
-export const isMcpHttpServer = (
-  config: McpServerConfig,
-): config is McpHttpServer => 'type' in config && (config.type === 'http' || config.type === 'sse')
+export const isMcpHttpServer = (config: McpServerConfig): config is McpHttpServer =>
+  'type' in config && (config.type === 'http' || config.type === 'sse')

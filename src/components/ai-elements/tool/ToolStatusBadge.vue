@@ -1,13 +1,7 @@
 <!-- StatusBadge.vue -->
 <script setup lang="ts">
 import type { DynamicToolUIPart, ToolUIPart } from 'ai'
-import type { Component } from 'vue'
-import {
-  CheckCircleIcon,
-  CircleIcon,
-  ClockIcon,
-  XCircleIcon,
-} from '@lucide/vue'
+import { AppIcon, type AppIconName } from '@/icons'
 import { Badge } from '@/components/ui/badge'
 import { computed } from 'vue'
 
@@ -30,15 +24,15 @@ const label = computed(() => {
   return labels[props.state]
 })
 
-const icon = computed<Component>(() => {
-  const icons: Record<ToolPart['state'], Component> = {
-    'input-streaming': CircleIcon,
-    'input-available': ClockIcon,
-    'approval-requested': ClockIcon,
-    'approval-responded': CheckCircleIcon,
-    'output-available': CheckCircleIcon,
-    'output-error': XCircleIcon,
-    'output-denied': XCircleIcon,
+const icon = computed<AppIconName>(() => {
+  const icons: Record<ToolPart['state'], AppIconName> = {
+    'input-streaming': 'circle',
+    'input-available': 'clock',
+    'approval-requested': 'clock',
+    'approval-responded': 'circle-check',
+    'output-available': 'circle-check',
+    'output-error': 'circle-x',
+    'output-denied': 'circle-x',
   }
   return icons[props.state]
 })
@@ -59,7 +53,7 @@ const iconClass = computed(() => {
 
 <template>
   <Badge class="gap-1.5 rounded-full text-xs" variant="secondary">
-    <component :is="icon" :class="iconClass" />
+    <AppIcon :name="icon" :class="iconClass" />
     <span>{{ label }}</span>
   </Badge>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertTriangle, ChevronDown, Loader2, Plus, Trash2 } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/shadcn/ui/button'
 import { Checkbox } from '@/components/shadcn/ui/checkbox'
 import { Input } from '@/components/shadcn/ui/input'
@@ -86,7 +86,9 @@ const {
         <DialogTitle>{{ title }}</DialogTitle>
       </DialogHeader>
 
-      <div class="max-h-[min(36rem,70vh)] min-w-0 space-y-4 overflow-x-hidden overflow-y-auto px-1 py-0.5">
+      <div
+        class="max-h-[min(36rem,70vh)] min-w-0 space-y-4 overflow-x-hidden overflow-y-auto px-1 py-0.5"
+      >
         <p class="text-sm text-muted-foreground">
           Connect a private or self-hosted endpoint that speaks the OpenAI Chat Completions API.
         </p>
@@ -95,7 +97,12 @@ const {
           <div class="grid gap-3 sm:grid-cols-2">
             <div class="min-w-0 space-y-1.5">
               <Label for="manage-provider-name">Name</Label>
-              <Input id="manage-provider-name" v-model="name" placeholder="local" :class="fieldClass" />
+              <Input
+                id="manage-provider-name"
+                v-model="name"
+                placeholder="local"
+                :class="fieldClass"
+              />
             </div>
             <div class="min-w-0 space-y-1.5">
               <Label for="manage-provider-base-url">Base URL</Label>
@@ -124,10 +131,7 @@ const {
               <p class="text-xs text-muted-foreground">
                 Leave blank for local servers that do not require authentication.
               </p>
-              <div
-                v-if="initialApiKeyConfigured"
-                class="flex items-center gap-2"
-              >
+              <div v-if="initialApiKeyConfigured" class="flex items-center gap-2">
                 <Switch
                   id="manage-provider-clear-key"
                   :checked="clearApiKey"
@@ -168,7 +172,7 @@ const {
               :disabled="testing"
               @click="handleTestConnection"
             >
-              <Loader2 v-if="testing" class="mr-2 h-4 w-4 animate-spin" />
+              <AppIcon name="loader" v-if="testing" class="mr-2 h-4 w-4 animate-spin" />
               Test connection
             </Button>
           </div>
@@ -179,7 +183,8 @@ const {
             class="flex w-full items-center justify-between py-1 text-left text-sm font-medium hover:underline"
           >
             Request headers & query params
-            <ChevronDown
+            <AppIcon
+              name="chevron-down"
               class="h-4 w-4 shrink-0 transition-transform"
               :class="requestExtrasOpen ? 'rotate-180' : ''"
             />
@@ -189,7 +194,7 @@ const {
               <div class="flex items-center justify-between gap-2">
                 <Label>Headers</Label>
                 <Button variant="ghost" size="sm" @click="addKeyValueRow(headers)">
-                  <Plus class="mr-1 h-3.5 w-3.5" />
+                  <AppIcon name="plus" class="mr-1 h-3.5 w-3.5" />
                   Add
                 </Button>
               </div>
@@ -206,7 +211,7 @@ const {
                   class="h-9 w-9 shrink-0"
                   @click="removeKeyValueRow(headers, index)"
                 >
-                  <Trash2 class="h-4 w-4" />
+                  <AppIcon name="trash" class="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -214,7 +219,7 @@ const {
               <div class="flex items-center justify-between gap-2">
                 <Label>Query params</Label>
                 <Button variant="ghost" size="sm" @click="addKeyValueRow(queryParams)">
-                  <Plus class="mr-1 h-3.5 w-3.5" />
+                  <AppIcon name="plus" class="mr-1 h-3.5 w-3.5" />
                   Add
                 </Button>
               </div>
@@ -231,7 +236,7 @@ const {
                   class="h-9 w-9 shrink-0"
                   @click="removeKeyValueRow(queryParams, index)"
                 >
-                  <Trash2 class="h-4 w-4" />
+                  <AppIcon name="trash" class="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -258,11 +263,15 @@ const {
                 :disabled="importingModels"
                 @click="importModelsFromEndpoint"
               >
-                <Loader2 v-if="importingModels" class="mr-1 h-3.5 w-3.5 animate-spin" />
+                <AppIcon
+                  name="loader"
+                  v-if="importingModels"
+                  class="mr-1 h-3.5 w-3.5 animate-spin"
+                />
                 Import
               </Button>
               <Button variant="outline" size="sm" @click="addModel()">
-                <Plus class="mr-1 h-3.5 w-3.5" />
+                <AppIcon name="plus" class="mr-1 h-3.5 w-3.5" />
                 Add model
               </Button>
             </div>
@@ -293,7 +302,7 @@ const {
                         class="inline-flex text-amber-500 hover:text-amber-400"
                         aria-label="No pricing configured for this model"
                       >
-                        <AlertTriangle class="size-3.5" />
+                        <AppIcon name="triangle-alert" class="size-3.5" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent class="max-w-xs">
@@ -308,7 +317,7 @@ const {
                 class="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
                 @click="removeModel(index)"
               >
-                <Trash2 class="h-4 w-4" />
+                <AppIcon name="trash" class="h-4 w-4" />
               </Button>
             </div>
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -362,33 +371,21 @@ const {
               </div>
               <div class="flex min-w-0 flex-wrap items-end gap-x-3 gap-y-2 pb-1">
                 <div class="flex items-center gap-1.5">
-                  <Checkbox
-                    :id="`model-tools-${index}`"
-                    v-model="model.toolCalling"
-                  />
+                  <Checkbox :id="`model-tools-${index}`" v-model="model.toolCalling" />
                   <Label :for="`model-tools-${index}`" class="text-xs font-normal">Tools</Label>
                 </div>
                 <div class="flex items-center gap-1.5">
-                  <Checkbox
-                    :id="`model-vision-${index}`"
-                    v-model="model.vision"
-                  />
+                  <Checkbox :id="`model-vision-${index}`" v-model="model.vision" />
                   <Label :for="`model-vision-${index}`" class="text-xs font-normal">Vision</Label>
                 </div>
                 <div class="flex items-center gap-1.5">
-                  <Checkbox
-                    :id="`model-thinking-${index}`"
-                    v-model="model.thinking"
-                  />
+                  <Checkbox :id="`model-thinking-${index}`" v-model="model.thinking" />
                   <Label :for="`model-thinking-${index}`" class="text-xs font-normal">
                     Thinking
                   </Label>
                 </div>
                 <div class="flex items-center gap-1.5">
-                  <Checkbox
-                    :id="`model-streaming-${index}`"
-                    v-model="model.streaming"
-                  />
+                  <Checkbox :id="`model-streaming-${index}`" v-model="model.streaming" />
                   <Label :for="`model-streaming-${index}`" class="text-xs font-normal">
                     Stream
                   </Label>
@@ -475,7 +472,8 @@ const {
                 class="flex w-full items-center justify-between py-1 text-left text-sm font-medium hover:underline"
               >
                 Advanced
-                <ChevronDown
+                <AppIcon
+                  name="chevron-down"
                   class="h-4 w-4 shrink-0 transition-transform"
                   :class="model.advancedOpen ? 'rotate-180' : ''"
                 />
@@ -490,7 +488,7 @@ const {
                       inputmode="decimal"
                       placeholder="0.2"
                       :class="fieldClass"
-                />
+                    />
                   </div>
                   <div class="min-w-0 space-y-1.5">
                     <Label :for="`model-top-p-${index}`">Top P</Label>
@@ -500,7 +498,7 @@ const {
                       inputmode="decimal"
                       placeholder="0.9"
                       :class="fieldClass"
-                />
+                    />
                   </div>
                   <div class="min-w-0 space-y-1.5">
                     <Label :for="`model-top-k-${index}`">Top K</Label>
@@ -509,7 +507,7 @@ const {
                       v-model="model.topK"
                       inputmode="numeric"
                       :class="fieldClass"
-                />
+                    />
                   </div>
                   <div class="min-w-0 space-y-1.5">
                     <Label :for="`model-seed-${index}`">Seed</Label>
@@ -518,7 +516,7 @@ const {
                       v-model="model.seed"
                       inputmode="numeric"
                       :class="fieldClass"
-                />
+                    />
                   </div>
                   <div class="min-w-0 space-y-1.5">
                     <Label :for="`model-freq-${index}`">Freq. penalty</Label>
@@ -527,7 +525,7 @@ const {
                       v-model="model.frequencyPenalty"
                       inputmode="decimal"
                       :class="fieldClass"
-                />
+                    />
                   </div>
                   <div class="min-w-0 space-y-1.5">
                     <Label :for="`model-pres-${index}`">Pres. penalty</Label>
@@ -536,7 +534,7 @@ const {
                       v-model="model.presencePenalty"
                       inputmode="decimal"
                       :class="fieldClass"
-                />
+                    />
                   </div>
                   <div class="min-w-0 space-y-1.5">
                     <Label :for="`model-efforts-${index}`">Reasoning efforts</Label>
@@ -545,7 +543,7 @@ const {
                       v-model="model.supportsReasoningEffort"
                       placeholder="none, minimal, low, medium, high, xhigh"
                       :class="fieldClass"
-                />
+                    />
                   </div>
                   <div class="min-w-0 space-y-1.5">
                     <Label :for="`model-effort-${index}`">Default effort</Label>
@@ -554,18 +552,14 @@ const {
                       v-model="model.reasoningEffort"
                       placeholder="provider-default, none, low, medium, high"
                       :class="fieldClass"
-                />
+                    />
                   </div>
                 </div>
                 <div class="space-y-1.5">
                   <div class="flex items-center justify-between gap-2">
                     <Label>Model headers</Label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      @click="addKeyValueRow(model.headers)"
-                    >
-                      <Plus class="mr-1 h-3.5 w-3.5" />
+                    <Button variant="ghost" size="sm" @click="addKeyValueRow(model.headers)">
+                      <AppIcon name="plus" class="mr-1 h-3.5 w-3.5" />
                       Add
                     </Button>
                   </div>
@@ -582,7 +576,7 @@ const {
                       class="h-9 w-9 shrink-0"
                       @click="removeKeyValueRow(model.headers, headerIndex)"
                     >
-                      <Trash2 class="h-4 w-4" />
+                      <AppIcon name="trash" class="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

@@ -10,18 +10,11 @@ interface Props extends Experimental_GeneratedImage {
 
 const props = defineProps<Props>()
 
-const classes = computed(() => cn(
-  'h-auto max-w-full overflow-hidden rounded-md',
-  props.class,
-))
+const classes = computed(() => cn('h-auto max-w-full overflow-hidden rounded-md', props.class))
 
 const src = computed(() => `data:${props.mediaType};base64,${props.base64}`)
 </script>
 
 <template>
-  <img
-    :class="classes"
-    :src="src"
-    v-bind="$attrs"
-  >
+  <img :class="classes" :src="src" v-bind="$attrs" />
 </template>

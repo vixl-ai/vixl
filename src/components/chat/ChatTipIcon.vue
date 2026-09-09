@@ -1,16 +1,11 @@
 <script setup lang="ts">
-import type { Component } from 'vue'
+import { AppIcon, type AppIconName } from '@/icons'
 import { Button } from '@/components/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = withDefaults(
   defineProps<{
-    icon: Component
+    icon: AppIconName
     tooltip: string
     iconClass?: string
     tone?: 'chat' | 'terminal'
@@ -35,10 +30,7 @@ const props = withDefaults(
           :aria-label="tooltip"
           @click.stop
         >
-          <component
-            :is="icon"
-            :class="iconClass ?? 'size-3.5'"
-          />
+          <AppIcon :name="icon" :class="iconClass ?? 'size-3.5'" />
         </Button>
       </TooltipTrigger>
       <TooltipContent class="z-60">{{ tooltip }}</TooltipContent>

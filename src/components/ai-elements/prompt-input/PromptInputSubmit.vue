@@ -2,7 +2,7 @@
 // import type { InputGroupButtonVariants } from '@/components/ui/input-group'
 import type { ChatStatus } from 'ai'
 import type { HTMLAttributes } from 'vue'
-import { ArrowUpIcon, Loader2Icon, SquareIcon, XIcon } from '@lucide/vue'
+import { AppIcon, type AppIconName } from '@/icons'
 import { InputGroupButton } from '@/components/ui/input-group'
 import { cn } from '@/lib/utils'
 import { computed } from 'vue'
@@ -21,17 +21,15 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'icon-sm',
 })
 
-const icon = computed(() => {
+const icon = computed((): AppIconName => {
   if (props.status === 'submitted') {
-    return Loader2Icon
+    return 'loader'
+  } else if (props.status === 'streaming') {
+    return 'square'
+  } else if (props.status === 'error') {
+    return 'x'
   }
-  else if (props.status === 'streaming') {
-    return SquareIcon
-  }
-  else if (props.status === 'error') {
-    return XIcon
-  }
-  return ArrowUpIcon
+  return 'arrow-up'
 })
 
 const iconClass = computed(() => {
@@ -54,7 +52,7 @@ const { status, size, variant, class: _, ...restProps } = props
     v-bind="restProps"
   >
     <slot>
-      <component :is="icon" :class="iconClass" />
+      <AppIcon :name="icon" :class="iconClass" />
     </slot>
   </InputGroupButton>
 </template>

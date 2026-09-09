@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref } from 'vue'
-import { CheckIcon, ChevronDownIcon, GitBranchIcon } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import { Input } from '@/components/shadcn/ui/input'
 import {
@@ -48,21 +48,16 @@ const handleBranchSelect = async (branch: string): Promise<void> => {
         :title="git.currentBranch.value ?? 'Git branch'"
         aria-label="Git branch"
       >
-        <GitBranchIcon class="size-3.5 shrink-0" />
+        <AppIcon name="git-branch" class="size-3.5 shrink-0" />
         <span class="max-w-24 min-w-0 truncate @max-[22rem]/composer:hidden">
           {{ git.currentBranch.value ?? 'Branch' }}
         </span>
-        <ChevronDownIcon class="size-3 shrink-0 opacity-60" />
+        <AppIcon name="chevron-down" class="size-3 shrink-0 opacity-60" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" class="w-56 p-0">
       <div class="border-b border-border/50 p-2" @pointerdown.stop>
-        <Input
-          v-model="branchSearch"
-          placeholder="Search branches…"
-          class="h-8"
-          @keydown.stop
-        />
+        <Input v-model="branchSearch" placeholder="Search branches…" class="h-8" @keydown.stop />
       </div>
       <div class="max-h-60 overflow-y-auto p-1">
         <DropdownMenuItem
@@ -71,7 +66,8 @@ const handleBranchSelect = async (branch: string): Promise<void> => {
           class="gap-2"
           @select="handleBranchSelect(branch)"
         >
-          <CheckIcon
+          <AppIcon
+            name="check"
             class="size-3.5 shrink-0"
             :class="branch === git.currentBranch.value ? 'opacity-100' : 'opacity-0'"
           />

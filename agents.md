@@ -260,9 +260,23 @@ First-party UI must be built with **shadcn-vue** primitives and **Tailwind utili
 - Do **not** use `@apply` in first-party component code.
 - Do **not** use `:deep()` or other CSS overrides to patch shadcn internals: pass supported `class` props, compose wrappers, or consult the shadcn Vue MCP for the correct primitive.
 - Prefer shadcn layout patterns (for example sidebar blocks with `SidebarMenuButton`, icons beside labels, `variant="floating"`) over bespoke markup.
-- Glass / translucent surfaces: use Tailwind utilities such as `bg-white/85`, `dark:bg-black/85`, `backdrop-blur-xl`, and `border-border/50` on shadcn components, not custom CSS.
+- Glass / translucent surfaces: use the centralized `glass-surface-sidebar`, `glass-surface-panel`, and `glass-surface-overlay` utility classes on top-level shadcn primitives (they only activate when the active theme opts the scope in). Never add ad-hoc `backdrop-blur-*` classes or hard-coded Zinc backgrounds.
 - Global base styles and design tokens belong in `src/assets/css/` only (`tailwind.css`, `main.css`).
 - Consult the **shadcn Vue MCP** before adding or substantially changing UI.
+
+## Icons
+
+App icons render through the semantic icon registry in `src/icons` so the active theme's icon pack (Lucide, Tabler, Phosphor) applies everywhere:
+
+- Render icons with `<AppIcon>` (or `resolveIconComponent` for dynamic maps). **Never** import `@lucide/vue`, `@tabler/icons-vue`, or `@phosphor-icons/vue` directly; pack packages may only be imported inside `src/icons/adapters/**` (enforced by the `app/icon-pack-boundary` ESLint rule and a repository icon-boundary test in `spec/src/icons`).
+- A new app glyph needs a new semantic name in `src/icons/icon-names.ts` mapped in **all three** adapters; do not bypass the registry with raw components or inline SVG for app chrome.
+- Keep `currentColor` semantics: destructive/success/warning coloring happens at the call site, not inside the icon.
+- Exclusions that stay outside the pack system: `vscode-material-icons` file-type glyphs, provider/server/product logos, user- or content-supplied artwork, and Monaco editor internals. Use the specialized components for those.
+- Bundle budget: adapters import mapped glyphs only, so tree shaking keeps unmapped icons out. Measured at this feature's introduction: ~498 kB raw / ~105 KiB gzip added to the initial main chunk for the three adapters plus the appearance gallery/editor runtime (vs the pre-adapter baseline), and ~4 kB raw CSS for glass utilities. Accepted budget for the icon/appearance system: **≤ 600 kB raw / ≤ 150 KiB gzip added to the initial main chunk**. When adding glyphs, keep adapters explicit named imports and re-measure `vite build` output if the delta grows toward the budget.
+
+## Appearance themes
+
+Theme data is strictly data-only and schema-bounded. When extending the theme model (new token, canvas, glass, or icon fields), extend in one pass: the runtime schema (`src/schemas/appearance/theme.ts`), the shareable file schema (`src/schemas/appearance/theme-file.ts`), the canonical serializer and summary (`src/services/appearance/theme-file-utils.ts`), the v1 migration (`src/services/appearance/theme-migration.ts`), the editor/preview surfaces, and `docs/guide/appearance.md`. Never accept raw CSS, URLs, SVG, images, or font sources from theme files, and never bypass the shared canvas/glass serializers (`src/utils/appearance/appearance-css.ts`) with duplicate gradient logic in previews or editors.
 
 ## Scope
 

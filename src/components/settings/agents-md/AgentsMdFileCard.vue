@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FileText } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import {
@@ -9,17 +9,10 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/shadcn/ui/empty'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import type { SettingsTab } from '@/composables/use-vixl-config'
 import { writeAgentsMd } from '@/services/agents-md'
-import {
-  listVixlFiles,
-  type ProjectFileEntry,
-} from '@/services/vixl/vixl-tauri'
+import { listVixlFiles, type ProjectFileEntry } from '@/services/vixl/vixl-tauri'
 
 const props = defineProps<{
   tab: SettingsTab
@@ -37,9 +30,7 @@ const scope = computed<'personal' | 'project'>(() =>
 
 const canCreate = computed(
   () =>
-    !creating.value &&
-    !file.value &&
-    !(props.tab === 'project' && !config.activeRootPath.value),
+    !creating.value && !file.value && !(props.tab === 'project' && !config.activeRootPath.value),
 )
 
 const toastLoadError = (error: unknown): void => {
@@ -54,11 +45,7 @@ const load = async (): Promise<void> => {
     return
   }
 
-  const files = await listVixlFiles(
-    scope.value,
-    'agents-md',
-    config.activeRootPath.value,
-  )
+  const files = await listVixlFiles(scope.value, 'agents-md', config.activeRootPath.value)
   file.value = files[0] ?? null
 }
 
@@ -116,10 +103,7 @@ const handleCreate = async (): Promise<void> => {
   try {
     await writeAgentsMd({
       scope: scope.value,
-      projectRoot:
-        props.tab === 'project'
-          ? (config.activeRootPath.value ?? undefined)
-          : undefined,
+      projectRoot: props.tab === 'project' ? (config.activeRootPath.value ?? undefined) : undefined,
     })
     await refresh()
     toast.success('AGENTS.md created')
@@ -160,13 +144,10 @@ watch(vixlFileChangeToken, async () => {
 
 <template>
   <SettingsCollapsibleSection title="AGENTS.md">
-    <Empty
-      v-if="!file"
-      class="min-h-0 flex-none border border-border/60 p-4 md:p-4"
-    >
+    <Empty v-if="!file" class="min-h-0 flex-none border border-border/60 p-4 md:p-4">
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <FileText />
+          <AppIcon name="file-text" />
         </EmptyMedia>
         <EmptyTitle>No AGENTS.md</EmptyTitle>
       </EmptyHeader>
@@ -187,11 +168,6 @@ watch(vixlFileChangeToken, async () => {
       </EmptyContent>
     </Empty>
 
-    <VixlFileListItem
-      v-else
-      :file="file"
-      kind="agents-md"
-      @open="openInEditor"
-    />
+    <VixlFileListItem v-else :file="file" kind="agents-md" @open="openInEditor" />
   </SettingsCollapsibleSection>
 </template>

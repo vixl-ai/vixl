@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes, VNode } from 'vue'
-import { FileIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import { computed, provide } from 'vue'
 import { FileTreeFileKey, useFileTreeContext } from './context'
@@ -44,10 +44,11 @@ provide(FileTreeFileKey, {
     @keydown.space="() => onSelect(props.path)"
   >
     <slot>
-      <span class="size-4" /> <!-- Spacer for alignment -->
+      <span class="size-4" />
+      <!-- Spacer for alignment -->
       <FileTreeIcon>
         <component :is="props.icon" v-if="props.icon" />
-        <FileIcon v-else class="size-4 text-muted-foreground" />
+        <AppIcon name="file" v-else class="size-4 text-muted-foreground" />
       </FileTreeIcon>
       <FileTreeName>{{ props.name }}</FileTreeName>
     </slot>

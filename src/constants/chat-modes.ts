@@ -1,23 +1,17 @@
-import {
-  BotIcon,
-  CircleHelpIcon,
-  ListTodoIcon,
-  NetworkIcon,
-} from '@lucide/vue'
-import type { Component } from 'vue'
+import type { AppIconName } from '@/icons'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 
 export type ChatModeMeta = {
   value: VixlChatMode
   label: string
-  icon: Component
+  icon: AppIconName
 }
 
 export const CHAT_MODES: ChatModeMeta[] = [
-  { value: 'agent', label: 'Agent', icon: BotIcon },
-  { value: 'ask', label: 'Ask', icon: CircleHelpIcon },
-  { value: 'orchestrator', label: 'Orchestrator', icon: NetworkIcon },
-  { value: 'plan', label: 'Plan', icon: ListTodoIcon },
+  { value: 'agent', label: 'Agent', icon: 'bot' },
+  { value: 'ask', label: 'Ask', icon: 'circle-help' },
+  { value: 'orchestrator', label: 'Orchestrator', icon: 'network' },
+  { value: 'plan', label: 'Plan', icon: 'list-todo' },
 ]
 
 const DEFAULT_CHAT_MODE = CHAT_MODES.find((entry) => entry.value === 'agent')!

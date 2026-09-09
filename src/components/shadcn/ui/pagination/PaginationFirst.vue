@@ -1,21 +1,26 @@
 <script setup lang="ts">
-import type { PaginationFirstProps } from "reka-ui"
-import type { HTMLAttributes } from "vue"
+import { AppIcon } from '@/icons'
+import type { PaginationFirstProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
 import type { ButtonVariants } from '@/components/shadcn/ui/button'
-import { ChevronLeftIcon } from "@lucide/vue"
-import { reactiveOmit } from "@vueuse/core"
-import { PaginationFirst, useForwardProps } from "reka-ui"
-import { cn } from "@/lib/utils"
+import { reactiveOmit } from '@vueuse/core'
+import { PaginationFirst, useForwardProps } from 'reka-ui'
+import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/shadcn/ui/button'
 
-const props = withDefaults(defineProps<PaginationFirstProps & {
-  size?: ButtonVariants["size"]
-  class?: HTMLAttributes["class"]
-}>(), {
-  size: "default",
-})
+const props = withDefaults(
+  defineProps<
+    PaginationFirstProps & {
+      size?: ButtonVariants['size']
+      class?: HTMLAttributes['class']
+    }
+  >(),
+  {
+    size: 'default',
+  },
+)
 
-const delegatedProps = reactiveOmit(props, "class", "size")
+const delegatedProps = reactiveOmit(props, 'class', 'size')
 const forwarded = useForwardProps(delegatedProps)
 </script>
 
@@ -26,7 +31,7 @@ const forwarded = useForwardProps(delegatedProps)
     v-bind="forwarded"
   >
     <slot>
-      <ChevronLeftIcon />
+      <AppIcon name="chevron-left" />
       <span class="hidden sm:block">First</span>
     </slot>
   </PaginationFirst>

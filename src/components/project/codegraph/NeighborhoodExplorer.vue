@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { Edge, Node, NodeMouseEvent } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { MarkerType, Position, VueFlow } from '@vue-flow/core'
-import { GitBranch, Loader2, Search } from '@lucide/vue'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, markRaw, reactive, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
@@ -19,10 +19,7 @@ import { Input } from '@/components/shadcn/ui/input'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import normalizeCodegraphResult from '@/services/codegraph/normalize-codegraph-result'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
-import type {
-  CodebaseImpactResult,
-  CodebaseToolSpan,
-} from '@/types/codegraph/codebase-tool-result'
+import type { CodebaseImpactResult, CodebaseToolSpan } from '@/types/codegraph/codebase-tool-result'
 import { CODEGRAPH_SERVER_ID } from '@/types/codegraph/managed-codegraph'
 import invokeErrorMessage from '@/utils/invoke-error-message'
 import openAtLine from '@/utils/open-at-line'
@@ -94,10 +91,7 @@ const looksLikeFilePath = (value: string): boolean =>
 const spanKey = (span: CodebaseToolSpan): string =>
   `${span.path}|${span.symbol ?? ''}|${span.startLine}`
 
-const pickFocusSpan = (
-  query: string,
-  results: CodebaseToolSpan[],
-): CodebaseToolSpan => {
+const pickFocusSpan = (query: string, results: CodebaseToolSpan[]): CodebaseToolSpan => {
   const trimmed = query.trim()
   const exact = results.find(
     (span) =>
@@ -256,14 +250,7 @@ const buildGraph = (
       if (!source || !target) {
         continue
       }
-      pushEdge(
-        nextEdges,
-        seenEdgeIds,
-        source.id,
-        target.id,
-        edge.kind ?? 'depends',
-        true,
-      )
+      pushEdge(nextEdges, seenEdgeIds, source.id, target.id, edge.kind ?? 'depends', true)
     }
   }
 
@@ -273,10 +260,8 @@ const buildGraph = (
   }
 }
 
-const callCodegraphTool = async (
-  tool: string,
-  args: Record<string, unknown>,
-): Promise<unknown> => mcpRuntime.callTool(CODEGRAPH_SERVER_ID, tool, args)
+const callCodegraphTool = async (tool: string, args: Record<string, unknown>): Promise<unknown> =>
+  mcpRuntime.callTool(CODEGRAPH_SERVER_ID, tool, args)
 
 const valuesOrThrow = <T>(results: PromiseSettledResult<T>[]): T[] => {
   const failed = results.find(
@@ -288,10 +273,7 @@ const valuesOrThrow = <T>(results: PromiseSettledResult<T>[]): T[] => {
   return results.map((result) => (result as PromiseFulfilledResult<T>).value)
 }
 
-const matchIndexedFiles = (
-  files: CodebaseToolSpan[],
-  query: string,
-): CodebaseToolSpan[] => {
+const matchIndexedFiles = (files: CodebaseToolSpan[], query: string): CodebaseToolSpan[] => {
   const needle = query.trim().toLowerCase()
   if (!needle) {
     return []
@@ -415,13 +397,7 @@ const runSearch = async (rawQuery: string): Promise<void> => {
         startLine: 1,
         endLine: 1,
       }
-      const graph = buildGraph(
-        focusSpan,
-        [],
-        [],
-        { results: [] },
-        related,
-      )
+      const graph = buildGraph(focusSpan, [], [], { results: [] }, related)
       nodes.value = graph.nodes
       edges.value = graph.edges
       return
@@ -529,9 +505,12 @@ const handleNodeClick = async (event: NodeMouseEvent): Promise<void> => {
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/50 bg-muted/10">
+  <div
+    class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/50 bg-muted/10"
+  >
     <div class="relative shrink-0 border-b border-border/50 p-3">
-      <Search
+      <AppIcon
+        name="search"
         class="pointer-events-none absolute top-1/2 left-5 size-4 -translate-y-1/2 text-muted-foreground"
       />
       <Input
@@ -540,7 +519,8 @@ const handleNodeClick = async (event: NodeMouseEvent): Promise<void> => {
         placeholder="Search symbol or file"
         aria-label="Graph search"
       />
-      <Loader2
+      <AppIcon
+        name="loader"
         v-if="loading"
         class="pointer-events-none absolute top-1/2 right-5 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
       />
@@ -550,24 +530,16 @@ const handleNodeClick = async (event: NodeMouseEvent): Promise<void> => {
       v-if="loading && !hasGraph"
       class="flex min-h-0 flex-1 flex-col items-center justify-center p-6"
     >
-      <Loader2 class="size-6 animate-spin text-muted-foreground" />
-      <p class="mt-3 text-sm text-muted-foreground">
-        Loading callers, callees, and impact...
-      </p>
+      <AppIcon name="loader" class="size-6 animate-spin text-muted-foreground" />
+      <p class="mt-3 text-sm text-muted-foreground">Loading callers, callees, and impact...</p>
     </div>
 
-    <div
-      v-else-if="hasGraph"
-      class="relative min-h-0 flex-1"
-    >
-      <div
-        v-if="loading"
-        class="absolute inset-x-0 top-0 z-10 flex justify-center p-2"
-      >
+    <div v-else-if="hasGraph" class="relative min-h-0 flex-1">
+      <div v-if="loading" class="absolute inset-x-0 top-0 z-10 flex justify-center p-2">
         <span
-          class="inline-flex items-center gap-2 rounded-md border border-border/50 bg-background/90 px-2 py-1 text-xs text-muted-foreground backdrop-blur"
+          class="glass-surface-overlay inline-flex items-center gap-2 rounded-md border border-border/50 bg-background px-2 py-1 text-xs text-muted-foreground"
         >
-          <Loader2 class="size-3.5 animate-spin" />
+          <AppIcon name="loader" class="size-3.5 animate-spin" />
           Updating
         </span>
       </div>
@@ -587,20 +559,16 @@ const handleNodeClick = async (event: NodeMouseEvent): Promise<void> => {
       </VueFlow>
     </div>
 
-    <Empty
-      v-else
-      class="min-h-0 flex-1 border-0 bg-transparent"
-    >
+    <Empty v-else class="min-h-0 flex-1 border-0 bg-transparent">
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <GitBranch class="size-6" />
+          <AppIcon name="git-branch" class="size-6" />
         </EmptyMedia>
         <template v-if="state.hasSearched">
-          <EmptyTitle>
-            No graph to show
-          </EmptyTitle>
+          <EmptyTitle> No graph to show </EmptyTitle>
           <EmptyDescription>
-            No indexed files or symbols matched. Try a symbol, or a source file from the index (markdown and some configs may be missing).
+            No indexed files or symbols matched. Try a symbol, or a source file from the index
+            (markdown and some configs may be missing).
           </EmptyDescription>
         </template>
       </EmptyHeader>

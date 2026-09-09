@@ -3,19 +3,13 @@ import { createGateway } from '@ai-sdk/gateway'
 import type { LanguageModelUsage } from 'ai'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
-import type {
-  VixlCustomProviderModel,
-  VixlSettings,
-} from '@/types/vixl/vixl-settings'
+import type { VixlCustomProviderModel, VixlSettings } from '@/types/vixl/vixl-settings'
 import recordBillableUsage from '@/services/billing/record-billable-usage'
 import appendUsageLedger from '@/services/billing/append-usage-ledger'
 import aggregateTurnUsage from '@/services/billing/aggregate-turn-usage'
 import enrichGatewayCost from '@/services/billing/enrich-gateway-cost'
 import { getSecret } from '@/services/vixl/vixl-tauri'
-import {
-  getCustomProvider,
-  keychainKeyForProvider,
-} from '@/services/providers/registry'
+import { getCustomProvider, keychainKeyForProvider } from '@/services/providers/registry'
 import proxyFetch from '@/services/providers/proxy-fetch'
 
 const gatewayGenerationId = (providerMetadata: unknown): string | undefined => {
@@ -27,20 +21,14 @@ const gatewayGenerationId = (providerMetadata: unknown): string | undefined => {
     return undefined
   }
   const generationId = (gateway as Record<string, unknown>).generationId
-  return typeof generationId === 'string' && generationId.length > 0
-    ? generationId
-    : undefined
+  return typeof generationId === 'string' && generationId.length > 0 ? generationId : undefined
 }
 
-const resolveGatewayApiKey = async (
-  settings: VixlSettings,
-): Promise<string | undefined> => {
+const resolveGatewayApiKey = async (settings: VixlSettings): Promise<string | undefined> => {
   const custom = getCustomProvider(settings, 'gateway')
   const ref =
     custom?.apiKeyRef ??
-    (settings['providers.gateway.apiKeyRef' as keyof VixlSettings] as
-      | string
-      | undefined)
+    (settings['providers.gateway.apiKeyRef' as keyof VixlSettings] as string | undefined)
   if (!ref) {
     return undefined
   }

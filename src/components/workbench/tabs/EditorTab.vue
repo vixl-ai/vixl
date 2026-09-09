@@ -1,14 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, nextTick, ref, watch } from 'vue'
-import {
-  ChevronLeft,
-  ChevronRight,
-  FileCode,
-  FileSearch,
-  List,
-  Replace,
-  X,
-} from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
   AlertDialog,
@@ -20,22 +12,14 @@ import {
   AlertDialogTitle,
 } from '@/components/shadcn/ui/alert-dialog'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-} from '@/components/shadcn/ui/empty'
+import { Empty, EmptyHeader, EmptyMedia } from '@/components/shadcn/ui/empty'
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/shadcn/ui/resizable'
 import { ScrollArea, ScrollBar } from '@/components/shadcn/ui/scroll-area'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import type { EditorSidePaneMode } from '@/components/workbench/EditorSidePane.vue'
 import WorkbenchEditorFileSearchDialog from '@/components/workbench/EditorFileSearchDialog.vue'
 import WorkbenchEditorMarkdownPreview from '@/components/workbench/EditorMarkdownPreview.vue'
@@ -438,15 +422,8 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
 </script>
 
 <template>
-  <ResizablePanelGroup
-    direction="horizontal"
-    class="h-full min-h-0 overflow-hidden"
-  >
-    <ResizablePanel
-      :default-size="75"
-      :min-size="40"
-      class="min-h-0 min-w-0 overflow-hidden"
-    >
+  <ResizablePanelGroup direction="horizontal" class="h-full min-h-0 overflow-hidden">
+    <ResizablePanel :default-size="75" :min-size="40" class="min-h-0 min-w-0 overflow-hidden">
       <div class="flex h-full min-h-0 flex-col overflow-hidden">
         <div
           v-if="!isEmpty"
@@ -463,7 +440,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
                   aria-label="Go back"
                   @click="handleBack"
                 >
-                  <ChevronLeft class="h-3.5 w-3.5" />
+                  <AppIcon name="chevron-left" class="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent class="z-60">Go back</TooltipContent>
@@ -478,7 +455,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
                   aria-label="Go forward"
                   @click="handleForward"
                 >
-                  <ChevronRight class="h-3.5 w-3.5" />
+                  <AppIcon name="chevron-right" class="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent class="z-60">Go forward</TooltipContent>
@@ -503,17 +480,16 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
                     class="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                     aria-label="Unsaved changes"
                   />
-                  <span
-                    class="truncate"
-                    :class="{ 'line-through': isMissing(path) }"
-                  >{{ fileName(path) }}</span>
+                  <span class="truncate" :class="{ 'line-through': isMissing(path) }">{{
+                    fileName(path)
+                  }}</span>
                   <span
                     class="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover/tab:opacity-100"
                     role="button"
                     aria-label="Close file"
                     @click.stop="handleSubTabClose(path)"
                   >
-                    <X class="h-3 w-3" />
+                    <AppIcon name="x" class="h-3 w-3" />
                   </span>
                 </button>
               </div>
@@ -521,10 +497,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
             </ScrollArea>
           </div>
 
-          <div
-            v-if="!sidePaneOpen || isMarkdownFile"
-            class="flex shrink-0 items-center gap-0.5"
-          >
+          <div v-if="!sidePaneOpen || isMarkdownFile" class="flex shrink-0 items-center gap-0.5">
             <template v-if="isMarkdownFile">
               <Button
                 variant="ghost"
@@ -563,7 +536,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
                   aria-label="Search files"
                   @click="handleOpenFileSearch"
                 >
-                  <FileSearch class="h-3.5 w-3.5" />
+                  <AppIcon name="file-search" class="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent class="z-60">Search files</TooltipContent>
@@ -578,7 +551,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
                   aria-label="Find and replace"
                   @click="openWorkspaceSearch(false)"
                 >
-                  <Replace class="h-3.5 w-3.5" />
+                  <AppIcon name="replace" class="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent class="z-60">Find and replace</TooltipContent>
@@ -593,7 +566,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
                   aria-label="Toggle file list"
                   @click="handleToggleFileTree"
                 >
-                  <List class="h-3.5 w-3.5" />
+                  <AppIcon name="list" class="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent class="z-60">Toggle file list</TooltipContent>
@@ -601,13 +574,10 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
           </div>
         </div>
 
-        <Empty
-          v-if="isEmpty"
-          class="min-h-0 flex-1 border-none"
-        >
+        <Empty v-if="isEmpty" class="min-h-0 flex-1 border-none">
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <FileCode />
+              <AppIcon name="file-code" />
             </EmptyMedia>
             <Button
               variant="ghost"
@@ -615,20 +585,14 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
               class="mt-2 text-muted-foreground"
               @click="handleOpenFileSearch"
             >
-              <FileSearch class="mr-2 h-3.5 w-3.5" />
+              <AppIcon name="file-search" class="mr-2 h-3.5 w-3.5" />
               Search files
             </Button>
           </EmptyHeader>
         </Empty>
 
-        <div
-          v-else
-          class="flex min-h-0 flex-1 flex-col overflow-hidden"
-        >
-          <div
-            v-show="showEditor"
-            class="h-full min-h-0 min-w-0 overflow-hidden"
-          >
+        <div v-else class="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div v-show="showEditor" class="h-full min-h-0 min-w-0 overflow-hidden">
             <WorkbenchMonacoEditor
               ref="monacoRef"
               :project-id="tab.projectId"
@@ -642,14 +606,8 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
             />
           </div>
 
-          <div
-            v-if="showPreview"
-            class="h-full min-h-0 min-w-0 overflow-hidden"
-          >
-            <WorkbenchEditorMarkdownPreview
-              :key="selectedPath"
-              :content="fileContent"
-            />
+          <div v-if="showPreview" class="h-full min-h-0 min-w-0 overflow-hidden">
+            <WorkbenchEditorMarkdownPreview :key="selectedPath" :content="fileContent" />
           </div>
         </div>
       </div>
@@ -691,10 +649,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
     @select="handleFileSearchSelect"
   />
 
-  <AlertDialog
-    :open="closeConfirmOpen"
-    @update:open="handleCloseConfirmOpenChange"
-  >
+  <AlertDialog :open="closeConfirmOpen" @update:open="handleCloseConfirmOpenChange">
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>Save before closing?</AlertDialogTitle>
@@ -706,19 +661,10 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>Cancel</AlertDialogCancel>
-        <Button
-          variant="outline"
-          :disabled="closeSaving"
-          @click="handleDiscardClose"
-        >
+        <Button variant="outline" :disabled="closeSaving" @click="handleDiscardClose">
           Discard
         </Button>
-        <Button
-          :disabled="closeSaving"
-          @click="handleSaveAndClose"
-        >
-          Save
-        </Button>
+        <Button :disabled="closeSaving" @click="handleSaveAndClose"> Save </Button>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>

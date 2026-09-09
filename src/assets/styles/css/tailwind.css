@@ -45,8 +45,8 @@
   --radius-4xl: calc(var(--radius) * 2.6);
   --animate-sidebar-collapsible-down: sidebar-collapsible-down 150ms ease-out;
   --animate-sidebar-collapsible-up: sidebar-collapsible-up 150ms ease-out;
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: var(--vixl-font-ui, 'Inter Variable', ui-sans-serif, system-ui, sans-serif);
+  --font-mono: var(--vixl-font-mono, 'JetBrains Mono', ui-monospace, monospace);
 }
 
 @keyframes sidebar-collapsible-down {
@@ -78,6 +78,37 @@
   /* Width of the title bar control clusters; keeps title content clear of them */
   --titlebar-safe-left: 8.75rem;
   --titlebar-safe-right: 6rem;
+  /*
+   * Appearance runtime variables. Defaults match the shipped built-in theme
+   * exactly; the theme runtime overrides them on documentElement only while a
+   * custom theme (or live preview) is active.
+   */
+  --vixl-font-ui: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --vixl-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --vixl-font-size-ui: 13px;
+  --vixl-canvas-background: var(--background);
+  --vixl-canvas-image: none;
+  /*
+   * Glass surface runtime defaults. The appearance runtime overrides these
+   * only while a glass-enabled theme is active; the values below match the
+   * built-in default theme's disabled glass configuration (fully opaque).
+   */
+  --vixl-glass-surface-opacity: 100%;
+  --vixl-glass-blur: 0px;
+  --vixl-glass-saturation: 100%;
+  --vixl-glass-border-opacity: 0%;
+  --vixl-glass-shadow: none;
+  --vixl-glass-radius: 0px;
+  /* Decorative accent accents (mentions, skills, aurora ring); theme-able */
+  --vixl-accent-mention: #c4b5fd;
+  --vixl-accent-mention-strong: #b89ad4;
+  --vixl-accent-skill: #86efac;
+  --vixl-accent-skill-strong: #7ec9a0;
+  --vixl-accent-aurora-1: #b89ad4;
+  --vixl-accent-aurora-2: #7eb6d9;
+  --vixl-accent-aurora-3: #c4b5fd;
+  --vixl-accent-aurora-4: #7ec9a0;
+  --vixl-accent-aurora-5: #a894d4;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -155,6 +186,164 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans text-[13px] antialiased tracking-[0.01em];
+    @apply text-foreground font-sans antialiased tracking-[0.01em];
+    /* App canvas: solid color plus optional structured gradient image */
+    background-color: var(--vixl-canvas-background);
+    background-image: var(--vixl-canvas-image);
+    font-size: var(--vixl-font-size-ui, 13px);
+  }
+}
+
+/*
+ * Glass surface utilities (appearance `glass-surfaces`).
+ *
+ * The classes below are inert unless the appearance runtime opts the scope in
+ * on the document element via
+ * `data-vixl-appearance-glass="sidebar panels overlays"`. Every value comes
+ * from the runtime-owned, bounded glass variables (`--vixl-glass-*`), which
+ * are derived from the strict, data-only theme domain — never raw CSS from
+ * theme files. Blur and saturation are additionally re-capped here with
+ * `min()` so even hand-edited variable values cannot exceed the safe bounds.
+ *
+ * Blur is never animated: do not add transition/animation classes targeting
+ * `backdrop-filter` on glass surfaces.
+ *
+ * Fallbacks are layered after the base rules:
+ * - unsupported `backdrop-filter`: opaque semantic surface + solid border;
+ * - `prefers-reduced-transparency: reduce`: blur disabled, opaque surfaces;
+ * - `prefers-contrast: more`: opaque surfaces and solid, strong borders.
+ */
+@layer utilities {
+  [data-vixl-appearance-glass~='overlays'] .glass-surface-overlay {
+    background-color: color-mix(
+      in srgb,
+      var(--popover) var(--vixl-glass-surface-opacity),
+      transparent
+    );
+    border-color: color-mix(in srgb, var(--border) var(--vixl-glass-border-opacity), transparent);
+    border-radius: var(--vixl-glass-radius);
+    box-shadow: var(--vixl-glass-shadow);
+    -webkit-backdrop-filter: blur(min(var(--vixl-glass-blur), 48px))
+      saturate(min(var(--vixl-glass-saturation), 200%));
+    backdrop-filter: blur(min(var(--vixl-glass-blur), 48px))
+      saturate(min(var(--vixl-glass-saturation), 200%));
+  }
+
+  [data-vixl-appearance-glass~='panels'] .glass-surface-panel {
+    background-color: color-mix(
+      in srgb,
+      var(--card) var(--vixl-glass-surface-opacity),
+      transparent
+    );
+    border-color: color-mix(in srgb, var(--border) var(--vixl-glass-border-opacity), transparent);
+    border-radius: var(--vixl-glass-radius);
+    box-shadow: var(--vixl-glass-shadow);
+    -webkit-backdrop-filter: blur(min(var(--vixl-glass-blur), 48px))
+      saturate(min(var(--vixl-glass-saturation), 200%));
+    backdrop-filter: blur(min(var(--vixl-glass-blur), 48px))
+      saturate(min(var(--vixl-glass-saturation), 200%));
+  }
+
+  /*
+   * Sidebar glass is declared last so that surfaces carrying both classes
+   * (the mobile sidebar renders through SheetContent) keep sidebar colors.
+   * The sidebar stays square: it is a flush full-height shell.
+   */
+  [data-vixl-appearance-glass~='sidebar'] .glass-surface-sidebar {
+    background-color: color-mix(
+      in srgb,
+      var(--sidebar) var(--vixl-glass-surface-opacity),
+      transparent
+    );
+    border-color: color-mix(
+      in srgb,
+      var(--sidebar-border) var(--vixl-glass-border-opacity),
+      transparent
+    );
+    box-shadow: var(--vixl-glass-shadow);
+    -webkit-backdrop-filter: blur(min(var(--vixl-glass-blur), 48px))
+      saturate(min(var(--vixl-glass-saturation), 200%));
+    backdrop-filter: blur(min(var(--vixl-glass-blur), 48px))
+      saturate(min(var(--vixl-glass-saturation), 200%));
+  }
+
+  /*
+   * Inner command surfaces defer to their glass overlay shell (dialog,
+   * popover) so blur and translucency are never stacked.
+   */
+  [data-vixl-appearance-glass~='overlays'] [data-slot='command'] {
+    background-color: transparent;
+  }
+
+  /* No backdrop-filter support: opaque surfaces, solid borders, no filter. */
+  @supports not (backdrop-filter: blur(1px)) {
+    [data-vixl-appearance-glass~='overlays'] .glass-surface-overlay {
+      background-color: var(--popover);
+      border-color: var(--border);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    [data-vixl-appearance-glass~='panels'] .glass-surface-panel {
+      background-color: var(--card);
+      border-color: var(--border);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    [data-vixl-appearance-glass~='sidebar'] .glass-surface-sidebar {
+      background-color: var(--sidebar);
+      border-color: var(--sidebar-border);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  /* Reduced transparency: blur off, fully opaque surfaces. */
+  @media (prefers-reduced-transparency: reduce) {
+    [data-vixl-appearance-glass~='overlays'] .glass-surface-overlay {
+      background-color: var(--popover);
+      border-color: var(--border);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    [data-vixl-appearance-glass~='panels'] .glass-surface-panel {
+      background-color: var(--card);
+      border-color: var(--border);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    [data-vixl-appearance-glass~='sidebar'] .glass-surface-sidebar {
+      background-color: var(--sidebar);
+      border-color: var(--sidebar-border);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  /* Increased contrast: opaque surfaces with solid, strong borders. */
+  @media (prefers-contrast: more) {
+    [data-vixl-appearance-glass~='overlays'] .glass-surface-overlay {
+      background-color: var(--popover);
+      border-color: var(--foreground);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    [data-vixl-appearance-glass~='panels'] .glass-surface-panel {
+      background-color: var(--card);
+      border-color: var(--foreground);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    [data-vixl-appearance-glass~='sidebar'] .glass-surface-sidebar {
+      background-color: var(--sidebar);
+      border-color: var(--foreground);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
   }
 }

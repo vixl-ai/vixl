@@ -1,10 +1,6 @@
 <script setup lang="ts">
-import { ArrowUp, ArrowDown, Database, HardDriveUpload } from '@lucide/vue'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { AppIcon } from '@/icons'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 
 const props = withDefaults(
   defineProps<{
@@ -29,10 +25,7 @@ const formatTokens = (tokens: number): string => compactFormatter.format(tokens)
     <Tooltip>
       <TooltipTrigger as-child>
         <span class="inline-flex items-center gap-0.5">
-          <ArrowUp
-            class="size-3 shrink-0"
-            aria-label="Input"
-          />
+          <AppIcon name="arrow-up" class="size-3 shrink-0" aria-label="Input" />
           <span class="tabular-nums">{{ formatTokens(props.inputTokens) }}</span>
         </span>
       </TooltipTrigger>
@@ -42,10 +35,7 @@ const formatTokens = (tokens: number): string => compactFormatter.format(tokens)
     <Tooltip>
       <TooltipTrigger as-child>
         <span class="inline-flex items-center gap-0.5">
-          <ArrowDown
-            class="size-3 shrink-0"
-            aria-label="Output"
-          />
+          <AppIcon name="arrow-down" class="size-3 shrink-0" aria-label="Output" />
           <span class="tabular-nums">{{ formatTokens(props.outputTokens) }}</span>
         </span>
       </TooltipTrigger>
@@ -55,10 +45,7 @@ const formatTokens = (tokens: number): string => compactFormatter.format(tokens)
     <Tooltip v-if="props.cacheReadTokens > 0">
       <TooltipTrigger as-child>
         <span class="inline-flex items-center gap-0.5">
-          <Database
-            class="size-3 shrink-0"
-            aria-label="Cache read"
-          />
+          <AppIcon name="database" class="size-3 shrink-0" aria-label="Cache read" />
           <span class="tabular-nums">{{ formatTokens(props.cacheReadTokens) }}</span>
         </span>
       </TooltipTrigger>
@@ -68,10 +55,7 @@ const formatTokens = (tokens: number): string => compactFormatter.format(tokens)
     <Tooltip v-if="props.cacheWriteTokens > 0">
       <TooltipTrigger as-child>
         <span class="inline-flex items-center gap-0.5">
-          <HardDriveUpload
-            class="size-3 shrink-0"
-            aria-label="Cache write"
-          />
+          <AppIcon name="hard-drive-upload" class="size-3 shrink-0" aria-label="Cache write" />
           <span class="tabular-nums">{{ formatTokens(props.cacheWriteTokens) }}</span>
         </span>
       </TooltipTrigger>

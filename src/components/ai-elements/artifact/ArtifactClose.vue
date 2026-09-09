@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { ButtonVariants } from '@/components/ui/button'
 import type { HTMLAttributes } from 'vue'
-import { X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { computed } from 'vue'
@@ -17,10 +17,9 @@ const props = withDefaults(defineProps<ArtifactCloseProps>(), {
   size: 'sm',
 })
 
-const classes = computed(() => cn(
-  'size-8 p-0 text-muted-foreground hover:text-foreground',
-  props.class,
-))
+const classes = computed(() =>
+  cn('size-8 p-0 text-muted-foreground hover:text-foreground', props.class),
+)
 </script>
 
 <template>
@@ -32,7 +31,7 @@ const classes = computed(() => cn(
     }"
   >
     <slot>
-      <X class="size-4" />
+      <AppIcon name="x" class="size-4" />
     </slot>
     <span class="sr-only">Close</span>
   </Button>

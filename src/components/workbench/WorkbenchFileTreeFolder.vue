@@ -1,15 +1,8 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { ChevronRightIcon } from '@lucide/vue'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-} from '@/components/shadcn/ui/context-menu'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { ContextMenu, ContextMenuTrigger } from '@/components/shadcn/ui/context-menu'
 import { Input } from '@/components/shadcn/ui/input'
 import { cn } from '@/lib/utils'
 import { computed, inject, nextTick, provide, ref, watch } from 'vue'
@@ -67,10 +60,7 @@ const folderNameClass = computed(() => {
   if (!decoration) {
     return 'min-w-0 flex-1 font-sans text-[13px]'
   }
-  return cn(
-    'min-w-0 flex-1 font-sans text-[13px] font-medium',
-    decorationNameClass(decoration),
-  )
+  return cn('min-w-0 flex-1 font-sans text-[13px] font-medium', decorationNameClass(decoration))
 })
 
 provide(FileTreeFolderKey, {
@@ -131,12 +121,7 @@ const handleRenameBlur = (): void => {
 
 <template>
   <Collapsible :open="isExpanded" @update:open="() => togglePath(props.path)">
-    <div
-      :class="cn('', props.class)"
-      role="treeitem"
-      tabindex="0"
-      v-bind="$attrs"
-    >
+    <div :class="cn('', props.class)" role="treeitem" tabindex="0" v-bind="$attrs">
       <ContextMenu>
         <ContextMenuTrigger as-child>
           <CollapsibleTrigger as-child>
@@ -151,7 +136,8 @@ const handleRenameBlur = (): void => {
               type="button"
               :data-path="props.path"
             >
-              <ChevronRightIcon
+              <AppIcon
+                name="chevron-right"
                 :class="
                   cn(
                     'size-4 shrink-0 text-muted-foreground transition-transform',

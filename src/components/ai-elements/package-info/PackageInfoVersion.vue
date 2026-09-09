@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { ArrowRightIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import { usePackageInfoContext } from './context'
 
@@ -16,17 +16,12 @@ const { currentVersion, newVersion } = usePackageInfoContext()
 <template>
   <div
     v-if="currentVersion || newVersion"
-    :class="
-      cn(
-        'mt-2 flex items-center gap-2 font-mono text-muted-foreground text-sm',
-        props.class,
-      )
-    "
+    :class="cn('mt-2 flex items-center gap-2 font-mono text-muted-foreground text-sm', props.class)"
     v-bind="$attrs"
   >
     <slot>
       <span v-if="currentVersion">{{ currentVersion }}</span>
-      <ArrowRightIcon v-if="currentVersion && newVersion" class="size-3" />
+      <AppIcon name="arrow-right" v-if="currentVersion && newVersion" class="size-3" />
       <span v-if="newVersion" class="font-medium text-foreground">{{ newVersion }}</span>
     </slot>
   </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ImageIcon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { usePromptInput } from './context'
 
@@ -16,7 +16,7 @@ const { openFileDialog } = usePromptInput()
 
 <template>
   <DropdownMenuItem @select.prevent="openFileDialog">
-    <ImageIcon class="mr-2 size-4" />
+    <AppIcon name="image" class="mr-2 size-4" />
     {{ props.label || 'Add photos or files' }}
   </DropdownMenuItem>
 </template>

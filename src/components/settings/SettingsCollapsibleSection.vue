@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { ref } from 'vue'
-import { ChevronRight } from '@lucide/vue'
 import {
   Collapsible,
   CollapsibleContent,
@@ -20,16 +20,14 @@ const open = ref(false)
       <CollapsibleTrigger
         class="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium"
       >
-        <ChevronRight
+        <AppIcon
+          name="chevron-right"
           class="h-4 w-4 shrink-0 transition-transform"
           :class="open ? 'rotate-90' : ''"
         />
         {{ title }}
       </CollapsibleTrigger>
-      <div
-        v-if="$slots.actions"
-        class="flex items-center gap-2"
-      >
+      <div v-if="$slots.actions" class="flex items-center gap-2">
         <slot name="actions" />
       </div>
     </div>

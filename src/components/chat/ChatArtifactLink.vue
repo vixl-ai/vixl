@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { AppIcon } from '@/icons'
 import { useRoute } from 'vue-router'
-import { FileCodeIcon, FileTextIcon } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import { Button } from '@/components/shadcn/ui/button'
@@ -21,9 +21,7 @@ const workbench = useWorkbenchStore()
 const projectId = computed(() => {
   const slug = String(route.params.slug ?? '')
   const standalone =
-    route.name === 'home-chat' ||
-    route.name === 'home-chat-subagent' ||
-    isHomeChatSlug(slug)
+    route.name === 'home-chat' || route.name === 'home-chat-subagent' || isHomeChatSlug(slug)
   if (standalone) {
     return HOME_WORKSPACE_ID
   }
@@ -60,9 +58,9 @@ const displayLabel = computed(() => {
 
 const icon = computed(() => {
   if (props.artifact.kind === 'plan') {
-    return FileTextIcon
+    return 'file-text'
   }
-  return FileCodeIcon
+  return 'file-code'
 })
 
 const handleOpen = async (event: MouseEvent): Promise<void> => {
@@ -80,8 +78,7 @@ const handleOpen = async (event: MouseEvent): Promise<void> => {
   try {
     if (props.artifact.kind === 'plan') {
       const planId =
-        props.artifact.path.match(/^\.vixl\/plans\/([^/]+)\//)?.[1] ??
-        displayLabel.value
+        props.artifact.path.match(/^\.vixl\/plans\/([^/]+)\//)?.[1] ?? displayLabel.value
       await workbench.openPlan(id, planId, props.artifact.path, props.artifact.label)
       return
     }
@@ -103,7 +100,7 @@ const handleOpen = async (event: MouseEvent): Promise<void> => {
     class="h-auto max-w-[18rem] shrink-0 px-0 py-0 text-xs font-normal"
     @click="handleOpen"
   >
-    <component :is="icon" class="size-3 shrink-0" />
+    <AppIcon :name="icon" class="size-3 shrink-0" />
     <span class="truncate">{{ displayLabel }}</span>
   </Button>
 </template>

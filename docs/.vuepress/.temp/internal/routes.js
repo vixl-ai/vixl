@@ -1,0 +1,28 @@
+export const redirects = JSON.parse("{}")
+
+export const routes = Object.fromEntries([
+  ["/", { loader: () => import(/* webpackChunkName: "index.html" */"/Users/kyle/personal/vixl/docs/index.md"), meta: {"title":""} }],
+  ["/guide/agent-shell.html", { loader: () => import(/* webpackChunkName: "guide_agent-shell.html" */"/Users/kyle/personal/vixl/docs/guide/agent-shell.md"), meta: {"title":"Agent shell"} }],
+  ["/guide/agents-md.html", { loader: () => import(/* webpackChunkName: "guide_agents-md.html" */"/Users/kyle/personal/vixl/docs/guide/agents-md.md"), meta: {"title":"AGENTS.md"} }],
+  ["/guide/agents.html", { loader: () => import(/* webpackChunkName: "guide_agents.html" */"/Users/kyle/personal/vixl/docs/guide/agents.md"), meta: {"title":"Agents"} }],
+  ["/guide/appearance.html", { loader: () => import(/* webpackChunkName: "guide_appearance.html" */"/Users/kyle/personal/vixl/docs/guide/appearance.md"), meta: {"title":"Appearance"} }],
+  ["/guide/changes.html", { loader: () => import(/* webpackChunkName: "guide_changes.html" */"/Users/kyle/personal/vixl/docs/guide/changes.md"), meta: {"title":"Changes"} }],
+  ["/guide/chat-ui.html", { loader: () => import(/* webpackChunkName: "guide_chat-ui.html" */"/Users/kyle/personal/vixl/docs/guide/chat-ui.md"), meta: {"title":"Chat UI"} }],
+  ["/guide/chats.html", { loader: () => import(/* webpackChunkName: "guide_chats.html" */"/Users/kyle/personal/vixl/docs/guide/chats.md"), meta: {"title":"Chats"} }],
+  ["/guide/editor.html", { loader: () => import(/* webpackChunkName: "guide_editor.html" */"/Users/kyle/personal/vixl/docs/guide/editor.md"), meta: {"title":"Editor"} }],
+  ["/guide/general.html", { loader: () => import(/* webpackChunkName: "guide_general.html" */"/Users/kyle/personal/vixl/docs/guide/general.md"), meta: {"title":"General"} }],
+  ["/guide/graphs.html", { loader: () => import(/* webpackChunkName: "guide_graphs.html" */"/Users/kyle/personal/vixl/docs/guide/graphs.md"), meta: {"title":"Graphs"} }],
+  ["/guide/", { loader: () => import(/* webpackChunkName: "guide_index.html" */"/Users/kyle/personal/vixl/docs/guide/index.md"), meta: {"title":"Vixl docs"} }],
+  ["/guide/lsp.html", { loader: () => import(/* webpackChunkName: "guide_lsp.html" */"/Users/kyle/personal/vixl/docs/guide/lsp.md"), meta: {"title":"LSP"} }],
+  ["/guide/mcp.html", { loader: () => import(/* webpackChunkName: "guide_mcp.html" */"/Users/kyle/personal/vixl/docs/guide/mcp.md"), meta: {"title":"MCP"} }],
+  ["/guide/models.html", { loader: () => import(/* webpackChunkName: "guide_models.html" */"/Users/kyle/personal/vixl/docs/guide/models.md"), meta: {"title":"Models"} }],
+  ["/guide/permissions.html", { loader: () => import(/* webpackChunkName: "guide_permissions.html" */"/Users/kyle/personal/vixl/docs/guide/permissions.md"), meta: {"title":"Permissions"} }],
+  ["/guide/plans.html", { loader: () => import(/* webpackChunkName: "guide_plans.html" */"/Users/kyle/personal/vixl/docs/guide/plans.md"), meta: {"title":"Plans"} }],
+  ["/guide/projects-bar.html", { loader: () => import(/* webpackChunkName: "guide_projects-bar.html" */"/Users/kyle/personal/vixl/docs/guide/projects-bar.md"), meta: {"title":"Projects Bar"} }],
+  ["/guide/providers.html", { loader: () => import(/* webpackChunkName: "guide_providers.html" */"/Users/kyle/personal/vixl/docs/guide/providers.md"), meta: {"title":"Providers"} }],
+  ["/guide/rules.html", { loader: () => import(/* webpackChunkName: "guide_rules.html" */"/Users/kyle/personal/vixl/docs/guide/rules.md"), meta: {"title":"Rules"} }],
+  ["/guide/settings-json.html", { loader: () => import(/* webpackChunkName: "guide_settings-json.html" */"/Users/kyle/personal/vixl/docs/guide/settings-json.md"), meta: {"title":"settings.json"} }],
+  ["/guide/skills.html", { loader: () => import(/* webpackChunkName: "guide_skills.html" */"/Users/kyle/personal/vixl/docs/guide/skills.md"), meta: {"title":"Skills"} }],
+  ["/guide/terminal.html", { loader: () => import(/* webpackChunkName: "guide_terminal.html" */"/Users/kyle/personal/vixl/docs/guide/terminal.md"), meta: {"title":"Terminal"} }],
+  ["/404.html", { loader: () => import(/* webpackChunkName: "404.html" */"/Users/kyle/personal/vixl/docs/.vuepress/.temp/pages/404.html.vue"), meta: {"title":""} }],
+]);

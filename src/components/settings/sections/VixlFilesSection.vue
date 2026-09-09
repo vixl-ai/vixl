@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, onMounted, ref, watch } from 'vue'
-import { FileText, Folder, FolderSymlink, MessageSquare, Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import {
@@ -9,17 +9,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@/components/shadcn/ui/empty'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/shadcn/ui/empty'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import VixlFileCreateHost from '@/components/settings/vixl-files/VixlFileCreateHost.vue'
 import VixlFileListItem from '@/components/settings/vixl-files/VixlFileListItem.vue'
 import SettingsCollapsibleSection from '@/components/settings/SettingsCollapsibleSection.vue'
@@ -29,10 +20,7 @@ import useFleetRegistry from '@/composables/use-fleet-registry'
 import useStartVixlFilesChat from '@/composables/use-start-vixl-files-chat'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import type { SettingsTab } from '@/composables/use-vixl-config'
-import {
-  lastVixlFileChange,
-  vixlFileChangeToken,
-} from '@/composables/use-vixl-live-sync'
+import { lastVixlFileChange, vixlFileChangeToken } from '@/composables/use-vixl-live-sync'
 import { HOME_WORKSPACE_ID } from '@/constants/home-chat'
 import type { VixlFilesKind } from '@/services/vixl/vixl-tauri'
 import {
@@ -70,9 +58,7 @@ const projectRoot = computed(() =>
   props.tab === 'project' ? (config.activeRootPath.value ?? undefined) : undefined,
 )
 
-const usesCreateMenu = computed(
-  () => props.kind === 'plans',
-)
+const usesCreateMenu = computed(() => props.kind === 'plans')
 
 const NEW_ITEM_TOOLTIPS: Record<VixlFilesKind, string> = {
   plans: 'New plan',
@@ -95,12 +81,7 @@ const toastLoadError = (error: unknown): void => {
 }
 
 const isAlreadyExistsError = (error: unknown): boolean => {
-  const raw =
-    error instanceof Error
-      ? error.message
-      : typeof error === 'string'
-        ? error
-        : ''
+  const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
   const message = raw.toLowerCase()
   return (
     message.includes('already exists') ||
@@ -237,22 +218,17 @@ watch(vixlFileChangeToken, async () => {
           <span class="inline-flex shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  class="h-8 w-8"
-                  :aria-label="newItemTooltip"
-                >
-                  <Plus class="h-4 w-4" />
+                <Button variant="ghost" size="icon" class="h-8 w-8" :aria-label="newItemTooltip">
+                  <AppIcon name="plus" class="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" class="w-40">
                 <DropdownMenuItem @click="handleSelectChat">
-                  <MessageSquare class="mr-2 h-4 w-4" />
+                  <AppIcon name="message-square" class="mr-2 h-4 w-4" />
                   Chat
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="handleSelectForm">
-                  <FileText class="mr-2 h-4 w-4" />
+                  <AppIcon name="file-text" class="mr-2 h-4 w-4" />
                   Form
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -271,7 +247,7 @@ watch(vixlFileChangeToken, async () => {
             :aria-label="newItemTooltip"
             @click="handleSelectForm"
           >
-            <Plus class="h-4 w-4" />
+            <AppIcon name="plus" class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{{ newItemTooltip }}</TooltipContent>
@@ -286,7 +262,7 @@ watch(vixlFileChangeToken, async () => {
             aria-label="Reveal in folder"
             @click="revealRoot"
           >
-            <FolderSymlink class="h-4 w-4" />
+            <AppIcon name="folder-symlink" class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Reveal in folder</TooltipContent>
@@ -300,17 +276,13 @@ watch(vixlFileChangeToken, async () => {
     >
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <Folder />
+          <AppIcon name="folder" />
         </EmptyMedia>
         <EmptyTitle>{{ emptyMessage }}</EmptyTitle>
       </EmptyHeader>
     </Empty>
 
-    <div
-      v-else
-      class="flex flex-col gap-2"
-      :class="collapsible ? undefined : 'flex-1 min-h-0'"
-    >
+    <div v-else class="flex flex-col gap-2" :class="collapsible ? undefined : 'flex-1 min-h-0'">
       <VixlFileListItem
         v-for="file in files"
         :key="file.path"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { ChevronRightIcon } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
@@ -20,8 +20,13 @@ const { parameters } = useSchemaDisplayContext('SchemaDisplayParameters')
 
 <template>
   <Collapsible :class="cn(props.class)" :default-open="true" v-bind="$attrs">
-    <CollapsibleTrigger class="group flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50">
-      <ChevronRightIcon class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+    <CollapsibleTrigger
+      class="group flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+    >
+      <AppIcon
+        name="chevron-right"
+        class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+      />
       <span class="font-medium text-sm">Parameters</span>
       <Badge class="ml-auto text-xs" variant="secondary">
         {{ parameters?.length }}
@@ -30,11 +35,7 @@ const { parameters } = useSchemaDisplayContext('SchemaDisplayParameters')
     <CollapsibleContent>
       <div class="divide-y border-t">
         <slot>
-          <SchemaDisplayParameter
-            v-for="param in parameters"
-            :key="param.name"
-            v-bind="param"
-          />
+          <SchemaDisplayParameter v-for="param in parameters" :key="param.name" v-bind="param" />
         </slot>
       </div>
     </CollapsibleContent>

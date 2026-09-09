@@ -8,9 +8,7 @@ interface Props extends /* @vue-ignore */ HTMLAttributes {
   class?: HTMLAttributes['class']
 }
 
-type PathSegment =
-  | { kind: 'text'; value: string }
-  | { kind: 'param'; value: string }
+type PathSegment = { kind: 'text'; value: string } | { kind: 'param'; value: string }
 
 const props = defineProps<Props>()
 
@@ -40,19 +38,12 @@ const pathSegments = computed((): PathSegment[] => {
 </script>
 
 <template>
-  <span
-    :class="cn('font-mono text-sm', props.class)"
-    v-bind="$attrs"
-  >
+  <span :class="cn('font-mono text-sm', props.class)" v-bind="$attrs">
     <slot>
-      <template
-        v-for="(segment, index) in pathSegments"
-        :key="`${segment.kind}-${index}`"
-      >
-        <span
-          v-if="segment.kind === 'param'"
-          class="text-blue-600 dark:text-blue-400"
-        >{{ segment.value }}</span>
+      <template v-for="(segment, index) in pathSegments" :key="`${segment.kind}-${index}`">
+        <span v-if="segment.kind === 'param'" class="text-blue-600 dark:text-blue-400">{{
+          segment.value
+        }}</span>
         <template v-else>{{ segment.value }}</template>
       </template>
     </slot>

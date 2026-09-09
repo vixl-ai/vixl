@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { Component } from 'vue'
-import { ExternalLinkIcon } from '@lucide/vue'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 
 interface Props {
@@ -14,17 +14,12 @@ const props = defineProps<Props>()
 
 <template>
   <DropdownMenuItem v-bind="$attrs" as-child>
-    <a
-      :href="props.href"
-      class="flex items-center gap-2"
-      rel="noopener"
-      target="_blank"
-    >
+    <a :href="props.href" class="flex items-center gap-2" rel="noopener" target="_blank">
       <span class="shrink-0">
         <component :is="props.icon" />
       </span>
       <span class="flex-1">{{ props.title }}</span>
-      <ExternalLinkIcon class="size-4 shrink-0" />
+      <AppIcon name="external-link" class="size-4 shrink-0" />
     </a>
   </DropdownMenuItem>
 </template>

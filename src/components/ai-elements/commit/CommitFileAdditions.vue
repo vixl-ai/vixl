@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { PlusIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 interface Props extends /* @vue-ignore */ HTMLAttributes {
@@ -18,7 +18,7 @@ const props = defineProps<Props>()
     v-bind="$attrs"
   >
     <slot>
-      <PlusIcon class="inline-block size-3" />
+      <AppIcon name="plus" class="inline-block size-3" />
       {{ props.count }}
     </slot>
   </span>

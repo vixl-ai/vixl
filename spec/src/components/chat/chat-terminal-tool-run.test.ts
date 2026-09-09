@@ -1,16 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
+import { AppIcon } from '@/icons'
 import { shallowMount } from '@vue/test-utils'
-import { ChevronRightIcon } from '@lucide/vue'
 import ChatTerminalToolRun from '@/components/chat/ChatTerminalToolRun.vue'
 import {
   TerminalCopyButton,
   TerminalHeader,
   TerminalTitle,
 } from '@/components/ai-elements/terminal'
-import {
-  Collapsible,
-  CollapsibleTrigger,
-} from '@/components/shadcn/ui/collapsible'
+import { Collapsible, CollapsibleTrigger } from '@/components/shadcn/ui/collapsible'
 import type { ToolRun } from '@/types/harness/tool-run'
 
 vi.mock('vue-router', () => ({
@@ -75,7 +72,7 @@ describe('ChatTerminalToolRun layout', () => {
     await collapsible.vm.$emit('update:open', true)
 
     expect(trigger(wrapper)?.exists()).toBe(true)
-    expect(wrapper.findComponent(ChevronRightIcon).classes()).toContain('rotate-90')
+    expect(wrapper.findComponent(AppIcon).classes()).toContain('rotate-90')
   })
 
   it('does not render TerminalHeader or TerminalTitle', () => {

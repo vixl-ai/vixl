@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronsUpDownIcon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/ui/button'
 import { PopoverTrigger } from '@/components/ui/popover'
 import { useResizeObserver } from '@vueuse/core'
@@ -22,8 +22,7 @@ const triggerRef = ref<InstanceType<typeof Button> | null>(null)
 
 useResizeObserver(triggerRef, (entries) => {
   const entry = entries[0]
-  if (!entry)
-    return
+  if (!entry) return
   const newWidth = (entry.target as HTMLElement).offsetWidth
   if (newWidth) {
     setWidth(newWidth)
@@ -33,16 +32,9 @@ useResizeObserver(triggerRef, (entries) => {
 
 <template>
   <PopoverTrigger as-child>
-    <Button
-      ref="triggerRef"
-      variant="outline"
-      v-bind="forwardedProps"
-    >
+    <Button ref="triggerRef" variant="outline" v-bind="forwardedProps">
       <slot />
-      <ChevronsUpDownIcon
-        class="shrink-0 text-muted-foreground"
-        :size="16"
-      />
+      <AppIcon name="chevrons-up-down" class="shrink-0 text-muted-foreground" :size="16" />
     </Button>
   </PopoverTrigger>
 </template>

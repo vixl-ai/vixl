@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import type { AccordionTriggerProps } from "reka-ui"
-import type { HTMLAttributes } from "vue"
-import { ChevronDown } from "@lucide/vue"
-import { reactiveOmit } from "@vueuse/core"
-import {
-  AccordionHeader,
-  AccordionTrigger,
-} from "reka-ui"
-import { cn } from "@/lib/utils"
+import { AppIcon } from '@/icons'
+import type { AccordionTriggerProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
+import { reactiveOmit } from '@vueuse/core'
+import { AccordionHeader, AccordionTrigger } from 'reka-ui'
+import { cn } from '@/lib/utils'
 
-const props = defineProps<AccordionTriggerProps & { class?: HTMLAttributes["class"] }>()
+const props = defineProps<AccordionTriggerProps & { class?: HTMLAttributes['class'] }>()
 
-const delegatedProps = reactiveOmit(props, "class")
+const delegatedProps = reactiveOmit(props, 'class')
 </script>
 
 <template>
@@ -28,7 +25,8 @@ const delegatedProps = reactiveOmit(props, "class")
     >
       <slot />
       <slot name="icon">
-        <ChevronDown
+        <AppIcon
+          name="chevron-down"
           class="text-muted-foreground pointer-events-none size-4 shrink-0 translate-y-0.5 transition-transform duration-200"
         />
       </slot>

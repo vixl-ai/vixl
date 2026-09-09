@@ -15,6 +15,4 @@ export type ResolveCatalogMatchesError = {
   error: string
 }
 
-export type ResolveCatalogMatchesResult =
-  | ResolveCatalogMatchesOk
-  | ResolveCatalogMatchesError
+export type ResolveCatalogMatchesResult = ResolveCatalogMatchesOk | ResolveCatalogMatchesError

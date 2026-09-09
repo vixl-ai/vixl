@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { XIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useAttachmentContext } from './context'
@@ -32,20 +32,18 @@ const handleClick = (e: Event): void => {
     :aria-label="props.label"
     :class="
       cn(
-        variant === 'grid'
-          && [
-            'absolute top-2 right-2 size-6 rounded-full p-0',
-            'bg-background',
-            'opacity-0 transition-opacity group-hover:opacity-100',
-            'hover:bg-background',
-            '[&>svg]:size-3',
-          ],
-        variant === 'inline'
-          && [
-            'size-5 rounded p-0',
-            'opacity-0 transition-opacity group-hover:opacity-100',
-            '[&>svg]:size-2.5',
-          ],
+        variant === 'grid' && [
+          'absolute top-2 right-2 size-6 rounded-full p-0',
+          'bg-background',
+          'opacity-0 transition-opacity group-hover:opacity-100',
+          'hover:bg-background',
+          '[&>svg]:size-3',
+        ],
+        variant === 'inline' && [
+          'size-5 rounded p-0',
+          'opacity-0 transition-opacity group-hover:opacity-100',
+          '[&>svg]:size-2.5',
+        ],
         variant === 'list' && ['size-8 shrink-0 rounded p-0', '[&>svg]:size-4'],
         props.class,
       )
@@ -56,7 +54,7 @@ const handleClick = (e: Event): void => {
     @click="handleClick"
   >
     <slot>
-      <XIcon />
+      <AppIcon name="x" />
     </slot>
     <span class="sr-only">{{ props.label }}</span>
   </Button>

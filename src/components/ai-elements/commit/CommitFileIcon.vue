@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { FileIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
@@ -9,7 +9,8 @@ const props = defineProps<{
 </script>
 
 <template>
-  <FileIcon
+  <AppIcon
+    name="file"
     :class="cn('size-3.5 shrink-0 text-muted-foreground', props.class)"
     v-bind="$attrs"
   />

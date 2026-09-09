@@ -22,12 +22,7 @@ export type ProjectFileEntry = {
   description?: string | null
 }
 
-export type VixlFilesKind =
-  | 'agents'
-  | 'agents-md'
-  | 'rules'
-  | 'skills'
-  | 'plans'
+export type VixlFilesKind = 'agents' | 'agents-md' | 'rules' | 'skills' | 'plans'
 
 export type McpToolInfo = {
   name: string
@@ -73,13 +68,7 @@ export type ChatMetaRecord = {
   mode: string
   model: string
   status: 'idle' | 'running'
-  attention?:
-    | 'needs_approval'
-    | 'needs_input'
-    | 'needs_mcp_auth'
-    | 'completed'
-    | 'error'
-    | null
+  attention?: 'needs_approval' | 'needs_input' | 'needs_mcp_auth' | 'completed' | 'error' | null
 
   createdAt: string
   updatedAt: string

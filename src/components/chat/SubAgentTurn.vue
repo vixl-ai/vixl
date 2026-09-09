@@ -1,22 +1,12 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  CheckCircle2Icon,
-  CircleAlertIcon,
-  ExternalLinkIcon,
-  OctagonXIcon,
-  SquareIcon,
-} from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import NavigationAsideLeftChatRunningDots from '@/components/navigation/aside/left/ChatRunningDots.vue'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import type { SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 import { HOME_CHAT_SLUG, isHomeChatSlug } from '@/constants/home-chat'
 import chatRouteFor from '@/utils/chat-route-for'
@@ -44,12 +34,12 @@ const activityLabel = computed(() => deriveSubagentActivity(props.subagent))
 
 const statusIcon = computed(() => {
   if (props.subagent.status === 'stopped') {
-    return OctagonXIcon
+    return 'octagon-x'
   }
   if (props.subagent.status === 'error') {
-    return CircleAlertIcon
+    return 'circle-alert'
   }
-  return CheckCircle2Icon
+  return 'circle-check-big'
 })
 
 const statusIconClass = computed(() => {
@@ -72,13 +62,9 @@ const openSubagentChat = async (): Promise<void> => {
     route.name === 'home-chat' ||
     route.name === 'home-chat-subagent' ||
     isHomeChatSlug(String(route.params.slug ?? ''))
-  const projectSlug = isStandalone
-    ? HOME_CHAT_SLUG
-    : String(route.params.slug ?? '')
+  const projectSlug = isStandalone ? HOME_CHAT_SLUG : String(route.params.slug ?? '')
   try {
-    await router.push(
-      chatRouteFor(projectSlug, chatId, props.subagent.subagentId),
-    )
+    await router.push(chatRouteFor(projectSlug, chatId, props.subagent.subagentId))
   } catch (error) {
     toast.error('Failed to open sub-agent', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -99,19 +85,14 @@ const handleStop = (): void => {
         class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
         @click="openSubagentChat"
       >
-        <NavigationAsideLeftChatRunningDots
-          v-if="isRunning"
-        />
-        <component
-          :is="statusIcon"
-          v-else
-          :class="statusIconClass"
-        />
+        <NavigationAsideLeftChatRunningDots v-if="isRunning" />
+        <AppIcon v-else :name="statusIcon" :class="statusIconClass" />
         <span class="min-w-0 flex-1">
           <span
             v-if="modelLabel"
             class="block truncate text-[10px] leading-tight text-muted-foreground/80"
-          >{{ modelLabel }}</span>
+            >{{ modelLabel }}</span
+          >
           <span class="block truncate text-foreground/90">{{ displayName }}</span>
           <AiElementsShimmerShimmer
             v-if="activityLabel"
@@ -132,7 +113,7 @@ const handleStop = (): void => {
               aria-label="Stop sub-agent"
               @click.stop="handleStop"
             >
-              <SquareIcon class="size-3" />
+              <AppIcon name="square" class="size-3" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Stop sub-agent</TooltipContent>
@@ -147,7 +128,7 @@ const handleStop = (): void => {
               aria-label="Open sub-agent"
               @click.stop="openSubagentChat"
             >
-              <ExternalLinkIcon class="size-3.5" />
+              <AppIcon name="external-link" class="size-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Open sub-agent</TooltipContent>

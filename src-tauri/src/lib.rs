@@ -22,14 +22,15 @@ use commands::{
     move_chat_to_workspace, oauth_begin_loopback, oauth_cancel_loopback, open_external_url,
     open_project_at_path, open_project_at_path_command, pin_chat, read_chat_messages,
     read_chat_meta, read_chat_usage, read_json_file, read_lsp_config, read_mcp_config,
-    read_settings, registry_add_project, registry_list_projects, registry_remove_project,
-    registry_set_active_project, registry_update_project_root, resolve_launch_path,
-    reveal_in_folder, set_mcp_server_enabled, set_secret, shell_kill_pty, shell_kill_tracked,
-    shell_resize_pty, shell_spawn_pty, shell_spawn_tracked, shell_write_pty, truncate_chat_log,
-    update_chat_meta, watch_git_head, watch_vixl_paths, web_fetch, workbench_load_session,
-    workbench_replace_session, workspace_glob, workspace_grep, write_chat_usage, write_json_file,
-    write_lsp_config, write_mcp_config, write_settings, write_temp_bytes, write_temp_handoff,
-    write_text_file, GitHeadWatchState, OAuthLoopbackState, WatchState,
+    read_settings, read_theme_file, registry_add_project, registry_list_projects,
+    registry_remove_project, registry_set_active_project, registry_update_project_root,
+    resolve_launch_path, reveal_in_folder, set_mcp_server_enabled, set_secret, shell_kill_pty,
+    shell_kill_tracked, shell_resize_pty, shell_spawn_pty, shell_spawn_tracked, shell_write_pty,
+    truncate_chat_log, update_chat_meta, watch_git_head, watch_vixl_paths, web_fetch,
+    workbench_load_session, workbench_replace_session, workspace_glob, workspace_grep,
+    write_chat_usage, write_json_file, write_lsp_config, write_mcp_config, write_settings,
+    write_temp_bytes, write_temp_handoff, write_text_file, write_theme_file, GitHeadWatchState,
+    OAuthLoopbackState, WatchState,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -217,6 +218,8 @@ pub fn run_with_launch_path(launch_path: Option<String>) {
         lsp_set_server_disabled,
         read_lsp_config,
         write_lsp_config,
+        read_theme_file,
+        write_theme_file,
     ]);
 
     builder

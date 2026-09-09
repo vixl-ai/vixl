@@ -12,9 +12,7 @@ const props = defineProps<Props>()
 const failed = ref(false)
 
 /** models.dev "gateway" mark is a 4-spark glyph that reads as tildes; use Vercel. */
-const logoId = computed(() =>
-  props.provider === 'gateway' ? 'vercel' : props.provider,
-)
+const logoId = computed(() => (props.provider === 'gateway' ? 'vercel' : props.provider))
 
 const handleLogoError = (): void => {
   failed.value = true
@@ -35,5 +33,5 @@ watch(logoId, () => {
     :src="`https://models.dev/logos/${logoId}.svg`"
     width="12"
     @error="handleLogoError"
-  >
+  />
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
 import type { SchemaProperty } from './context'
-import { ChevronRightIcon } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
@@ -23,13 +23,18 @@ const paddingLeft = computed(() => 40 + props.depth * 16)
 <template>
   <Collapsible v-if="hasChildren" :default-open="depth < 2">
     <CollapsibleTrigger
-      :class="cn(
-        'group flex w-full items-center gap-2 py-3 text-left transition-colors hover:bg-muted/50',
-        props.class,
-      )"
+      :class="
+        cn(
+          'group flex w-full items-center gap-2 py-3 text-left transition-colors hover:bg-muted/50',
+          props.class,
+        )
+      "
       :style="{ paddingLeft: `${paddingLeft}px` }"
     >
-      <ChevronRightIcon class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+      <AppIcon
+        name="chevron-right"
+        class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+      />
       <span class="font-mono text-sm">{{ name }}</span>
       <Badge class="text-xs" variant="outline">
         {{ type }}
@@ -57,12 +62,7 @@ const paddingLeft = computed(() => 40 + props.depth * 16)
           v-bind="prop"
           :depth="depth + 1"
         />
-        <SchemaDisplayProperty
-          v-if="items"
-          v-bind="items"
-          :depth="depth + 1"
-          :name="`${name}[]`"
-        />
+        <SchemaDisplayProperty v-if="items" v-bind="items" :depth="depth + 1" :name="`${name}[]`" />
       </div>
     </CollapsibleContent>
   </Collapsible>
@@ -74,7 +74,8 @@ const paddingLeft = computed(() => 40 + props.depth * 16)
     v-bind="$attrs"
   >
     <div class="flex items-center gap-2">
-      <span class="size-4" /> <!-- Spacer for alignment -->
+      <span class="size-4" />
+      <!-- Spacer for alignment -->
       <span class="font-mono text-sm">{{ name }}</span>
       <Badge class="text-xs" variant="outline">
         {{ type }}

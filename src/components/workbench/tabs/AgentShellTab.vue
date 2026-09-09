@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed } from 'vue'
-import { SquareIcon } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
   Terminal,
@@ -13,11 +13,7 @@ import {
 } from '@/components/ai-elements/terminal'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   agentShellRevision,
   getAgentShell,
@@ -31,9 +27,7 @@ const props = defineProps<{
 
 const shellId = computed(() => (props.tab.payload as AgentShellPayload).shellId)
 
-const shell = computed(() =>
-  agentShellRevision.value >= 0 ? getAgentShell(shellId.value) : null,
-)
+const shell = computed(() => (agentShellRevision.value >= 0 ? getAgentShell(shellId.value) : null))
 
 const output = computed(() => {
   const record = shell.value
@@ -77,11 +71,7 @@ const handleStop = async (): Promise<void> => {
     >
       <TerminalHeader>
         <TerminalTitle class="min-w-0 truncate">
-          <AiElementsShimmerShimmer
-            v-if="isStreaming"
-            :duration="1"
-            as="span"
-          >
+          <AiElementsShimmerShimmer v-if="isStreaming" :duration="1" as="span">
             {{ title }}
           </AiElementsShimmerShimmer>
           <template v-else>{{ title }}</template>
@@ -99,7 +89,7 @@ const handleStop = async (): Promise<void> => {
                   aria-label="Stop terminal"
                   @click.stop="handleStop"
                 >
-                  <SquareIcon class="size-3.5" />
+                  <AppIcon name="square" class="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Stop terminal</TooltipContent>

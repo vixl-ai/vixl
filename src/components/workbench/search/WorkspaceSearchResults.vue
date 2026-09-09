@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronRight } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { toast } from 'vue-sonner'
 import {
   Collapsible,
@@ -50,12 +50,7 @@ const lineParts = (hit: GrepMatch): LinePart[] => {
   const line = hit.line
   const start = hit.startColumn
   const end = hit.endColumn
-  if (
-    typeof start !== 'number'
-    || typeof end !== 'number'
-    || start < 1
-    || end <= start
-  ) {
+  if (typeof start !== 'number' || typeof end !== 'number' || start < 1 || end <= start) {
     return [{ text: line, hit: false }]
   }
   const from = start - 1
@@ -98,10 +93,7 @@ const handleReplaceFile = async (path: string): Promise<void> => {
 
     <ScrollArea class="min-h-0 flex-1">
       <div class="px-1 py-1 font-sans text-[13px]">
-        <p
-          v-if="!hasQuery"
-          class="px-2 py-3 text-xs text-muted-foreground"
-        >
+        <p v-if="!hasQuery" class="px-2 py-3 text-xs text-muted-foreground">
           Type a search query to find matches in the project.
         </p>
         <p
@@ -119,15 +111,14 @@ const handleReplaceFile = async (path: string): Promise<void> => {
         >
           <div class="group flex w-full items-center gap-1 rounded px-1.5 py-1 hover:bg-muted/50">
             <CollapsibleTrigger as-child>
-              <button
-                type="button"
-                class="flex min-w-0 flex-1 items-center gap-1 text-left"
-              >
-                <ChevronDown
+              <button type="button" class="flex min-w-0 flex-1 items-center gap-1 text-left">
+                <AppIcon
+                  name="chevron-down"
                   v-if="isGroupOpen(group.path)"
                   class="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                 />
-                <ChevronRight
+                <AppIcon
+                  name="chevron-right"
                   v-else
                   class="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                 />
@@ -168,10 +159,9 @@ const handleReplaceFile = async (path: string): Promise<void> => {
                   v-for="(part, partIndex) in lineParts(hit)"
                   :key="`${hitKey(hit, index)}:${partIndex}`"
                 >
-                  <mark
-                    v-if="part.hit"
-                    class="rounded-sm bg-yellow-500/30 text-foreground"
-                  >{{ part.text }}</mark>
+                  <mark v-if="part.hit" class="rounded-sm bg-yellow-500/30 text-foreground">{{
+                    part.text
+                  }}</mark>
                   <template v-else>{{ part.text }}</template>
                 </template>
               </span>

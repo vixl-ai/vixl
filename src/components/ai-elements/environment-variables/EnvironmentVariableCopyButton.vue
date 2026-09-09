@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { CheckIcon, CopyIcon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { computed, ref } from 'vue'
@@ -27,8 +27,6 @@ const emit = defineEmits<{
 const isCopied = ref(false)
 const { name, value } = useEnvironmentVariableContext()
 
-const icon = computed(() => (isCopied.value ? CheckIcon : CopyIcon))
-
 async function copyToClipboard() {
   if (typeof window === 'undefined' || !navigator?.clipboard?.writeText) {
     const error = new Error('Clipboard API not available')
@@ -39,8 +37,7 @@ async function copyToClipboard() {
   let textToCopy = value
   if (props.copyFormat === 'name') {
     textToCopy = name
-  }
-  else if (props.copyFormat === 'export') {
+  } else if (props.copyFormat === 'export') {
     textToCopy = `export ${name}="${value}"`
   }
 
@@ -51,8 +48,7 @@ async function copyToClipboard() {
     setTimeout(() => {
       isCopied.value = false
     }, props.timeout)
-  }
-  catch (error) {
+  } catch (error) {
     const err = error as Error
     emit('error', err)
   }
@@ -68,7 +64,7 @@ async function copyToClipboard() {
     @click="copyToClipboard"
   >
     <slot>
-      <component :is="icon" :size="12" />
+      <AppIcon :name="isCopied ? 'check' : 'copy'" :size="12" />
     </slot>
   </Button>
 </template>

@@ -1,12 +1,8 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { SettingsTab } from '@/composables/use-vixl-config'
-import { KeyRound, Loader2, Pencil, Plus, RefreshCw, Settings2, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import { Input } from '@/components/shadcn/ui/input'
 import {
   Dialog,
@@ -72,7 +68,7 @@ const {
             aria-label="Add provider"
             @click="openAddDialog"
           >
-            <Plus class="h-4 w-4" />
+            <AppIcon name="plus" class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Add provider</TooltipContent>
@@ -104,11 +100,14 @@ const {
                   : providerRequiresApiKey(providerId, settings)
                     ? 'No API key'
                     : 'API key optional'
-              }}<template v-if="isCustomProvider(providerId)">, {{
+              }}<template v-if="isCustomProvider(providerId)"
+                >,
+                {{
                   getCustomModelCount(providerId) > 0
                     ? `${getCustomModelCount(providerId)} model${getCustomModelCount(providerId) === 1 ? '' : 's'}`
                     : 'No models configured'
-                }}</template>
+                }}</template
+              >
             </p>
           </div>
           <div class="flex items-center gap-0.5">
@@ -127,8 +126,8 @@ const {
                   "
                   @click="openEditDialog(providerId)"
                 >
-                  <Settings2 v-if="isCustomProvider(providerId)" class="h-4 w-4" />
-                  <Pencil v-else class="h-4 w-4" />
+                  <AppIcon name="settings-2" v-if="isCustomProvider(providerId)" class="h-4 w-4" />
+                  <AppIcon name="pencil" v-else class="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -151,11 +150,12 @@ const {
                   :disabled="testingProviderId === providerId"
                   @click="testConnection(providerId)"
                 >
-                  <Loader2
+                  <AppIcon
+                    name="loader"
                     v-if="testingProviderId === providerId"
                     class="h-4 w-4 animate-spin"
                   />
-                  <RefreshCw v-else class="h-4 w-4" />
+                  <AppIcon name="refresh-cw" v-else class="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Test connection</TooltipContent>
@@ -169,7 +169,7 @@ const {
                   aria-label="Clear key"
                   @click="clearApiKey(providerId)"
                 >
-                  <KeyRound class="h-4 w-4" />
+                  <AppIcon name="key-round" class="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Clear key</TooltipContent>
@@ -183,7 +183,7 @@ const {
                   aria-label="Remove provider"
                   @click="removeProvider(providerId)"
                 >
-                  <Trash2 class="h-4 w-4" />
+                  <AppIcon name="trash" class="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Remove</TooltipContent>
@@ -252,9 +252,7 @@ const {
       :mode="manageMode"
       :provider-id="manageProviderId"
       :initial-provider="manageInitialProvider"
-      :initial-api-key-configured="
-        manageProviderId ? hasApiKeyInKeychain(manageProviderId) : false
-      "
+      :initial-api-key-configured="manageProviderId ? hasApiKeyInKeychain(manageProviderId) : false"
       :resolve-stored-api-key="resolveManageStoredApiKey"
       @save="handleManageSave"
     />

@@ -20,6 +20,7 @@ pub mod registry;
 pub mod sandbox;
 pub mod search;
 pub mod shell;
+pub mod theme_files;
 pub mod watch;
 pub mod web_fetch;
 pub mod workbench;
@@ -72,6 +73,7 @@ pub use shell::{
     reveal_in_folder, shell_kill_pty, shell_kill_tracked, shell_resize_pty, shell_spawn_pty,
     shell_spawn_tracked, shell_write_pty,
 };
+pub use theme_files::{read_theme_file, write_theme_file};
 pub use watch::{watch_vixl_paths, WatchState};
 pub use web_fetch::web_fetch;
 pub use workbench::{

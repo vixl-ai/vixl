@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import {
-  FileCode,
-  GitBranch,
-  Terminal,
-} from '@lucide/vue'
+import { AppIcon, type AppIconName } from '@/icons'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   DropdownMenu,
@@ -13,11 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 
@@ -36,10 +28,15 @@ const workbench = useWorkbenchStore()
 const open = ref(false)
 
 const items = [
-  { id: 'editor', label: 'Editor', icon: FileCode, requiresProject: false },
-  { id: 'terminal', label: 'Terminal', icon: Terminal, requiresProject: false },
-  { id: 'changes', label: 'Changes', icon: GitBranch, requiresProject: true },
-] as const
+  { id: 'editor', label: 'Editor', icon: 'file-code', requiresProject: false },
+  { id: 'terminal', label: 'Terminal', icon: 'terminal', requiresProject: false },
+  { id: 'changes', label: 'Changes', icon: 'git-branch', requiresProject: true },
+] as const satisfies readonly {
+  id: string
+  label: string
+  icon: AppIconName
+  requiresProject: boolean
+}[]
 
 const activeProjectId = computed(() => fleet.activeProjectId.value)
 
@@ -52,10 +49,7 @@ const handleOpen = async (type: (typeof items)[number]['id']): Promise<void> => 
   try {
     switch (type) {
       case 'editor':
-        await workbench.openEditor(
-          projectId,
-          activeProjectId.value ? 'README.md' : '',
-        )
+        await workbench.openEditor(projectId, activeProjectId.value ? 'README.md' : '')
         break
       case 'terminal':
         await workbench.openTerminal(projectId)
@@ -103,7 +97,7 @@ const handleOpen = async (type: (typeof items)[number]['id']): Promise<void> => 
               :disabled="isItemDisabled(item)"
               @click="handleOpen(item.id)"
             >
-              <component :is="item.icon" class="mr-2 h-4 w-4" />
+              <AppIcon :name="item.icon" class="mr-2 h-4 w-4" />
               {{ item.label }}
             </DropdownMenuItem>
           </DropdownMenuContent>

@@ -1,5 +1,1 @@
-export type PricingSource =
-  | 'provider_reported'
-  | 'user_configured'
-  | 'catalog_estimate'
-  | 'none'
+export type PricingSource = 'provider_reported' | 'user_configured' | 'catalog_estimate' | 'none'

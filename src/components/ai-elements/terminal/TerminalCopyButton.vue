@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckIcon, CopyIcon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { computed, ref } from 'vue'
@@ -23,8 +23,6 @@ const emit = defineEmits<{
 const { output } = useTerminalContext('TerminalCopyButton')
 const isCopied = ref(false)
 
-const Icon = computed(() => (isCopied.value ? CheckIcon : CopyIcon))
-
 async function copyToClipboard() {
   if (typeof window === 'undefined' || !navigator?.clipboard?.writeText) {
     emit('error', new Error('Clipboard API not available'))
@@ -38,8 +36,7 @@ async function copyToClipboard() {
     setTimeout(() => {
       isCopied.value = false
     }, props.timeout)
-  }
-  catch (error) {
+  } catch (error) {
     emit('error', error as Error)
   }
 }
@@ -47,17 +44,14 @@ async function copyToClipboard() {
 
 <template>
   <Button
-    :class="cn(
-      'size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
-      props.class,
-    )"
+    :class="cn('size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100', props.class)"
     size="icon"
     variant="ghost"
     v-bind="$attrs"
     @click="copyToClipboard"
   >
     <slot>
-      <component :is="Icon" :size="14" />
+      <AppIcon :name="isCopied ? 'check' : 'copy'" :size="14" />
     </slot>
   </Button>
 </template>

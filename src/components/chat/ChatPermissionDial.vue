@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
+import type { AppIconName } from '@/icons'
 import { computed, ref } from 'vue'
-import { CheckIcon, ShieldIcon, ShieldCheckIcon, ShieldOffIcon } from '@lucide/vue'
 import type { PermissionLevel } from '@/types/harness/permission'
 import {
   AlertDialog,
@@ -18,11 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import { Button } from '@/components/shadcn/ui/button'
 
 const props = defineProps<{
@@ -39,7 +36,7 @@ const open = ref(false)
 type LevelMeta = {
   label: string
   description: string
-  icon: typeof ShieldIcon
+  icon: AppIconName
   class: string
 }
 
@@ -47,29 +44,27 @@ const LEVELS: Record<PermissionLevel, LevelMeta> = {
   ask: {
     label: 'Ask',
     description: 'Prompt before each write, shell, git, or MCP action.',
-    icon: ShieldIcon,
+    icon: 'shield',
     class: 'text-foreground',
   },
   allowlist: {
     label: 'Allowlist',
     description: 'Auto-approve paths matching your glob allowlist; ask for the rest.',
-    icon: ShieldCheckIcon,
+    icon: 'shield-check',
     class: 'text-blue-500',
   },
   bypass: {
     label: 'Bypass',
     description:
       'Skip prompts for file, shell, git, web, and MCP actions. Sensitive paths still ask.',
-    icon: ShieldOffIcon,
+    icon: 'shield-off',
     class: 'text-amber-500',
   },
 }
 
 const currentMeta = computed(() => LEVELS[props.modelValue])
 
-const tooltipLabel = computed(
-  () => `Permission: ${currentMeta.value.label}`,
-)
+const tooltipLabel = computed(() => `Permission: ${currentMeta.value.label}`)
 
 const handleSelect = (level: PermissionLevel): void => {
   if (level === 'bypass' && props.modelValue !== 'bypass') {
@@ -102,12 +97,8 @@ const cancelBypass = (): void => {
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel @click="cancelBypass">
-          Cancel
-        </AlertDialogCancel>
-        <AlertDialogAction @click="confirmBypass">
-          Enable bypass
-        </AlertDialogAction>
+        <AlertDialogCancel @click="cancelBypass"> Cancel </AlertDialogCancel>
+        <AlertDialogAction @click="confirmBypass"> Enable bypass </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
@@ -117,17 +108,8 @@ const cancelBypass = (): void => {
       <span class="inline-flex shrink-0">
         <DropdownMenu v-model:open="open">
           <DropdownMenuTrigger as-child>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-7 w-7 shrink-0"
-              :aria-label="tooltipLabel"
-            >
-              <component
-                :is="currentMeta.icon"
-                class="size-3.5"
-                :class="currentMeta.class"
-              />
+            <Button variant="ghost" size="icon" class="h-7 w-7 shrink-0" :aria-label="tooltipLabel">
+              <component :is="currentMeta.icon" class="size-3.5" :class="currentMeta.class" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" class="w-60">
@@ -138,18 +120,12 @@ const cancelBypass = (): void => {
               @select="handleSelect(level as PermissionLevel)"
             >
               <div class="flex w-full items-center gap-2">
-                <component
-                  :is="meta.icon"
-                  class="size-4 shrink-0"
-                  :class="meta.class"
-                />
-                <span
-                  class="font-medium"
-                  :class="{ 'text-foreground': modelValue === level }"
-                >
+                <component :is="meta.icon" class="size-4 shrink-0" :class="meta.class" />
+                <span class="font-medium" :class="{ 'text-foreground': modelValue === level }">
                   {{ meta.label }}
                 </span>
-                <CheckIcon
+                <AppIcon
+                  name="check"
                   v-if="modelValue === level"
                   class="ml-auto size-3.5 shrink-0 text-foreground"
                   aria-hidden="true"

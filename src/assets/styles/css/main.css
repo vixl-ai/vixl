@@ -105,13 +105,13 @@
     linear-gradient(var(--agent-aurora-fill), var(--agent-aurora-fill)) padding-box,
     conic-gradient(
       from var(--agent-aurora-angle),
-      #b89ad4 0deg,
-      #7eb6d9 60deg,
-      #c4b5fd 120deg,
-      #7ec9a0 180deg,
-      #a894d4 240deg,
-      #7eb6d9 300deg,
-      #b89ad4 360deg
+      var(--vixl-accent-aurora-1, #b89ad4) 0deg,
+      var(--vixl-accent-aurora-2, #7eb6d9) 60deg,
+      var(--vixl-accent-aurora-3, #c4b5fd) 120deg,
+      var(--vixl-accent-aurora-4, #7ec9a0) 180deg,
+      var(--vixl-accent-aurora-5, #a894d4) 240deg,
+      var(--vixl-accent-aurora-2, #7eb6d9) 300deg,
+      var(--vixl-accent-aurora-1, #b89ad4) 360deg
     )
     border-box !important;
   background-origin: border-box !important;
@@ -158,10 +158,10 @@
 .chat-mention {
   display: inline;
   border-radius: 0.25rem;
-  background: color-mix(in oklab, #b89ad4 24%, transparent);
+  background: color-mix(in oklab, var(--vixl-accent-mention-strong, #b89ad4) 24%, transparent);
   padding: 0.05rem 0.3rem;
   font-weight: 500;
-  color: #c4b5fd;
+  color: var(--vixl-accent-mention, #c4b5fd);
   box-decoration-break: clone;
 }
 
@@ -169,20 +169,20 @@
 .chat-skill {
   display: inline;
   border-radius: 0.25rem;
-  background: color-mix(in oklab, #7ec9a0 24%, transparent);
+  background: color-mix(in oklab, var(--vixl-accent-skill-strong, #7ec9a0) 24%, transparent);
   padding: 0.05rem 0.3rem;
   font-weight: 500;
-  color: #86efac;
+  color: var(--vixl-accent-skill, #86efac);
   box-decoration-break: clone;
 }
 
 .chat-mention-match {
   font-weight: 600;
-  color: #c4b5fd;
+  color: var(--vixl-accent-mention, #c4b5fd);
 }
 
 .chat-skill-match {
   font-weight: 600;
-  color: #86efac;
+  color: var(--vixl-accent-skill, #86efac);
 }
 

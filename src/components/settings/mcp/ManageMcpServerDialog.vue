@@ -1,25 +1,13 @@
 <script setup lang="ts">
-import { Plus, Trash2 } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/shadcn/ui/button'
 import { Input } from '@/components/shadcn/ui/input'
 import { Label } from '@/components/shadcn/ui/label'
 import { Badge } from '@/components/shadcn/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-} from '@/components/shadcn/ui/dialog'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Dialog, DialogContent, DialogFooter } from '@/components/shadcn/ui/dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import SettingsInputPasswordInput from '@/components/settings/input/PasswordInput.vue'
-import type {
-  McpConfig,
-  McpInputDefinition,
-  McpServerConfig,
-} from '@/types/vixl/mcp-config'
+import type { McpConfig, McpInputDefinition, McpServerConfig } from '@/types/vixl/mcp-config'
 import useManageMcpServerDialog from '@/composables/manage-mcp-server-dialog'
 
 const props = defineProps<{
@@ -60,19 +48,12 @@ const {
 </script>
 
 <template>
-  <Dialog
-    :open="open"
-    @update:open="(value) => emit('update:open', value)"
-  >
+  <Dialog :open="open" @update:open="(value) => emit('update:open', value)">
     <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-xl">
       <div class="space-y-4">
         <div class="space-y-2">
           <Label>Server ID</Label>
-          <Input
-            v-model="draftId"
-            :disabled="mode === 'edit'"
-            placeholder="brave-search"
-          />
+          <Input v-model="draftId" :disabled="mode === 'edit'" placeholder="brave-search" />
         </div>
 
         <div class="space-y-2">
@@ -90,10 +71,7 @@ const {
         <template v-if="transport === 'stdio'">
           <div class="space-y-2">
             <Label>Command</Label>
-            <Input
-              v-model="command"
-              placeholder="npx"
-            />
+            <Input v-model="command" placeholder="npx" />
             <p class="text-xs text-muted-foreground">
               PATH basename only (for example npx, uvx, or docker). Review before trusting.
             </p>
@@ -119,7 +97,7 @@ const {
                     aria-label="Add env var"
                     @click="addEnvRow"
                   >
-                    <Plus class="h-4 w-4" />
+                    <AppIcon name="plus" class="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Add env var</TooltipContent>
@@ -131,33 +109,20 @@ const {
               class="space-y-2 rounded-md border border-border/50 p-3"
             >
               <div class="flex items-center gap-2">
-                <Input
-                  v-model="row.key"
-                  class="flex-1"
-                  placeholder="BRAVE_API_KEY"
-                />
-                <Badge
-                  v-if="row.configured && !row.value.trim()"
-                  variant="outline"
-                >
-                  Saved
-                </Badge>
+                <Input v-model="row.key" class="flex-1" placeholder="BRAVE_API_KEY" />
+                <Badge v-if="row.configured && !row.value.trim()" variant="outline"> Saved </Badge>
                 <Button
                   type="button"
                   size="icon"
                   variant="ghost"
                   @click="envRows = envRows.filter((_, i) => i !== index)"
                 >
-                  <Trash2 class="h-4 w-4" />
+                  <AppIcon name="trash" class="h-4 w-4" />
                 </Button>
               </div>
               <SettingsInputPasswordInput
                 v-model="row.value"
-                :placeholder="
-                  row.configured
-                    ? 'Leave blank to keep saved value'
-                    : 'Paste secret'
-                "
+                :placeholder="row.configured ? 'Leave blank to keep saved value' : 'Paste secret'"
               />
             </div>
           </div>
@@ -166,10 +131,7 @@ const {
         <template v-else>
           <div class="space-y-2">
             <Label>URL</Label>
-            <Input
-              v-model="url"
-              placeholder="https://example.com/mcp"
-            />
+            <Input v-model="url" placeholder="https://example.com/mcp" />
           </div>
 
           <div class="space-y-2">
@@ -190,7 +152,7 @@ const {
                     aria-label="Add header"
                     @click="addHeaderRow"
                   >
-                    <Plus class="h-4 w-4" />
+                    <AppIcon name="plus" class="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Add header</TooltipContent>
@@ -202,43 +164,27 @@ const {
               class="space-y-2 rounded-md border border-border/50 p-3"
             >
               <div class="flex items-center gap-2">
-                <Input
-                  v-model="row.key"
-                  class="flex-1"
-                  placeholder="Authorization"
-                />
-                <Badge
-                  v-if="row.configured && !row.value.trim()"
-                  variant="outline"
-                >
-                  Saved
-                </Badge>
+                <Input v-model="row.key" class="flex-1" placeholder="Authorization" />
+                <Badge v-if="row.configured && !row.value.trim()" variant="outline"> Saved </Badge>
                 <Button
                   type="button"
                   size="icon"
                   variant="ghost"
                   @click="headerRows = headerRows.filter((_, i) => i !== index)"
                 >
-                  <Trash2 class="h-4 w-4" />
+                  <AppIcon name="trash" class="h-4 w-4" />
                 </Button>
               </div>
               <SettingsInputPasswordInput
                 v-model="row.value"
-                :placeholder="
-                  row.configured
-                    ? 'Leave blank to keep saved value'
-                    : 'Paste secret'
-                "
+                :placeholder="row.configured ? 'Leave blank to keep saved value' : 'Paste secret'"
               />
             </div>
           </div>
 
           <div class="space-y-2">
             <Label>OAuth client ID (optional)</Label>
-            <Input
-              v-model="oauthClientId"
-              placeholder="Leave blank for dynamic registration"
-            />
+            <Input v-model="oauthClientId" placeholder="Leave blank for dynamic registration" />
           </div>
           <div class="space-y-2">
             <Label>Allowed authorization servers (optional)</Label>
@@ -255,19 +201,10 @@ const {
       </div>
 
       <DialogFooter>
-        <Button
-          type="button"
-          variant="outline"
-          @click="emit('update:open', false)"
-        >
+        <Button type="button" variant="outline" @click="emit('update:open', false)">
           Cancel
         </Button>
-        <Button
-          type="button"
-          @click="handleSave"
-        >
-          Save
-        </Button>
+        <Button type="button" @click="handleSave"> Save </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

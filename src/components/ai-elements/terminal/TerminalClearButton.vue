@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Trash2Icon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useTerminalContext } from './context'
@@ -16,17 +16,14 @@ const { onClear, hasClear } = useTerminalContext('TerminalClearButton')
 <template>
   <Button
     v-if="hasClear"
-    :class="cn(
-      'size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
-      props.class,
-    )"
+    :class="cn('size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100', props.class)"
     size="icon"
     variant="ghost"
     v-bind="$attrs"
     @click="onClear"
   >
     <slot>
-      <Trash2Icon :size="14" />
+      <AppIcon name="trash" :size="14" />
     </slot>
   </Button>
 </template>

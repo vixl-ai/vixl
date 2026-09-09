@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeftIcon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/ui/button'
 import { useMessageBranchContext } from './context'
 
@@ -17,7 +17,7 @@ const { goToPrevious, totalBranches } = useMessageBranchContext()
     @click="goToPrevious"
   >
     <slot>
-      <ChevronLeftIcon :size="14" />
+      <AppIcon name="chevron-left" :size="14" />
     </slot>
   </Button>
 </template>

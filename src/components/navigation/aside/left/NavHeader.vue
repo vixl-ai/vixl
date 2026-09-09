@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bot, Pin, Search } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import useCommandPalette from '@/composables/use-command-palette'
@@ -32,13 +32,13 @@ const openChat = async (projectSlug: string, chatId: string): Promise<void> => {
   <SidebarMenu class="pt-8">
     <SidebarMenuItem>
       <SidebarMenuButton tooltip="New Agent" @click="push('/')">
-        <Bot />
+        <AppIcon name="bot" />
         <span>New Agent</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
     <SidebarMenuItem>
       <SidebarMenuButton tooltip="Search" @click="commandPalette.togglePalette()">
-        <Search />
+        <AppIcon name="search" />
         <span>Search</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -46,7 +46,7 @@ const openChat = async (projectSlug: string, chatId: string): Promise<void> => {
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <SidebarMenuButton tooltip="Pinned">
-            <Pin />
+            <AppIcon name="pin" />
             <span>Pinned</span>
           </SidebarMenuButton>
         </DropdownMenuTrigger>

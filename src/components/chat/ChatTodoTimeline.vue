@@ -1,21 +1,8 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed } from 'vue'
-import {
-  CheckCircle2Icon,
-  ChevronDownIcon,
-  CircleDashedIcon,
-  CircleDotIcon,
-  CircleIcon,
-  ListTodoIcon,
-  XCircleIcon,
-} from '@lucide/vue'
 import type { TodoItem } from '@/types/harness/harness-event'
-import {
-  Task,
-  TaskContent,
-  TaskItem,
-  TaskTrigger,
-} from '@/components/ai-elements/task'
+import { Task, TaskContent, TaskItem, TaskTrigger } from '@/components/ai-elements/task'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
@@ -41,18 +28,18 @@ const defaultOpen = computed(() => inProgressCount.value > 0)
 
 const statusIcon = (status: TodoItem['status']) => {
   if (status === 'completed') {
-    return CheckCircle2Icon
+    return 'circle-check-big'
   }
   if (status === 'in_progress') {
-    return CircleDotIcon
+    return 'circle-dot'
   }
   if (status === 'cancelled') {
-    return XCircleIcon
+    return 'circle-x'
   }
   if (status === 'pending') {
-    return CircleDashedIcon
+    return 'circle-dashed'
   }
-  return CircleIcon
+  return 'circle'
 }
 
 const statusIconClass = (status: TodoItem['status']): string => {
@@ -87,20 +74,17 @@ const statusTextClass = (status: TodoItem['status']): string => {
       <div
         class="flex w-fit max-w-full cursor-pointer items-center gap-1.5 text-muted-foreground text-xs font-medium transition-colors hover:text-foreground"
       >
-        <ListTodoIcon class="size-3.5 shrink-0" />
+        <AppIcon name="list-todo" class="size-3.5 shrink-0" />
         <span class="truncate">{{ triggerTitle }}</span>
-        <ChevronDownIcon
+        <AppIcon
+          name="chevron-down"
           class="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180"
         />
       </div>
     </TaskTrigger>
     <TaskContent>
       <div class="max-h-40 space-y-1.5 overflow-y-auto">
-        <TaskItem
-          v-for="todo in todos"
-          :key="todo.id"
-          class="flex items-start gap-2 text-xs"
-        >
+        <TaskItem v-for="todo in todos" :key="todo.id" class="flex items-start gap-2 text-xs">
           <component
             :is="statusIcon(todo.status)"
             class="mt-0.5 size-3.5 shrink-0"

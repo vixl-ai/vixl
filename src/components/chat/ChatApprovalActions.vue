@@ -1,28 +1,12 @@
 <script setup lang="ts">
-import {
-  BanIcon,
-  CheckIcon,
-  ClockIcon,
-  FolderIcon,
-  InfinityIcon,
-  UnlockIcon,
-  XIcon,
-} from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import type { ApprovalResolution } from '@/services/harness/permission/approval-gate'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import type { PermissionScope } from '@/types/harness/permission'
 import approvalActionClass from '@/components/chat/approval-action-class'
-import {
-  approvalActionSpecs,
-  type ApprovalActionKey,
-} from '@/components/chat/chat-tool-card'
+import { approvalActionSpecs, type ApprovalActionKey } from '@/components/chat/chat-tool-card'
 import { Button } from '@/components/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { computed } from 'vue'
 
 const props = withDefaults(
@@ -47,28 +31,27 @@ const actions = computed(() =>
 
 const iconFor = (key: ApprovalActionKey) => {
   if (key === 'once' && props.approval.unsandboxed) {
-    return UnlockIcon
+    return 'unlock'
   }
   if (key === 'once') {
-    return CheckIcon
+    return 'check'
   }
   if (key === 'session') {
-    return ClockIcon
+    return 'clock'
   }
   if (key === 'workspace') {
-    return FolderIcon
+    return 'folder'
   }
   if (key === 'always') {
-    return InfinityIcon
+    return 'infinity'
   }
   if (key === 'never') {
-    return BanIcon
+    return 'ban'
   }
-  return XIcon
+  return 'x'
 }
 
-const actionClass = (key: ApprovalActionKey): string =>
-  approvalActionClass(key, props.tone)
+const actionClass = (key: ApprovalActionKey): string => approvalActionClass(key, props.tone)
 
 const handleAction = (key: ApprovalActionKey): void => {
   if (key === 'deny') {
@@ -88,10 +71,7 @@ const handleAction = (key: ApprovalActionKey): void => {
 
 <template>
   <div class="flex shrink-0 items-center gap-0" @click.stop>
-    <TooltipProvider
-      v-for="action in actions"
-      :key="action.key"
-    >
+    <TooltipProvider v-for="action in actions" :key="action.key">
       <Tooltip>
         <TooltipTrigger as-child>
           <Button
@@ -102,7 +82,7 @@ const handleAction = (key: ApprovalActionKey): void => {
             :aria-label="action.tooltip"
             @click.stop="handleAction(action.key)"
           >
-            <component :is="iconFor(action.key)" class="size-3.5" />
+            <AppIcon :name="iconFor(action.key)" class="size-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent class="z-60">

@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { ChevronsUpDownIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
@@ -12,13 +12,8 @@ const props = defineProps<{
 
 <template>
   <CollapsibleTrigger as-child>
-    <Button
-      :class="cn('size-8', props.class)"
-      data-slot="plan-trigger"
-      size="icon"
-      variant="ghost"
-    >
-      <ChevronsUpDownIcon class="size-4" />
+    <Button :class="cn('size-8', props.class)" data-slot="plan-trigger" size="icon" variant="ghost">
+      <AppIcon name="chevrons-up-down" class="size-4" />
       <span class="sr-only">Toggle plan</span>
     </Button>
   </CollapsibleTrigger>

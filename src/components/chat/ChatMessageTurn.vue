@@ -1,12 +1,8 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed } from 'vue'
-import { PencilIcon } from '@lucide/vue'
 import type { FileUIPart, UIMessage } from 'ai'
-import {
-  Attachment,
-  AttachmentPreview,
-  Attachments,
-} from '@/components/ai-elements/attachments'
+import { Attachment, AttachmentPreview, Attachments } from '@/components/ai-elements/attachments'
 import type { AttachmentData } from '@/components/ai-elements/attachments'
 import AiElementsMessageMessage from '@/components/ai-elements/message/Message.vue'
 import AiElementsMessageMessageAction from '@/components/ai-elements/message/MessageAction.vue'
@@ -18,9 +14,7 @@ import type { UserMessageMetadata } from '@/types/chat/user-message-metadata'
 import formatModelLabelFromRef from '@/utils/format-model-label-from-ref'
 import formatRelativeTime from '@/utils/format-relative-time'
 
-const parseMentionHighlights = (
-  value: unknown,
-): MentionHighlight[] | undefined => {
+const parseMentionHighlights = (value: unknown): MentionHighlight[] | undefined => {
   if (!Array.isArray(value)) {
     return undefined
   }
@@ -100,9 +94,7 @@ const relativeTime = computed(() => {
   return formatRelativeTime(metadata.value.createdAt)
 })
 
-const isEditing = computed(
-  () => chatStore.editingMessageId.value === props.message.id,
-)
+const isEditing = computed(() => chatStore.editingMessageId.value === props.message.id)
 
 const handleEditClick = (): void => {
   if (!props.editable || isEditing.value) {
@@ -114,16 +106,8 @@ const handleEditClick = (): void => {
 
 <template>
   <div class="flex w-full min-w-0 flex-col items-end gap-1.5">
-    <Attachments
-      v-if="fileAttachments.length > 0"
-      variant="grid"
-      class="max-w-[80%]"
-    >
-      <Attachment
-        v-for="file in fileAttachments"
-        :key="file.id"
-        :data="file"
-      >
+    <Attachments v-if="fileAttachments.length > 0" variant="grid" class="max-w-[80%]">
+      <Attachment v-for="file in fileAttachments" :key="file.id" :data="file">
         <AttachmentPreview />
       </Attachment>
     </Attachments>
@@ -143,16 +127,11 @@ const handleEditClick = (): void => {
         ]"
         @click="handleEditClick"
       >
-        <ChatMentionText
-          :text="text"
-          :highlights="metadata.mentionHighlights"
-        />
+        <ChatMentionText :text="text" :highlights="metadata.mentionHighlights" />
       </AiElementsMessageMessageContent>
     </AiElementsMessageMessage>
 
-    <AiElementsMessageMessageActions
-      class="justify-end gap-2 text-xs text-muted-foreground"
-    >
+    <AiElementsMessageMessageActions class="justify-end gap-2 text-xs text-muted-foreground">
       <AiElementsMessageMessageAction
         v-if="editable"
         tooltip="Edit message"
@@ -161,7 +140,7 @@ const handleEditClick = (): void => {
         :disabled="isEditing"
         @click="handleEditClick"
       >
-        <PencilIcon class="size-3.5" />
+        <AppIcon name="pencil" class="size-3.5" />
       </AiElementsMessageMessageAction>
       <span v-if="relativeTime || modelLabel" class="truncate max-w-64">
         <template v-if="relativeTime && modelLabel">

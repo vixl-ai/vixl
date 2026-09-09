@@ -1,6 +1,4 @@
-type PlanBodySegment =
-  | { type: 'markdown'; content: string }
-  | { type: 'mermaid'; content: string }
+type PlanBodySegment = { type: 'markdown'; content: string } | { type: 'mermaid'; content: string }
 
 const MERMAID_FENCE_RE = /```mermaid\s*\n([\s\S]*?)```/g
 

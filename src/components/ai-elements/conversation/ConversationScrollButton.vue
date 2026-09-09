@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { ArrowDownIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { computed } from 'vue'
@@ -22,10 +22,12 @@ function handleClick() {
 <template>
   <Button
     v-if="showScrollButton"
-    :class="cn(
-      'absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full dark:bg-background dark:hover:bg-muted',
-      props.class,
-    )"
+    :class="
+      cn(
+        'absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full dark:bg-background dark:hover:bg-muted',
+        props.class,
+      )
+    "
     aria-label="Scroll to bottom"
     size="icon"
     type="button"
@@ -33,6 +35,6 @@ function handleClick() {
     v-bind="$attrs"
     @click="handleClick"
   >
-    <ArrowDownIcon class="size-4" />
+    <AppIcon name="arrow-down" class="size-4" />
   </Button>
 </template>

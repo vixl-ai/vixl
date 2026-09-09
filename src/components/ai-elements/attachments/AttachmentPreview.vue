@@ -1,14 +1,7 @@
 <script setup lang="ts">
 import type { HTMLAttributes, VNode } from 'vue'
 import type { AttachmentMediaCategory } from './types'
-import {
-  FileTextIcon,
-  GlobeIcon,
-  ImageIcon,
-  Music2Icon,
-  PaperclipIcon,
-  VideoIcon,
-} from '@lucide/vue'
+import type { AppIconName } from '@/icons'
 import { cn } from '@/lib/utils'
 import { computed } from 'vue'
 import { useAttachmentContext } from './context'
@@ -32,18 +25,18 @@ const showVideo = computed(
   () => mediaCategory.value === 'video' && data.value.type === 'file' && !!fileUrl.value,
 )
 
-const iconMap: Record<AttachmentMediaCategory, typeof ImageIcon> = {
-  image: ImageIcon,
-  video: VideoIcon,
-  audio: Music2Icon,
-  source: GlobeIcon,
-  document: FileTextIcon,
-  unknown: PaperclipIcon,
+const iconMap: Record<AttachmentMediaCategory, AppIconName> = {
+  image: 'image',
+  video: 'video',
+  audio: 'music',
+  source: 'globe',
+  document: 'file-text',
+  unknown: 'paperclip',
 }
 
 const iconComponent = computed(() => iconMap[mediaCategory.value])
-const imageAlt = computed(() =>
-  (data.value.type === 'file' ? data.value.filename : undefined) || 'Image',
+const imageAlt = computed(
+  () => (data.value.type === 'file' ? data.value.filename : undefined) || 'Image',
 )
 </script>
 
@@ -67,18 +60,9 @@ const imageAlt = computed(() =>
       :height="isGrid ? 96 : 20"
       :src="fileUrl"
       :width="isGrid ? 96 : 20"
-    >
-    <video
-      v-else-if="showVideo"
-      class="size-full object-cover"
-      muted
-      :src="fileUrl"
     />
+    <video v-else-if="showVideo" class="size-full object-cover" muted :src="fileUrl" />
     <component :is="props.fallbackIcon" v-else-if="props.fallbackIcon" />
-    <component
-      :is="iconComponent"
-      v-else
-      :class="cn(iconSize, 'text-muted-foreground')"
-    />
+    <AppIcon :name="iconComponent" v-else :class="cn(iconSize, 'text-muted-foreground')" />
   </div>
 </template>

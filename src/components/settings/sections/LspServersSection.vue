@@ -2,11 +2,7 @@
 import { Button } from '@/components/shadcn/ui/button'
 import { Label } from '@/components/shadcn/ui/label'
 import { Switch } from '@/components/shadcn/ui/switch'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import SettingsSectionScroll from '@/components/settings/SettingsSectionScroll.vue'
 import WorkbenchFileEntryIcon from '@/components/workbench/FileEntryIcon.vue'
 import useLspServersSection from '@/composables/lsp-servers-section'
@@ -26,12 +22,6 @@ const {
   updateAutoDownload,
   lspServerIconName,
   isTauri,
-  Ban,
-  Download,
-  Loader2,
-  Play,
-  RotateCcw,
-  Trash2,
 } = useLspServersSection()
 </script>
 
@@ -48,14 +38,8 @@ const {
             :disabled="!isTauri() || prefetching"
             @click="prefetchDefaults"
           >
-            <Loader2
-              v-if="prefetching"
-              class="h-4 w-4 animate-spin"
-            />
-            <Download
-              v-else
-              class="h-4 w-4"
-            />
+            <Loader2 v-if="prefetching" class="h-4 w-4 animate-spin" />
+            <Download v-else class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Install defaults</TooltipContent>
@@ -73,10 +57,7 @@ const {
         <Switch :model-value="autoDownload" @update:model-value="updateAutoDownload" />
       </div>
 
-      <p
-        v-if="installMessage"
-        class="text-sm text-muted-foreground"
-      >
+      <p v-if="installMessage" class="text-sm text-muted-foreground">
         {{ installMessage }}
       </p>
 
@@ -97,22 +78,13 @@ const {
                 <div class="flex min-w-0 items-center gap-1.5">
                   <p class="truncate text-sm font-medium">{{ entry.label }}</p>
                   <div class="flex shrink-0 items-center gap-1">
-                    <Tooltip
-                      v-for="badge in statusBadges(entry)"
-                      :key="badge.key"
-                    >
+                    <Tooltip v-for="badge in statusBadges(entry)" :key="badge.key">
                       <TooltipTrigger as-child>
-                        <span
-                          class="inline-flex"
-                          :aria-label="badge.label"
-                        >
-                          <component
-                            :is="badge.icon"
+                        <span class="inline-flex" :aria-label="badge.label">
+                          <AppIcon
+                            :name="badge.icon"
                             class="h-3.5 w-3.5"
-                            :class="[
-                              badge.className,
-                              badge.key === 'state' ? 'animate-spin' : '',
-                            ]"
+                            :class="[badge.className, badge.key === 'state' ? 'animate-spin' : '']"
                           />
                         </span>
                       </TooltipTrigger>
@@ -120,10 +92,7 @@ const {
                     </Tooltip>
                   </div>
                 </div>
-                <p
-                  v-if="extensionsHint(entry)"
-                  class="truncate text-xs text-muted-foreground"
-                >
+                <p v-if="extensionsHint(entry)" class="truncate text-xs text-muted-foreground">
                   {{ extensionsHint(entry) }}
                 </p>
               </div>
@@ -139,14 +108,8 @@ const {
                     :disabled="isBusy(entry.id)"
                     @click="setDisabled(entry.id, !entry.disabled)"
                   >
-                    <Play
-                      v-if="entry.disabled"
-                      class="h-4 w-4"
-                    />
-                    <Ban
-                      v-else
-                      class="h-4 w-4"
-                    />
+                    <AppIcon v-if="entry.disabled" class="h-4 w-4" name="play" />
+                    <AppIcon v-else class="h-4 w-4" name="ban" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -164,14 +127,8 @@ const {
                     :disabled="isBusy(entry.id) || entry.disabled"
                     @click="installServer(entry.id)"
                   >
-                    <Loader2
-                      v-if="isBusy(entry.id)"
-                      class="h-4 w-4 animate-spin"
-                    />
-                    <Download
-                      v-else
-                      class="h-4 w-4"
-                    />
+                    <AppIcon v-if="isBusy(entry.id)" class="h-4 w-4 animate-spin" name="loader" />
+                    <Download v-else class="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Install</TooltipContent>
@@ -187,14 +144,8 @@ const {
                     :disabled="isBusy(entry.id) || entry.disabled"
                     @click="installServer(entry.id)"
                   >
-                    <Loader2
-                      v-if="isBusy(entry.id)"
-                      class="h-4 w-4 animate-spin"
-                    />
-                    <RotateCcw
-                      v-else
-                      class="h-4 w-4"
-                    />
+                    <AppIcon v-if="isBusy(entry.id)" class="h-4 w-4 animate-spin" name="loader" />
+                    <AppIcon v-else class="h-4 w-4" name="rotate-ccw" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Retry</TooltipContent>
@@ -210,14 +161,8 @@ const {
                     :disabled="isBusy(entry.id)"
                     @click="uninstallServer(entry.id)"
                   >
-                    <Loader2
-                      v-if="isBusy(entry.id)"
-                      class="h-4 w-4 animate-spin"
-                    />
-                    <Trash2
-                      v-else
-                      class="h-4 w-4"
-                    />
+                    <AppIcon v-if="isBusy(entry.id)" class="h-4 w-4 animate-spin" name="loader" />
+                    <AppIcon v-else class="h-4 w-4" name="trash" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Uninstall</TooltipContent>
@@ -225,10 +170,7 @@ const {
             </div>
           </li>
         </ul>
-        <p
-          v-if="!isTauri()"
-          class="text-sm text-muted-foreground"
-        >
+        <p v-if="!isTauri()" class="text-sm text-muted-foreground">
           Language servers require the desktop app.
         </p>
       </div>

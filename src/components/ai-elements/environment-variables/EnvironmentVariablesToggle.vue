@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { EyeIcon, EyeOffIcon } from '@lucide/vue'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useEnvironmentVariablesContext } from './context'
@@ -19,8 +19,8 @@ const { showValues, setShowValues } = useEnvironmentVariablesContext()
 <template>
   <div :class="cn('flex items-center gap-2', props.class)">
     <span class="text-muted-foreground text-xs">
-      <EyeIcon v-if="showValues" :size="14" />
-      <EyeOffIcon v-else :size="14" />
+      <AppIcon name="eye" v-if="showValues" :size="14" />
+      <AppIcon name="eye-off" v-else :size="14" />
     </span>
     <Switch
       aria-label="Toggle value visibility"

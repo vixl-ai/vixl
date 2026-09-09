@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDownIcon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/ui/button'
 import { DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 </script>
@@ -9,7 +9,7 @@ import { DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
     <slot>
       <Button type="button" variant="outline">
         Open in chat
-        <ChevronDownIcon class="ml-2 size-4" />
+        <AppIcon name="chevron-down" class="ml-2 size-4" />
       </Button>
     </slot>
   </DropdownMenuTrigger>

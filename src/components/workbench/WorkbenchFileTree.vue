@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FilePlus, FolderPlus, RefreshCw } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -19,11 +19,7 @@ import {
   DialogTitle,
 } from '@/components/shadcn/ui/dialog'
 import { Input } from '@/components/shadcn/ui/input'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import { FileTree } from '@/components/ai-elements/file-tree'
 import WorkbenchFileTreeNode from '@/components/workbench/FileTreeNode.vue'
 import useFileTreeView from '@/composables/file-tree-view'
@@ -98,7 +94,7 @@ defineExpose({
               aria-label="New file"
               @click="handleNewFile"
             >
-              <FilePlus class="h-3.5 w-3.5" />
+              <AppIcon name="file-plus" class="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent class="z-60">New file</TooltipContent>
@@ -112,7 +108,7 @@ defineExpose({
               aria-label="New folder"
               @click="handleNewFolder"
             >
-              <FolderPlus class="h-3.5 w-3.5" />
+              <AppIcon name="folder-plus" class="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent class="z-60">New folder</TooltipContent>
@@ -127,7 +123,8 @@ defineExpose({
               :disabled="refreshing"
               @click="handleRefresh"
             >
-              <RefreshCw
+              <AppIcon
+                name="refresh-cw"
                 class="h-3.5 w-3.5"
                 :class="{ 'animate-spin': refreshing }"
               />
@@ -159,10 +156,7 @@ defineExpose({
       </FileTree>
     </div>
 
-    <Dialog
-      :open="createDialogOpen"
-      @update:open="handleCreateDialogOpenChange"
-    >
+    <Dialog :open="createDialogOpen" @update:open="handleCreateDialogOpenChange">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
@@ -185,41 +179,29 @@ defineExpose({
           >
             Cancel
           </Button>
-          <Button
-            :disabled="creating || !createName.trim()"
-            @click="handleCreateConfirm"
-          >
+          <Button :disabled="creating || !createName.trim()" @click="handleCreateConfirm">
             Create
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
 
-    <AlertDialog
-      :open="deleteTarget !== null"
-      @update:open="handleDeleteOpenChange"
-    >
+    <AlertDialog :open="deleteTarget !== null" @update:open="handleDeleteOpenChange">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete {{ deleteTarget?.isDirectory ? 'folder' : 'file' }}?</AlertDialogTitle>
+          <AlertDialogTitle
+            >Delete {{ deleteTarget?.isDirectory ? 'folder' : 'file' }}?</AlertDialogTitle
+          >
           <AlertDialogDescription>
             <template v-if="deleteTarget?.isDirectory">
               This will permanently delete "{{ deleteTarget.path }}" and all of its contents.
             </template>
-            <template v-else>
-              This will permanently delete "{{ deleteTarget?.path }}".
-            </template>
+            <template v-else> This will permanently delete "{{ deleteTarget?.path }}". </template>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel :disabled="deleting">
-            Cancel
-          </AlertDialogCancel>
-          <Button
-            variant="destructive"
-            :disabled="deleting"
-            @click="handleDeleteConfirm"
-          >
+          <AlertDialogCancel :disabled="deleting"> Cancel </AlertDialogCancel>
+          <Button variant="destructive" :disabled="deleting" @click="handleDeleteConfirm">
             Delete
           </Button>
         </AlertDialogFooter>

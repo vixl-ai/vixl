@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref } from 'vue'
-import { ChevronRightIcon, Undo2Icon } from '@lucide/vue'
 import type { AggregatedTurnFileChange } from '@/types/harness/file-checkpoint'
 import {
   CommitFile,
@@ -25,11 +25,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/shadcn/ui/collapsible'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import { summarizeMutationCounts } from '@/services/harness/restore-file-checkpoints'
 
 const props = defineProps<{
@@ -76,16 +72,14 @@ const handleConfirmRestore = (): void => {
 </script>
 
 <template>
-  <div
-    v-if="changes.length > 0"
-    class="w-full min-w-0 max-w-full"
-  >
+  <div v-if="changes.length > 0" class="w-full min-w-0 max-w-full">
     <Collapsible v-model:open="open" class="w-full min-w-0">
       <div class="flex w-full max-w-full items-center gap-1">
         <CollapsibleTrigger
           class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-          <ChevronRightIcon
+          <AppIcon
+            name="chevron-right"
             class="size-3.5 shrink-0 transition-transform"
             :class="open ? 'rotate-90' : ''"
           />
@@ -116,7 +110,7 @@ const handleConfirmRestore = (): void => {
               aria-label="Restore files"
               @click="handleRestoreClick"
             >
-              <Undo2Icon class="size-3.5" />
+              <AppIcon name="undo" class="size-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Restore files</TooltipContent>
@@ -124,10 +118,7 @@ const handleConfirmRestore = (): void => {
       </div>
       <CollapsibleContent class="mt-1">
         <CommitFiles>
-          <CommitFile
-            v-for="change in changes"
-            :key="change.path"
-          >
+          <CommitFile v-for="change in changes" :key="change.path">
             <div class="flex min-w-0 flex-1 items-center gap-2">
               <CommitFileStatus :status="statusFor(change.operation)" />
               <CommitFilePath class="truncate">
@@ -151,10 +142,7 @@ const handleConfirmRestore = (): void => {
       </CollapsibleContent>
     </Collapsible>
 
-    <AlertDialog
-      :open="confirmOpen"
-      @update:open="confirmOpen = $event"
-    >
+    <AlertDialog :open="confirmOpen" @update:open="confirmOpen = $event">
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Revert files from this turn?</AlertDialogTitle>
@@ -164,17 +152,13 @@ const handleConfirmRestore = (): void => {
             <template v-if="counts.created > 0">
               ({{ counts.created }} created file{{ counts.created === 1 ? '' : 's' }} removed)
             </template>
-            and discard the conversation after the preceding message.
-            Manual edits on those paths will also be overwritten.
+            and discard the conversation after the preceding message. Manual edits on those paths
+            will also be overwritten.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button
-            type="button"
-            variant="destructive"
-            @click="handleConfirmRestore"
-          >
+          <Button type="button" variant="destructive" @click="handleConfirmRestore">
             Revert files
           </Button>
         </AlertDialogFooter>

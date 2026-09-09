@@ -1,15 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import {
-  ChevronRightIcon,
-  FolderIcon,
-  FolderOpenIcon,
-} from '@lucide/vue'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import { computed, provide } from 'vue'
 import { FileTreeFolderKey, useFileTreeContext } from './context'
@@ -38,12 +30,7 @@ provide(FileTreeFolderKey, {
 
 <template>
   <Collapsible :open="isExpanded" @update:open="() => togglePath(props.path)">
-    <div
-      :class="cn('', props.class)"
-      role="treeitem"
-      tabindex="0"
-      v-bind="$attrs"
-    >
+    <div :class="cn('', props.class)" role="treeitem" tabindex="0" v-bind="$attrs">
       <CollapsibleTrigger as-child>
         <button
           :class="
@@ -55,7 +42,8 @@ provide(FileTreeFolderKey, {
           type="button"
           @click="() => onSelect(props.path)"
         >
-          <ChevronRightIcon
+          <AppIcon
+            name="chevron-right"
             :class="
               cn(
                 'size-4 shrink-0 text-muted-foreground transition-transform',
@@ -64,8 +52,8 @@ provide(FileTreeFolderKey, {
             "
           />
           <FileTreeIcon>
-            <FolderOpenIcon v-if="isExpanded" class="size-4 text-blue-500" />
-            <FolderIcon v-else class="size-4 text-blue-500" />
+            <AppIcon name="folder-open" v-if="isExpanded" class="size-4 text-blue-500" />
+            <AppIcon name="folder" v-else class="size-4 text-blue-500" />
           </FileTreeIcon>
           <FileTreeName>{{ props.name }}</FileTreeName>
         </button>

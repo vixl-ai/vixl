@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Settings } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { RouterLink } from 'vue-router'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/shadcn/ui/sidebar'
 </script>
@@ -9,7 +9,7 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/sh
     <SidebarMenuItem>
       <SidebarMenuButton tooltip="Settings" as-child>
         <RouterLink to="/settings">
-          <Settings />
+          <AppIcon name="settings" />
           <span>Settings</span>
         </RouterLink>
       </SidebarMenuButton>

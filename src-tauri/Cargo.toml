@@ -124,6 +124,10 @@ name = "commands_config"
 path = "../spec/src-tauri/commands/config.rs"
 
 [[test]]
+name = "commands_theme_files"
+path = "../spec/src-tauri/commands/theme_files.rs"
+
+[[test]]
 name = "commands_oauth"
 path = "../spec/src-tauri/commands/oauth.rs"
 

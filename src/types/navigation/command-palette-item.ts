@@ -1,11 +1,6 @@
 import type { SettingsSectionId } from '@/types/settings/settings-section'
 
-export type CommandPaletteGroup =
-  | 'Actions'
-  | 'Projects'
-  | 'Chats'
-  | 'Pinned'
-  | 'Settings'
+export type CommandPaletteGroup = 'Actions' | 'Projects' | 'Chats' | 'Pinned' | 'Settings'
 
 export const COMMAND_PALETTE_GROUP_ORDER: CommandPaletteGroup[] = [
   'Actions',
@@ -15,11 +10,7 @@ export const COMMAND_PALETTE_GROUP_ORDER: CommandPaletteGroup[] = [
   'Settings',
 ]
 
-export type CommandPaletteAction =
-  | 'new-agent'
-  | 'open-settings'
-  | 'open-terminal'
-  | 'open-editor'
+export type CommandPaletteAction = 'new-agent' | 'open-settings' | 'open-terminal' | 'open-editor'
 
 export interface CommandPaletteItem {
   id: string
@@ -32,18 +23,9 @@ export interface CommandPaletteItem {
   action?: CommandPaletteAction
 }
 
-export type CommandPaletteTab =
-  | 'All'
-  | 'Agents'
-  | 'Actions'
-  | 'Settings'
+export type CommandPaletteTab = 'All' | 'Agents' | 'Actions' | 'Settings'
 
-export const COMMAND_PALETTE_TABS: CommandPaletteTab[] = [
-  'All',
-  'Agents',
-  'Actions',
-  'Settings',
-]
+export const COMMAND_PALETTE_TABS: CommandPaletteTab[] = ['All', 'Agents', 'Actions', 'Settings']
 
 export const getCommandPaletteTab = (
   item: CommandPaletteItem,

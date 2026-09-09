@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { CheckCircle2, Circle, XCircle } from '@lucide/vue'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useTestResultsContext } from './context'
@@ -15,17 +15,13 @@ const { summary } = useTestResultsContext()
 </script>
 
 <template>
-  <div
-    v-if="summary"
-    :class="cn('flex items-center gap-3', props.class)"
-    v-bind="$attrs"
-  >
+  <div v-if="summary" :class="cn('flex items-center gap-3', props.class)" v-bind="$attrs">
     <slot>
       <Badge
         class="gap-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
         variant="secondary"
       >
-        <CheckCircle2 class="size-3" />
+        <AppIcon name="circle-check-big" class="size-3" />
         {{ summary.passed }} passed
       </Badge>
       <Badge
@@ -33,7 +29,7 @@ const { summary } = useTestResultsContext()
         class="gap-1 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
         variant="secondary"
       >
-        <XCircle class="size-3" />
+        <AppIcon name="circle-x" class="size-3" />
         {{ summary.failed }} failed
       </Badge>
       <Badge
@@ -41,7 +37,7 @@ const { summary } = useTestResultsContext()
         class="gap-1 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
         variant="secondary"
       >
-        <Circle class="size-3" />
+        <AppIcon name="circle" class="size-3" />
         {{ summary.skipped }} skipped
       </Badge>
     </slot>

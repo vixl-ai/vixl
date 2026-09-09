@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { PackageIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import { usePackageInfoContext } from './context'
 
@@ -15,7 +15,7 @@ const { name } = usePackageInfoContext()
 
 <template>
   <div :class="cn('flex items-center gap-2', props.class)" v-bind="$attrs">
-    <PackageIcon class="size-4 text-muted-foreground" />
+    <AppIcon name="package" class="size-4 text-muted-foreground" />
     <span class="font-medium font-mono text-sm">
       <slot>{{ name }}</slot>
     </span>

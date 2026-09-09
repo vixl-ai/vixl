@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { TerminalIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 interface Props extends /* @vue-ignore */ HTMLAttributes {
@@ -16,7 +16,7 @@ const props = defineProps<Props>()
     v-bind="$attrs"
   >
     <slot name="icon">
-      <TerminalIcon class="size-4 shrink-0" />
+      <AppIcon name="terminal" class="size-4 shrink-0" />
     </slot>
     <div class="min-w-0 truncate">
       <slot>Terminal</slot>

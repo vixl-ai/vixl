@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import type { Tool } from 'ai'
 import type { HTMLAttributes } from 'vue'
-import {
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion'
+import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { cn } from '@/lib/utils'
 import { computed } from 'vue'
 import { CodeBlock } from '../code-block'
@@ -36,7 +32,7 @@ const schemaString = computed(() => JSON.stringify(schema.value, null, 2))
     v-bind="$attrs"
   >
     <AccordionTrigger class="px-3 py-2 text-sm hover:no-underline">
-      {{ props.tool.description ?? "No description" }}
+      {{ props.tool.description ?? 'No description' }}
     </AccordionTrigger>
     <AccordionContent class="px-3 pb-3">
       <div class="rounded-md bg-muted/50">

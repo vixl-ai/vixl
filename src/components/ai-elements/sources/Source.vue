@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { BookIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
@@ -19,7 +19,7 @@ const props = defineProps<{
   >
     <!-- Default slot content -->
     <slot>
-      <BookIcon class="h-4 w-4" />
+      <AppIcon name="book" class="h-4 w-4" />
       <span class="block font-medium">{{ props.title }}</span>
     </slot>
   </a>

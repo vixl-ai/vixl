@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { CheckIcon, CopyIcon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { computed, ref } from 'vue'
@@ -39,13 +39,10 @@ async function copyToClipboard() {
     setTimeout(() => {
       isCopied.value = false
     }, props.timeout)
-  }
-  catch (error) {
+  } catch (error) {
     emit('error', error as Error)
   }
 }
-
-const icon = computed(() => (isCopied.value ? CheckIcon : CopyIcon))
 </script>
 
 <template>
@@ -57,7 +54,7 @@ const icon = computed(() => (isCopied.value ? CheckIcon : CopyIcon))
     @click="copyToClipboard"
   >
     <slot>
-      <component :is="icon" :size="14" />
+      <AppIcon :name="isCopied ? 'check' : 'copy'" :size="14" />
     </slot>
   </Button>
 </template>

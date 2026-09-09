@@ -1,12 +1,7 @@
 <script setup lang="ts">
-import type { Component, HTMLAttributes } from 'vue'
+import type { HTMLAttributes } from 'vue'
 import type { TestStatusType } from './context'
-import {
-  CheckCircle2,
-  Circle,
-  CircleDot,
-  XCircle,
-} from '@lucide/vue'
+import { AppIcon, type AppIconName } from '@/icons'
 import { cn } from '@/lib/utils'
 import { useTestContext } from './context'
 
@@ -25,11 +20,11 @@ const statusStyles: Record<TestStatusType, string> = {
   running: 'text-blue-600 dark:text-blue-400',
 }
 
-const statusIcons: Record<TestStatusType, Component> = {
-  passed: CheckCircle2,
-  failed: XCircle,
-  skipped: Circle,
-  running: CircleDot,
+const statusIcons: Record<TestStatusType, AppIconName> = {
+  passed: 'circle-check-big',
+  failed: 'circle-x',
+  skipped: 'circle',
+  running: 'circle-dot',
 }
 </script>
 
@@ -40,8 +35,8 @@ const statusIcons: Record<TestStatusType, Component> = {
     v-bind="$attrs"
   >
     <slot>
-      <component
-        :is="statusIcons[status]"
+      <AppIcon
+        :name="statusIcons[status]"
         :class="cn('size-4', status === 'running' && 'animate-pulse')"
       />
     </slot>

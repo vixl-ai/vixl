@@ -1,13 +1,7 @@
 <script setup lang="ts">
-import type { Component, HTMLAttributes } from 'vue'
+import { AppIcon, type AppIconName } from '@/icons'
+import type { HTMLAttributes } from 'vue'
 import type { TestStatusType } from './context'
-import {
-  CheckCircle2,
-  ChevronRight,
-  Circle,
-  CircleDot,
-  XCircle,
-} from '@lucide/vue'
 import { CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import { useTestSuiteContext } from './context'
@@ -29,29 +23,32 @@ const statusStyles: Record<TestStatusType, string> = {
   running: 'text-blue-600 dark:text-blue-400',
 }
 
-const statusIcons: Record<TestStatusType, Component> = {
-  passed: CheckCircle2,
-  failed: XCircle,
-  skipped: Circle,
-  running: CircleDot,
+const statusIcons: Record<TestStatusType, AppIconName> = {
+  passed: 'circle-check-big',
+  failed: 'circle-x',
+  skipped: 'circle',
+  running: 'circle-dot',
 }
 </script>
 
 <template>
   <CollapsibleTrigger
     v-if="context"
-    :class="cn(
-      'group flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50',
-      props.class,
-    )"
+    :class="
+      cn(
+        'group flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50',
+        props.class,
+      )
+    "
     v-bind="$attrs"
   >
-    <ChevronRight
+    <AppIcon
+      name="chevron-right"
       class="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
     />
     <span :class="cn('shrink-0', statusStyles[context.status])">
-      <component
-        :is="statusIcons[context.status]"
+      <AppIcon
+        :name="statusIcons[context.status]"
         :class="cn('size-4', context.status === 'running' && 'animate-pulse')"
       />
     </span>

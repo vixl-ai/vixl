@@ -1,13 +1,5 @@
 import type { Component } from 'vue'
-import { MessageCircleIcon } from '@lucide/vue'
-import {
-  ChatGPTIcon,
-  ClaudeIcon,
-  CursorIcon,
-  GithubIcon,
-  SciraIcon,
-  V0Icon,
-} from './icons'
+import { ChatGPTIcon, ClaudeIcon, CursorIcon, GithubIcon, SciraIcon, V0Icon } from './icons'
 
 // --- Providers Object ---
 export const providers = {
@@ -47,7 +39,7 @@ export const providers = {
       `https://t3.chat/new?${new URLSearchParams({
         q,
       })}`,
-    icon: MessageCircleIcon as Component,
+    icon: 'message-circle' as unknown as Component,
   },
   v0: {
     title: 'Open in v0',

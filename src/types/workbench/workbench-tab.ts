@@ -1,9 +1,4 @@
-export type WorkbenchTabType =
-  | 'changes'
-  | 'editor'
-  | 'terminal'
-  | 'plan'
-  | 'agent-shell'
+export type WorkbenchTabType = 'changes' | 'editor' | 'terminal' | 'plan' | 'agent-shell'
 
 export type EditorPayload = {
   path: string

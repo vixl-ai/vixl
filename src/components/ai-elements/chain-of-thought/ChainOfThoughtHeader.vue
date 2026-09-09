@@ -1,10 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HtmlHTMLAttributes } from 'vue'
-import { ChevronDownIcon } from '@lucide/vue'
-import {
-  Collapsible,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
+import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import { useChainOfThought } from './context'
 
@@ -29,13 +26,9 @@ const { isOpen, setIsOpen } = useChainOfThought()
       <span class="text-left">
         <slot>Chain of Thought</slot>
       </span>
-      <ChevronDownIcon
-        :class="
-          cn(
-            'size-3.5 transition-transform',
-            isOpen ? 'rotate-180' : 'rotate-0',
-          )
-        "
+      <AppIcon
+        name="chevron-down"
+        :class="cn('size-3.5 transition-transform', isOpen ? 'rotate-180' : 'rotate-0')"
       />
     </CollapsibleTrigger>
   </Collapsible>

@@ -1,19 +1,11 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { AlertTriangle } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/shadcn/ui/popover'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/shadcn/ui/popover'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import ChatUsageTokenMetrics from '@/components/chat/ChatUsageTokenMetrics.vue'
 import type { ContextBucket } from '@/types/harness/context-bucket'
 import { CONTEXT_BUCKET_META } from '@/types/harness/context-bucket-meta'
@@ -160,11 +152,7 @@ const handleHandoff = async (): Promise<void> => {
         class="h-7 gap-1.5 px-2 text-xs"
         :class="statusClass"
       >
-        <svg
-          aria-hidden="true"
-          class="size-5 shrink-0"
-          viewBox="0 0 24 24"
-        >
+        <svg aria-hidden="true" class="size-5 shrink-0" viewBox="0 0 24 24">
           <circle
             cx="12"
             cy="12"
@@ -194,31 +182,22 @@ const handleHandoff = async (): Promise<void> => {
     <PopoverContent align="end" class="w-84 divide-y overflow-hidden p-0">
       <div class="space-y-2 p-3">
         <div class="flex items-center justify-between gap-3 text-xs">
-          <p class="font-medium">
-            Estimated context window
-          </p>
-          <p class="text-muted-foreground">
-            {{ limitLabel }} limit
-          </p>
+          <p class="font-medium">Estimated context window</p>
+          <p class="text-muted-foreground">{{ limitLabel }} limit</p>
         </div>
         <div class="flex items-center justify-between gap-3 text-xs">
-          <p
-            class="font-medium"
-            :class="statusClass"
-          >
+          <p class="font-medium" :class="statusClass">
             {{ promptUsedLabel }} / {{ usablePromptLabel }} usable
           </p>
         </div>
 
-        <div
-          v-if="usageTotals"
-          class="flex items-center gap-1.5 text-xs text-muted-foreground"
-        >
+        <div v-if="usageTotals" class="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span class="tabular-nums">Session {{ sessionCostLabel }}</span>
           <Tooltip v-if="sessionPricingIncomplete">
             <TooltipTrigger as-child>
               <span class="inline-flex shrink-0">
-                <AlertTriangle
+                <AppIcon
+                  name="triangle-alert"
                   class="size-3 text-amber-600 dark:text-amber-400"
                   aria-hidden="true"
                 />
@@ -228,10 +207,7 @@ const handleHandoff = async (): Promise<void> => {
           </Tooltip>
         </div>
 
-        <div
-          v-if="limit > 0"
-          class="flex h-2 w-full overflow-hidden rounded-full bg-muted"
-        >
+        <div v-if="limit > 0" class="flex h-2 w-full overflow-hidden rounded-full bg-muted">
           <div
             v-for="bucket in visibleBuckets"
             :key="bucket.id"
@@ -267,10 +243,7 @@ const handleHandoff = async (): Promise<void> => {
             class="flex items-center justify-between gap-3 text-xs"
           >
             <span class="flex min-w-0 items-center gap-2 text-muted-foreground">
-              <span
-                class="size-2 shrink-0 rounded-full"
-                :class="bucketColorClass(bucket)"
-              />
+              <span class="size-2 shrink-0 rounded-full" :class="bucketColorClass(bucket)" />
               <span class="truncate">{{ bucket.label }}</span>
             </span>
             <span class="flex shrink-0 items-center gap-2 tabular-nums text-foreground">
@@ -279,10 +252,7 @@ const handleHandoff = async (): Promise<void> => {
             </span>
           </li>
 
-          <li
-            v-if="reservedOutput > 0"
-            class="flex items-center justify-between gap-3 text-xs"
-          >
+          <li v-if="reservedOutput > 0" class="flex items-center justify-between gap-3 text-xs">
             <span class="flex min-w-0 items-center gap-2 text-muted-foreground">
               <span class="size-2 shrink-0 rounded-full bg-muted-foreground/40" />
               <span class="truncate">Reserved for reply</span>
@@ -292,10 +262,7 @@ const handleHandoff = async (): Promise<void> => {
             </span>
           </li>
 
-          <li
-            v-if="safetyBuffer > 0"
-            class="flex items-center justify-between gap-3 text-xs"
-          >
+          <li v-if="safetyBuffer > 0" class="flex items-center justify-between gap-3 text-xs">
             <span class="flex min-w-0 items-center gap-2 text-muted-foreground">
               <span class="size-2 shrink-0 rounded-full bg-muted-foreground/25" />
               <span class="truncate">Safety buffer</span>
@@ -305,10 +272,7 @@ const handleHandoff = async (): Promise<void> => {
             </span>
           </li>
 
-          <li
-            v-if="free > 0"
-            class="flex items-center justify-between gap-3 text-xs"
-          >
+          <li v-if="free > 0" class="flex items-center justify-between gap-3 text-xs">
             <span class="flex min-w-0 items-center gap-2 text-muted-foreground">
               <span class="size-2 shrink-0 rounded-full bg-muted-foreground/15" />
               <span class="truncate">Free</span>
@@ -332,48 +296,28 @@ const handleHandoff = async (): Promise<void> => {
           />
         </div>
 
-        <p
-          v-if="visibleBuckets.length === 0"
-          class="text-xs text-muted-foreground"
-        >
+        <p v-if="visibleBuckets.length === 0" class="text-xs text-muted-foreground">
           No context counted yet. Select a model to estimate usage.
         </p>
       </div>
 
-      <div
-        v-if="showManageActions"
-        class="flex items-center gap-2 p-3"
-      >
-        <p
-          v-if="isHighUsage"
-          class="min-w-0 flex-1 text-xs"
-          :class="statusClass"
-        >
+      <div v-if="showManageActions" class="flex items-center gap-2 p-3">
+        <p v-if="isHighUsage" class="min-w-0 flex-1 text-xs" :class="statusClass">
           {{ ratio >= 0.95 ? 'Context nearly full.' : 'Context getting full.' }}
         </p>
-        <div
-          v-else
-          class="min-w-0 flex-1 text-xs text-muted-foreground"
-        >
-          Manage context
-        </div>
+        <div v-else class="min-w-0 flex-1 text-xs text-muted-foreground">Manage context</div>
         <Button
           v-if="contextActions.onCompact.value"
           type="button"
           variant="outline"
           size="sm"
           class="h-7 px-2 text-xs"
-          :disabled="
-            contextActions.actionsDisabled.value || contextActions.compacting.value
-          "
+          :disabled="contextActions.actionsDisabled.value || contextActions.compacting.value"
           :aria-busy="contextActions.compacting.value"
           :aria-label="contextActions.compacting.value ? 'Compacting...' : undefined"
           @click="handleCompact"
         >
-          <Spinner
-            v-if="contextActions.compacting.value"
-            class="size-3"
-          />
+          <Spinner v-if="contextActions.compacting.value" class="size-3" />
           {{ contextActions.compacting.value ? 'Compacting...' : 'Compact' }}
         </Button>
         <Button
@@ -382,9 +326,7 @@ const handleHandoff = async (): Promise<void> => {
           variant="outline"
           size="sm"
           class="h-7 px-2 text-xs"
-          :disabled="
-            contextActions.actionsDisabled.value || contextActions.compacting.value
-          "
+          :disabled="contextActions.actionsDisabled.value || contextActions.compacting.value"
           @click="handleHandoff"
         >
           Handoff

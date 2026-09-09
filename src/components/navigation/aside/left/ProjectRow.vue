@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Folder, FolderOpen, FolderCog, PanelLeftClose, Plus, FileCode, Terminal } from '@lucide/vue'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
 import {
   Collapsible,
@@ -10,11 +10,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/shadcn/ui/collapsible'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -82,9 +78,7 @@ const handleStartChat = async (): Promise<void> => {
     return
   }
 
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
+  const fleetProject = fleet.projects.value.find((item) => item.slug === props.project.slug)
   if (!fleetProject) {
     toast.error('Project not found')
     return
@@ -121,9 +115,7 @@ const handleRemoveFromSidebar = async (): Promise<void> => {
     return
   }
 
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
+  const fleetProject = fleet.projects.value.find((item) => item.slug === props.project.slug)
   if (!fleetProject) {
     return
   }
@@ -146,9 +138,7 @@ const handleRemoveFromSidebar = async (): Promise<void> => {
 }
 
 const handleOpenProject = async (): Promise<void> => {
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
+  const fleetProject = fleet.projects.value.find((item) => item.slug === props.project.slug)
   if (!fleetProject) {
     toast.error('Project not found')
     return
@@ -164,9 +154,7 @@ const handleOpenProject = async (): Promise<void> => {
 }
 
 const handleOpenEditor = async (): Promise<void> => {
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
+  const fleetProject = fleet.projects.value.find((item) => item.slug === props.project.slug)
   if (!fleetProject) {
     toast.error('Project not found')
     return
@@ -182,9 +170,7 @@ const handleOpenEditor = async (): Promise<void> => {
 }
 
 const handleOpenTerminal = async (): Promise<void> => {
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
+  const fleetProject = fleet.projects.value.find((item) => item.slug === props.project.slug)
   if (!fleetProject) {
     toast.error('Project not found')
     return
@@ -201,21 +187,19 @@ const handleOpenTerminal = async (): Promise<void> => {
 </script>
 
 <template>
-  <Collapsible
-    v-model:open="projectOpen"
-    as-child
-    class="group/collapsible"
-  >
+  <Collapsible v-model:open="projectOpen" as-child class="group/collapsible">
     <SidebarMenuItem>
       <ContextMenu>
         <ContextMenuTrigger as-child>
           <CollapsibleTrigger as-child>
             <SidebarMenuButton :tooltip="project.displayName">
               <span class="relative inline-flex size-4 shrink-0">
-                <Folder
+                <AppIcon
+                  name="folder"
                   class="size-4 shrink-0 opacity-100 transition-all duration-150 group-data-[state=open]/collapsible:scale-90 group-data-[state=open]/collapsible:rotate-6 group-data-[state=open]/collapsible:opacity-0"
                 />
-                <FolderOpen
+                <AppIcon
+                  name="folder-open"
                   class="pointer-events-none absolute inset-0 size-4 shrink-0 scale-90 -rotate-6 opacity-0 transition-all duration-150 group-data-[state=open]/collapsible:scale-100 group-data-[state=open]/collapsible:rotate-0 group-data-[state=open]/collapsible:opacity-100"
                 />
               </span>
@@ -225,23 +209,20 @@ const handleOpenTerminal = async (): Promise<void> => {
         </ContextMenuTrigger>
         <ContextMenuContent class="w-52">
           <ContextMenuItem @select="handleOpenProject">
-            <FolderCog />
+            <AppIcon name="folder-cog" />
             Open Project
           </ContextMenuItem>
           <ContextMenuItem @select="handleOpenEditor">
-            <FileCode />
+            <AppIcon name="file-code" />
             Open Editor
           </ContextMenuItem>
           <ContextMenuItem @select="handleOpenTerminal">
-            <Terminal />
+            <AppIcon name="terminal" />
             Open Terminal
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem
-            :disabled="removingProject"
-            @select="handleRemoveFromSidebar"
-          >
-            <PanelLeftClose />
+          <ContextMenuItem :disabled="removingProject" @select="handleRemoveFromSidebar">
+            <AppIcon name="panel-left-close" />
             Remove from sidebar
           </ContextMenuItem>
         </ContextMenuContent>
@@ -257,7 +238,7 @@ const handleOpenTerminal = async (): Promise<void> => {
               :aria-label="`New chat in ${project.displayName}`"
               @click.stop="handleStartChat"
             >
-              <Plus class="size-3.5" />
+              <AppIcon name="plus" class="size-3.5" />
             </Button>
           </SidebarMenuAction>
         </TooltipTrigger>
@@ -266,16 +247,12 @@ const handleOpenTerminal = async (): Promise<void> => {
       <CollapsibleContent
         class="overflow-hidden data-[state=closed]:animate-sidebar-collapsible-up data-[state=open]:animate-sidebar-collapsible-down"
       >
-        <div class="min-w-0 max-h-42 scroll-fade-b scrollbar-none overflow-x-hidden overflow-y-auto pl-3.5">
+        <div
+          class="min-w-0 max-h-42 scroll-fade-b scrollbar-none overflow-x-hidden overflow-y-auto pl-3.5"
+        >
           <SidebarMenuSub class="mx-0 gap-0.5">
-            <SidebarMenuSubItem
-              v-for="chat in project.chats"
-              :key="chat.id"
-            >
-              <NavigationAsideLeftChatListItem
-                :chat="chat"
-                :project-slug="project.slug"
-              />
+            <SidebarMenuSubItem v-for="chat in project.chats" :key="chat.id">
+              <NavigationAsideLeftChatListItem :chat="chat" :project-slug="project.slug" />
             </SidebarMenuSubItem>
           </SidebarMenuSub>
         </div>

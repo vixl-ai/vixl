@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { ref, watch } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
-import { Search } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
   CommandDialog,
@@ -41,11 +41,9 @@ const fileDirectory = (path: string): string => {
   return path.slice(0, lastSlash)
 }
 
-const escapeGlob = (value: string): string =>
-  value.replace(/[\\*?[\]]/g, '\\$&')
+const escapeGlob = (value: string): string => value.replace(/[\\*?[\]]/g, '\\$&')
 
-const normalizeQuery = (value: string): string =>
-  value.trim().replace(/\s+/g, '*')
+const normalizeQuery = (value: string): string => value.trim().replace(/\s+/g, '*')
 
 const rankFiles = (paths: string[], rawQuery: string): string[] => {
   const needle = rawQuery.trim().toLowerCase()
@@ -91,11 +89,7 @@ const runSearch = async (rawQuery: string): Promise<void> => {
   loading.value = true
 
   try {
-    const result = await workspaceGlob(
-      root,
-      `*${escapeGlob(normalized)}*`,
-      FILE_SEARCH_LIMIT,
-    )
+    const result = await workspaceGlob(root, `*${escapeGlob(normalized)}*`, FILE_SEARCH_LIMIT)
     if (generation !== searchGeneration.value) {
       return
     }
@@ -171,23 +165,18 @@ watch(
     description="Search and open a file in the project"
     @update:open="handleOpenChange"
   >
-    <div
-      data-slot="command-input-wrapper"
-      class="flex h-9 items-center gap-2 border-b px-3"
-    >
-      <Search class="size-4 shrink-0 opacity-50" />
+    <div data-slot="command-input-wrapper" class="flex h-9 items-center gap-2 border-b px-3">
+      <AppIcon name="search" class="size-4 shrink-0 opacity-50" />
       <input
         v-model="query"
         data-slot="command-input"
         class="placeholder:text-muted-foreground flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
         placeholder="Search project files…"
         autofocus
-      >
+      />
     </div>
     <CommandList v-if="files.length > 0">
-      <CommandGroup
-        :heading="truncated ? `Files (first ${FILE_SEARCH_LIMIT})` : undefined"
-      >
+      <CommandGroup :heading="truncated ? `Files (first ${FILE_SEARCH_LIMIT})` : undefined">
         <CommandItem
           v-for="path in files"
           :key="path"
@@ -197,10 +186,7 @@ watch(
         >
           <WorkbenchFileEntryIcon :name="fileName(path)" />
           <span class="truncate">{{ fileName(path) }}</span>
-          <span
-            v-if="fileDirectory(path)"
-            class="ml-auto truncate text-xs text-muted-foreground"
-          >
+          <span v-if="fileDirectory(path)" class="ml-auto truncate text-xs text-muted-foreground">
             {{ fileDirectory(path) }}
           </span>
         </CommandItem>

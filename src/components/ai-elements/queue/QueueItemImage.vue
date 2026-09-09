@@ -14,5 +14,5 @@ const props = defineProps<{
     height="32"
     width="32"
     v-bind="$attrs"
-  >
+  />
 </template>

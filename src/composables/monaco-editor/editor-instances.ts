@@ -1,6 +1,7 @@
 import { toast } from 'vue-sonner'
 import * as monaco from 'monaco-editor'
 import formatMonacoError from '@/utils/format-monaco-error'
+import { registerMonacoEditorInstance } from '@/utils/appearance/editor-theme'
 import { ensureMonacoShiki } from '@/utils/monaco-shiki'
 import { applyMonacoTheme, resolveMonacoEditorOptions } from '@/utils/monaco-theme'
 import type { MonacoHelpers } from './helpers'
@@ -29,6 +30,8 @@ export const createEditorInstances = (ctx: MonacoEditorContext, deps: EditorDeps
       wordWrap: ctx.wordWrapOption.value,
     })
     ctx.editor = created
+    // Track the mounted editor so live appearance changes reach it.
+    registerMonacoEditorInstance(created)
 
     created.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       deps.save().catch((error) => {
@@ -64,6 +67,8 @@ export const createEditorInstances = (ctx: MonacoEditorContext, deps: EditorDeps
       renderSideBySide: true,
     })
     ctx.diffEditor = created
+    // Track the mounted diff editor so live appearance changes reach it.
+    registerMonacoEditorInstance(created)
 
     if (ctx.props.path) {
       await deps.models.attachDiffModels(ctx.props.path)

@@ -1,13 +1,5 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { listen } from '@tauri-apps/api/event'
-import {
-  Ban,
-  Download,
-  Loader2,
-  Play,
-  RotateCcw,
-  Trash2,
-} from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import useVixlConfig from '@/composables/use-vixl-config'
 import {
@@ -24,7 +16,6 @@ import formatUnknownError from '@/utils/format-unknown-error'
 import lspServerIconName from '@/utils/lsp-server-icon-name'
 import { buildStatusBadges } from './status-badges'
 
-
 export default () => {
   const config = useVixlConfig()
   const fleet = useFleetRegistry()
@@ -34,9 +25,7 @@ export default () => {
   const prefetching = ref(false)
   let unlistenInstall: (() => void) | null = null
 
-  const autoDownload = computed(
-    () => config.personalSettings.value['lsp.autoDownload'] ?? true,
-  )
+  const autoDownload = computed(() => config.personalSettings.value['lsp.autoDownload'] ?? true)
 
   const activeRoot = computed(() => fleet.activeProject.value?.rootPath ?? null)
 
@@ -84,11 +73,9 @@ export default () => {
     }
   }
 
-  const extensionsHint = (entry: LspCatalogEntry): string =>
-    entry.extensions.slice(0, 6).join(', ')
+  const extensionsHint = (entry: LspCatalogEntry): string => entry.extensions.slice(0, 6).join(', ')
 
-  const statusBadges = (entry: LspCatalogEntry) =>
-    buildStatusBadges(entry, workspaceTrusted.value)
+  const statusBadges = (entry: LspCatalogEntry) => buildStatusBadges(entry, workspaceTrusted.value)
 
   const installServer = async (serverId: string): Promise<void> => {
     setBusy(serverId, true)
@@ -160,13 +147,16 @@ export default () => {
         state: string
         message?: string | null
       }>('lsp://install', (event) => {
-        installMessage.value = event.payload.message ?? `${event.payload.serverId}: ${event.payload.state}`
+        installMessage.value =
+          event.payload.message ?? `${event.payload.serverId}: ${event.payload.state}`
         if (event.payload.state === 'ready' || event.payload.state === 'error') {
-          refreshCatalog().then(() => undefined).catch((error: unknown) => {
-            toast.error('Failed to refresh language servers', {
-              description: formatUnknownError(error),
+          refreshCatalog()
+            .then(() => undefined)
+            .catch((error: unknown) => {
+              toast.error('Failed to refresh language servers', {
+                description: formatUnknownError(error),
+              })
             })
-          })
         }
       })
     } catch (error) {
@@ -195,12 +185,5 @@ export default () => {
     updateAutoDownload,
     lspServerIconName,
     isTauri,
-    // Icons used by template
-    Ban,
-    Download,
-    Loader2,
-    Play,
-    RotateCcw,
-    Trash2,
   }
 }

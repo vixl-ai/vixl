@@ -1,9 +1,11 @@
 import * as monaco from 'monaco-editor'
 import {
   applyMonacoTheme,
+  ensureMonacoAppearanceBridge,
   ensureMonacoBaseThemes,
   observeMonacoTheme,
 } from '@/utils/monaco-theme'
+import { unregisterMonacoEditorInstance } from '@/utils/appearance/editor-theme'
 import { disposeEditorViewStateListeners } from './view-state'
 import type { MonacoEditorContext } from './types'
 
@@ -33,6 +35,10 @@ export const createHelpers = (ctx: MonacoEditorContext) => {
 
     ctx.stopThemeObserver?.()
     ctx.stopThemeObserver = observeMonacoTheme(monaco, layoutEditor)
+
+    // Attach the shared appearance bridge once; it fans live
+    // `vixl:appearance-change` updates out to every tracked editor.
+    ensureMonacoAppearanceBridge(monaco)
 
     // Silence Monaco's built-in TypeScript worker diagnostics. The bundled
     // tsserver worker does not understand Vue SFC or Vite CSS module imports,
@@ -65,11 +71,17 @@ export const createHelpers = (ctx: MonacoEditorContext) => {
 
   const disposeCodeEditor = (): void => {
     disposeEditorViewStateListeners(ctx)
+    if (ctx.editor) {
+      unregisterMonacoEditorInstance(ctx.editor)
+    }
     ctx.editor?.dispose()
     ctx.editor = null
   }
 
   const disposeDiffEditorInstance = (): void => {
+    if (ctx.diffEditor) {
+      unregisterMonacoEditorInstance(ctx.diffEditor)
+    }
     ctx.diffEditor?.setModel(null)
     ctx.diffEditor?.dispose()
     ctx.diffEditor = null

@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Folder, FolderSymlink, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
   AlertDialog,
@@ -14,12 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/shadcn/ui/alert-dialog'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Empty,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@/components/shadcn/ui/empty'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/shadcn/ui/empty'
 import {
   Table,
   TableBody,
@@ -28,11 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/shadcn/ui/table'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import SettingsSectionScroll from '@/components/settings/SettingsSectionScroll.vue'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
@@ -90,8 +81,7 @@ const revealGraphsFolder = async (): Promise<void> => {
       await fsMkdir({ projectRoot: userDir, path: 'graphs' })
     } catch (mkdirError) {
       toast.error('Failed to create graphs folder', {
-        description:
-          mkdirError instanceof Error ? mkdirError.message : 'Unknown error',
+        description: mkdirError instanceof Error ? mkdirError.message : 'Unknown error',
       })
     }
     await revealInFolder(`${userDir}/graphs`)
@@ -176,37 +166,29 @@ const handleConfirmDelete = async (): Promise<void> => {
             :disabled="revealingRoot"
             @click="revealGraphsFolder"
           >
-            <FolderSymlink class="h-4 w-4" />
+            <AppIcon name="folder-symlink" class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Open in folder</TooltipContent>
       </Tooltip>
     </template>
 
-    <Empty
-      v-if="!pending && graphRows.length === 0"
-      class="min-h-0 flex-1 border border-border/60"
-    >
+    <Empty v-if="!pending && graphRows.length === 0" class="min-h-0 flex-1 border border-border/60">
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <Folder />
+          <AppIcon name="folder" />
         </EmptyMedia>
         <EmptyTitle>No graphs yet</EmptyTitle>
       </EmptyHeader>
     </Empty>
 
-    <div
-      v-else
-      class="min-h-0 flex-1 overflow-auto rounded-lg border border-border/40"
-    >
+    <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-border/40">
       <Table>
         <TableHeader>
           <TableRow class="hover:bg-transparent">
             <TableHead class="h-9 px-3 text-xs">Name</TableHead>
             <TableHead class="h-9 px-3 text-xs">Storage size</TableHead>
-            <TableHead class="h-9 w-28 px-3 text-right text-xs">
-              Actions
-            </TableHead>
+            <TableHead class="h-9 w-28 px-3 text-right text-xs"> Actions </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -236,7 +218,7 @@ const handleConfirmDelete = async (): Promise<void> => {
                       :aria-label="`Reveal ${graph.name}`"
                       @click="revealGraphStore(graph)"
                     >
-                      <FolderSymlink class="size-3.5" />
+                      <AppIcon name="folder-symlink" class="size-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Reveal in folder</TooltipContent>
@@ -250,7 +232,7 @@ const handleConfirmDelete = async (): Promise<void> => {
                       :aria-label="`Delete ${graph.name}`"
                       @click="graphToDelete = graph"
                     >
-                      <Trash2 class="size-3.5" />
+                      <AppIcon name="trash" class="size-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Delete</TooltipContent>
@@ -267,8 +249,8 @@ const handleConfirmDelete = async (): Promise<void> => {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete graph?</AlertDialogTitle>
           <AlertDialogDescription>
-            This deletes the stored index for "{{ graphToDelete?.name }}". The
-            project stays in the sidebar.
+            This deletes the stored index for "{{ graphToDelete?.name }}". The project stays in the
+            sidebar.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

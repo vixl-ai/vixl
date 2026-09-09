@@ -1,14 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  CircleAlert,
-  CircleCheck,
-  Database,
-  GitBranch,
-  Loader2,
-  RefreshCw,
-} from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import {
@@ -16,11 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import useCodegraphStatus from '@/composables/use-codegraph-status'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import projectRouteFor from '@/utils/project-route-for'
@@ -116,10 +105,7 @@ watch(open, async (isOpen) => {
 </script>
 
 <template>
-  <Tooltip
-    v-if="visible"
-    :disable-closing-trigger="true"
-  >
+  <Tooltip v-if="visible" :disable-closing-trigger="true">
     <TooltipTrigger as-child>
       <span class="inline-flex shrink-0">
         <DropdownMenu v-model:open="open">
@@ -133,32 +119,28 @@ watch(open, async (isOpen) => {
               :disabled="navigating"
               :aria-label="triggerTooltip"
             >
-              <Loader2
+              <AppIcon
+                name="loader"
                 v-if="codegraph.isBusy.value"
                 class="size-4 animate-spin"
                 aria-hidden="true"
               />
-              <CircleAlert
+              <AppIcon
+                name="circle-alert"
                 v-else-if="codegraph.state.value === 'error'"
                 class="size-4"
                 aria-hidden="true"
               />
-              <CircleCheck
+              <AppIcon
+                name="circle-check"
                 v-else-if="codegraph.state.value === 'ready'"
                 class="size-4"
                 aria-hidden="true"
               />
-              <Database
-                v-else
-                class="size-4"
-                aria-hidden="true"
-              />
+              <AppIcon name="database" v-else class="size-4" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            class="w-auto min-w-0 p-1"
-          >
+          <DropdownMenuContent align="end" class="w-auto min-w-0 p-1">
             <div class="flex items-center gap-0.5">
               <Tooltip :disable-closing-trigger="true">
                 <TooltipTrigger as-child>
@@ -171,7 +153,8 @@ watch(open, async (isOpen) => {
                     aria-label="Refresh Graph"
                     @click="handleRefresh"
                   >
-                    <RefreshCw
+                    <AppIcon
+                      name="refresh-cw"
                       class="size-4"
                       :class="codegraph.pending.value ? 'animate-spin' : ''"
                       aria-hidden="true"
@@ -191,10 +174,7 @@ watch(open, async (isOpen) => {
                     aria-label="Open Graph"
                     @click="handleOpenCodegraph"
                   >
-                    <GitBranch
-                      class="size-4"
-                      aria-hidden="true"
-                    />
+                    <AppIcon name="git-branch" class="size-4" aria-hidden="true" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent class="z-[100]">Open Graph</TooltipContent>

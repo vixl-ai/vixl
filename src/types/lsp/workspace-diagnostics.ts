@@ -1,7 +1,4 @@
-export type LspWorkspaceDiagnosticMode =
-  | 'workspace'
-  | 'open_documents'
-  | 'unavailable'
+export type LspWorkspaceDiagnosticMode = 'workspace' | 'open_documents' | 'unavailable'
 
 export type LspDiagnostic = {
   message: string

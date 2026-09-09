@@ -2,9 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MCPClient, OAuthClientProvider } from '@ai-sdk/mcp'
 import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
-const createMCPClientMock = vi.hoisted(() =>
-  vi.fn<(config: unknown) => Promise<MCPClient>>(),
-)
+const createMCPClientMock = vi.hoisted(() => vi.fn<(config: unknown) => Promise<MCPClient>>())
 
 const proxyFetchImpl = vi.hoisted(() =>
   vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(),
@@ -25,9 +23,9 @@ vi.mock('vue-sonner', () => ({
 
 vi.mock('@/services/mcp/mcp-tool-baseline', () => ({
   loadMcpToolBaseline: vi.fn<(serverId: string) => Promise<null>>(async () => null),
-  saveMcpToolBaseline: vi.fn<
-    (serverId: string, tools: unknown) => Promise<Record<string, never>>
-  >(async () => ({})),
+  saveMcpToolBaseline: vi.fn<(serverId: string, tools: unknown) => Promise<Record<string, never>>>(
+    async () => ({}),
+  ),
   detectMcpToolDrift: vi.fn<
     (
       serverId: string,
@@ -72,9 +70,7 @@ type CreateClientConfig = {
 }
 
 const transportOf = (callIndex: number): TransportConfig => {
-  const config = createMCPClientMock.mock.calls[callIndex]?.[0] as
-    | CreateClientConfig
-    | undefined
+  const config = createMCPClientMock.mock.calls[callIndex]?.[0] as CreateClientConfig | undefined
   if (!config?.transport) {
     throw new Error(`createMCPClient was not called at index ${callIndex}`)
   }
@@ -82,9 +78,7 @@ const transportOf = (callIndex: number): TransportConfig => {
 }
 
 const configOf = (callIndex: number): CreateClientConfig => {
-  const config = createMCPClientMock.mock.calls[callIndex]?.[0] as
-    | CreateClientConfig
-    | undefined
+  const config = createMCPClientMock.mock.calls[callIndex]?.[0] as CreateClientConfig | undefined
   if (!config) {
     throw new Error(`createMCPClient was not called at index ${callIndex}`)
   }
@@ -94,11 +88,11 @@ const configOf = (callIndex: number): CreateClientConfig => {
 const mockClient = (): MCPClient =>
   ({
     onElicitationRequest: vi.fn<() => void>(),
-    listTools: vi.fn<
-      () => Promise<{ tools: { name: string; description: string }[] }>
-    >(async () => ({
-      tools: [{ name: 'ping', description: 'Ping' }],
-    })),
+    listTools: vi.fn<() => Promise<{ tools: { name: string; description: string }[] }>>(
+      async () => ({
+        tools: [{ name: 'ping', description: 'Ping' }],
+      }),
+    ),
     close: vi.fn<() => Promise<void>>(async () => {}),
     serverInfo: {},
     callTool: vi.fn<() => Promise<unknown>>(),

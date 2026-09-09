@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { Trash2 } from '@lucide/vue'
 import {
   Accordion,
   AccordionContent,
@@ -12,11 +12,7 @@ import { Button } from '@/components/shadcn/ui/button'
 import { Badge } from '@/components/shadcn/ui/badge'
 import { Label } from '@/components/shadcn/ui/label'
 import { Switch } from '@/components/shadcn/ui/switch'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import McpServerIcon from '@/components/mcp/ServerIcon.vue'
 import SettingsSectionScroll from '@/components/settings/SettingsSectionScroll.vue'
 import {
@@ -39,13 +35,9 @@ const { refreshStates } = useMcpServers()
 
 const clearing = ref(false)
 
-const sandboxEnabled = computed(() =>
-  sandboxEnabledFromSettings(config.personalSettings.value),
-)
+const sandboxEnabled = computed(() => sandboxEnabledFromSettings(config.personalSettings.value))
 
-const sandboxNetwork = computed(() =>
-  sandboxNetworkFromSettings(config.personalSettings.value),
-)
+const sandboxNetwork = computed(() => sandboxNetworkFromSettings(config.personalSettings.value))
 
 const records = computed((): PermissionRecord[] =>
   parsePermissionRecords(config.personalSettings.value['agent.permissions']),
@@ -124,7 +116,7 @@ onMounted(() => {
             :disabled="clearing"
             @click="handleClearAll"
           >
-            <Trash2 class="h-4 w-4" />
+            <AppIcon name="trash" class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Clear all</TooltipContent>
@@ -139,10 +131,7 @@ onMounted(() => {
             Sandboxed commands can auto-run. Leaving the sandbox always asks.
           </p>
         </div>
-        <Switch
-          :model-value="sandboxEnabled"
-          @update:model-value="updateSandboxEnabled"
-        />
+        <Switch :model-value="sandboxEnabled" @update:model-value="updateSandboxEnabled" />
       </div>
 
       <div class="flex items-center justify-between gap-4">
@@ -157,7 +146,9 @@ onMounted(() => {
             variant="ghost"
             size="sm"
             class="h-7"
-            :class="sandboxNetwork === 'deny' ? 'bg-muted text-foreground' : 'text-muted-foreground'"
+            :class="
+              sandboxNetwork === 'deny' ? 'bg-muted text-foreground' : 'text-muted-foreground'
+            "
             :aria-pressed="sandboxNetwork === 'deny'"
             :disabled="!sandboxEnabled"
             @click="updateSandboxNetwork('deny')"
@@ -168,7 +159,9 @@ onMounted(() => {
             variant="ghost"
             size="sm"
             class="h-7"
-            :class="sandboxNetwork === 'allow' ? 'bg-muted text-foreground' : 'text-muted-foreground'"
+            :class="
+              sandboxNetwork === 'allow' ? 'bg-muted text-foreground' : 'text-muted-foreground'
+            "
             :aria-pressed="sandboxNetwork === 'allow'"
             :disabled="!sandboxEnabled"
             @click="updateSandboxNetwork('allow')"
@@ -178,114 +171,95 @@ onMounted(() => {
         </div>
       </div>
 
-      <div
-        v-if="records.length > 0"
-        class="space-y-6"
-      >
-      <div
-        v-for="group in groupedRecords"
-        :key="group.kind"
-        class="space-y-2"
-      >
-        <Label>{{ group.label }}</Label>
+      <div v-if="records.length > 0" class="space-y-6">
+        <div v-for="group in groupedRecords" :key="group.kind" class="space-y-2">
+          <Label>{{ group.label }}</Label>
 
-        <Accordion
-          v-if="usesPermissionSubgroupAccordion(group.kind)"
-          type="multiple"
-          class="w-full"
-        >
-          <AccordionItem
-            v-for="subgroup in group.subgroups"
-            :key="subgroup.key"
-            :value="`${group.kind}:${subgroup.key}`"
+          <Accordion
+            v-if="usesPermissionSubgroupAccordion(group.kind)"
+            type="multiple"
+            class="w-full"
           >
-            <AccordionTrigger class="py-3 text-sm hover:no-underline">
-              <span class="flex min-w-0 items-center gap-2">
-                <McpServerIcon
-                  v-if="group.kind === 'mcp'"
-                  :server-id="subgroup.key"
-                />
-                <span class="truncate">{{ subgroup.label }}</span>
-                <Badge
-                  variant="secondary"
-                  class="shrink-0 font-normal tabular-nums"
-                >
-                  {{ subgroup.records.length }}
-                </Badge>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div class="divide-y divide-border">
-                <div
-                  v-for="record in subgroup.records"
-                  :key="record.capability"
-                  class="flex items-center gap-3 py-2"
-                >
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-mono">
-                      {{ labelPermissionCapability(record.capability) }}
-                    </p>
-                    <p class="text-xs text-muted-foreground capitalize">{{ record.scope }}</p>
-                  </div>
-                  <Badge
-                    :variant="record.verdict === 'allow' ? 'default' : 'destructive'"
-                    class="shrink-0 capitalize"
-                  >
-                    {{ record.verdict }}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                    aria-label="Remove"
-                    @click="handleRemove(record)"
-                  >
-                    <Trash2 class="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-
-        <div
-          v-else
-          class="divide-y divide-border"
-        >
-          <template
-            v-for="subgroup in group.subgroups"
-            :key="subgroup.key"
-          >
-            <div
-              v-for="record in subgroup.records"
-              :key="record.capability"
-              class="flex items-center gap-3 py-2"
+            <AccordionItem
+              v-for="subgroup in group.subgroups"
+              :key="subgroup.key"
+              :value="`${group.kind}:${subgroup.key}`"
             >
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-mono">
-                  {{ labelPermissionCapability(record.capability) }}
-                </p>
-                <p class="text-xs text-muted-foreground capitalize">{{ record.scope }}</p>
+              <AccordionTrigger class="py-3 text-sm hover:no-underline">
+                <span class="flex min-w-0 items-center gap-2">
+                  <McpServerIcon v-if="group.kind === 'mcp'" :server-id="subgroup.key" />
+                  <span class="truncate">{{ subgroup.label }}</span>
+                  <Badge variant="secondary" class="shrink-0 font-normal tabular-nums">
+                    {{ subgroup.records.length }}
+                  </Badge>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div class="divide-y divide-border">
+                  <div
+                    v-for="record in subgroup.records"
+                    :key="record.capability"
+                    class="flex items-center gap-3 py-2"
+                  >
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-mono">
+                        {{ labelPermissionCapability(record.capability) }}
+                      </p>
+                      <p class="text-xs text-muted-foreground capitalize">{{ record.scope }}</p>
+                    </div>
+                    <Badge
+                      :variant="record.verdict === 'allow' ? 'default' : 'destructive'"
+                      class="shrink-0 capitalize"
+                    >
+                      {{ record.verdict }}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      class="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                      aria-label="Remove"
+                      @click="handleRemove(record)"
+                    >
+                      <AppIcon name="trash" class="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+
+          <div v-else class="divide-y divide-border">
+            <template v-for="subgroup in group.subgroups" :key="subgroup.key">
+              <div
+                v-for="record in subgroup.records"
+                :key="record.capability"
+                class="flex items-center gap-3 py-2"
+              >
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-mono">
+                    {{ labelPermissionCapability(record.capability) }}
+                  </p>
+                  <p class="text-xs text-muted-foreground capitalize">{{ record.scope }}</p>
+                </div>
+                <Badge
+                  :variant="record.verdict === 'allow' ? 'default' : 'destructive'"
+                  class="shrink-0 capitalize"
+                >
+                  {{ record.verdict }}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                  aria-label="Remove"
+                  @click="handleRemove(record)"
+                >
+                  <AppIcon name="trash" class="h-3.5 w-3.5" />
+                </Button>
               </div>
-              <Badge
-                :variant="record.verdict === 'allow' ? 'default' : 'destructive'"
-                class="shrink-0 capitalize"
-              >
-                {{ record.verdict }}
-              </Badge>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                aria-label="Remove"
-                @click="handleRemove(record)"
-              >
-                <Trash2 class="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </template>
+            </template>
+          </div>
         </div>
-      </div>
       </div>
     </div>
   </SettingsSectionScroll>

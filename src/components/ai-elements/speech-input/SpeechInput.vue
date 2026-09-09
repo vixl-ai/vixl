@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { MicIcon, SquareIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
@@ -40,12 +40,8 @@ interface SpeechRecognitionInstance extends EventTarget {
   stop: () => void
   onstart: ((this: SpeechRecognitionInstance, ev: Event) => void) | null
   onend: ((this: SpeechRecognitionInstance, ev: Event) => void) | null
-  onresult:
-    | ((this: SpeechRecognitionInstance, ev: SpeechRecognitionEventCustom) => void)
-    | null
-  onerror:
-    | ((this: SpeechRecognitionInstance, ev: SpeechRecognitionErrorEventCustom) => void)
-    | null
+  onresult: ((this: SpeechRecognitionInstance, ev: SpeechRecognitionEventCustom) => void) | null
+  onerror: ((this: SpeechRecognitionInstance, ev: SpeechRecognitionErrorEventCustom) => void) | null
 }
 
 interface SpeechRecognitionEventCustom extends Event {
@@ -110,59 +106,64 @@ onMounted(() => {
 })
 
 // Initialize Speech Recognition when mode is speech-recognition
-watch([mode, () => props.lang], ([newMode, newLang], [oldMode, oldLang]) => {
-  if (newMode !== 'speech-recognition') {
-    if (recognition.value) {
-      recognition.value.stop()
-      recognition.value = null
+watch(
+  [mode, () => props.lang],
+  ([newMode, newLang], [oldMode, oldLang]) => {
+    if (newMode !== 'speech-recognition') {
+      if (recognition.value) {
+        recognition.value.stop()
+        recognition.value = null
+      }
+      return
     }
-    return
-  }
 
-  // Only re-initialize if mode changed or lang changed
-  if (recognition.value && newLang === oldLang && newMode === oldMode) {
-    return
-  }
+    // Only re-initialize if mode changed or lang changed
+    if (recognition.value && newLang === oldLang && newMode === oldMode) {
+      return
+    }
 
-  const SpeechRecognitionCtor = (window.SpeechRecognition || window.webkitSpeechRecognition) as SpeechRecognitionConstructor
-  const speechRecognition = new SpeechRecognitionCtor()
+    const SpeechRecognitionCtor = (window.SpeechRecognition ||
+      window.webkitSpeechRecognition) as SpeechRecognitionConstructor
+    const speechRecognition = new SpeechRecognitionCtor()
 
-  speechRecognition.continuous = true
-  speechRecognition.interimResults = true
-  speechRecognition.lang = newLang
+    speechRecognition.continuous = true
+    speechRecognition.interimResults = true
+    speechRecognition.lang = newLang
 
-  speechRecognition.onstart = () => {
-    isListening.value = true
-  }
+    speechRecognition.onstart = () => {
+      isListening.value = true
+    }
 
-  speechRecognition.onend = () => {
-    isListening.value = false
-  }
+    speechRecognition.onend = () => {
+      isListening.value = false
+    }
 
-  speechRecognition.onresult = (event) => {
-    let finalTranscript = ''
+    speechRecognition.onresult = (event) => {
+      let finalTranscript = ''
 
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const result = event.results[i]
-      if (result?.isFinal) {
-        finalTranscript += result[0]?.transcript ?? ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        if (result?.isFinal) {
+          finalTranscript += result[0]?.transcript ?? ''
+        }
+      }
+
+      if (finalTranscript) {
+        emit('transcriptionChange', finalTranscript)
+        // Stop recognition after receiving final transcript to return to default state
+        recognition.value?.stop()
       }
     }
 
-    if (finalTranscript) {
-      emit('transcriptionChange', finalTranscript)
-      // Stop recognition after receiving final transcript to return to default state
-      recognition.value?.stop()
+    speechRecognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error)
+      isListening.value = false
     }
-  }
 
-  speechRecognition.onerror = (event) => {
-    console.error('Speech recognition error:', event.error)
-    isListening.value = false
-  }
-
-  recognition.value = speechRecognition
-}, { immediate: true })
+    recognition.value = speechRecognition
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   if (recognition.value) {
@@ -173,9 +174,7 @@ onUnmounted(() => {
 // Start MediaRecorder recording
 async function startMediaRecorder() {
   if (!props.onAudioRecorded) {
-    console.warn(
-      'SpeechInput: onAudioRecorded callback is required for MediaRecorder fallback',
-    )
+    console.warn('SpeechInput: onAudioRecorded callback is required for MediaRecorder fallback')
     return
   }
 
@@ -207,11 +206,9 @@ async function startMediaRecorder() {
           if (transcript) {
             emit('transcriptionChange', transcript)
           }
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Transcription error:', error)
-        }
-        finally {
+        } finally {
           isProcessing.value = false
         }
       }
@@ -229,8 +226,7 @@ async function startMediaRecorder() {
     mediaRecorderRef.value = mediaRecorder
     mediaRecorder.start()
     isListening.value = true
-  }
-  catch (error) {
+  } catch (error) {
     console.error('Failed to start MediaRecorder:', error)
     isListening.value = false
   }
@@ -248,26 +244,25 @@ function toggleListening() {
   if (mode.value === 'speech-recognition' && recognition.value) {
     if (isListening.value) {
       recognition.value.stop()
-    }
-    else {
+    } else {
       recognition.value.start()
     }
-  }
-  else if (mode.value === 'media-recorder') {
+  } else if (mode.value === 'media-recorder') {
     if (isListening.value) {
       stopMediaRecorder()
-    }
-    else {
+    } else {
       startMediaRecorder()
     }
   }
 }
 
 const isDisabled = computed(() => {
-  return mode.value === 'none'
-    || (mode.value === 'speech-recognition' && !recognition.value)
-    || (mode.value === 'media-recorder' && !props.onAudioRecorded)
-    || isProcessing.value
+  return (
+    mode.value === 'none' ||
+    (mode.value === 'speech-recognition' && !recognition.value) ||
+    (mode.value === 'media-recorder' && !props.onAudioRecorded) ||
+    isProcessing.value
+  )
 })
 </script>
 
@@ -289,19 +284,21 @@ const isDisabled = computed(() => {
     <!-- Main record button -->
     <Button
       v-bind="$attrs"
-      :class="cn(
-        'relative z-10 rounded-full transition-all duration-300',
-        isListening
-          ? 'bg-destructive text-white hover:bg-destructive/80 hover:text-white'
-          : 'bg-primary text-primary-foreground hover:bg-primary/80 hover:text-primary-foreground',
-        props.class,
-      )"
+      :class="
+        cn(
+          'relative z-10 rounded-full transition-all duration-300',
+          isListening
+            ? 'bg-destructive text-white hover:bg-destructive/80 hover:text-white'
+            : 'bg-primary text-primary-foreground hover:bg-primary/80 hover:text-primary-foreground',
+          props.class,
+        )
+      "
       :disabled="isDisabled"
       @click="toggleListening"
     >
       <Spinner v-if="isProcessing" />
-      <SquareIcon v-else-if="isListening" class="size-4" />
-      <MicIcon v-else class="size-4" />
+      <AppIcon name="square" v-else-if="isListening" class="size-4" />
+      <AppIcon name="mic" v-else class="size-4" />
     </Button>
   </div>
 </template>

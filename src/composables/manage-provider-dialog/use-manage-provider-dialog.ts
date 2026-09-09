@@ -36,8 +36,10 @@ export default (props: ManageProviderDialogProps, emit: ManageProviderDialogEmit
   const importingModels = ref(false)
   const requestExtrasOpen = ref(false)
 
+  // Semantic surface tokens only; glass surfaces come from the centralized
+  // `glass-surface-*` utilities, never ad-hoc blur or hard-coded Zinc colors.
   const dialogSurfaceClass =
-    'overflow-x-hidden border-border/80 bg-zinc-50 shadow-2xl backdrop-blur-none dark:bg-zinc-900 sm:max-w-2xl'
+    'overflow-x-hidden border-border/80 bg-popover text-popover-foreground shadow-2xl sm:max-w-2xl'
 
   const fieldClass = 'min-w-0 focus-visible:ring-inset'
   const flexFieldClass = 'min-w-0 flex-1 focus-visible:ring-inset'

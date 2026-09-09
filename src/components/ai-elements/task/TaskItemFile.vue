@@ -1,4 +1,4 @@
-<script setup lang='ts'>
+<script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
 
@@ -11,7 +11,12 @@ const props = defineProps<TaskItemFileProps>()
 
 <template>
   <div
-    :class="cn('inline-flex items-center gap-1 rounded-md border bg-secondary px-1.5 py-0.5 text-foreground text-xs', props.class)"
+    :class="
+      cn(
+        'inline-flex items-center gap-1 rounded-md border bg-secondary px-1.5 py-0.5 text-foreground text-xs',
+        props.class,
+      )
+    "
   >
     <slot />
   </div>

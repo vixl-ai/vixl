@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { PaperclipIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
@@ -10,14 +10,9 @@ const props = defineProps<{
 
 <template>
   <span
-    :class="
-      cn(
-        'flex items-center gap-1 rounded border bg-muted px-2 py-1 text-xs',
-        props.class,
-      )
-    "
+    :class="cn('flex items-center gap-1 rounded border bg-muted px-2 py-1 text-xs', props.class)"
   >
-    <PaperclipIcon :size="12" />
+    <AppIcon name="paperclip" :size="12" />
     <span class="max-w-[100px] truncate">
       <slot />
     </span>

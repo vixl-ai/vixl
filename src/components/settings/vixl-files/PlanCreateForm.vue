@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { ref } from 'vue'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import { toast } from 'vue-sonner'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
-import { Plus, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   FormControl,
@@ -16,11 +16,7 @@ import {
 } from '@/components/shadcn/ui/form'
 import { Input } from '@/components/shadcn/ui/input'
 import { Textarea } from '@/components/shadcn/ui/textarea'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import VixlFileCreateSheet from '@/components/settings/vixl-files/VixlFileCreateSheet.vue'
 import createPlan from '@/services/plans/write-plan'
 import { fsWriteFile, getVixlDir } from '@/services/vixl/vixl-tauri'
@@ -121,10 +117,7 @@ const onSubmit = handleSubmit(async (values) => {
 </script>
 
 <template>
-  <VixlFileCreateSheet
-    :open="open"
-    @update:open="emit('update:open', $event)"
-  >
+  <VixlFileCreateSheet :open="open" @update:open="emit('update:open', $event)">
     <form class="space-y-4" @submit="onSubmit">
       <FormField v-slot="{ componentField }" name="title">
         <FormItem>
@@ -149,23 +142,15 @@ const onSubmit = handleSubmit(async (values) => {
                 aria-label="Add todo"
                 @click="addTodo"
               >
-                <Plus class="h-3.5 w-3.5" />
+                <AppIcon name="plus" class="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Add todo</TooltipContent>
           </Tooltip>
         </div>
         <div class="space-y-2">
-          <div
-            v-for="(_, index) in todoInputs"
-            :key="index"
-            class="flex items-center gap-2"
-          >
-            <Input
-              v-model="todoInputs[index]"
-              type="text"
-              placeholder="Todo content"
-            />
+          <div v-for="(_, index) in todoInputs" :key="index" class="flex items-center gap-2">
+            <Input v-model="todoInputs[index]" type="text" placeholder="Todo content" />
             <Button
               v-if="todoInputs.length > 1"
               type="button"
@@ -175,7 +160,7 @@ const onSubmit = handleSubmit(async (values) => {
               aria-label="Remove todo"
               @click="removeTodo(index)"
             >
-              <Trash2 class="h-4 w-4" />
+              <AppIcon name="trash" class="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -185,11 +170,7 @@ const onSubmit = handleSubmit(async (values) => {
         <FormItem>
           <FormLabel>Description</FormLabel>
           <FormControl>
-            <Textarea
-              placeholder="Describe the plan"
-              class="min-h-32"
-              v-bind="componentField"
-            />
+            <Textarea placeholder="Describe the plan" class="min-h-32" v-bind="componentField" />
           </FormControl>
           <FormMessage />
         </FormItem>

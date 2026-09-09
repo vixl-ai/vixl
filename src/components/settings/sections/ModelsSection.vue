@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed } from 'vue'
-import { CircleHelpIcon, TriangleAlertIcon } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import { Label } from '@/components/shadcn/ui/label'
@@ -15,10 +15,7 @@ import SettingsSectionScroll from '@/components/settings/SettingsSectionScroll.v
 import ModelsOptionsModelOptionsRow from '@/components/models/options/ModelOptionsRow.vue'
 import useVixlConfig from '@/composables/use-vixl-config'
 import type { SettingsTab } from '@/composables/use-vixl-config'
-import {
-  MODEL_ROLE_REGISTRY,
-  type ModelRoleDefinition,
-} from '@/data/model-role-registry'
+import { MODEL_ROLE_REGISTRY, type ModelRoleDefinition } from '@/data/model-role-registry'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
 
 const props = defineProps<{
@@ -48,14 +45,9 @@ const isRoleOverridden = (role: ModelRoleDefinition): boolean => {
 }
 
 const showDefaultWarning = (role: ModelRoleDefinition): boolean =>
-  Boolean(role.recommendCheapModel) &&
-  role.id !== 'default' &&
-  !isRoleOverridden(role)
+  Boolean(role.recommendCheapModel) && role.id !== 'default' && !isRoleOverridden(role)
 
-const handleModelChange = async (
-  role: ModelRoleDefinition,
-  value: string,
-): Promise<void> => {
+const handleModelChange = async (role: ModelRoleDefinition, value: string): Promise<void> => {
   if (props.tab === 'project' && !config.activeRootPath.value) {
     toast.error('Failed to save model', {
       description: 'No active project',
@@ -82,10 +74,7 @@ const clearRoleOverride = async (role: ModelRoleDefinition): Promise<void> => {
   }
 
   try {
-    await config.removeSettings(props.tab, [
-      role.settingsKey,
-      role.reasoningSettingsKey,
-    ])
+    await config.removeSettings(props.tab, [role.settingsKey, role.reasoningSettingsKey])
     toast.success('Using default model')
   } catch (error) {
     toast.error('Failed to clear override', {
@@ -127,11 +116,7 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
 
     <TooltipProvider v-else>
       <div class="flex flex-col gap-5">
-        <div
-          v-for="role in roles"
-          :key="role.id"
-          class="flex flex-col gap-2"
-        >
+        <div v-for="role in roles" :key="role.id" class="flex flex-col gap-2">
           <div class="flex min-w-0 flex-wrap items-center gap-2">
             <Label class="text-sm font-medium">{{ role.label }}</Label>
             <Tooltip>
@@ -141,7 +126,7 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
                   class="inline-flex text-muted-foreground hover:text-foreground"
                   :aria-label="`${role.label} description`"
                 >
-                  <CircleHelpIcon class="size-3.5" />
+                  <AppIcon name="circle-help" class="size-3.5" />
                 </button>
               </TooltipTrigger>
               <TooltipContent class="max-w-xs">
@@ -155,7 +140,7 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
                   class="inline-flex text-amber-500 hover:text-amber-400"
                   :aria-label="`${role.label} is using the default model`"
                 >
-                  <TriangleAlertIcon class="size-3.5" />
+                  <AppIcon name="triangle-alert" class="size-3.5" />
                 </button>
               </TooltipTrigger>
               <TooltipContent class="max-w-xs">
@@ -173,10 +158,7 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
             </Button>
           </div>
 
-          <div
-            v-if="role.id === 'title'"
-            class="flex items-center gap-2"
-          >
+          <div v-if="role.id === 'title'" class="flex items-center gap-2">
             <Switch
               id="auto-title"
               :model-value="autoTitleEnabled"
@@ -191,9 +173,7 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
             <div class="flex max-w-md flex-col gap-3">
               <div class="flex flex-col gap-1.5">
                 <div class="flex items-center gap-2">
-                  <Label class="text-xs font-normal text-muted-foreground">
-                    Parent
-                  </Label>
+                  <Label class="text-xs font-normal text-muted-foreground"> Parent </Label>
                   <Button
                     v-if="isRoleOverridden(role)"
                     variant="ghost"
@@ -215,9 +195,7 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
               </div>
               <div class="flex flex-col gap-1.5">
                 <div class="flex items-center gap-2">
-                  <Label class="text-xs font-normal text-muted-foreground">
-                    Subagent
-                  </Label>
+                  <Label class="text-xs font-normal text-muted-foreground"> Subagent </Label>
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <button
@@ -225,7 +203,7 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
                         class="inline-flex text-muted-foreground hover:text-foreground"
                         aria-label="Subagent description"
                       >
-                        <CircleHelpIcon class="size-3.5" />
+                        <AppIcon name="circle-help" class="size-3.5" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent class="max-w-xs">
@@ -254,10 +232,7 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
             </div>
           </template>
 
-          <div
-            v-else
-            class="min-w-0 max-w-md"
-          >
+          <div v-else class="min-w-0 max-w-md">
             <ModelsOptionsModelOptionsRow
               :model-value="roleModelValue(role)"
               :scope-settings="settings"

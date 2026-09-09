@@ -1,16 +1,8 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import {
-  Circle,
-  CircleAlert,
-  KeyRound,
-  MessageCircleQuestion,
-  Pencil,
-  ShieldAlert,
-  Trash2,
-} from '@lucide/vue'
 import type { FleetSidebarChat } from '@/types/fleet/fleet-sidebar-chat'
 import {
   AlertDialog,
@@ -40,11 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/shadcn/ui/table'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import NavigationAsideLeftChatRunningDots from '@/components/navigation/aside/left/ChatRunningDots.vue'
 import { dropAgentHarness } from '@/composables/use-agent-harness'
 import useChatStore from '@/composables/use-chat-store'
@@ -81,18 +69,13 @@ const deleting = ref(false)
 const activeChat = ref<FleetSidebarChat | null>(null)
 
 const chats = computed((): FleetSidebarChat[] => {
-  const project = fleetSidebar.sidebarProjects.value.find(
-    (item) => item.slug === props.projectSlug,
-  )
+  const project = fleetSidebar.sidebarProjects.value.find((item) => item.slug === props.projectSlug)
   return project?.chats ?? []
 })
 
-const statusFor = (
-  chat: FleetSidebarChat,
-): { kind: ChatStatusKind; label: string } => {
+const statusFor = (chat: FleetSidebarChat): { kind: ChatStatusKind; label: string } => {
   const meta = chatStore.meta.value
-  const live =
-    meta && meta.id === chat.id && meta.projectSlug === props.projectSlug ? meta : null
+  const live = meta && meta.id === chat.id && meta.projectSlug === props.projectSlug ? meta : null
   const status = live?.status ?? chat.status
   const attention = live?.attention ?? chat.attention ?? null
 
@@ -224,10 +207,7 @@ watch(deleteOpen, (open) => {
       <p class="text-sm text-muted-foreground">No chats in this project yet.</p>
     </div>
 
-    <div
-      v-else
-      class="min-h-0 flex-1 overflow-auto rounded-lg border border-border/40"
-    >
+    <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-border/40">
       <Table>
         <TableHeader>
           <TableRow class="hover:bg-transparent">
@@ -253,18 +233,19 @@ watch(deleteOpen, (open) => {
                     class="inline-flex size-8 items-center justify-center"
                     :aria-label="status.label"
                   >
-                    <NavigationAsideLeftChatRunningDots
-                      v-if="status.kind === 'running'"
-                    />
-                    <ShieldAlert
+                    <NavigationAsideLeftChatRunningDots v-if="status.kind === 'running'" />
+                    <AppIcon
+                      name="shield-alert"
                       v-else-if="status.kind === 'needs_approval'"
                       class="size-3.5 text-amber-600 dark:text-amber-400"
                     />
-                    <MessageCircleQuestion
+                    <AppIcon
+                      name="message-circle-question"
                       v-else-if="status.kind === 'needs_input'"
                       class="size-3.5 text-amber-600 dark:text-amber-400"
                     />
-                    <KeyRound
+                    <AppIcon
+                      name="key-round"
                       v-else-if="status.kind === 'needs_mcp_auth'"
                       class="size-3.5 text-amber-600 dark:text-amber-400"
                     />
@@ -272,14 +253,12 @@ watch(deleteOpen, (open) => {
                       v-else-if="status.kind === 'completed'"
                       class="size-1.5 rounded-full bg-[#D4C1EC]"
                     />
-                    <CircleAlert
+                    <AppIcon
+                      name="circle-alert"
                       v-else-if="status.kind === 'error'"
                       class="size-3.5 text-destructive"
                     />
-                    <Circle
-                      v-else
-                      class="size-3.5 text-muted-foreground/50"
-                    />
+                    <AppIcon name="circle" v-else class="size-3.5 text-muted-foreground/50" />
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>{{ status.label }}</TooltipContent>
@@ -296,7 +275,7 @@ watch(deleteOpen, (open) => {
                       :aria-label="`Rename ${chat.title}`"
                       @click="openRenameDialog(chat)"
                     >
-                      <Pencil class="size-3.5" />
+                      <AppIcon name="pencil" class="size-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Rename</TooltipContent>
@@ -310,7 +289,7 @@ watch(deleteOpen, (open) => {
                       :aria-label="`Delete ${chat.title}`"
                       @click="openDeleteDialog(chat)"
                     >
-                      <Trash2 class="size-3.5" />
+                      <AppIcon name="trash" class="size-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Delete</TooltipContent>
@@ -328,11 +307,7 @@ watch(deleteOpen, (open) => {
           <DialogTitle>Rename chat</DialogTitle>
           <DialogDescription>Enter a new title for this chat.</DialogDescription>
         </DialogHeader>
-        <Input
-          v-model="renameTitle"
-          autocomplete="off"
-          @keydown.enter.prevent="handleRename"
-        />
+        <Input v-model="renameTitle" autocomplete="off" @keydown.enter.prevent="handleRename" />
         <DialogFooter>
           <Button variant="outline" @click="renameOpen = false">Cancel</Button>
           <Button :disabled="savingRename || !renameTitle.trim()" @click="handleRename">

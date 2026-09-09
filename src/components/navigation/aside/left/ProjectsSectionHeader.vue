@@ -1,18 +1,9 @@
 <script setup lang="ts">
-import {
-  ChevronsDownUp,
-  Filter,
-  FolderPlus,
-  Search,
-} from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import { SidebarGroupLabel } from '@/components/shadcn/ui/sidebar'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import useAddProject from '@/composables/use-add-project'
 import useProjectsExpansion from '@/composables/use-projects-expansion'
 import useProjectsSection from '@/composables/use-projects-section'
@@ -34,9 +25,7 @@ const handleSearchClick = async (): Promise<void> => {
 
 <template>
   <div class="flex h-8 items-center justify-between gap-1 px-0">
-    <SidebarGroupLabel class="h-auto px-0">
-      Chats
-    </SidebarGroupLabel>
+    <SidebarGroupLabel class="h-auto px-0"> Chats </SidebarGroupLabel>
     <div class="flex items-center gap-0.5">
       <Tooltip>
         <TooltipTrigger as-child>
@@ -47,7 +36,7 @@ const handleSearchClick = async (): Promise<void> => {
             aria-label="Search projects and chats"
             @click="handleSearchClick"
           >
-            <Search class="size-3.5" />
+            <AppIcon name="search" class="size-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Search projects and chats</TooltipContent>
@@ -62,7 +51,7 @@ const handleSearchClick = async (): Promise<void> => {
             aria-label="Filter by running status"
             @click="toggleRunningFilter"
           >
-            <Filter class="size-3.5" />
+            <AppIcon name="filter" class="size-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Filter by running status</TooltipContent>
@@ -77,7 +66,7 @@ const handleSearchClick = async (): Promise<void> => {
             aria-label="Add project"
             @click="addProjectFromPicker"
           >
-            <FolderPlus class="size-3.5" />
+            <AppIcon name="folder-plus" class="size-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Add project</TooltipContent>
@@ -88,10 +77,12 @@ const handleSearchClick = async (): Promise<void> => {
             variant="ghost"
             size="icon"
             class="size-6"
-            :aria-label="expansionMode === 'all-collapsed' ? 'Expand all projects' : 'Collapse all projects'"
+            :aria-label="
+              expansionMode === 'all-collapsed' ? 'Expand all projects' : 'Collapse all projects'
+            "
             @click="toggleCollapseAll"
           >
-            <ChevronsDownUp class="size-3.5" />
+            <AppIcon name="chevrons-down-up" class="size-3.5" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>

@@ -1,13 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref } from 'vue'
-import { Plus } from '@lucide/vue'
-import {
-  FileCode,
-  FileText,
-  GitBranch,
-  Terminal,
-  X,
-} from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import { ScrollArea, ScrollBar } from '@/components/shadcn/ui/scroll-area'
 import RightSidebarTrigger from '@/components/navigation/aside/right/RightSidebarTrigger.vue'
@@ -27,17 +20,17 @@ const activeTabId = computed(() => workbench.activeTabId.value)
 const tabIcon = (type: WorkbenchTabType) => {
   switch (type) {
     case 'editor':
-      return FileCode
+      return 'file-code'
     case 'terminal':
-      return Terminal
+      return 'terminal'
     case 'agent-shell':
-      return Terminal
+      return 'terminal'
     case 'changes':
-      return GitBranch
+      return 'git-branch'
     case 'plan':
-      return FileText
+      return 'file-text'
     default:
-      return FileCode
+      return 'file-code'
   }
 }
 
@@ -96,15 +89,12 @@ const handleDragEnd = (): void => {
     <div class="pointer-events-auto shrink-0 pl-1">
       <WorkbenchTabPicker tooltip="Open tab">
         <Button variant="ghost" size="icon" class="h-7 w-7 shrink-0" aria-label="Open tab">
-          <Plus class="h-4 w-4" />
+          <AppIcon name="plus" class="h-4 w-4" />
         </Button>
       </WorkbenchTabPicker>
     </div>
 
-    <ScrollArea
-      v-if="hasTabs"
-      class="pointer-events-auto h-full min-w-0 flex-1"
-    >
+    <ScrollArea v-if="hasTabs" class="pointer-events-auto h-full min-w-0 flex-1">
       <div class="flex h-(--titlebar-height) items-center gap-0.5 pr-1">
         <button
           v-for="(tab, index) in workbench.tabs.value"
@@ -123,7 +113,7 @@ const handleDragEnd = (): void => {
           @dragover="handleDragOver($event, index)"
           @dragend="handleDragEnd"
         >
-          <component :is="tabIcon(tab.type)" class="h-3 w-3 shrink-0" />
+          <AppIcon :name="tabIcon(tab.type)" class="h-3 w-3 shrink-0" />
           <span class="truncate">{{ tabLabel(tab) }}</span>
           <span
             v-if="workbench.hasMultipleProjects.value && projectSlug(tab.projectId)"
@@ -135,7 +125,7 @@ const handleDragEnd = (): void => {
             class="ml-0.5 shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
             @click="handleClose($event, tab.id)"
           >
-            <X class="h-3 w-3" />
+            <AppIcon name="x" class="h-3 w-3" />
           </span>
         </button>
         <div class="h-full min-w-0 flex-1" data-tauri-drag-region />

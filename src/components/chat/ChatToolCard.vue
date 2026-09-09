@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { ApprovalResolution } from '@/services/harness/permission/approval-gate'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import { ref } from 'vue'
@@ -11,13 +12,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/shadcn/ui/collapsible'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { ChevronRightIcon, WifiIcon } from '@lucide/vue'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const NETWORK_TOOLTIP = 'This command uses network in the sandbox'
 
@@ -39,7 +34,8 @@ const open = ref(false)
       <CollapsibleTrigger
         class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm transition-colors hover:text-foreground"
       >
-        <ChevronRightIcon
+        <AppIcon
+          name="chevron-right"
           class="size-3.5 shrink-0 transition-transform"
           :class="open ? 'rotate-90' : ''"
         />
@@ -48,9 +44,7 @@ const open = ref(false)
           :server-id="approval.serverId"
         />
         <span class="min-w-0 truncate">{{ approval.title }}</span>
-        <TooltipProvider
-          v-if="isNetworkSandboxApproval(approval.detail, approval.needsNetwork)"
-        >
+        <TooltipProvider v-if="isNetworkSandboxApproval(approval.detail, approval.needsNetwork)">
           <Tooltip>
             <TooltipTrigger as-child>
               <span
@@ -59,7 +53,7 @@ const open = ref(false)
                 :aria-label="NETWORK_TOOLTIP"
                 @click.stop
               >
-                <WifiIcon class="size-3.5 text-muted-foreground" />
+                <AppIcon name="wifi" class="size-3.5 text-muted-foreground" />
               </span>
             </TooltipTrigger>
             <TooltipContent class="z-60">
@@ -67,17 +61,11 @@ const open = ref(false)
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <span
-          v-if="subagentLabel"
-          class="shrink-0 text-xs text-muted-foreground"
-        >
+        <span v-if="subagentLabel" class="shrink-0 text-xs text-muted-foreground">
           {{ subagentLabel }}
         </span>
       </CollapsibleTrigger>
-      <ChatApprovalActions
-        :approval="approval"
-        @resolve="emit('resolve', $event)"
-      />
+      <ChatApprovalActions :approval="approval" @resolve="emit('resolve', $event)" />
     </div>
     <CollapsibleContent class="space-y-2 px-2 py-2">
       <p
@@ -86,10 +74,7 @@ const open = ref(false)
       >
         $ {{ approval.detail }}
       </p>
-      <p
-        v-else-if="approval.detail"
-        class="text-sm text-muted-foreground"
-      >
+      <p v-else-if="approval.detail" class="text-sm text-muted-foreground">
         {{ approval.detail }}
       </p>
 

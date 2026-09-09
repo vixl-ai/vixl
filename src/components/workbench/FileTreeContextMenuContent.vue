@@ -1,17 +1,5 @@
 <script setup lang="ts">
-import {
-  ClipboardCopy,
-  ClipboardPaste,
-  Copy,
-  File,
-  FilePlus,
-  FolderOpen,
-  MessageSquarePlus,
-  Pencil,
-  Scissors,
-  Terminal,
-  Trash2,
-} from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -105,16 +93,16 @@ const handleOpenInTerminalSelect = async (): Promise<void> => {
     </ContextMenuLabel>
     <ContextMenuSeparator />
     <ContextMenuItem @select="handleRenameSelect">
-      <Pencil />
+      <AppIcon name="pencil" />
       Rename
     </ContextMenuItem>
     <ContextMenuSeparator />
     <ContextMenuItem @select="handleCutSelect">
-      <Scissors />
+      <AppIcon name="scissors" />
       Cut
     </ContextMenuItem>
     <ContextMenuItem @select="handleCopySelect">
-      <ClipboardCopy />
+      <AppIcon name="clipboard-copy" />
       Copy
     </ContextMenuItem>
     <ContextMenuItem
@@ -122,58 +110,46 @@ const handleOpenInTerminalSelect = async (): Promise<void> => {
       :disabled="!clipboard.hasClipboard.value"
       @select="handlePasteSelect"
     >
-      <ClipboardPaste />
+      <AppIcon name="clipboard-paste" />
       Paste
     </ContextMenuItem>
     <ContextMenuSeparator />
-    <ContextMenuItem
-      v-if="!isDirectory"
-      @select="handleAddFileToChatSelect"
-    >
-      <File />
+    <ContextMenuItem v-if="!isDirectory" @select="handleAddFileToChatSelect">
+      <AppIcon name="file" />
       Add file to chat
     </ContextMenuItem>
-    <ContextMenuItem
-      v-if="!isDirectory"
-      @select="handleAddFileToNewChatSelect"
-    >
-      <MessageSquarePlus />
+    <ContextMenuItem v-if="!isDirectory" @select="handleAddFileToNewChatSelect">
+      <AppIcon name="message-square-plus" />
       Add file to new chat
     </ContextMenuItem>
     <ContextMenuItem @select="handleOpenInTerminalSelect">
-      <Terminal />
+      <AppIcon name="terminal" />
       Open in terminal
     </ContextMenuItem>
     <ContextMenuSeparator />
     <ContextMenuItem @select="handleCopyRelativePath">
-      <Copy />
+      <AppIcon name="copy" />
       Copy relative path
     </ContextMenuItem>
     <ContextMenuItem @select="handleCopyAbsolutePath">
-      <Copy />
+      <AppIcon name="copy" />
       Copy path
     </ContextMenuItem>
     <ContextMenuItem @select="handleCopyName">
-      <Copy />
+      <AppIcon name="copy" />
       Copy name
     </ContextMenuItem>
     <ContextMenuItem @select="handleRevealInFinder">
-      <FolderOpen />
+      <AppIcon name="folder-open" />
       Reveal in Finder
     </ContextMenuItem>
-    <ContextMenuItem
-      v-if="!isDirectory"
-      @select="handleOpenInEditor"
-    >
-      <FilePlus />
+    <ContextMenuItem v-if="!isDirectory" @select="handleOpenInEditor">
+      <AppIcon name="file-plus" />
       Open in editor
     </ContextMenuItem>
     <ContextMenuSeparator />
-    <ContextMenuItem
-      variant="destructive"
-      @select="handleDeleteSelect"
-    >
-      <Trash2 />
+    <ContextMenuItem variant="destructive" @select="handleDeleteSelect">
+      <AppIcon name="trash" />
       Delete
     </ContextMenuItem>
   </ContextMenuContent>

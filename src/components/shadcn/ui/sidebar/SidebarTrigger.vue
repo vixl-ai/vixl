@@ -1,17 +1,13 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from "vue"
-import { PanelLeft } from "@lucide/vue"
-import { cn } from "@/lib/utils"
+import { AppIcon } from '@/icons'
+import type { HTMLAttributes } from 'vue'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
-import { useSidebar } from "./utils"
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
+import { useSidebar } from './utils'
 
 const props = defineProps<{
-  class?: HTMLAttributes["class"]
+  class?: HTMLAttributes['class']
 }>()
 
 const { toggleSidebar } = useSidebar()
@@ -29,7 +25,7 @@ const { toggleSidebar } = useSidebar()
         aria-label="Toggle left sidebar"
         @click="toggleSidebar"
       >
-        <PanelLeft />
+        <AppIcon name="panel-left" />
       </Button>
     </TooltipTrigger>
     <TooltipContent>Toggle left sidebar</TooltipContent>

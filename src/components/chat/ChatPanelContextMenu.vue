@@ -1,13 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import {
-  Copy,
-  Download,
-  Pencil,
-  Pin,
-  PinOff,
-} from '@lucide/vue'
 import useChatStore from '@/composables/use-chat-store'
 import useFleetSidebar, { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import { Button } from '@/components/shadcn/ui/button'
@@ -27,11 +21,7 @@ import {
   DialogTitle,
 } from '@/components/shadcn/ui/dialog'
 import { Input } from '@/components/shadcn/ui/input'
-import {
-  pinChat,
-  saveTextFileWithDialog,
-  updateChatMeta,
-} from '@/services/vixl/vixl-tauri'
+import { pinChat, saveTextFileWithDialog, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import buildChatTranscript from '@/utils/build-chat-transcript'
 import sanitizeExportFilename from '@/utils/sanitize-export-filename'
 
@@ -178,30 +168,21 @@ watch(
     </ContextMenuTrigger>
     <ContextMenuContent class="w-52">
       <ContextMenuItem :disabled="copying" @select="handleCopyId">
-        <Copy />
+        <AppIcon name="copy" />
         Copy ID
       </ContextMenuItem>
-      <ContextMenuItem
-        :disabled="exporting"
-        @select="handleExportTranscript"
-      >
-        <Download />
+      <ContextMenuItem :disabled="exporting" @select="handleExportTranscript">
+        <AppIcon name="download" />
         Export Transcript
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem
-        :disabled="savingRename"
-        @select="openRenameDialog"
-      >
-        <Pencil />
+      <ContextMenuItem :disabled="savingRename" @select="openRenameDialog">
+        <AppIcon name="pencil" />
         Rename
       </ContextMenuItem>
-      <ContextMenuItem
-        :disabled="pinning"
-        @select="handleTogglePin"
-      >
-        <PinOff v-if="isPinned" />
-        <Pin v-else />
+      <ContextMenuItem :disabled="pinning" @select="handleTogglePin">
+        <AppIcon name="pin-off" v-if="isPinned" />
+        <AppIcon name="pin" v-else />
         {{ isPinned ? 'Unpin' : 'Pin' }}
       </ContextMenuItem>
     </ContextMenuContent>
@@ -213,11 +194,7 @@ watch(
         <DialogTitle>Rename chat</DialogTitle>
         <DialogDescription>Enter a new title for this chat.</DialogDescription>
       </DialogHeader>
-      <Input
-        v-model="renameTitle"
-        autocomplete="off"
-        @keydown.enter.prevent="handleRename"
-      />
+      <Input v-model="renameTitle" autocomplete="off" @keydown.enter.prevent="handleRename" />
       <DialogFooter>
         <Button variant="outline" @click="renameOpen = false">Cancel</Button>
         <Button :disabled="savingRename || !renameTitle.trim()" @click="handleRename">

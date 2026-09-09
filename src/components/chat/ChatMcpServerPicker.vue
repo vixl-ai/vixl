@@ -1,16 +1,10 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  ChevronDownIcon,
-  ServerIcon,
-} from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import { Input } from '@/components/shadcn/ui/input'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/shadcn/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/shadcn/ui/popover'
 import { toast } from 'vue-sonner'
 import useProjectMcpConfig from '@/composables/mcp-servers/use-project-mcp-config'
 import useMcpTrustChoice from '@/composables/mcp-servers/use-mcp-trust-choice'
@@ -53,16 +47,13 @@ const filteredServers = computed(() => {
   if (!query) {
     return effectiveServers.value
   }
-  return effectiveServers.value.filter((server) =>
-    server.id.toLowerCase().includes(query),
-  )
+  return effectiveServers.value.filter((server) => server.id.toLowerCase().includes(query))
 })
 
 const connectedCount = computed(
   () =>
-    effectiveServers.value.filter(
-      (server) => serverStates.value[server.id]?.status === 'connected',
-    ).length,
+    effectiveServers.value.filter((server) => serverStates.value[server.id]?.status === 'connected')
+      .length,
 )
 
 const hasAuthRequired = computed(() =>
@@ -187,42 +178,30 @@ onMounted(async () => {
         variant="ghost"
         size="sm"
         class="h-7 min-w-0 gap-1.5 px-2 text-xs"
-        :class="
-          hasAuthRequired
-            ? 'text-amber-600 dark:text-amber-400'
-            : 'text-muted-foreground'
-        "
+        :class="hasAuthRequired ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'"
         :title="`${connectedCount} of ${effectiveServers.length} MCP servers connected`"
         aria-label="MCP servers"
       >
-        <ServerIcon class="size-3.5 shrink-0" />
+        <AppIcon name="server" class="size-3.5 shrink-0" />
         <span class="max-w-32 min-w-0 truncate @max-[22rem]/composer:hidden">
           MCP
           <template v-if="effectiveServers.length > 0">
             ({{ connectedCount }}/{{ effectiveServers.length }})
           </template>
         </span>
-        <ChevronDownIcon class="size-3 shrink-0 opacity-60" />
+        <AppIcon name="chevron-down" class="size-3 shrink-0 opacity-60" />
       </Button>
     </PopoverTrigger>
     <PopoverContent align="end" class="w-80 p-0">
       <div class="border-b border-border/50 p-2">
-        <Input
-          v-model="searchQuery"
-          placeholder="Search MCP servers…"
-          class="h-8"
-        />
+        <Input v-model="searchQuery" placeholder="Search MCP servers…" class="h-8" />
       </div>
       <div class="max-h-60 overflow-y-auto p-1">
         <p
           v-if="filteredServers.length === 0"
           class="px-2 py-4 text-center text-sm text-muted-foreground"
         >
-          {{
-            searchQuery.trim()
-              ? 'No servers match your search.'
-              : 'No MCP servers configured.'
-          }}
+          {{ searchQuery.trim() ? 'No servers match your search.' : 'No MCP servers configured.' }}
         </p>
         <ChatMcpServerPickerItem
           v-for="server in filteredServers"

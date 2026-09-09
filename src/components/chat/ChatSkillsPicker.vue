@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref } from 'vue'
-import { ChevronDownIcon, SparklesIcon } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import { Input } from '@/components/shadcn/ui/input'
 import {
@@ -30,8 +30,7 @@ const filteredSkills = computed(() => {
   }
   return skills.value.filter(
     (skill) =>
-      skill.name.toLowerCase().includes(query) ||
-      skill.description.toLowerCase().includes(query),
+      skill.name.toLowerCase().includes(query) || skill.description.toLowerCase().includes(query),
   )
 })
 
@@ -61,22 +60,17 @@ const handleSkillSelect = (name: string): void => {
         :title="`${skills.length} skills available`"
         aria-label="Skills"
       >
-        <SparklesIcon class="size-3.5 shrink-0" />
+        <AppIcon name="sparkles" class="size-3.5 shrink-0" />
         <span class="max-w-32 min-w-0 truncate @max-[22rem]/composer:hidden">
           Skills
           <template v-if="skills.length > 0">({{ skills.length }})</template>
         </span>
-        <ChevronDownIcon class="size-3 shrink-0 opacity-60" />
+        <AppIcon name="chevron-down" class="size-3 shrink-0 opacity-60" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" class="w-72 p-0">
       <div class="border-b border-border/50 p-2" @pointerdown.stop>
-        <Input
-          v-model="searchQuery"
-          placeholder="Search skills…"
-          class="h-8"
-          @keydown.stop
-        />
+        <Input v-model="searchQuery" placeholder="Search skills…" class="h-8" @keydown.stop />
       </div>
       <div class="max-h-60 overflow-y-auto p-1">
         <DropdownMenuItem
@@ -97,10 +91,7 @@ const handleSkillSelect = (name: string): void => {
               : 'No user or project skills available.'
           }}
         </p>
-        <p
-          v-else-if="pending"
-          class="px-2 py-4 text-center text-sm text-muted-foreground"
-        >
+        <p v-else-if="pending" class="px-2 py-4 text-center text-sm text-muted-foreground">
           Loading skills…
         </p>
       </div>

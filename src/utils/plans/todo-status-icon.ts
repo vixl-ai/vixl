@@ -1,24 +1,19 @@
-import {
-  CheckCircle2Icon,
-  CircleDashedIcon,
-  CircleDotIcon,
-  CircleIcon,
-  XCircleIcon,
-} from '@lucide/vue'
+import type { AppIconName } from '@/icons'
 import type { PlanTodoItem } from '@/types/plans/plan-document'
 
-export default (status: PlanTodoItem['status']) => {
+/** Semantic icon name for a plan todo status (resolved via AppIcon). */
+export default (status: PlanTodoItem['status']): AppIconName => {
   if (status === 'completed') {
-    return CheckCircle2Icon
+    return 'circle-check-big'
   }
   if (status === 'in_progress') {
-    return CircleDotIcon
+    return 'circle-dot'
   }
   if (status === 'cancelled') {
-    return XCircleIcon
+    return 'circle-x'
   }
   if (status === 'pending') {
-    return CircleDashedIcon
+    return 'circle-dashed'
   }
-  return CircleIcon
+  return 'circle'
 }

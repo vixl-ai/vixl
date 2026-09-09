@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { ExternalLink, FolderSymlink } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import type { ProjectFileEntry, VixlFilesKind } from '@/services/vixl/vixl-tauri'
 import { revealInFolder } from '@/services/vixl/vixl-tauri'
 
@@ -20,9 +16,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div
-    class="flex items-center justify-between rounded-lg border border-border/50 px-4 py-2"
-  >
+  <div class="flex items-center justify-between rounded-lg border border-border/50 px-4 py-2">
     <div>
       <p class="font-medium">
         {{ kind === 'skills' ? file.name : (file.description ?? file.name) }}
@@ -38,7 +32,7 @@ const emit = defineEmits<{
             aria-label="Open in editor"
             @click="emit('open', file)"
           >
-            <ExternalLink class="h-4 w-4" />
+            <AppIcon name="external-link" class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Open in editor</TooltipContent>
@@ -52,7 +46,7 @@ const emit = defineEmits<{
             aria-label="Reveal in folder"
             @click="revealInFolder(file.path)"
           >
-            <FolderSymlink class="h-4 w-4" />
+            <AppIcon name="folder-symlink" class="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Reveal in folder</TooltipContent>

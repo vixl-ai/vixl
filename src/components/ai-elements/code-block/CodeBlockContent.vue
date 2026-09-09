@@ -3,6 +3,7 @@ import type { BundledLanguage, ThemedToken } from 'shiki'
 import type { TokenizedCode } from './utils'
 import { cn } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
+import { editorAppearanceRevision } from '@/utils/appearance/editor-theme'
 import { createRawTokens, highlightCode, isBold, isItalic, isUnderline } from './utils'
 
 const props = withDefaults(
@@ -21,7 +22,7 @@ const rawTokens = computed(() => createRawTokens(props.code))
 const tokenized = ref<TokenizedCode>(highlightCode(props.code, props.language) ?? rawTokens.value)
 
 watch(
-  () => [props.code, props.language],
+  () => [props.code, props.language, editorAppearanceRevision.value],
   () => {
     // Reset to raw tokens or cached result
     tokenized.value = highlightCode(props.code, props.language) ?? rawTokens.value

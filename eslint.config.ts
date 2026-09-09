@@ -97,4 +97,37 @@ export default defineConfigWithVueTs(
       'vixl/no-empty-catch': 'error',
     },
   },
+
+  // Direct icon-pack imports are restricted to the adapter modules in
+  // `src/icons/adapters/**`. Application code must render icons through the
+  // semantic registry (`AppIcon` / `resolveIconComponent`) so pack switching
+  // stays comprehensive. (shadcn/ai-elements are in globalIgnores; the
+  // repository icon-boundary test in `spec/src/icons` covers those too.)
+  {
+    name: 'app/icon-pack-boundary',
+    files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/icons/adapters/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@lucide/vue', '@lucide/vue/*', '@tabler/icons-vue', '@tabler/icons-vue/*', '@phosphor-icons/vue', '@phosphor-icons/vue/*'],
+              message:
+                'Import icons through the semantic registry (src/icons) instead. Pack packages may only be imported inside src/icons/adapters/**.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
+    name: 'app/icon-pack-adapter-allowlist',
+    files: ['src/icons/adapters/**'],
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
 )

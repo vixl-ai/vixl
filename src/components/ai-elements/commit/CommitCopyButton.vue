@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { CheckIcon, CopyIcon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { computed, onBeforeUnmount, ref } from 'vue'
@@ -13,12 +13,9 @@ interface Props extends /* @vue-ignore */ CommitCopyButtonProps {
   class?: HTMLAttributes['class']
 }
 
-const props = withDefaults(
-  defineProps<Props>(),
-  {
-    timeout: 2000,
-  },
-)
+const props = withDefaults(defineProps<Props>(), {
+  timeout: 2000,
+})
 
 const emit = defineEmits<{
   (event: 'copy'): void
@@ -27,8 +24,6 @@ const emit = defineEmits<{
 
 const isCopied = ref(false)
 let resetTimer: ReturnType<typeof setTimeout> | undefined
-
-const icon = computed(() => (isCopied.value ? CheckIcon : CopyIcon))
 
 async function copyToClipboard() {
   if (typeof window === 'undefined' || !navigator?.clipboard?.writeText) {
@@ -49,8 +44,7 @@ async function copyToClipboard() {
     resetTimer = setTimeout(() => {
       isCopied.value = false
     }, props.timeout)
-  }
-  catch (error) {
+  } catch (error) {
     emit('error', error instanceof Error ? error : new Error('Copy failed'))
   }
 }
@@ -71,7 +65,7 @@ onBeforeUnmount(() => {
     @click="copyToClipboard"
   >
     <slot>
-      <component :is="icon" :size="14" />
+      <AppIcon :name="isCopied ? 'check' : 'copy'" :size="14" />
     </slot>
   </Button>
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { AlertTriangle } from '@lucide/vue'
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
 import type { TurnUsageAggregate } from '@/types/billing/turn-usage-aggregate'
 import useAgentHarness from '@/composables/use-agent-harness'
@@ -9,11 +9,7 @@ import useChatStore from '@/composables/use-chat-store'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import { HOME_CHAT_SLUG, isHomeChatSlug } from '@/constants/home-chat'
 import ChatUsageTokenMetrics from '@/components/chat/ChatUsageTokenMetrics.vue'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 
 const props = defineProps<{
   turnId: string
@@ -28,9 +24,7 @@ const isStandalone =
   route.name === 'home-chat-subagent' ||
   isHomeChatSlug(String(route.params.slug ?? ''))
 
-const projectSlug = isStandalone
-  ? HOME_CHAT_SLUG
-  : String(route.params.slug ?? '')
+const projectSlug = isStandalone ? HOME_CHAT_SLUG : String(route.params.slug ?? '')
 const chatId = String(route.params.chatId ?? '')
 
 const sessionMeta = chatStore.forChat(projectSlug, chatId).meta.value
@@ -119,16 +113,11 @@ const partCostLabel = (part: BillableUsageRecord): string => {
   return formatCostUsd(part.costUSD)
 }
 
-const showTooltip = computed(
-  () => showWarning.value || (aggregate.value?.parts.length ?? 0) > 0,
-)
+const showTooltip = computed(() => showWarning.value || (aggregate.value?.parts.length ?? 0) > 0)
 </script>
 
 <template>
-  <div
-    v-if="aggregate"
-    class="flex max-w-prose items-center gap-1.5 text-xs text-muted-foreground"
-  >
+  <div v-if="aggregate" class="flex max-w-prose items-center gap-1.5 text-xs text-muted-foreground">
     <Tooltip v-if="showTooltip">
       <TooltipTrigger as-child>
         <div class="inline-flex min-w-0 items-center gap-1.5">
@@ -139,7 +128,8 @@ const showTooltip = computed(
             :cache-read-tokens="aggregate.cacheReadTokens"
             :cache-write-tokens="aggregate.cacheWriteTokens"
           />
-          <AlertTriangle
+          <AppIcon
+            name="triangle-alert"
             v-if="showWarning"
             class="size-3 shrink-0 text-amber-600 dark:text-amber-400"
             aria-hidden="true"
@@ -147,21 +137,11 @@ const showTooltip = computed(
         </div>
       </TooltipTrigger>
       <TooltipContent class="max-w-xs space-y-1.5">
-        <p
-          v-if="warningText"
-          class="font-medium"
-        >
+        <p v-if="warningText" class="font-medium">
           {{ warningText }}
         </p>
-        <ul
-          v-if="aggregate.parts.length > 0"
-          class="space-y-1"
-        >
-          <li
-            v-for="part in aggregate.parts"
-            :key="part.id"
-            class="flex flex-col gap-0.5"
-          >
+        <ul v-if="aggregate.parts.length > 0" class="space-y-1">
+          <li v-for="part in aggregate.parts" :key="part.id" class="flex flex-col gap-0.5">
             <span class="font-medium">{{ partLabel(part) }}</span>
             <span class="flex flex-wrap items-center gap-1.5 text-muted-foreground">
               <span class="tabular-nums">{{ partCostLabel(part) }}</span>

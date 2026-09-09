@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { Replace } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import type { GrepMatch } from '@/services/vixl/vixl-tauri'
 
 const props = defineProps<{
@@ -39,7 +35,7 @@ const handleReplace = (event: MouseEvent): void => {
         :disabled="replacing"
         @click="handleReplace"
       >
-        <Replace class="h-3 w-3" />
+        <AppIcon name="replace" class="h-3 w-3" />
       </Button>
     </TooltipTrigger>
     <TooltipContent class="z-60">Replace</TooltipContent>

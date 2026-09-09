@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, nextTick, ref, shallowRef } from 'vue'
-import { ChevronRight } from '@lucide/vue'
 import { Collapsible } from '@/components/shadcn/ui/collapsible'
 import { TooltipProvider } from '@/components/shadcn/ui/tooltip'
 import VixlFileCreateHost from '@/components/settings/vixl-files/VixlFileCreateHost.vue'
@@ -10,17 +9,12 @@ import { HOME_WORKSPACE_ID } from '@/constants/home-chat'
 import type { SettingsTab } from '@/composables/use-vixl-config'
 import type { ProjectFileEntry } from '@/services/vixl/vixl-tauri'
 
-const listVixlFiles = vi.hoisted(
-  () => vi.fn<() => Promise<ProjectFileEntry[]>>().mockResolvedValue([]),
+const listVixlFiles = vi.hoisted(() =>
+  vi.fn<() => Promise<ProjectFileEntry[]>>().mockResolvedValue([]),
 )
-const openEditor = vi.hoisted(
-  () => vi.fn<(projectId: string, path: string) => Promise<void>>(),
-)
-const openPlan = vi.hoisted(
-  () =>
-    vi.fn<
-      (projectId: string, name: string, path: string, title: string) => Promise<void>
-    >(),
+const openEditor = vi.hoisted(() => vi.fn<(projectId: string, path: string) => Promise<void>>())
+const openPlan = vi.hoisted(() =>
+  vi.fn<(projectId: string, name: string, path: string, title: string) => Promise<void>>(),
 )
 const activeRootPath = vi.hoisted(() => ({ value: null as string | null }))
 const fleetProjects = vi.hoisted(() => ({
@@ -88,7 +82,7 @@ const isCollapsibleOpen = (wrapper: VueWrapper): boolean => {
   if (typeof openProp === 'boolean') {
     return openProp
   }
-  return wrapper.findComponent(ChevronRight).classes().includes('rotate-90')
+  return wrapper.find('[data-icon="chevron-right"]').classes().includes('rotate-90')
 }
 
 const SectionHost = defineComponent({
@@ -113,9 +107,7 @@ const SectionHost = defineComponent({
   `,
 })
 
-const mountSection = (
-  props: { tab?: SettingsTab; collapsible?: boolean } = {},
-): VueWrapper =>
+const mountSection = (props: { tab?: SettingsTab; collapsible?: boolean } = {}): VueWrapper =>
   mount(SectionHost, {
     props,
     global: {
@@ -151,7 +143,7 @@ describe('VixlFilesSection create host', () => {
     const createHost = wrapper.findComponent(VixlFileCreateHost)
     expect(createHost.exists()).toBe(true)
     expect(isCollapsibleOpen(wrapper)).toBe(false)
-    expect(wrapper.findComponent(ChevronRight).classes()).not.toContain('rotate-90')
+    expect(wrapper.find('[data-icon="chevron-right"]').classes()).not.toContain('rotate-90')
 
     const newRule = wrapper.find('button[aria-label="New rule"]')
     expect(newRule.exists()).toBe(true)
@@ -160,7 +152,7 @@ describe('VixlFilesSection create host', () => {
 
     expect(wrapper.findComponent(VixlFileCreateHost).props('open')).toBe(true)
     expect(isCollapsibleOpen(wrapper)).toBe(false)
-    expect(wrapper.findComponent(ChevronRight).classes()).not.toContain('rotate-90')
+    expect(wrapper.find('[data-icon="chevron-right"]').classes()).not.toContain('rotate-90')
   })
 })
 
@@ -194,9 +186,7 @@ describe('VixlFilesSection project id for editor', () => {
   })
 
   it('opens project files against the matching fleet project', async () => {
-    listVixlFiles.mockResolvedValue([
-      { name: 'rule.md', path: '/tmp/proj/.vixl/rules/rule.md' },
-    ])
+    listVixlFiles.mockResolvedValue([{ name: 'rule.md', path: '/tmp/proj/.vixl/rules/rule.md' }])
     activeRootPath.value = '/tmp/proj'
     fleetProjects.value = [{ id: 'proj-1', rootPath: '/tmp/proj' }]
     activeProjectId.value = 'other-proj'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { CheckIcon, CopyIcon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { InputGroupButton } from '@/components/ui/input-group'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useSnippetContext } from './context'
@@ -25,8 +25,6 @@ const { code } = useSnippetContext('SnippetCopyButton')
 const isCopied = ref(false)
 const timeoutRef = ref<number>(0)
 
-const Icon = computed(() => (isCopied.value ? CheckIcon : CopyIcon))
-
 async function copyToClipboard() {
   if (typeof window === 'undefined' || !navigator?.clipboard?.writeText) {
     emit('error', new Error('Clipboard API not available'))
@@ -38,13 +36,9 @@ async function copyToClipboard() {
       await navigator.clipboard.writeText(code.value)
       isCopied.value = true
       emit('copy')
-      timeoutRef.value = window.setTimeout(
-        () => (isCopied.value = false),
-        props.timeout,
-      )
+      timeoutRef.value = window.setTimeout(() => (isCopied.value = false), props.timeout)
     }
-  }
-  catch (error) {
+  } catch (error) {
     emit('error', error as Error)
   }
 }
@@ -64,7 +58,7 @@ onBeforeUnmount(() => {
     @click="copyToClipboard"
   >
     <slot>
-      <component :is="Icon" class="size-3.5" :size="14" />
+      <AppIcon :name="isCopied ? 'check' : 'copy'" class="size-3.5" :size="14" />
     </slot>
   </InputGroupButton>
 </template>

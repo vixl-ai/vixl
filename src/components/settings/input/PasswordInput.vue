@@ -1,17 +1,13 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref } from 'vue'
-import { Eye, EyeOff } from '@lucide/vue'
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
 } from '@/components/shadcn/ui/input-group'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
@@ -33,12 +29,7 @@ const handleToggle = (): void => {
 
 <template>
   <InputGroup
-    :class="
-      cn(
-        'has-[[data-slot=input-group-control]:focus-visible]:ring-inset',
-        props.class,
-      )
-    "
+    :class="cn('has-[[data-slot=input-group-control]:focus-visible]:ring-inset', props.class)"
   >
     <InputGroupInput
       :id="id"
@@ -55,8 +46,8 @@ const handleToggle = (): void => {
             :aria-label="toggleLabel"
             @click="handleToggle"
           >
-            <EyeOff v-if="visible" />
-            <Eye v-else />
+            <AppIcon name="eye-off" v-if="visible" />
+            <AppIcon name="eye" v-else />
           </InputGroupButton>
         </TooltipTrigger>
         <TooltipContent>{{ toggleLabel }}</TooltipContent>

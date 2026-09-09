@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronDownIcon } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import ModelsSearchModelSelector from '@/components/ai-elements/model-selector/ModelSelector.vue'
@@ -67,9 +67,7 @@ const open = ref(false)
 const searchQuery = ref('')
 const optionsOpenFor = ref<string | null>(null)
 
-const settingsSource = computed(
-  () => props.scopeSettings ?? config.effectiveSettings.value,
-)
+const settingsSource = computed(() => props.scopeSettings ?? config.effectiveSettings.value)
 
 const extraModelRefs = computed(() => {
   const parsed = parseModelRef(props.modelValue)
@@ -92,9 +90,7 @@ const scoredMatches = computed(() =>
 
 const filteredGroups = computed((): ScoredVendorGroup[] => {
   const matches = props.hideDisallowed
-    ? scoredMatches.value.filter((match) =>
-        isModelAllowed(settingsSource.value, match.model),
-      )
+    ? scoredMatches.value.filter((match) => isModelAllowed(settingsSource.value, match.model))
     : scoredMatches.value
   return regroupScoredVendorModels(matches)
 })
@@ -147,13 +143,8 @@ const selectedSuffix = computed(() => {
   }
   return formatModelSearchSuffix({
     option: getClampedModelCatalogOption(settingsSource.value, canonical),
-    reportedContextWindow: getModelCatalogMeta(
-      settingsSource.value,
-      canonical,
-    ).contextWindow,
-    fastFromModelId: isFastModelId(
-      parseModelRef(props.modelValue)?.modelId ?? '',
-    ),
+    reportedContextWindow: getModelCatalogMeta(settingsSource.value, canonical).contextWindow,
+    fastFromModelId: isFastModelId(parseModelRef(props.modelValue)?.modelId ?? ''),
   })
 })
 
@@ -193,20 +184,15 @@ const optionFor = (model: ModelRef): ModelCatalogOption => {
   return clampModelCatalogOption(settingsSource.value, model, next)
 }
 
-const capabilityFor = (model: ModelRef) =>
-  resolveReasoningCapability(settingsSource.value, model)
+const capabilityFor = (model: ModelRef) => resolveReasoningCapability(settingsSource.value, model)
 
-const metaFor = (model: ModelRef) =>
-  getModelCatalogMeta(settingsSource.value, model)
+const metaFor = (model: ModelRef) => getModelCatalogMeta(settingsSource.value, model)
 
 const openModelOptions = (serialized: string, next: boolean): void => {
   optionsOpenFor.value = next ? serialized : null
 }
 
-const handleOptionChange = async (
-  model: ModelRef,
-  patch: ModelCatalogOption,
-): Promise<void> => {
+const handleOptionChange = async (model: ModelRef, patch: ModelCatalogOption): Promise<void> => {
   const nextMap = mergeModelCatalogOption(settingsSource.value, model, patch)
   try {
     await config.updateSetting(props.optionsTab, 'models.catalogOptions', nextMap)
@@ -276,14 +262,9 @@ watch(
       >
         <span class="min-w-0 truncate text-sm @max-[22rem]/composer:hidden">
           {{ compact ? compactLabel : displayLabel }}
-          <span
-            v-if="selectedSuffix"
-            class="text-muted-foreground"
-          >
-            ({{ selectedSuffix }})
-          </span>
+          <span v-if="selectedSuffix" class="text-muted-foreground"> ({{ selectedSuffix }}) </span>
         </span>
-        <ChevronDownIcon class="size-3.5 shrink-0 opacity-60" />
+        <AppIcon name="chevron-down" class="size-3.5 shrink-0 opacity-60" />
       </Button>
     </ModelsSearchModelSelectorTrigger>
     <ModelsSearchModelSelectorContent class="max-w-md">

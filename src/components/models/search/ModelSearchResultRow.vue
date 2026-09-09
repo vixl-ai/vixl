@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { Settings2Icon } from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/shadcn/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/shadcn/ui/popover'
 import ModelsSearchModelSelectorLogo from '@/components/ai-elements/model-selector/ModelSelectorLogo.vue'
 import ModelsSearchModelSelectorName from '@/components/ai-elements/model-selector/ModelSelectorName.vue'
 import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
@@ -58,17 +54,9 @@ const handleChange = (patch: ModelCatalogOption): void => {
         unmatched-class="text-muted-foreground"
       />
     </span>
-    <span
-      v-if="showDisabledBadge"
-      class="ml-1 text-xs text-muted-foreground"
-    >
-      (disabled)
-    </span>
+    <span v-if="showDisabledBadge" class="ml-1 text-xs text-muted-foreground"> (disabled) </span>
   </ModelsSearchModelSelectorName>
-  <Popover
-    :open="optionsOpen"
-    @update:open="handleOptionsOpen"
-  >
+  <Popover :open="optionsOpen" @update:open="handleOptionsOpen">
     <PopoverTrigger as-child>
       <Button
         type="button"
@@ -79,16 +67,10 @@ const handleChange = (patch: ModelCatalogOption): void => {
         @click.stop
         @pointerdown.stop
       >
-        <Settings2Icon class="size-3.5" />
+        <AppIcon name="settings-2" class="size-3.5" />
       </Button>
     </PopoverTrigger>
-    <PopoverContent
-      class="w-72"
-      align="end"
-      :side-offset="6"
-      @click.stop
-      @pointerdown.stop
-    >
+    <PopoverContent class="w-72" align="end" :side-offset="6" @click.stop @pointerdown.stop>
       <ModelCatalogOptionsPanel
         :option="option"
         :capability="capability"

@@ -3,11 +3,7 @@ import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 
 export type ModelRoleGroup = 'general' | 'chatModes' | 'nested' | 'backgroundTasks'
 
-export type ModelRoleId =
-  | 'default'
-  | VixlChatMode
-  | 'subagent'
-  | 'title'
+export type ModelRoleId = 'default' | VixlChatMode | 'subagent' | 'title'
 
 export type ModelRoleDefinition = {
   id: ModelRoleId
@@ -93,9 +89,7 @@ export const CHAT_MODE_MODEL_ROLES = MODEL_ROLE_REGISTRY.filter(
   (role) => role.group === 'chatModes',
 )
 
-export const NESTED_MODEL_ROLES = MODEL_ROLE_REGISTRY.filter(
-  (role) => role.group === 'nested',
-)
+export const NESTED_MODEL_ROLES = MODEL_ROLE_REGISTRY.filter((role) => role.group === 'nested')
 
 export const BACKGROUND_MODEL_ROLES = MODEL_ROLE_REGISTRY.filter(
   (role) => role.group === 'backgroundTasks',

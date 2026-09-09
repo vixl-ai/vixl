@@ -1,17 +1,13 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from "vue"
-import { PanelRight } from "@lucide/vue"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/shadcn/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
-import { useRightSidebar } from "./utils"
+import { AppIcon } from '@/icons'
+import type { HTMLAttributes } from 'vue'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/shadcn/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
+import { useRightSidebar } from './utils'
 
 const props = defineProps<{
-  class?: HTMLAttributes["class"]
+  class?: HTMLAttributes['class']
 }>()
 
 const { toggleSidebar } = useRightSidebar()
@@ -28,7 +24,7 @@ const { toggleSidebar } = useRightSidebar()
         aria-label="Toggle right sidebar"
         @click="toggleSidebar"
       >
-        <PanelRight />
+        <AppIcon name="panel-right" />
       </Button>
     </TooltipTrigger>
     <TooltipContent>Toggle right sidebar</TooltipContent>

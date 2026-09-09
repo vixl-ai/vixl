@@ -1,21 +1,10 @@
-import type { Component } from 'vue'
-import {
-  Activity,
-  AlertCircle,
-  Ban,
-  HardDrive,
-  Loader2,
-  Package,
-  PackageX,
-  ShieldAlert,
-  Wrench,
-} from '@lucide/vue'
+import type { AppIconName } from '@/icons'
 import type { LspCatalogEntry } from '@/services/vixl/vixl-tauri'
 
 export type LspStatusBadge = {
   key: string
   label: string
-  icon: Component
+  icon: AppIconName
   className: string
 }
 
@@ -29,7 +18,7 @@ export const buildStatusBadges = (
     badges.push({
       key: 'disabled',
       label: 'Disabled',
-      icon: Ban,
+      icon: 'ban',
       className: 'text-muted-foreground',
     })
   }
@@ -38,7 +27,7 @@ export const buildStatusBadges = (
     badges.push({
       key: 'trust',
       label: 'Requires workspace trust',
-      icon: ShieldAlert,
+      icon: 'shield-alert',
       className: 'text-amber-600 dark:text-amber-500',
     })
   }
@@ -47,7 +36,7 @@ export const buildStatusBadges = (
     badges.push({
       key: 'running',
       label: 'Running',
-      icon: Activity,
+      icon: 'activity',
       className: 'text-emerald-600 dark:text-emerald-500',
     })
   }
@@ -56,35 +45,35 @@ export const buildStatusBadges = (
     badges.push({
       key: 'managed',
       label: 'Managed install',
-      icon: Package,
+      icon: 'package',
       className: 'text-muted-foreground',
     })
   } else if (entry.source === 'path') {
     badges.push({
       key: 'path',
       label: 'Available on PATH',
-      icon: HardDrive,
+      icon: 'hard-drive',
       className: 'text-muted-foreground',
     })
   } else if (entry.source === 'custom') {
     badges.push({
       key: 'custom',
       label: 'Custom configuration',
-      icon: HardDrive,
+      icon: 'hard-drive',
       className: 'text-muted-foreground',
     })
   } else if (entry.installable && !entry.installed) {
     badges.push({
       key: 'missing',
       label: 'Not installed',
-      icon: PackageX,
+      icon: 'package-x',
       className: 'text-muted-foreground',
     })
   } else if (entry.installKind === 'toolchain') {
     badges.push({
       key: 'toolchain',
       label: 'Needs toolchain on PATH',
-      icon: Wrench,
+      icon: 'wrench',
       className: 'text-muted-foreground',
     })
   }
@@ -93,20 +82,20 @@ export const buildStatusBadges = (
     badges.push({
       key: 'error',
       label: entry.error,
-      icon: AlertCircle,
+      icon: 'circle-alert',
       className: 'text-destructive',
     })
   } else if (
-    entry.installState
-    && entry.installState !== 'ready'
-    && entry.installState !== 'missing'
-    && entry.installState !== 'toolchain'
-    && entry.installState !== 'stopped'
+    entry.installState &&
+    entry.installState !== 'ready' &&
+    entry.installState !== 'missing' &&
+    entry.installState !== 'toolchain' &&
+    entry.installState !== 'stopped'
   ) {
     badges.push({
       key: 'state',
       label: entry.installState,
-      icon: Loader2,
+      icon: 'loader',
       className: 'text-muted-foreground',
     })
   }

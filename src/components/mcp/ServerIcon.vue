@@ -1,13 +1,9 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
 import { computed } from 'vue'
 import { useColorMode } from '@vueuse/core'
-import { Server } from '@lucide/vue'
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from '@/components/shadcn/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/shadcn/ui/avatar'
 import useMcpServers from '@/composables/use-mcp-servers'
 import resolveMcpServerIconSrc from '@/utils/resolve-mcp-server-icon-src'
 import { cn } from '@/lib/utils'
@@ -33,13 +29,9 @@ const src = computed((): string | null =>
 
 <template>
   <Avatar :class="cn('size-4 shrink-0 rounded-sm', props.class)">
-    <AvatarImage
-      v-if="src"
-      :src="src"
-      :alt="props.serverId"
-    />
+    <AvatarImage v-if="src" :src="src" :alt="props.serverId" />
     <AvatarFallback class="rounded-sm bg-transparent p-0">
-      <Server class="size-3.5 text-muted-foreground" />
+      <AppIcon name="server" class="size-3.5 text-muted-foreground" />
     </AvatarFallback>
   </Avatar>
 </template>

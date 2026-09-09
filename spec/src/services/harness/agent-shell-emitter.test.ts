@@ -20,18 +20,13 @@ describe('agent shell event emitters per chat', () => {
     vi.clearAllMocks()
     shellSpawnTracked.mockResolvedValue(undefined)
     shellKillTracked.mockResolvedValue({ exitCode: 0 })
-    const { resetAgentShellRegistryForTests } = await import(
-      '@/services/harness/shell/registry'
-    )
+    const { resetAgentShellRegistryForTests } = await import('@/services/harness/shell/registry')
     resetAgentShellRegistryForTests()
   })
 
   it('routes shell events only to the owning chat emitter', async () => {
-    const {
-      createAgentShell,
-      setAgentShellEventEmitter,
-      resetAgentShellRegistryForTests,
-    } = await import('@/services/harness/shell/registry')
+    const { createAgentShell, setAgentShellEventEmitter, resetAgentShellRegistryForTests } =
+      await import('@/services/harness/shell/registry')
     resetAgentShellRegistryForTests()
 
     const eventsA: HarnessEvent[] = []
@@ -53,7 +48,9 @@ describe('agent shell event emitters per chat', () => {
     const listenMock = listen as unknown as ReturnType<typeof vi.fn>
     const outputHandler = listenMock.mock.calls.find(
       (call) => call[0] === `shell-output-${shellA.shellId}`,
-    )?.[1] as ((event: { payload: { stream: 'stdout' | 'stderr'; data: string } }) => void) | undefined
+    )?.[1] as
+      | ((event: { payload: { stream: 'stdout' | 'stderr'; data: string } }) => void)
+      | undefined
 
     expect(outputHandler).toBeTypeOf('function')
     outputHandler?.({ payload: { stream: 'stdout', data: 'from-a' } })
@@ -63,9 +60,8 @@ describe('agent shell event emitters per chat', () => {
   })
 
   it('does not throw or invoke another chat emitter for an unknown chatId', async () => {
-    const { createAgentShell, setAgentShellEventEmitter } = await import(
-      '@/services/harness/shell/registry'
-    )
+    const { createAgentShell, setAgentShellEventEmitter } =
+      await import('@/services/harness/shell/registry')
 
     const eventsA: HarnessEvent[] = []
     setAgentShellEventEmitter('chat-a', (event) => {
@@ -82,7 +78,9 @@ describe('agent shell event emitters per chat', () => {
     const listenMock = listen as unknown as ReturnType<typeof vi.fn>
     const outputHandler = listenMock.mock.calls.find(
       (call) => call[0] === `shell-output-${unknownShell.shellId}`,
-    )?.[1] as ((event: { payload: { stream: 'stdout' | 'stderr'; data: string } }) => void) | undefined
+    )?.[1] as
+      | ((event: { payload: { stream: 'stdout' | 'stderr'; data: string } }) => void)
+      | undefined
 
     expect(outputHandler).toBeTypeOf('function')
     expect(() => {

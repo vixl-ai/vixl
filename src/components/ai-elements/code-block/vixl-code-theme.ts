@@ -1,29 +1,38 @@
 import type { RawThemeSetting, ThemeRegistration } from 'shiki'
+import type { VixlThemeEditorPalette } from '@/types/appearance/theme'
 
 export const VIXL_CODE_THEME_LIGHT = 'vixl-light' as const
 export const VIXL_CODE_THEME_DARK = 'vixl-dark' as const
 
 export type VixlCodeTheme = typeof VIXL_CODE_THEME_LIGHT | typeof VIXL_CODE_THEME_DARK
 
-interface VixlSyntaxPalette {
-  background: string
-  foreground: string
-  comment: string
-  keyword: string
-  keywordAccent: string
-  string: string
-  number: string
-  function: string
-  type: string
-  variable: string
-  constant: string
-  operator: string
-  invalid: string
-  regexp: string
-  attribute: string
-  tag: string
-  escape: string
-}
+/**
+ * Syntax palette used by the token-color table.
+ *
+ * Structurally identical to the syntax subset of the appearance domain's
+ * `VixlThemeEditorPalette`, so built-in and generated (custom theme) Shiki
+ * registrations share one token-color builder.
+ */
+type VixlSyntaxPalette = Pick<
+  VixlThemeEditorPalette,
+  | 'background'
+  | 'foreground'
+  | 'comment'
+  | 'keyword'
+  | 'keywordAccent'
+  | 'string'
+  | 'number'
+  | 'function'
+  | 'type'
+  | 'variable'
+  | 'constant'
+  | 'operator'
+  | 'invalid'
+  | 'regexp'
+  | 'attribute'
+  | 'tag'
+  | 'escape'
+>
 
 // oklch(0.145 0 0) background, oklch(0.985 0 0) foreground — muted vs-dark-style tokens
 const vixlDarkPalette: VixlSyntaxPalette = {
@@ -325,10 +334,17 @@ const buildTokenColors = (palette: VixlSyntaxPalette): RawThemeSetting[] => [
   { scope: 'entity.name.label', settings: { foreground: palette.operator } },
 ]
 
-const createVixlTheme = (
-  name: VixlCodeTheme,
+/**
+ * Build a Shiki theme registration from an editor palette.
+ *
+ * Used both for the built-in Vixl themes at module load and by the
+ * appearance runtime to generate registrations for custom themes, so code
+ * blocks and Monaco always consume the same resolved palette.
+ */
+export const createVixlCodeTheme = (
+  name: string,
   type: 'light' | 'dark',
-  palette: VixlSyntaxPalette,
+  palette: VixlThemeEditorPalette | VixlSyntaxPalette,
 ): ThemeRegistration => ({
   name,
   type,
@@ -340,6 +356,12 @@ const createVixlTheme = (
   },
   settings: buildTokenColors(palette),
 })
+
+const createVixlTheme = (
+  name: VixlCodeTheme,
+  type: 'light' | 'dark',
+  palette: VixlSyntaxPalette,
+): ThemeRegistration => createVixlCodeTheme(name, type, palette)
 
 export const vixlCodeThemeDark = createVixlTheme(
   VIXL_CODE_THEME_DARK,

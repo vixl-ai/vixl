@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { ChevronDownIcon } from '@lucide/vue'
 import { CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import { computed } from 'vue'
@@ -28,16 +28,16 @@ const thinkingMessage = computed(() => {
 
 <template>
   <CollapsibleTrigger
-    :class="cn(
-      'flex w-fit items-center gap-1.5 text-muted-foreground text-xs font-medium transition-colors hover:text-foreground',
-      props.class,
-    )"
+    :class="
+      cn(
+        'flex w-fit items-center gap-1.5 text-muted-foreground text-xs font-medium transition-colors hover:text-foreground',
+        props.class,
+      )
+    "
   >
     <slot>
       <template v-if="thinkingMessage === 'thinking'">
-        <Shimmer :duration="1">
-          Thinking...
-        </Shimmer>
+        <Shimmer :duration="1"> Thinking... </Shimmer>
       </template>
 
       <template v-else-if="thinkingMessage === 'default_done'">
@@ -48,11 +48,9 @@ const thinkingMessage = computed(() => {
         <span>Thought for {{ duration }} {{ duration === 1 ? 'second' : 'seconds' }}</span>
       </template>
 
-      <ChevronDownIcon
-        :class="cn(
-          'size-3.5 transition-transform',
-          isOpen ? 'rotate-180' : 'rotate-0',
-        )"
+      <AppIcon
+        name="chevron-down"
+        :class="cn('size-3.5 transition-transform', isOpen ? 'rotate-180' : 'rotate-0')"
       />
     </slot>
   </CollapsibleTrigger>

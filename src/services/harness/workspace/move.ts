@@ -47,12 +47,11 @@ const resolveRootPath = (
 
 const moveWorkspace = (ctx: HarnessToolContext) =>
   tool({
-    description:
-      'Move this chat onto a different project folder (always user-approved).',
+    description: 'Move this chat onto a different project folder (always user-approved).',
     inputSchema: z.object({
       rootPath: z
         .string()
-        .describe('Absolute or workspace-relative folder that should become this chat\'s project'),
+        .describe("Absolute or workspace-relative folder that should become this chat's project"),
     }),
     execute: async ({ rootPath }, { toolCallId }) => {
       if (ctx.subagentId) {

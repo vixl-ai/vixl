@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { ArrowLeft } from '@lucide/vue'
 import { useCarousel } from '@/components/ui/carousel'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +18,6 @@ const { scrollPrev } = useCarousel()
     aria-label="Previous"
     @click="scrollPrev"
   >
-    <ArrowLeft class="size-4 text-muted-foreground" />
+    <AppIcon name="arrow-left" class="size-4 text-muted-foreground" />
   </button>
 </template>

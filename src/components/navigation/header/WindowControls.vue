@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import { X, Minus, Plus } from "@lucide/vue"
-import { getCurrentWindow } from "@tauri-apps/api/window"
+import { AppIcon } from '@/icons'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { toast } from 'vue-sonner'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 
 const appWindow = getCurrentWindow()
 
@@ -43,10 +39,7 @@ const handleToggleMaximize = async (): Promise<void> => {
 
 <template>
   <!-- Custom macOS-style traffic lights (same on all platforms) -->
-  <div
-    class="group/controls flex items-center gap-2 pl-3 shrink-0"
-    data-tauri-drag-region="false"
-  >
+  <div class="group/controls flex items-center gap-2 pl-3 shrink-0" data-tauri-drag-region="false">
     <Tooltip>
       <TooltipTrigger as-child>
         <button
@@ -55,7 +48,10 @@ const handleToggleMaximize = async (): Promise<void> => {
           class="flex size-3 items-center justify-center rounded-full bg-[#ff5f57] transition-opacity hover:opacity-90"
           @click="handleClose"
         >
-          <X class="size-2 text-black/60 opacity-0 group-hover/controls:opacity-100" />
+          <AppIcon
+            name="x"
+            class="size-2 text-black/60 opacity-0 group-hover/controls:opacity-100"
+          />
         </button>
       </TooltipTrigger>
       <TooltipContent>Close</TooltipContent>
@@ -68,7 +64,10 @@ const handleToggleMaximize = async (): Promise<void> => {
           class="flex size-3 items-center justify-center rounded-full bg-[#febc2e] transition-opacity hover:opacity-90"
           @click="handleMinimize"
         >
-          <Minus class="size-2 text-black/60 opacity-0 group-hover/controls:opacity-100" />
+          <AppIcon
+            name="minus"
+            class="size-2 text-black/60 opacity-0 group-hover/controls:opacity-100"
+          />
         </button>
       </TooltipTrigger>
       <TooltipContent>Minimize</TooltipContent>
@@ -81,7 +80,10 @@ const handleToggleMaximize = async (): Promise<void> => {
           class="flex size-3 items-center justify-center rounded-full bg-[#28c840] transition-opacity hover:opacity-90"
           @click="handleToggleMaximize"
         >
-          <Plus class="size-2 text-black/60 opacity-0 group-hover/controls:opacity-100" />
+          <AppIcon
+            name="plus"
+            class="size-2 text-black/60 opacity-0 group-hover/controls:opacity-100"
+          />
         </button>
       </TooltipTrigger>
       <TooltipContent>Maximize</TooltipContent>

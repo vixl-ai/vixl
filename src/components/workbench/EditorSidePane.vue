@@ -1,19 +1,5 @@
 <script setup lang="ts">
-import {
-  Check,
-  ClipboardCopy,
-  FileSearch,
-  FolderSearch,
-  GitCompareArrows,
-  List,
-  ListOrdered,
-  MoreHorizontal,
-  Replace,
-  Save,
-  SaveAll,
-  WandSparkles,
-  WrapText,
-} from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   DropdownMenu,
@@ -24,11 +10,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 
 export type EditorSidePaneMode = 'explorer' | 'search'
 
@@ -119,52 +101,52 @@ defineExpose({
                     class="h-6 w-6 text-muted-foreground"
                     aria-label="File actions"
                   >
-                    <MoreHorizontal class="h-3.5 w-3.5" />
+                    <AppIcon name="more-horizontal" class="h-3.5 w-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-56">
                   <DropdownMenuLabel>File</DropdownMenuLabel>
                   <DropdownMenuItem @click="emit('save')">
-                    <Save class="mr-2 h-4 w-4" />
+                    <AppIcon name="save" class="mr-2 h-4 w-4" />
                     Save
                     <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="emit('reveal-in-finder')">
-                    <FolderSearch class="mr-2 h-4 w-4" />
+                    <AppIcon name="folder-search" class="mr-2 h-4 w-4" />
                     Reveal in Finder
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="emit('copy-relative-path')">
-                    <ClipboardCopy class="mr-2 h-4 w-4" />
+                    <AppIcon name="clipboard-copy" class="mr-2 h-4 w-4" />
                     Copy Relative Path
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel>View</DropdownMenuLabel>
                   <DropdownMenuItem @click="emit('toggle-diff-view')">
-                    <GitCompareArrows class="mr-2 h-4 w-4" />
+                    <AppIcon name="git-compare-arrows" class="mr-2 h-4 w-4" />
                     Diff View
-                    <Check v-if="diffView" class="ml-auto h-4 w-4" />
+                    <AppIcon name="check" v-if="diffView" class="ml-auto h-4 w-4" />
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="emit('update:lineNumbers', !lineNumbers)">
-                    <ListOrdered class="mr-2 h-4 w-4" />
+                    <AppIcon name="list-ordered" class="mr-2 h-4 w-4" />
                     Line Numbers
-                    <Check v-if="lineNumbers" class="ml-auto h-4 w-4" />
+                    <AppIcon name="check" v-if="lineNumbers" class="ml-auto h-4 w-4" />
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="emit('update:wordWrap', !wordWrap)">
-                    <WrapText class="mr-2 h-4 w-4" />
+                    <AppIcon name="wrap-text" class="mr-2 h-4 w-4" />
                     Word Wrap
-                    <Check v-if="wordWrap" class="ml-auto h-4 w-4" />
+                    <AppIcon name="check" v-if="wordWrap" class="ml-auto h-4 w-4" />
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel>Editor</DropdownMenuLabel>
                   <DropdownMenuItem @click="emit('update:autoSave', !autoSave)">
-                    <SaveAll class="mr-2 h-4 w-4" />
+                    <AppIcon name="save-all" class="mr-2 h-4 w-4" />
                     Auto Save
-                    <Check v-if="autoSave" class="ml-auto h-4 w-4" />
+                    <AppIcon name="check" v-if="autoSave" class="ml-auto h-4 w-4" />
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="emit('update:formatOnSave', !formatOnSave)">
-                    <WandSparkles class="mr-2 h-4 w-4" />
+                    <AppIcon name="wand-sparkles" class="mr-2 h-4 w-4" />
                     Format on Save
-                    <Check v-if="formatOnSave" class="ml-auto h-4 w-4" />
+                    <AppIcon name="check" v-if="formatOnSave" class="ml-auto h-4 w-4" />
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -184,7 +166,7 @@ defineExpose({
               aria-label="Search files"
               @click="handleFileSearchClick"
             >
-              <FileSearch class="h-3.5 w-3.5" />
+              <AppIcon name="file-search" class="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent class="z-60">Search files</TooltipContent>
@@ -200,7 +182,7 @@ defineExpose({
               aria-label="Find and replace"
               @click="handleFindReplaceClick"
             >
-              <Replace class="h-3.5 w-3.5" />
+              <AppIcon name="replace" class="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent class="z-60">Find and replace</TooltipContent>
@@ -216,7 +198,7 @@ defineExpose({
               aria-label="Toggle file list"
               @click="handleListClick"
             >
-              <List class="h-3.5 w-3.5" />
+              <AppIcon name="list" class="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent class="z-60">Toggle file list</TooltipContent>

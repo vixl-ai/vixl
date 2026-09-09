@@ -1,8 +1,6 @@
 import type { ToolRun } from '@/types/harness/tool-run'
 
-type StepToolSegment =
-  | { type: 'tools'; tools: ToolRun[] }
-  | { type: 'subagent'; run: ToolRun }
+type StepToolSegment = { type: 'tools'; tools: ToolRun[] } | { type: 'subagent'; run: ToolRun }
 
 export default (tools: ToolRun[]): StepToolSegment[] => {
   const segments: StepToolSegment[] = []

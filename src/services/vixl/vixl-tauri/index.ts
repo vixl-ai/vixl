@@ -159,3 +159,10 @@ export {
   editorLoadViewState,
   editorSaveViewState,
 } from './workbench'
+export {
+  pickThemeFile,
+  pickThemeSavePath,
+  readThemeFile,
+  writeThemeFile,
+} from './theme-files'
+export type { ThemeFileContent } from './theme-files'

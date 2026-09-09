@@ -1,6 +1,6 @@
 <script lang="ts" setup>
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { BookmarkIcon } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
@@ -11,9 +11,5 @@ const props = defineProps<{
 <template>
   <slot v-if="$slots.default" />
 
-  <BookmarkIcon
-    v-else
-    :class="cn('size-4 shrink-0', props.class)"
-    v-bind="$attrs"
-  />
+  <AppIcon name="bookmark" v-else :class="cn('size-4 shrink-0', props.class)" v-bind="$attrs" />
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { PlusIcon } from '@lucide/vue'
 import { DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { InputGroupButton } from '@/components/ui/input-group'
 import PromptInputButton from './PromptInputButton.vue'
@@ -19,7 +19,7 @@ const props = defineProps<Props>()
 <template>
   <DropdownMenuTrigger as-child>
     <PromptInputButton :class="props.class" v-bind="props">
-      <slot><PlusIcon class="size-4" /></slot>
+      <slot><AppIcon name="plus" class="size-4" /></slot>
     </PromptInputButton>
   </DropdownMenuTrigger>
 </template>

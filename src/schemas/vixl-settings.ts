@@ -11,6 +11,9 @@ import {
 import { reasoningLevelSchema } from '@/schemas/models/reasoning-level'
 import { modelCatalogMetaMapSchema } from '@/schemas/models/model-catalog-meta'
 import { modelCatalogOptionsMapSchema } from '@/schemas/models/model-catalog-option'
+import { THEME_LIBRARY_MAX_SIZE, themeDefinitionSchema } from '@/schemas/appearance/theme'
+import { themeFilePayloadSchema } from '@/schemas/appearance/theme-file'
+import { cleanAppearanceThemeState } from '@/services/appearance/theme-library'
 
 export { customProviderSchema, customProviderModelSchema } from '@/schemas/providers/custom-provider'
 
@@ -27,6 +30,15 @@ export const vixlSettingsSchema = z
   .object({
     version: z.literal(1),
     'appearance.theme': themeSchema.optional(),
+    'appearance.activeThemeId': z.string().optional(),
+    'appearance.themeLibrary': z
+      .array(
+        // The runtime domain shape and the shareable file-format shape are
+        // both accepted; migration converts file entries to the domain shape.
+        z.union([themeDefinitionSchema, themeFilePayloadSchema]),
+      )
+      .max(THEME_LIBRARY_MAX_SIZE)
+      .optional(),
     'agent.autoApproveGlobs': z.array(z.string()).optional(),
     'agent.permissionLevel': z.enum(['ask', 'allowlist', 'bypass']).optional(),
     'agent.permissions': z
@@ -107,6 +119,7 @@ export const SANDBOX_NETWORK_DEFAULT = 'allow' as const
 export const defaultVixlSettings = (): VixlSettings => ({
   version: 1,
   'appearance.theme': 'system',
+  'appearance.themeLibrary': [],
   'agent.autoApproveGlobs': [],
   'agent.permissionLevel': 'allowlist',
   'agent.permissions': [],
@@ -183,9 +196,19 @@ export const migrateVixlSettings = (raw: unknown): VixlSettings => {
 
   if (version === 1) {
     const migratedRecord = migrateDeprecatedModelKeys(record)
+    const cleanedAppearanceTheme = cleanAppearanceThemeState(
+      migratedRecord['appearance.themeLibrary'],
+      migratedRecord['appearance.activeThemeId'],
+    )
+    migratedRecord['appearance.themeLibrary'] = cleanedAppearanceTheme.themeLibrary
+    if (cleanedAppearanceTheme.activeThemeId) {
+      migratedRecord['appearance.activeThemeId'] = cleanedAppearanceTheme.activeThemeId
+    } else {
+      delete migratedRecord['appearance.activeThemeId']
+    }
     const parsed = vixlSettingsSchema.safeParse(migratedRecord)
     if (parsed.success) {
-      return { ...defaultVixlSettings(), ...parsed.data }
+      return { ...defaultVixlSettings(), ...(parsed.data as VixlSettings) }
     }
   }
 

@@ -1,13 +1,8 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import {
-  ChevronsDownUp,
-  FolderPlus,
-  MessageSquarePlus,
-  X,
-} from '@lucide/vue'
 import useFleetSidebar, { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useProjectsSection from '@/composables/use-projects-section'
@@ -16,11 +11,7 @@ import useProjectsExpansion from '@/composables/use-projects-expansion'
 import useChatStore from '@/composables/use-chat-store'
 import useVixlConfig from '@/composables/use-vixl-config'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import { Input } from '@/components/shadcn/ui/input'
 import {
   ContextMenu,
@@ -29,11 +20,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/shadcn/ui/context-menu'
-import {
-  SidebarGroup,
-  SidebarMenu,
-  SidebarMenuItem,
-} from '@/components/shadcn/ui/sidebar'
+import { SidebarGroup, SidebarMenu, SidebarMenuItem } from '@/components/shadcn/ui/sidebar'
 import NavigationAsideLeftProjectRow from '@/components/navigation/aside/left/ProjectRow.vue'
 import NavigationAsideLeftChatListItem from '@/components/navigation/aside/left/ChatListItem.vue'
 import NavigationAsideLeftProjectsSectionHeader from '@/components/navigation/aside/left/ProjectsSectionHeader.vue'
@@ -49,13 +36,8 @@ const chatStore = useChatStore()
 const config = useVixlConfig()
 const { addingProject, addProjectFromPicker } = useAddProject()
 const { expansionMode, toggleCollapseAll } = useProjectsExpansion()
-const {
-  searchOpen,
-  searchQuery,
-  searchInputEl,
-  filteredActivityItems,
-  closeSearch,
-} = useProjectsSection()
+const { searchOpen, searchQuery, searchInputEl, filteredActivityItems, closeSearch } =
+  useProjectsSection()
 
 const startingChat = ref(false)
 
@@ -126,10 +108,7 @@ const handleCollapseAll = (): void => {
         <SidebarGroup class="flex-1">
           <div class="sticky top-0 z-10 bg-sidebar">
             <NavigationAsideLeftProjectsSectionHeader />
-            <div
-              v-if="searchOpen"
-              class="flex items-center gap-1 px-2 pb-1"
-            >
+            <div v-if="searchOpen" class="flex items-center gap-1 px-2 pb-1">
               <Input
                 ref="searchInputEl"
                 v-model="searchQuery"
@@ -146,7 +125,7 @@ const handleCollapseAll = (): void => {
                     aria-label="Close search"
                     @click="closeSearch"
                   >
-                    <X class="size-3.5" />
+                    <AppIcon name="x" class="size-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Close search</TooltipContent>
@@ -156,17 +135,16 @@ const handleCollapseAll = (): void => {
           <SidebarMenu>
             <template
               v-for="item in filteredActivityItems"
-              :key="item.kind === 'project' ? `project-${item.project.slug}` : `chat-${item.chat.id}`"
+              :key="
+                item.kind === 'project' ? `project-${item.project.slug}` : `chat-${item.chat.id}`
+              "
             >
               <NavigationAsideLeftProjectRow
                 v-if="item.kind === 'project'"
                 :project="item.project"
               />
               <SidebarMenuItem v-else>
-                <NavigationAsideLeftChatListItem
-                  :chat="item.chat"
-                  :project-slug="HOME_CHAT_SLUG"
-                />
+                <NavigationAsideLeftChatListItem :chat="item.chat" :project-slug="HOME_CHAT_SLUG" />
               </SidebarMenuItem>
             </template>
           </SidebarMenu>
@@ -175,16 +153,16 @@ const handleCollapseAll = (): void => {
     </ContextMenuTrigger>
     <ContextMenuContent class="w-52">
       <ContextMenuItem :disabled="addingProject" @select="handleOpenProject">
-        <FolderPlus />
+        <AppIcon name="folder-plus" />
         Open Project
       </ContextMenuItem>
       <ContextMenuItem :disabled="startingChat" @select="handleNewChat">
-        <MessageSquarePlus />
+        <AppIcon name="message-square-plus" />
         New Chat
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem @select="handleCollapseAll">
-        <ChevronsDownUp />
+        <AppIcon name="chevrons-down-up" />
         {{ expansionMode === 'all-collapsed' ? 'Expand All' : 'Collapse All' }}
       </ContextMenuItem>
     </ContextMenuContent>

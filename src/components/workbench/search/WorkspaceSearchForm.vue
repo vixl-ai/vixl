@@ -1,19 +1,8 @@
 <script setup lang="ts">
-import {
-  CaseSensitive,
-  ChevronDown,
-  ChevronRight,
-  Regex,
-  Replace,
-  WholeWord,
-} from '@lucide/vue'
+import { AppIcon } from '@/icons'
 import { Button } from '@/components/shadcn/ui/button'
 import { Input } from '@/components/shadcn/ui/input'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import { Toggle } from '@/components/shadcn/ui/toggle'
 
 const findQuery = defineModel<string>('findQuery', { required: true })
@@ -84,14 +73,8 @@ defineExpose({
         :aria-label="props.replaceExpanded ? 'Hide replace' : 'Show replace'"
         @click="emit('toggle-replace')"
       >
-        <ChevronDown
-          v-if="props.replaceExpanded"
-          class="h-3.5 w-3.5"
-        />
-        <ChevronRight
-          v-else
-          class="h-3.5 w-3.5"
-        />
+        <AppIcon name="chevron-down" v-if="props.replaceExpanded" class="h-3.5 w-3.5" />
+        <AppIcon name="chevron-right" v-else class="h-3.5 w-3.5" />
       </Button>
 
       <div class="flex min-w-0 flex-1 flex-col gap-2">
@@ -112,7 +95,7 @@ defineExpose({
                 aria-label="Match case"
                 @update:model-value="matchCase = $event"
               >
-                <CaseSensitive class="h-3.5 w-3.5" />
+                <AppIcon name="case-sensitive" class="h-3.5 w-3.5" />
               </Toggle>
             </TooltipTrigger>
             <TooltipContent class="z-60">Match case</TooltipContent>
@@ -126,7 +109,7 @@ defineExpose({
                 aria-label="Match whole word"
                 @update:model-value="matchWholeWord = $event"
               >
-                <WholeWord class="h-3.5 w-3.5" />
+                <AppIcon name="whole-word" class="h-3.5 w-3.5" />
               </Toggle>
             </TooltipTrigger>
             <TooltipContent class="z-60">Match whole word</TooltipContent>
@@ -140,17 +123,14 @@ defineExpose({
                 aria-label="Use regular expression"
                 @update:model-value="useRegex = $event"
               >
-                <Regex class="h-3.5 w-3.5" />
+                <AppIcon name="regex" class="h-3.5 w-3.5" />
               </Toggle>
             </TooltipTrigger>
             <TooltipContent class="z-60">Use regular expression</TooltipContent>
           </Tooltip>
         </div>
 
-        <div
-          v-if="props.replaceExpanded"
-          class="flex items-center gap-1"
-        >
+        <div v-if="props.replaceExpanded" class="flex items-center gap-1">
           <Input
             ref="replaceInputRef"
             v-model="replaceQuery"
@@ -168,7 +148,7 @@ defineExpose({
                 :disabled="replacing"
                 @click="handleReplaceOne"
               >
-                <Replace class="h-3.5 w-3.5" />
+                <AppIcon name="replace" class="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent class="z-60">Replace</TooltipContent>

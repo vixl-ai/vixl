@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { AppIcon } from '@/icons'
 import type { HTMLAttributes } from 'vue'
-import { PauseIcon, PlayIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
@@ -34,7 +34,7 @@ function handleClick(event: MouseEvent) {
     @click="handleClick"
   >
     <Spinner v-if="loading" class="size-3" />
-    <PauseIcon v-else-if="playing" class="size-3" />
-    <PlayIcon v-else class="size-3" />
+    <AppIcon name="pause" v-else-if="playing" class="size-3" />
+    <AppIcon name="play" v-else class="size-3" />
   </Button>
 </template>
