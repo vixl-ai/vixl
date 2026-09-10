@@ -1,5 +1,9 @@
-import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'vue-sonner'
+import {
+  applyWindowVibrancy,
+  clearWindowVibrancy,
+  isVibrancySupported,
+} from '@/services/vibrancy'
 import formatUnknownError from '@/utils/format-unknown-error'
 
 const transparencyEnabled = ref(false)
@@ -10,12 +14,8 @@ export default () => {
   const config = useVixlConfig()
   const mode = useColorMode()
 
-  const isLinux = (): boolean =>
-    typeof navigator !== 'undefined' &&
-    navigator.userAgent.toLowerCase().includes('linux')
-
   const syncTransparency = async (): Promise<void> => {
-    if (isLinux()) {
+    if (!isVibrancySupported()) {
       return
     }
 
@@ -27,7 +27,7 @@ export default () => {
       document.documentElement.classList.remove('transparency-on')
       transparencyEnabled.value = false
       try {
-        await invoke('clear_window_vibrancy')
+        await clearWindowVibrancy()
       } catch (error) {
         toast.error('Failed to disable window transparency', {
           description: formatUnknownError(error),
@@ -41,7 +41,7 @@ export default () => {
     const intensity =
       config.effectiveSettings.value['appearance.transparencyIntensity'] ?? 0
     try {
-      await invoke('set_window_vibrancy', { dark: isDark, hue, intensity })
+      await applyWindowVibrancy({ dark: isDark, hue, intensity })
       document.documentElement.classList.add('transparency-on')
       transparencyEnabled.value = true
     } catch (error) {
@@ -52,11 +52,11 @@ export default () => {
   }
 
   const previewTransparency = (hue: number, intensity: number): void => {
-    if (isLinux() || !transparencyEnabled.value) {
+    if (!transparencyEnabled.value) {
       return
     }
 
-    invoke('set_window_vibrancy', {
+    applyWindowVibrancy({
       dark: mode.state.value === 'dark',
       hue,
       intensity,

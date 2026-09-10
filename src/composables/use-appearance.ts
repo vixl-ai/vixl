@@ -1,18 +1,33 @@
-import { useColorMode } from '@vueuse/core'
-import { onMounted, watch } from 'vue'
-import useVixlConfig from '@/composables/use-vixl-config'
+import { toast } from 'vue-sonner'
+import { applyWindowVibrancy } from '@/services/vibrancy'
+import formatUnknownError from '@/utils/format-unknown-error'
 
 export default () => {
   const mode = useColorMode()
   const config = useVixlConfig()
+  const { transparencyEnabled } = useTransparency()
 
-  const syncTheme = (): void => {
+  const syncTheme = async (): Promise<void> => {
     const theme = config.effectiveSettings.value['appearance.theme'] ?? 'system'
-    if (theme === 'system') {
-      mode.value = 'auto'
-      return
+    const target = theme === 'system' ? 'auto' : theme
+    const nextDark =
+      target === 'auto' ? mode.system.value === 'dark' : target === 'dark'
+
+    if (transparencyEnabled.value) {
+      const hue =
+        config.effectiveSettings.value['appearance.transparencyHue'] ?? 265
+      const intensity =
+        config.effectiveSettings.value['appearance.transparencyIntensity'] ?? 0
+      try {
+        await applyWindowVibrancy({ dark: nextDark, hue, intensity })
+      } catch (error) {
+        toast.error('Failed to apply window transparency', {
+          description: formatUnknownError(error),
+        })
+      }
     }
-    mode.value = theme
+
+    mode.value = target
   }
 
   watch(
@@ -22,7 +37,11 @@ export default () => {
     ],
     () => {
       if (config.hydrated.value) {
-        syncTheme()
+        syncTheme().catch((error: unknown) => {
+          toast.error('Failed to apply theme', {
+            description: formatUnknownError(error),
+          })
+        })
       }
     },
     { deep: true },
@@ -30,7 +49,11 @@ export default () => {
 
   onMounted(() => {
     if (config.hydrated.value) {
-      syncTheme()
+      syncTheme().catch((error: unknown) => {
+        toast.error('Failed to apply theme', {
+          description: formatUnknownError(error),
+        })
+      })
     }
   })
 
