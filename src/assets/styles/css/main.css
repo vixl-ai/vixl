@@ -99,28 +99,36 @@
 }
 
 .chat-prompt-aurora [data-slot='input-group'] {
-  --agent-aurora-fill: var(--background);
   border-color: transparent !important;
-  background:
-    linear-gradient(var(--agent-aurora-fill), var(--agent-aurora-fill)) padding-box,
-    conic-gradient(
-      from var(--agent-aurora-angle),
-      #b89ad4 0deg,
-      #7eb6d9 60deg,
-      #c4b5fd 120deg,
-      #7ec9a0 180deg,
-      #a894d4 240deg,
-      #7eb6d9 300deg,
-      #b89ad4 360deg
-    )
-    border-box !important;
-  background-origin: border-box !important;
-  background-clip: padding-box, border-box !important;
+  background: var(--background) padding-box !important;
+}
+
+.chat-prompt-aurora [data-slot='input-group']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--agent-aurora-angle),
+    #b89ad4 0deg,
+    #7eb6d9 60deg,
+    #c4b5fd 120deg,
+    #7ec9a0 180deg,
+    #a894d4 240deg,
+    #7eb6d9 300deg,
+    #b89ad4 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
   animation: agent-aurora-drift 3s linear infinite;
+  pointer-events: none;
 }
 
 html.transparency-on .chat-prompt-aurora [data-slot='input-group'] {
-  --agent-aurora-fill: var(--composer-fill);
+  background: var(--composer-fill) padding-box !important;
 }
 
 @keyframes agent-aurora-drift {
@@ -130,7 +138,7 @@ html.transparency-on .chat-prompt-aurora [data-slot='input-group'] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chat-prompt-aurora [data-slot='input-group'] {
+  .chat-prompt-aurora [data-slot='input-group']::before {
     animation: none;
   }
 }
