@@ -1,4 +1,4 @@
-export type McpAuthKind = 'oauth' | 'inputs' | 'trust' | 'drift' | 'client'
+export type McpAuthKind = 'oauth' | 'inputs' | 'trust' | 'client'
 
 export type McpAuthResolution =
   | { action: 'authenticated' }

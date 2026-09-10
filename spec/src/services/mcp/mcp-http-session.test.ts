@@ -23,29 +23,6 @@ vi.mock('vue-sonner', () => ({
   },
 }))
 
-vi.mock('@/services/mcp/mcp-tool-baseline', () => ({
-  loadMcpToolBaseline: vi.fn<(serverId: string) => Promise<null>>(async () => null),
-  saveMcpToolBaseline: vi.fn<
-    (serverId: string, tools: unknown) => Promise<Record<string, never>>
-  >(async () => ({})),
-  detectMcpToolDrift: vi.fn<
-    (
-      serverId: string,
-      tools: unknown,
-    ) => Promise<{
-      drifted: boolean
-      changed: string[]
-      added: string[]
-      removed: string[]
-    }>
-  >(async () => ({
-    drifted: false,
-    changed: [],
-    added: [],
-    removed: [],
-  })),
-}))
-
 vi.mock('@ai-sdk/mcp', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@ai-sdk/mcp')>()
   return {

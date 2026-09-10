@@ -10,7 +10,6 @@ import {
   clearSessionTrust,
 } from '@/services/mcp/mcp-trust'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
-import { clearMcpToolBaseline } from '@/services/mcp/mcp-tool-baseline'
 import {
   loadEffectiveSettings,
   loadProjectSettings,
@@ -132,7 +131,6 @@ export default (root?: () => string | null) => {
     trustSaving.value = true
 
     try {
-      await clearMcpToolBaseline(pending.serverId)
       await persistTrustRecord(config, pending, scope, root)
     } catch (error) {
       toast.error('Failed to trust server', {

@@ -3,10 +3,9 @@ import { toast } from 'vue-sonner'
 import { sessionTrusts } from '@/services/mcp/mcp-trust'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
-const { updateSetting, clearMcpToolBaseline, loadEffectiveSettings, loadProjectSettings, saveSettings } =
+const { updateSetting, loadEffectiveSettings, loadProjectSettings, saveSettings } =
   vi.hoisted(() => ({
     updateSetting: vi.fn<(...args: unknown[]) => Promise<void>>(async () => {}),
-    clearMcpToolBaseline: vi.fn<(serverId: string) => Promise<void>>(async () => {}),
     loadEffectiveSettings: vi.fn<(rootPath: string | null) => Promise<VixlSettings>>(async () => ({
       version: 1,
     })),
@@ -56,10 +55,6 @@ vi.mock('@/composables/use-vixl-config', () => ({
     },
     updateSetting,
   }),
-}))
-
-vi.mock('@/services/mcp/mcp-tool-baseline', () => ({
-  clearMcpToolBaseline,
 }))
 
 vi.mock('@/services/config/vixl-config', () => ({
@@ -131,7 +126,7 @@ describe('useMcpTrustChoice', () => {
   })
 
   it('does not run the action when persisting trust fails', async () => {
-    clearMcpToolBaseline.mockRejectedValueOnce(new Error('baseline write failed'))
+    updateSetting.mockRejectedValueOnce(new Error('persist failed'))
     const action = vi.fn<() => Promise<void>>(async () => {})
     const choice = useMcpTrustChoice()
     choice.trustPending.value = {
@@ -140,12 +135,12 @@ describe('useMcpTrustChoice', () => {
       action,
     }
 
-    await choice.handleTrustChoice('session')
+    await choice.handleTrustChoice('always')
 
     expect(action).not.toHaveBeenCalled()
     expect(choice.trustSaving.value).toBe(false)
     expect(toast.error).toHaveBeenCalledWith('Failed to trust server', {
-      description: 'baseline write failed',
+      description: 'persist failed',
     })
   })
 

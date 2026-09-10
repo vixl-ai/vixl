@@ -1,7 +1,6 @@
 import type { OAuthClientProvider } from '@ai-sdk/mcp'
 import type { McpHttpServer } from '@/types/vixl/mcp-config'
 import { isAllowedMcpUrl } from '@/services/mcp/is-allowed-mcp-url'
-import { detectMcpToolDrift } from '@/services/mcp/mcp-tool-baseline'
 import isDcrMissingClientError from '@/services/mcp/oauth/is-dcr-missing-client'
 import type { McpServerState } from '@/services/vixl/vixl-tauri'
 import { applyHttpClientTools } from './apply-http-tools'
@@ -107,25 +106,6 @@ export const refreshHttpServer = async (
     const listed = await entry.client.listTools()
     const tools = listed.tools.map(toToolInfo)
     const icons = iconsFromClient(entry.client)
-    const fingerprintSources = tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-    }))
-    const drift = await detectMcpToolDrift(serverId, fingerprintSources)
-    if (drift.drifted) {
-      await entry.client.close()
-      return setEntryState(
-        serverId,
-        {
-          status: 'error',
-          tools,
-          icons,
-          error: `Tool definitions changed (${[...drift.changed, ...drift.added].join(', ') || 'unknown'}). Re-trust this server in Settings.`,
-        },
-        { client: null, sessionId: null },
-      )
-    }
     return setEntryState(serverId, {
       status: 'connected',
       tools,
