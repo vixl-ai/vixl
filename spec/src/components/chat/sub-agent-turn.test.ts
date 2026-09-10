@@ -74,3 +74,35 @@ describe('SubAgentTurn title', () => {
     expect(mounted.text()).toContain('Sub-agent')
   })
 })
+
+describe('SubAgentTurn error tooltip', () => {
+  it('shows the summary on error status', () => {
+    const mounted = mountTurn(
+      subagent({
+        status: 'error',
+        summary: 'Tool call timed out',
+      }),
+    )
+    const contents = mounted.findAllComponents({ name: 'TooltipContent' })
+    expect(contents.some((node) => node.text().includes('Tool call timed out'))).toBe(
+      true,
+    )
+  })
+
+  it('falls back to Sub-agent failed when error has no summary', () => {
+    const mounted = mountTurn(subagent({ status: 'error' }))
+    const contents = mounted.findAllComponents({ name: 'TooltipContent' })
+    expect(contents.some((node) => node.text().includes('Sub-agent failed'))).toBe(
+      true,
+    )
+  })
+
+  it('does not render the error tooltip on done status', () => {
+    const mounted = mountTurn(subagent({ status: 'done', summary: 'Finished' }))
+    const contents = mounted.findAllComponents({ name: 'TooltipContent' })
+    expect(contents.some((node) => node.text().includes('Finished'))).toBe(false)
+    expect(contents.some((node) => node.text().includes('Sub-agent failed'))).toBe(
+      false,
+    )
+  })
+})

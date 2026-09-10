@@ -41,6 +41,10 @@ const displayName = computed(() => {
   return name.length > 0 ? name : 'Sub-agent'
 })
 const activityLabel = computed(() => deriveSubagentActivity(props.subagent))
+const errorTooltip = computed(() => {
+  const summary = props.subagent.summary?.trim() ?? ''
+  return summary.length > 0 ? summary : 'Sub-agent failed'
+})
 
 const statusIcon = computed(() => {
   if (props.subagent.status === 'stopped') {
@@ -102,9 +106,20 @@ const handleStop = (): void => {
         <NavigationAsideLeftChatRunningDots
           v-if="isRunning"
         />
+        <Tooltip
+          v-else-if="subagent.status === 'error'"
+        >
+          <TooltipTrigger as-child>
+            <component
+              :is="statusIcon"
+              :class="statusIconClass"
+            />
+          </TooltipTrigger>
+          <TooltipContent>{{ errorTooltip }}</TooltipContent>
+        </Tooltip>
         <component
-          :is="statusIcon"
           v-else
+          :is="statusIcon"
           :class="statusIconClass"
         />
         <span class="min-w-0 flex-1">
