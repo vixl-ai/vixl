@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -88,9 +87,6 @@ const handleConfirm = (): void => {
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>Build plan</DialogTitle>
-        <DialogDescription>
-          Defaults come from Models settings (Agent). You can override the model for this run.
-        </DialogDescription>
       </DialogHeader>
       <div class="space-y-4 py-2">
         <div class="space-y-2">

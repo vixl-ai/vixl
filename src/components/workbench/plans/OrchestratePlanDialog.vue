@@ -6,7 +6,6 @@ import { Button } from '@/components/shadcn/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -101,9 +100,6 @@ const handleConfirm = (): void => {
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>Orchestrate plan</DialogTitle>
-        <DialogDescription>
-          Defaults come from Models settings (Orchestrator parent and subagent). You can override them for this run.
-        </DialogDescription>
       </DialogHeader>
       <div class="space-y-4 py-2">
         <div class="space-y-2">

@@ -578,7 +578,7 @@ watch(
                   type="button"
                   variant="secondary"
                   size="icon-sm"
-                  class="shrink-0 rounded-full"
+                  class="shrink-0 rounded-md"
                   aria-label="Stop generating"
                   @click="emit('stop')"
                 >

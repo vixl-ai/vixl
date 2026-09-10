@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import type { PendingQuestionState } from '@/types/chat/pending-question'
+import { PromptInputSubmit } from '@/components/ai-elements/prompt-input'
 import { Button } from '@/components/shadcn/ui/button'
 import { Input } from '@/components/shadcn/ui/input'
 import { Marker, MarkerContent } from '@/components/shadcn/ui/marker'
@@ -70,13 +71,10 @@ const handleCustomSubmit = (): void => {
         :disabled="submitted"
         @keydown.enter.prevent="handleCustomSubmit"
       />
-      <Button
-        size="sm"
+      <PromptInputSubmit
         :disabled="submitted || customAnswer.trim().length === 0"
         @click="handleCustomSubmit"
-      >
-        Submit
-      </Button>
+      />
     </div>
   </div>
 </template>
