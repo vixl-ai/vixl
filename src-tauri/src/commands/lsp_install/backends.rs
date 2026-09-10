@@ -50,17 +50,6 @@ pub(crate) async fn npm_install_packages(
     }
 
     let node = ensure_portable_node(app).await?;
-    let npm_cli = node
-        .parent()
-        .map(|p| {
-            if cfg!(windows) {
-                p.join("npm.cmd")
-            } else {
-                // Portable node layout: bin/node, npm may be sibling or via node + npm package
-                p.join("npm")
-            }
-        })
-        .filter(|p| p.exists());
 
     emit_progress(
         app,
@@ -81,27 +70,14 @@ pub(crate) async fn npm_install_packages(
     ]
     .concat();
 
-    // Prefer `node /path/to/npm` style via corepack/npm from PATH, else node -e with npx-like install
-    let output = if let Some(npm_bin) = npm_cli {
-        let mut cmd = TokioCommand::new(npm_bin);
-        cmd.args(&npm_args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        timed_output(&mut cmd).await?
-    } else if let Ok(system_npm) = which::which("npm") {
-        let mut cmd = TokioCommand::new(system_npm);
-        cmd.args(&npm_args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        timed_output(&mut cmd).await?
-    } else {
-        // Bootstrap: download packages using node + built-in fetch via a tiny install script is heavy.
-        // Fall back: require npm on PATH for first install after portable node without npm.
-        return Err(
-      "npm is required to install language servers. Install Node.js (includes npm) or ensure npm is on PATH."
-        .to_string(),
-    );
-    };
+    let mut cmd = super::npm_command::npm_install_command(&node, None, &npm_args).ok_or_else(
+        || {
+            "npm is required to install language servers. Install Node.js (includes npm) or ensure npm is on PATH."
+                .to_string()
+        },
+    )?;
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let output = timed_output(&mut cmd).await?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

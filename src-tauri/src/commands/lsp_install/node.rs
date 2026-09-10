@@ -24,7 +24,12 @@ fn node_dist_name() -> Result<String, String> {
 }
 
 fn find_system_node() -> Option<PathBuf> {
-    which::which("node").ok()
+    match crate::commands::mcp::merged_shell_path() {
+        Some(path) => which::which_in_global("node", Some(path))
+            .ok()
+            .and_then(|mut found| found.next()),
+        None => which::which("node").ok(),
+    }
 }
 
 pub fn find_node_bin(app: &AppHandle) -> Option<PathBuf> {

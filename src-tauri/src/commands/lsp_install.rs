@@ -5,6 +5,7 @@ mod managed;
 mod named_lock;
 mod native_npm;
 mod node;
+mod npm_command;
 mod paths;
 mod progress;
 mod resolve;
@@ -22,6 +23,7 @@ pub use native_npm::{
     looks_like_javascript_bin, native_typescript_exe, should_wrap_npm_bin_with_node,
 };
 pub use node::{ensure_portable_node, find_node_bin};
+pub use npm_command::npm_install_command;
 pub use paths::{auto_download_enabled, lsp_root, managed_server_dir, runtime_node_dir};
 pub(crate) use progress::emit_progress;
 pub use progress::LspInstallProgress;
