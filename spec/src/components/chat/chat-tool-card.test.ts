@@ -136,10 +136,10 @@ describe('approvalActionSpecs', () => {
       'deny',
     ])
     expect(firstCard.find((action) => action.key === 'once')?.tooltip).toBe(
-      'Allow once. Jail retry is included.',
+      'Allow once',
     )
     expect(firstCard.find((action) => action.key === 'session')?.tooltip).toBe(
-      'Allow session. Jail retry is included.',
+      'Allow session',
     )
   })
 

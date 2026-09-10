@@ -71,11 +71,11 @@ const handleBranchSelect = async (branch: string): Promise<void> => {
           class="gap-2"
           @select="handleBranchSelect(branch)"
         >
-          <CheckIcon
-            class="size-3.5 shrink-0"
-            :class="branch === git.currentBranch.value ? 'opacity-100' : 'opacity-0'"
-          />
           <span class="truncate">{{ branch }}</span>
+          <CheckIcon
+            v-if="branch === git.currentBranch.value"
+            class="ml-auto size-3.5 shrink-0"
+          />
         </DropdownMenuItem>
         <p
           v-if="!git.pending.value && filteredBranches.length === 0"

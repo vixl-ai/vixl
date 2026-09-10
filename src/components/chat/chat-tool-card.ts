@@ -71,13 +71,6 @@ export const approvalActionSpecs = (args: {
     } else if (scope === 'session' || scope === 'workspace' || scope === 'always') {
       tooltip = SCOPE_TOOLTIPS[scope]
     }
-    if (
-      args.kind === 'shell' &&
-      !args.unsandboxed &&
-      (scope === 'once' || scope === 'session')
-    ) {
-      tooltip = `${tooltip}. Jail retry is included.`
-    }
     return {
       key: scope,
       tooltip,

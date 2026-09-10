@@ -3,6 +3,7 @@ import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 import type { FileDiff } from '@/types/harness/file-diff'
+import { clipTerminalLabel } from '@/utils/clip-terminal-label'
 
 const fsStagePreviewWrite = vi.fn<
   (args: { projectRoot: string; path: string; content: string }) => Promise<FileDiff[]>
@@ -1000,6 +1001,41 @@ describe('build-tools run_terminal', () => {
         action: 'shell',
         capability: 'shell',
         unsandboxed: false,
+      }),
+    )
+  })
+
+  it('accepts a long description and clips it on stored results', async () => {
+    const long =
+      'Query the local jellyfin sqlite catalog for movies and series counts'
+    const expected = clipTerminalLabel(long)
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const schema = tools.run_terminal.inputSchema as {
+      safeParse: (value: unknown) => { success: boolean }
+    }
+
+    expect(
+      schema.safeParse({
+        command: 'echo hello',
+        description: long,
+      }).success,
+    ).toBe(true)
+
+    const result = await runTool(tools.run_terminal.execute, {
+      command: 'echo hello',
+      description: long,
+    })
+
+    expect(expected.length).toBeLessThanOrEqual(48)
+    expect(result).toMatchObject({
+      description: expected,
+    })
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expected,
+        detail: 'echo hello',
       }),
     )
   })

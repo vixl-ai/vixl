@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import { ChevronRightIcon } from '@lucide/vue'
 import ChatTerminalToolRun from '@/components/chat/ChatTerminalToolRun.vue'
+import ChatTipIcon from '@/components/chat/ChatTipIcon.vue'
 import {
   TerminalCopyButton,
   TerminalHeader,
@@ -52,9 +53,31 @@ const run: ToolRun = {
   },
 }
 
-const mountRun = () =>
+const retryRun: ToolRun = {
+  toolCallId: 'tc-ls-disk',
+  name: 'run_terminal',
+  status: 'done',
+  args: {
+    command: 'ls /dev/disk',
+  },
+  result: {
+    command: 'ls /dev/disk',
+    stdout: 'disk0',
+    sandboxed: false,
+    exitCode: 0,
+    shellId: 'shell-2',
+    priorPhase: {
+      sandboxed: true,
+      stdout: '',
+      error: 'Sandbox blocked: isolated devices',
+      exitCode: 1,
+    },
+  },
+}
+
+const mountRun = (toolRun: ToolRun = run) =>
   shallowMount(ChatTerminalToolRun, {
-    props: { run },
+    props: { run: toolRun },
     global: {
       renderStubDefaultSlot: true,
     },
@@ -89,5 +112,30 @@ describe('ChatTerminalToolRun layout', () => {
   it('renders TerminalCopyButton in the card', () => {
     const wrapper = mountRun()
     expect(wrapper.findComponent(TerminalCopyButton).exists()).toBe(true)
+  })
+
+  it('shows only the final phase sandbox badge in the header', () => {
+    const wrapper = mountRun(retryRun)
+    const tips = wrapper.findAllComponents(ChatTipIcon)
+    const sandboxTips = tips.filter((tip) => {
+      const tooltip = tip.props('tooltip')
+      return tooltip === 'Sandboxed' || tooltip === 'Unsandboxed'
+    })
+    expect(sandboxTips).toHaveLength(1)
+    expect(sandboxTips[0]?.props('tooltip')).toBe('Unsandboxed')
+  })
+
+  it('labels each terminal pane when a sandbox retry produced two phases', () => {
+    const wrapper = mountRun(retryRun)
+    const labels = wrapper.findAll('p').map((node) => node.text())
+    expect(labels).toContain('Sandboxed')
+    expect(labels).toContain('Unsandboxed')
+  })
+
+  it('omits phase labels when there is a single phase', () => {
+    const wrapper = mountRun()
+    const labels = wrapper.findAll('p').map((node) => node.text())
+    expect(labels).not.toContain('Sandboxed')
+    expect(labels).not.toContain('Unsandboxed')
   })
 })

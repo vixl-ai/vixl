@@ -47,6 +47,14 @@ const isError = computed(() => props.run.status === 'error')
 const view = computed(() => parseTerminalToolView(props.run))
 const label = computed(() => formatToolRunLabel(props.run))
 const headline = computed(() => view.value?.label || label.value)
+const lastPhaseIndex = computed(() => (view.value?.phases.length ?? 0) - 1)
+const lastPhase = computed(() => {
+  const phases = view.value?.phases
+  if (!phases || phases.length === 0) {
+    return undefined
+  }
+  return phases[phases.length - 1]
+})
 const phaseOutput = (output: string): string => {
   const command = view.value?.command
   if (!command) {
@@ -132,20 +140,20 @@ const handleShowTerminal = (): void => {
         </span>
       </CollapsibleTrigger>
       <div class="flex shrink-0 items-center gap-0">
-        <template v-for="(phase, phaseIndex) in view.phases" :key="`${phase.title}-${phaseIndex}`">
+        <template v-if="lastPhase">
           <ChatTipIcon
-            :icon="phaseStatus(phase, phaseIndex).icon"
-            :tooltip="phaseStatus(phase, phaseIndex).tooltip"
-            :icon-class="`size-3.5 ${phaseStatus(phase, phaseIndex).iconClass}`"
+            :icon="phaseStatus(lastPhase, lastPhaseIndex).icon"
+            :tooltip="phaseStatus(lastPhase, lastPhaseIndex).tooltip"
+            :icon-class="`size-3.5 ${phaseStatus(lastPhase, lastPhaseIndex).iconClass}`"
           />
           <ChatTipIcon
-            v-if="phase.badge === 'sandboxed'"
+            v-if="lastPhase.badge === 'sandboxed'"
             :icon="ShieldIcon"
             tooltip="Sandboxed"
             icon-class="size-3.5 text-sky-400"
           />
           <ChatTipIcon
-            v-else-if="phase.badge === 'unsandboxed'"
+            v-else-if="lastPhase.badge === 'unsandboxed'"
             :icon="ShieldOffIcon"
             tooltip="Unsandboxed"
             icon-class="size-3.5 text-red-400"
@@ -172,16 +180,23 @@ const handleShowTerminal = (): void => {
     </div>
     <CollapsibleContent class="mt-1 space-y-2 text-xs text-muted-foreground">
       <div class="space-y-2">
-        <Terminal
+        <div
           v-for="(phase, phaseIndex) in view.phases"
           :key="`${phase.title}-${phaseIndex}`"
-          :output="phaseOutput(phase.output)"
-          :is-streaming="isRunning && phaseIndex === view.phases.length - 1"
-          class="relative rounded-md"
+          class="space-y-1"
         >
-          <TerminalCopyButton class="absolute right-1.5 top-1.5 z-10" />
-          <TerminalContent class="max-h-40 p-3 pr-10 text-xs" />
-        </Terminal>
+          <p v-if="view.phases.length > 1" class="text-xs text-muted-foreground">
+            {{ phase.title }}
+          </p>
+          <Terminal
+            :output="phaseOutput(phase.output)"
+            :is-streaming="isRunning && phaseIndex === view.phases.length - 1"
+            class="relative rounded-md"
+          >
+            <TerminalCopyButton class="absolute right-1.5 top-1.5 z-10" />
+            <TerminalContent class="max-h-40 p-3 pr-10 text-xs" />
+          </Terminal>
+        </div>
       </div>
     </CollapsibleContent>
   </Collapsible>

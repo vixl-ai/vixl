@@ -33,7 +33,7 @@ const truncateCommand = (command: string, max = 60): string =>
 
 <template>
   <Queue v-if="shells.length > 0">
-    <QueueSection :default-open="true">
+    <QueueSection :default-open="false">
       <QueueSectionTrigger>
         <QueueSectionLabel
           :count="shells.length"

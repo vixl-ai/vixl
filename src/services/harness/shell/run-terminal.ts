@@ -29,11 +29,11 @@ const runTerminal = (ctx: HarnessToolContext) =>
       description: z
         .string()
         .min(1)
-        .max(48)
         .describe('2-6 word UI title'),
     }),
     execute: async ({ command, is_background, timeout_ms, description }, { toolCallId }) => {
-      const uiTitle = clipTerminalLabel(description ?? '') || command
+      const clippedDescription = clipTerminalLabel(description ?? '')
+      const uiTitle = clippedDescription || command
       const sandboxEnabled =
         (ctx.settings['agent.sandbox.enabled'] ?? true) &&
         !sessionAllowsUnsandboxed(ctx.sessionAllows)
@@ -81,7 +81,7 @@ const runTerminal = (ctx: HarnessToolContext) =>
         command,
         is_background,
         timeout_ms,
-        description,
+        description: clippedDescription || undefined,
       }
 
       const retryUnsandboxed = async (

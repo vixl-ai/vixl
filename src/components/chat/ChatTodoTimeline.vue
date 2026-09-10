@@ -26,18 +26,12 @@ const completedCount = computed(
   () => props.todos.filter((todo) => todo.status === 'completed').length,
 )
 
-const inProgressCount = computed(
-  () => props.todos.filter((todo) => todo.status === 'in_progress').length,
-)
-
 const triggerTitle = computed(() => {
   if (props.todos.length === 0) {
     return 'Tasks'
   }
   return `Tasks (${completedCount.value}/${props.todos.length})`
 })
-
-const defaultOpen = computed(() => inProgressCount.value > 0)
 
 const statusIcon = (status: TodoItem['status']) => {
   if (status === 'completed') {
@@ -79,8 +73,7 @@ const statusTextClass = (status: TodoItem['status']): string => {
 <template>
   <Task
     v-if="todos.length > 0"
-    :key="`${defaultOpen}:${todos.length}:${completedCount}`"
-    :default-open="defaultOpen"
+    :default-open="false"
     class="not-prose w-full min-w-0"
   >
     <TaskTrigger :title="triggerTitle">
