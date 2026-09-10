@@ -17,6 +17,7 @@ import {
 } from '@/services/harness/git'
 import {
   callMcpTool,
+  getMcpTool,
   getMcpTools,
   getMcpPrompt,
   listMcpResources,
@@ -61,6 +62,7 @@ const buildHarnessTools = (ctx: HarnessToolContext) => ({
   apply_patch: applyPatch(ctx),
   call_mcp_tool: callMcpTool(ctx),
   get_mcp_tools: getMcpTools(ctx),
+  get_mcp_tool: getMcpTool(ctx),
   list_mcp_resources: listMcpResources(ctx),
   read_mcp_resource: readMcpResource(ctx),
   get_mcp_prompt: getMcpPrompt(ctx),

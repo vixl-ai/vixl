@@ -142,6 +142,24 @@ describe('formatToolRunLabel call_mcp_tool', () => {
     ).toBe('Listed MCP tools')
   })
 
+  it('labels get_mcp_tool while running and when done', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'get_mcp_tool',
+          status: 'running',
+        }),
+      ),
+    ).toBe('Fetching MCP tool schema…')
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'get_mcp_tool',
+        }),
+      ),
+    ).toBe('Fetched MCP tool schema')
+  })
+
   it('labels spawn_subagent with agentName', () => {
     expect(
       formatToolRunLabel(

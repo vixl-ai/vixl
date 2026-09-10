@@ -19,6 +19,7 @@ export const SUBAGENT_READ_ONLY_TOOLS = [
   'diagnostics',
   'load_skill',
   'web_fetch',
+  'get_mcp_tool',
   'get_mcp_tools',
   'call_mcp_tool',
   'list_mcp_resources',
@@ -42,6 +43,7 @@ export const SUBAGENT_WRITE_TOOLS = [
 ] as const
 
 export const SUBAGENT_MCP_TOOLS = [
+  'get_mcp_tool',
   'get_mcp_tools',
   'call_mcp_tool',
   'list_mcp_resources',

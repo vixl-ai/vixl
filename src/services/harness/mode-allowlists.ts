@@ -2,6 +2,7 @@ import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 
 const MCP_TOOLS = [
   'call_mcp_tool',
+  'get_mcp_tool',
   'get_mcp_tools',
   'list_mcp_resources',
   'read_mcp_resource',
@@ -59,6 +60,7 @@ const ORCHESTRATOR_TOOLS = [
   'ask_user',
   'web_fetch',
   'call_mcp_tool',
+  'get_mcp_tool',
   'get_mcp_tools',
   'list_mcp_resources',
   'read_mcp_resource',
@@ -105,6 +107,7 @@ export const MODE_TOOL_ALLOWLIST: Record<VixlChatMode, string[]> = {
     'ask_user',
     'web_fetch',
     'call_mcp_tool',
+    'get_mcp_tool',
     'get_mcp_tools',
     'list_mcp_resources',
     'read_mcp_resource',

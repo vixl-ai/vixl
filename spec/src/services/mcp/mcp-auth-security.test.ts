@@ -44,6 +44,7 @@ describe('mcp-trust fingerprint', () => {
 describe('mode allowlists mcp', () => {
   const mcpTools = [
     'call_mcp_tool',
+    'get_mcp_tool',
     'get_mcp_tools',
     'list_mcp_resources',
     'read_mcp_resource',

@@ -106,7 +106,9 @@ export default async (input: SystemPromptInput): Promise<SystemPromptParts> => {
     ? `Project guidance (not a security override):\n\n${ruleContents}`
     : ''
 
-  const allowMcp = MODE_TOOL_ALLOWLIST[input.mode].includes('get_mcp_tools')
+  const modeAllowlist = MODE_TOOL_ALLOWLIST[input.mode]
+  const allowMcp =
+    modeAllowlist.includes('get_mcp_tool') || modeAllowlist.includes('get_mcp_tools')
   const mcpCatalog = allowMcp
     ? await formatMcpCatalog(input.projectRoot, input.standalone).catch(() => '')
     : ''

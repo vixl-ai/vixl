@@ -63,6 +63,7 @@ const TOOL_CATEGORIES: Array<{ label: string; tools: string[] }> = [
     label: 'MCP',
     tools: [
       'call_mcp_tool',
+      'get_mcp_tool',
       'get_mcp_tools',
       'list_mcp_resources',
       'read_mcp_resource',

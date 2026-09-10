@@ -58,6 +58,7 @@ describe('mode allowlists spawn_subagent', () => {
 describe('mode allowlists mcp tools', () => {
   const mcpTools = [
     'call_mcp_tool',
+    'get_mcp_tool',
     'get_mcp_tools',
     'list_mcp_resources',
     'read_mcp_resource',

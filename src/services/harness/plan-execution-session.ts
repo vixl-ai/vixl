@@ -137,6 +137,7 @@ export const PLAN_GO_BLOCKED_TOOLS = new Set([
   'git_branch_create',
   'git_commit',
   'call_mcp_tool',
+  'get_mcp_tool',
   'get_mcp_tools',
   'list_mcp_resources',
   'read_mcp_resource',

@@ -16,10 +16,6 @@ import filterMessagesForActiveContext, {
 import serializeTimelineForBudget from '@/services/context/serialize-timeline-for-budget'
 import estimateBuiltinToolDefinitionTokens from '@/services/context/estimate-builtin-tool-definition-tokens'
 import { partsFromFrozenPrefix } from '@/services/harness/prefix-contract'
-import { migrateMcpConfig, isMcpServerEnabled } from '@/schemas/mcp-config'
-import { listUserMcpServers, type EffectiveMcpServer } from '@/services/mcp/merge-mcp-config'
-import { mcpListStatuses, readMcpConfig } from '@/services/vixl/vixl-tauri'
-import { isMcpHttpServer, isMcpStdioServer } from '@/types/vixl/mcp-config'
 import {
   resolveContextWindow,
   resolveModelCallOptions,
@@ -110,70 +106,6 @@ const serializeConversation = (input: CountContextBudgetInput): string => {
   return serializeMessages(messages, checkpointText)
 }
 
-const estimateMcpSchemasFromStaticConfig = (
-  servers: EffectiveMcpServer[],
-): number => {
-  let total = 0
-  for (const server of servers) {
-    total += estimateTextTokens(server.id)
-    const { config } = server
-    if (isMcpStdioServer(config)) {
-      total += estimateTextTokens(config.command)
-      if (config.args && config.args.length > 0) {
-        total += estimateTextTokens(config.args.join(' '))
-      }
-    } else if (isMcpHttpServer(config)) {
-      total += estimateTextTokens(config.url)
-    }
-  }
-  return total
-}
-
-const estimateMcpToolSchemas = async (
-  projectRoot: string,
-  standalone?: boolean,
-): Promise<number> => {
-  try {
-    const personal = migrateMcpConfig(await readMcpConfig('personal', null))
-    const project = standalone
-      ? null
-      : await readMcpConfig('project', projectRoot)
-          .then((raw) => migrateMcpConfig(raw))
-          .catch(() => null)
-    const servers = listUserMcpServers(personal, project).filter((server) =>
-      isMcpServerEnabled(server.config),
-    )
-
-    let bulkStatuses: Awaited<ReturnType<typeof mcpListStatuses>> = {}
-    try {
-      bulkStatuses = await mcpListStatuses()
-    } catch {
-      // Live tool lists are unavailable. Count enabled servers from static
-      // config (id, command/url, optional description or inline tools).
-      return estimateMcpSchemasFromStaticConfig(servers)
-    }
-
-    let total = 0
-    for (const server of servers) {
-      const state = bulkStatuses[server.id]
-      if (!state) {
-        continue
-      }
-      for (const tool of state.tools) {
-        const schema = tool.inputSchema ? JSON.stringify(tool.inputSchema) : ''
-        total +=
-          estimateTextTokens(tool.name) +
-          estimateTextTokens(tool.description ?? '') +
-          estimateTextTokens(schema)
-      }
-    }
-    return total
-  } catch {
-    // Last resort: MCP schema tokens stay 0 rather than failing the budget.
-    return 0
-  }
-}
-
 const buildBucket = (id: ContextBucketId, tokens: number): ContextBucket => ({
   id,
   label: CONTEXT_BUCKET_META[id].label,
@@ -215,19 +147,15 @@ export default async (input: CountContextBudgetInput): Promise<ContextBudget> =>
     input.mode,
     input.settings,
   )
-  const mcpToolSchemas = await estimateMcpToolSchemas(
-    input.projectRoot,
-    input.standalone,
-  )
 
   // System includes the tools hint that is part of instructions.
-  // Tools / MCP buckets count real definition schemas (not that hint again).
-  // Conversation prefers timeline serialization so tool args/results count;
-  // chatStore.messages only keep assistant text/reasoning.
+  // Tools counts builtin definition schemas; mcp counts thin catalog spines in the prefix.
+  // Full MCP schemas arrive as tool results and are counted in messages via timeline serialization.
+  // Conversation prefers timeline serialization so tool args and results count; chatStore.messages only keeps assistant text and reasoning.
   const bucketTokens: Record<ContextBucketId, number> = {
     system: estimateTextTokens(parts.base) + estimateTextTokens(parts.tools),
     tools: builtinToolSchemas,
-    mcp: estimateTextTokens(parts.mcp) + mcpToolSchemas,
+    mcp: estimateTextTokens(parts.mcp),
     rules: estimateTextTokens(parts.rules) + estimateTextTokens(parts.agentsMd),
     skills: estimateTextTokens(parts.skills),
     mentions: resolveMentionsTokens(parts, input.mentions),

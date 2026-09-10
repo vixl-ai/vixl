@@ -2,7 +2,7 @@ import { migrateMcpConfig, isMcpServerEnabled } from '@/schemas/mcp-config'
 import { listUserMcpServers } from '@/services/mcp/merge-mcp-config'
 import { mcpListStatuses, readMcpConfig } from '@/services/vixl/vixl-tauri'
 
-const MCP_START_HINT = 'start the server in Settings or call get_mcp_tools'
+const MCP_START_HINT = 'start the server in Settings or call get_mcp_tools to check its status'
 
 export default async (
   projectRoot: string,
