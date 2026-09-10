@@ -25,6 +25,7 @@ const props = defineProps<{
 }>()
 
 const workbench = useWorkbenchStore()
+const { transparencyEnabled } = useTransparency()
 const query = ref('')
 
 const projectRoot = computed(() => workbench.getProject(props.tab.projectId)?.rootPath ?? null)
@@ -103,7 +104,10 @@ watch(
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background p-4 text-sm">
+  <div
+    class="flex h-full min-h-0 flex-col overflow-hidden p-4 text-sm"
+    :class="transparencyEnabled ? 'bg-transparent' : 'bg-background'"
+  >
     <div class="mb-3 flex items-center justify-between gap-2">
       <div>
         <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Local</p>

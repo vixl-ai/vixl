@@ -25,6 +25,7 @@ const props = defineProps<{
 
 const fleet = useFleetRegistry()
 const workbench = useWorkbenchStore()
+const { transparencyEnabled } = useTransparency()
 const containerRef = ref<HTMLDivElement | null>(null)
 
 let terminal: Terminal | null = null
@@ -43,16 +44,17 @@ const readCssVariable = (name: string): string => {
 }
 
 const buildTerminalTheme = (): ITheme => {
-  const background = readCssVariable('--background')
+  const backgroundToken = readCssVariable('--background')
   const foreground = readCssVariable('--foreground')
   const accent = readCssVariable('--accent')
   const accentForeground = readCssVariable('--accent-foreground')
+  const background = transparencyEnabled.value ? 'transparent' : backgroundToken
 
   return {
     background,
     foreground,
     cursor: foreground,
-    cursorAccent: background,
+    cursorAccent: backgroundToken,
     selectionBackground: accent,
     selectionForeground: accentForeground,
     selectionInactiveBackground: readCssVariable('--muted'),
@@ -123,6 +125,7 @@ const initTerminal = async (): Promise<void> => {
 
   try {
     terminal = new Terminal({
+      allowTransparency: true,
       cursorBlink: true,
       fontFamily: TERMINAL_FONT_FAMILY,
       fontSize: TERMINAL_FONT_SIZE,
@@ -249,7 +252,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+  <div
+    class="flex h-full min-h-0 flex-col overflow-hidden"
+    :class="transparencyEnabled ? 'bg-transparent' : 'bg-background'"
+  >
     <div ref="containerRef" class="min-h-0 flex-1 p-1" />
   </div>
 </template>

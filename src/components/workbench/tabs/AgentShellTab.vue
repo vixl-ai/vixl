@@ -29,6 +29,8 @@ const props = defineProps<{
   tab: WorkbenchTab
 }>()
 
+const { transparencyEnabled } = useTransparency()
+
 const shellId = computed(() => (props.tab.payload as AgentShellPayload).shellId)
 
 const shell = computed(() =>
@@ -62,7 +64,10 @@ const handleStop = async (): Promise<void> => {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background p-2">
+  <div
+    class="flex h-full min-h-0 flex-col overflow-hidden p-2"
+    :class="transparencyEnabled ? 'bg-transparent' : 'bg-background'"
+  >
     <div
       v-if="!shell"
       class="flex h-full items-center justify-center text-sm text-muted-foreground"
@@ -73,7 +78,7 @@ const handleStop = async (): Promise<void> => {
       v-else
       :output="output"
       :is-streaming="isStreaming"
-      class="h-full min-h-0 flex-1 rounded-md"
+      :class="['h-full min-h-0 flex-1 rounded-md', transparencyEnabled ? 'bg-transparent' : '']"
     >
       <TerminalHeader>
         <TerminalTitle class="min-w-0 truncate">

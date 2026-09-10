@@ -41,6 +41,7 @@ const workbench = useWorkbenchStore()
 const config = useVixlConfig()
 const router = useRouter()
 const { building, startPlanBuild } = useStartPlanBuild()
+const { transparencyEnabled } = useTransparency()
 const body = ref('')
 const todos = ref<PlanTodoItem[]>([])
 const title = ref('')
@@ -250,7 +251,10 @@ watch(
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-y-auto bg-background">
+  <div
+    class="flex h-full min-h-0 flex-col overflow-y-auto"
+    :class="transparencyEnabled ? 'bg-transparent' : 'bg-background'"
+  >
     <div class="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
       <div class="min-w-0">
         <h2 class="truncate text-sm font-semibold">{{ title || tab.label }}</h2>
