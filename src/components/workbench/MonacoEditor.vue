@@ -26,6 +26,6 @@ defineExpose({
 <template>
   <div
     ref="containerRef"
-    class="h-full min-h-0 w-full overflow-hidden"
+    class="h-full min-h-0 w-full overflow-hidden bg-background"
   />
 </template>

@@ -119,6 +119,10 @@
   animation: agent-aurora-drift 3s linear infinite;
 }
 
+html.transparency-on .chat-prompt-aurora [data-slot='input-group'] {
+  --agent-aurora-fill: var(--composer-fill);
+}
+
 @keyframes agent-aurora-drift {
   to {
     --agent-aurora-angle: 360deg;

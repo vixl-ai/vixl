@@ -37,6 +37,7 @@ const RIGHT_SIDEBAR_MIN_SIZE = 20
 
 useFleetRegistry()
 useAppearance()
+const { transparencyEnabled } = useTransparency()
 useVixlLiveSync()
 const updater = useAppUpdater()
 
@@ -116,16 +117,24 @@ watch(rightSidebarOpen, (open) => {
 <template>
   <SidebarProvider class="overflow-x-hidden">
     <AppSidebar />
-    <SidebarInset class="min-w-0 w-0 flex-1 overflow-hidden bg-background">
+    <SidebarInset
+      class="min-w-0 w-0 flex-1 overflow-hidden"
+      :class="transparencyEnabled ? 'bg-transparent' : 'bg-background'"
+    >
       <RightSidebarProvider
         v-model:open="rightSidebarOpen"
         class="h-svh min-w-0 flex-1 overflow-hidden"
       >
         <TitleBar />
         <ResizablePanelGroup direction="horizontal" class="min-h-0 min-w-0 flex-1 overflow-hidden">
-          <ResizablePanel :min-size="30" class="h-full min-h-0 min-w-0 overflow-hidden bg-background">
+          <ResizablePanel
+            :min-size="30"
+            class="h-full min-h-0 min-w-0 overflow-hidden"
+            :class="transparencyEnabled ? 'bg-transparent' : 'bg-background'"
+          >
             <main
-              class="flex h-full min-h-0 flex-col overflow-hidden bg-background pt-(--titlebar-height)"
+              class="flex h-full min-h-0 flex-col overflow-hidden pt-(--titlebar-height)"
+              :class="transparencyEnabled ? 'bg-transparent' : 'bg-background'"
               style="--titlebar-height: 40px"
             >
               <RouterView class="min-h-0 flex-1" />

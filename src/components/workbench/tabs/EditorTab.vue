@@ -52,6 +52,7 @@ const props = defineProps<{
 }>()
 
 const workbench = useWorkbenchStore()
+const { transparencyEnabled } = useTransparency()
 
 const monacoRef = ref<InstanceType<typeof WorkbenchMonacoEditor> | null>(null)
 const sidePaneRef = ref<{ openSearch: (expandReplace?: boolean) => void } | null>(null)
@@ -441,6 +442,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
   <ResizablePanelGroup
     direction="horizontal"
     class="h-full min-h-0 overflow-hidden"
+    :class="transparencyEnabled ? 'bg-transparent' : 'bg-background'"
   >
     <ResizablePanel
       :default-size="75"

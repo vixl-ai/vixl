@@ -158,3 +158,22 @@
     @apply bg-background text-foreground font-sans text-[13px] antialiased tracking-[0.01em];
   }
 }
+
+/*
+ * Native window vibrancy (html.transparency-on).
+ * Unlayered so these beat @layer base body { @apply bg-background }.
+ * --background, --card, and --popover stay opaque for content legibility.
+ * --sidebar is chrome (left sidebar, workbench tab strip, empty shell).
+ */
+html.transparency-on,
+html.transparency-on body {
+  background: transparent;
+}
+
+html.transparency-on {
+  --sidebar: transparent;
+  --sidebar-accent: color-mix(in oklab, var(--foreground) 8%, transparent);
+  --sidebar-border: color-mix(in oklab, var(--foreground) 12%, transparent);
+  /* Chat composer: translucent so native blur and tint show through. */
+  --composer-fill: color-mix(in oklab, var(--background) 60%, transparent);
+}

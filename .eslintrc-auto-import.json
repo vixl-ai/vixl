@@ -340,6 +340,7 @@
     "useToString": true,
     "useToggle": true,
     "useTransition": true,
+    "useTransparency": true,
     "useUrlSearchParams": true,
     "useUserMedia": true,
     "useVModel": true,

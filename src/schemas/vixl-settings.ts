@@ -27,6 +27,9 @@ export const vixlSettingsSchema = z
   .object({
     version: z.literal(1),
     'appearance.theme': themeSchema.optional(),
+    'appearance.transparency': z.boolean().optional(),
+    'appearance.transparencyHue': z.number().min(0).max(360).optional(),
+    'appearance.transparencyIntensity': z.number().min(0).max(100).optional(),
     'agent.autoApproveGlobs': z.array(z.string()).optional(),
     'agent.permissionLevel': z.enum(['ask', 'allowlist', 'bypass']).optional(),
     'agent.permissions': z
@@ -107,6 +110,9 @@ export const SANDBOX_NETWORK_DEFAULT = 'allow' as const
 export const defaultVixlSettings = (): VixlSettings => ({
   version: 1,
   'appearance.theme': 'system',
+  'appearance.transparency': true,
+  'appearance.transparencyHue': 265,
+  'appearance.transparencyIntensity': 0,
   'agent.autoApproveGlobs': [],
   'agent.permissionLevel': 'allowlist',
   'agent.permissions': [],

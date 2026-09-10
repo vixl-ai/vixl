@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod db;
 mod tray;
+mod vibrancy;
 
 use tauri::Manager;
 
@@ -31,6 +32,7 @@ use commands::{
     write_lsp_config, write_mcp_config, write_settings, write_temp_bytes, write_temp_handoff,
     write_text_file, GitHeadWatchState, OAuthLoopbackState, WatchState,
 };
+use vibrancy::{clear_window_vibrancy, set_window_vibrancy};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -217,6 +219,8 @@ pub fn run_with_launch_path(launch_path: Option<String>) {
         lsp_set_server_disabled,
         read_lsp_config,
         write_lsp_config,
+        set_window_vibrancy,
+        clear_window_vibrancy,
     ]);
 
     builder

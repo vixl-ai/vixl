@@ -51,6 +51,9 @@ export type VixlCustomProvider = {
 export type VixlSettings = {
   version: 1
   'appearance.theme'?: VixlTheme
+  'appearance.transparency'?: boolean
+  'appearance.transparencyHue'?: number
+  'appearance.transparencyIntensity'?: number
   'agent.autoApproveGlobs'?: string[]
   'agent.permissionLevel'?: PermissionLevel
   'agent.permissions'?: PermissionRecord[]

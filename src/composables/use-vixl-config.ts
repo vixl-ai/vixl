@@ -135,6 +135,12 @@ export default () => {
     usingPersonalDefault,
     setTheme: (tab: SettingsTab, theme: VixlTheme) =>
       updateSetting(tab, 'appearance.theme', theme),
+    setTransparency: (tab: SettingsTab, enabled: boolean) =>
+      updateSetting(tab, 'appearance.transparency', enabled),
+    setTransparencyHue: (tab: SettingsTab, hue: number) =>
+      updateSetting(tab, 'appearance.transparencyHue', hue),
+    setTransparencyIntensity: (tab: SettingsTab, intensity: number) =>
+      updateSetting(tab, 'appearance.transparencyIntensity', intensity),
   }
 }
 

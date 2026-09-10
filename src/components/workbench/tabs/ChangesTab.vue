@@ -103,7 +103,7 @@ watch(
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-hidden p-4 text-sm">
+  <div class="flex h-full min-h-0 flex-col overflow-hidden bg-background p-4 text-sm">
     <div class="mb-3 flex items-center justify-between gap-2">
       <div>
         <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Local</p>

@@ -109,6 +109,7 @@ const contextBudgetSync = useChatContextBudgetSync()
 const chatPromptEditor = useChatPromptEditor()
 const contextUsage = useContextUsage()
 const mcpServers = useMcpServers()
+const { transparencyEnabled } = useTransparency()
 
 const draftMentions = contextBudgetSync.draftMentions
 
@@ -175,7 +176,10 @@ const promptInputClass = computed(() => {
   if (isWaitingOnReply.value) {
     return base
   }
-  return `${base} [&_[data-slot=input-group]]:border-border/50 [&_[data-slot=input-group]]:bg-background`
+  const fill = transparencyEnabled.value
+    ? '[&_[data-slot=input-group]]:bg-(--composer-fill)'
+    : '[&_[data-slot=input-group]]:bg-background'
+  return `${base} [&_[data-slot=input-group]]:border-border/50 ${fill}`
 })
 
 const promptWorkspaceRoot = computed((): string | null => {
