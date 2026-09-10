@@ -9,6 +9,7 @@ import {
   upsertMcpTrustRecord,
   clearSessionTrust,
 } from '@/services/mcp/mcp-trust'
+import connectionKey from '@/services/mcp/connection-key'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
 import {
   loadEffectiveSettings,
@@ -20,6 +21,7 @@ type TrustPending = {
   serverId: string
   fingerprint: string
   action: () => Promise<void>
+  scopeKey: string
 }
 
 type TrustConfig = ReturnType<typeof useVixlConfig>
@@ -55,7 +57,7 @@ const persistTrustRecord = async (
   root?: () => string | null,
 ): Promise<void> => {
   if (scope === 'never') {
-    clearSessionTrust(pending.serverId)
+    clearSessionTrust(pending.serverId, pending.scopeKey)
     const existing = config.personalSettings.value['agent.mcp.trust'] ?? []
     await config.updateSetting(
       'personal',
@@ -66,7 +68,7 @@ const persistTrustRecord = async (
   }
 
   if (scope === 'session') {
-    sessionTrusts.set(pending.serverId, pending.fingerprint)
+    sessionTrusts.set(connectionKey(pending.scopeKey, pending.serverId), pending.fingerprint)
     return
   }
 
@@ -93,12 +95,12 @@ const persistTrustRecord = async (
     } else {
       await persistPersonalAlways(config, pending)
     }
-    sessionTrusts.set(pending.serverId, pending.fingerprint)
+    sessionTrusts.set(connectionKey(pending.scopeKey, pending.serverId), pending.fingerprint)
     return
   }
 
   await persistPersonalAlways(config, pending)
-  sessionTrusts.set(pending.serverId, pending.fingerprint)
+  sessionTrusts.set(connectionKey(pending.scopeKey, pending.serverId), pending.fingerprint)
 }
 
 export default (root?: () => string | null) => {
@@ -110,16 +112,18 @@ export default (root?: () => string | null) => {
     id: string,
     serverConfig: McpServerConfig,
     action: () => Promise<void>,
+    scopeKey?: string | null,
   ): Promise<void> => {
     const fingerprint = mcpServerFingerprint(serverConfig)
+    const resolvedScope = scopeKey?.trim() || root?.()?.trim() || 'personal'
     const settings = root
       ? await loadEffectiveSettings(root() ?? null)
       : config.effectiveSettings.value
-    if (isMcpTrusted(settings, id, fingerprint, sessionTrusts)) {
+    if (isMcpTrusted(settings, id, fingerprint, sessionTrusts, resolvedScope)) {
       await action()
       return
     }
-    trustPending.value = { serverId: id, fingerprint, action }
+    trustPending.value = { serverId: id, fingerprint, action, scopeKey: resolvedScope }
   }
 
   const handleTrustChoice = async (scope: McpTrustScope): Promise<void> => {

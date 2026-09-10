@@ -21,6 +21,7 @@ describe('mcp-auth-gate', () => {
       chatId: 'chat-1',
       toolCallId: 'tool-1',
       serverId: 'github',
+      scopeKey: 'personal',
       kind: 'oauth',
       title: 'Sign in to GitHub',
     })
@@ -38,6 +39,7 @@ describe('mcp-auth-gate', () => {
       chatId: 'chat-1',
       toolCallId: 'tool-skip',
       serverId: 'linear',
+      scopeKey: 'personal',
       kind: 'inputs',
       title: 'Provide API key',
     })
@@ -51,6 +53,7 @@ describe('mcp-auth-gate', () => {
       chatId: 'chat-a',
       toolCallId: 'tool-a',
       serverId: 'a',
+      scopeKey: 'personal',
       kind: 'trust',
       title: 'Trust A',
     })
@@ -58,6 +61,7 @@ describe('mcp-auth-gate', () => {
       chatId: 'chat-b',
       toolCallId: 'tool-b',
       serverId: 'b',
+      scopeKey: 'personal',
       kind: 'trust',
       title: 'Trust B',
     })
@@ -77,6 +81,7 @@ describe('mcp-auth-gate', () => {
       chatId: 'chat-1',
       toolCallId: 'tool-1',
       serverId: 'shared',
+      scopeKey: 'personal',
       kind: 'oauth',
       title: 'Auth 1',
     })
@@ -84,6 +89,7 @@ describe('mcp-auth-gate', () => {
       chatId: 'chat-2',
       toolCallId: 'tool-2',
       serverId: 'shared',
+      scopeKey: 'personal',
       kind: 'oauth',
       title: 'Auth 2',
     })
@@ -91,6 +97,7 @@ describe('mcp-auth-gate', () => {
       chatId: 'chat-1',
       toolCallId: 'tool-3',
       serverId: 'other',
+      scopeKey: 'personal',
       kind: 'oauth',
       title: 'Auth 3',
     })
@@ -113,6 +120,7 @@ describe('mcp-auth-gate', () => {
       chatId: 'chat-1',
       toolCallId: 'tool-client',
       serverId: 'remote',
+      scopeKey: 'personal',
       kind: 'oauth',
       title: 'Authenticate remote',
     })
@@ -127,5 +135,36 @@ describe('mcp-auth-gate', () => {
 
     resolveMcpAuth('tool-client', { action: 'authenticated' })
     await expect(pending).resolves.toEqual({ action: 'authenticated' })
+  })
+
+  it('resolveMcpAuthForServer only resolves the matching scope', async () => {
+    const personal = requestMcpAuth({
+      chatId: 'chat-1',
+      toolCallId: 'tool-personal',
+      serverId: 'github',
+      scopeKey: 'personal',
+      kind: 'oauth',
+      title: 'Personal GitHub',
+    })
+    const project = requestMcpAuth({
+      chatId: 'chat-1',
+      toolCallId: 'tool-project',
+      serverId: 'github',
+      scopeKey: '/tmp/project-a',
+      kind: 'oauth',
+      title: 'Project GitHub',
+    })
+
+    expect(listPendingMcpAuthForServer('github', 'personal')).toHaveLength(1)
+    expect(listPendingMcpAuthForServer('github', '/tmp/project-a')).toHaveLength(1)
+
+    resolveMcpAuthForServer('github', { action: 'authenticated' }, '/tmp/project-a')
+
+    await expect(project).resolves.toEqual({ action: 'authenticated' })
+    expect(listPendingMcpAuthForServer('github', '/tmp/project-a')).toHaveLength(0)
+    expect(listPendingMcpAuthForServer('github', 'personal')).toHaveLength(1)
+
+    resolveMcpAuth('tool-personal', { action: 'cancelled' })
+    await expect(personal).resolves.toEqual({ action: 'cancelled' })
   })
 })

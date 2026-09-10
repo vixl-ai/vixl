@@ -220,7 +220,7 @@ describe('createFileTreeMutations delete', () => {
 
     await mutations.handleDeleteConfirm()
 
-    expect(mcpStop).toHaveBeenCalledWith('codegraph')
+    expect(mcpStop).toHaveBeenCalledWith('codegraph', undefined, '/tmp/proj')
     expect(fsDelete).toHaveBeenCalledWith({
       projectRoot: '/tmp/proj',
       path: '.codegraph',

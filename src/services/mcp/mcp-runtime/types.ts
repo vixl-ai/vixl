@@ -15,6 +15,7 @@ export type McpRuntimeOptions = {
   confirmAuthorizationServerOrigin?: (origin: string) => Promise<boolean>
   skipTrustCheck?: boolean
   scope?: string
+  scopeKey?: string | null
   resourceMetadataUrl?: URL
 }
 

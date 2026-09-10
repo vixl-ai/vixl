@@ -28,6 +28,7 @@ const resolveTrustedMcpServer = async (
     return {
       trusted: true,
       config: buildCodegraphServer(ctx.projectRoot),
+      scopeKey: ctx.projectRoot,
     }
   }
 
@@ -39,13 +40,15 @@ const resolveTrustedMcpServer = async (
   if (!server) {
     return { trusted: false, reason: 'missing' }
   }
+  const scopeKey = server.scope === 'personal' ? 'personal' : ctx.projectRoot
   const fingerprint = mcpServerFingerprint(server.config)
-  if (!isMcpTrusted(ctx.settings, serverId, fingerprint, sessionTrusts)) {
+  if (!isMcpTrusted(ctx.settings, serverId, fingerprint, sessionTrusts, scopeKey)) {
     return { trusted: false, reason: 'untrusted' }
   }
   return {
     trusted: true,
     config: server.config,
+    scopeKey,
   }
 }
 

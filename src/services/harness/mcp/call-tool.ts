@@ -57,7 +57,7 @@ const callMcpTool = (ctx: HarnessToolContext) =>
         return { rejected: true, error: 'MCP call denied' }
       }
 
-      const status = await mcpRuntime.getStatus(serverId, trust.config)
+      const status = await mcpRuntime.getStatus(serverId, trust.config, trust.scopeKey)
       const toolInfo = status.tools.find((item) => item.name === toolName)
       const normalized = normalizeMcpToolArgs(
         (args ?? {}) as Record<string, unknown>,
@@ -93,7 +93,13 @@ const callMcpTool = (ctx: HarnessToolContext) =>
           }
         })
         try {
-          return await mcpRuntime.callTool(serverId, toolName, toolArgs)
+          return await mcpRuntime.callTool(
+            serverId,
+            toolName,
+            toolArgs,
+            undefined,
+            trust.scopeKey,
+          )
         } finally {
           setMcpElicitationHandler(previous)
         }
@@ -111,6 +117,7 @@ const callMcpTool = (ctx: HarnessToolContext) =>
           chatId: ctx.chatId,
           toolCallId,
           serverId,
+          scopeKey: trust.scopeKey,
           kind,
           title: ctx.subagentLabel
             ? `Authenticate ${serverId} (${ctx.subagentLabel})`

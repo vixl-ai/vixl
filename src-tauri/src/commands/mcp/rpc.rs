@@ -98,7 +98,12 @@ fn response_id_as_u64(value: &serde_json::Value) -> Option<u64> {
     None
 }
 
-pub(crate) fn spawn_reader(process: std::sync::Arc<Mutex<McpProcess>>, server_id: String) {
+pub(crate) fn spawn_reader(
+    process: std::sync::Arc<Mutex<McpProcess>>,
+    connection_key: String,
+    scope_key: String,
+    server_id: String,
+) {
     tokio::spawn(async move {
         let stdout = {
             let mut guard = process.lock().await;
@@ -126,9 +131,9 @@ pub(crate) fn spawn_reader(process: std::sync::Arc<Mutex<McpProcess>>, server_id
                 }
             }
         }
-        set_state(&server_id, "stopped", None, vec![], None).await;
+        set_state(Some(&scope_key), &server_id, "stopped", None, vec![], None).await;
         let mut processes = MCP_PROCESSES.lock().await;
-        processes.remove(&server_id);
+        processes.remove(&connection_key);
     });
 }
 

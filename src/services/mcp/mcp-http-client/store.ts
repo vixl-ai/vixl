@@ -7,6 +7,7 @@ import type {
 import { UnauthorizedError } from '@ai-sdk/mcp'
 import type { McpHttpServer } from '@/types/vixl/mcp-config'
 import parseMcpIcons from '@/services/mcp/parse-mcp-icons'
+import connectionKey from '@/services/mcp/connection-key'
 import type { McpServerState, McpToolInfo } from '@/services/vixl/vixl-tauri'
 import type { McpIcon } from '@/types/mcp/mcp-icon'
 import type { WwwAuthenticateChallenge } from '@/types/mcp/www-authenticate-challenge'
@@ -37,6 +38,7 @@ export type HttpServerEntry = {
   sessionId?: string | null
   lastChallenge?: WwwAuthenticateChallenge
   lastRequestedScope?: string
+  scopeKey: string
 }
 
 export const httpServers = new Map<string, HttpServerEntry>()
@@ -72,9 +74,13 @@ export const setEntryState = (
       | 'lastChallenge'
       | 'lastRequestedScope'
     >
-  >,
+  > & {
+    scopeKey?: string | null
+  },
 ): McpServerState => {
-  const existing = httpServers.get(serverId)
+  const resolvedScope = extras?.scopeKey?.trim() || 'personal'
+  const key = connectionKey(resolvedScope, serverId)
+  const existing = httpServers.get(key)
   const state: McpServerState = {
     serverId,
     status: patch.status,
@@ -83,7 +89,7 @@ export const setEntryState = (
     icons:
       patch.icons !== undefined ? patch.icons : (existing?.state.icons ?? null),
   }
-  httpServers.set(serverId, {
+  httpServers.set(key, {
     client: extras?.client !== undefined ? extras.client : (existing?.client ?? null),
     config: extras?.config ?? existing?.config ?? { type: 'http', url: '' },
     authProvider:
@@ -102,13 +108,17 @@ export const setEntryState = (
       extras?.lastRequestedScope !== undefined
         ? extras.lastRequestedScope
         : existing?.lastRequestedScope,
+    scopeKey: resolvedScope,
     state,
   })
   return state
 }
 
-export const syncHttpChallengeFromFetch = (serverId: string): void => {
-  const existing = httpServers.get(serverId)
+export const syncHttpChallengeFromFetch = (
+  serverId: string,
+  scopeKey?: string | null,
+): void => {
+  const existing = httpServers.get(connectionKey(scopeKey, serverId))
   if (!existing?.config.url) {
     return
   }
@@ -116,7 +126,7 @@ export const syncHttpChallengeFromFetch = (serverId: string): void => {
   if (!challenge) {
     return
   }
-  httpServers.set(serverId, {
+  httpServers.set(connectionKey(scopeKey, serverId), {
     ...existing,
     lastChallenge: challenge,
   })
@@ -124,8 +134,9 @@ export const syncHttpChallengeFromFetch = (serverId: string): void => {
 
 export const getHttpOauthChallenge = (
   serverId: string,
+  scopeKey?: string | null,
 ): WwwAuthenticateChallenge | undefined => {
-  const existing = httpServers.get(serverId)
+  const existing = httpServers.get(connectionKey(scopeKey, serverId))
   if (existing?.lastChallenge) {
     return existing.lastChallenge
   }
@@ -138,12 +149,13 @@ export const getHttpOauthChallenge = (
 export const setHttpLastRequestedScope = (
   serverId: string,
   scope: string | undefined,
+  scopeKey?: string | null,
 ): void => {
-  const existing = httpServers.get(serverId)
+  const existing = httpServers.get(connectionKey(scopeKey, serverId))
   if (!existing) {
     return
   }
-  httpServers.set(serverId, {
+  httpServers.set(connectionKey(scopeKey, serverId), {
     ...existing,
     lastRequestedScope: scope,
   })
@@ -151,11 +163,15 @@ export const setHttpLastRequestedScope = (
 
 export const getHttpLastRequestedScope = (
   serverId: string,
-): string | undefined => httpServers.get(serverId)?.lastRequestedScope
+  scopeKey?: string | null,
+): string | undefined =>
+  httpServers.get(connectionKey(scopeKey, serverId))?.lastRequestedScope
 
 export const getHttpServerConfig = (
   serverId: string,
-): McpHttpServer | undefined => httpServers.get(serverId)?.config
+  scopeKey?: string | null,
+): McpHttpServer | undefined =>
+  httpServers.get(connectionKey(scopeKey, serverId))?.config
 
 export const isUnauthorized = (error: unknown): boolean =>
   error instanceof UnauthorizedError ||

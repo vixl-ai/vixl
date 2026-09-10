@@ -1,10 +1,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import type { FleetProject } from '@/types/fleet/fleet-project'
-import useMcpServers from '@/composables/use-mcp-servers'
 import ensureCodeGraph from '@/services/codegraph/ensure-codegraph'
-import { sessionTrusts } from '@/services/mcp/mcp-trust'
-import { CODEGRAPH_SERVER_ID } from '@/types/codegraph/managed-codegraph'
 import {
   getActiveProjectId,
   hasProjectVixl,
@@ -77,32 +74,6 @@ export default () => {
       return
     }
 
-    // Tear down project-scoped MCP before switching so tools do not keep the old cwd/env.
-    const mcp = useMcpServers()
-    const effective = mcp.listEffectiveMcpServers(
-      mcp.personalMcp.value,
-      mcp.projectMcp.value,
-    )
-    for (const server of effective) {
-      if (server.scope === 'project' || server.scope === 'overridden') {
-        try {
-          await mcp.stopServer(server.id, { quiet: true })
-        } catch (error) {
-          toast.error('Failed to stop project MCP server', {
-            description: error instanceof Error ? error.message : 'Unknown error',
-          })
-        }
-      }
-    }
-    try {
-      await mcp.stopServer(CODEGRAPH_SERVER_ID, { quiet: true })
-    } catch (error) {
-      toast.error('Failed to stop graph', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-      })
-    }
-    sessionTrusts.clear()
-
     await registrySetActiveProject(projectId)
     activeProjectId.value = projectId
     await refreshHasVixl()
@@ -117,7 +88,6 @@ export default () => {
 
       const project = projects.value.find((entry) => entry.id === projectId)
       if (project) {
-        // Project MCP was stopped above; reload configs for the new root via ensure.
         // Do not block activation on CodeGraph connect; Graph UI polls status itself.
         ensureGraphQuietly(project.rootPath).catch((error: unknown) => {
           toast.error('Failed to check project configuration', {

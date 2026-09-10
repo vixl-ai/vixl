@@ -95,7 +95,7 @@ export const createFileTreeMutations = (s: FileTreeMutationState) => {
     s.deleting.value = true
     try {
       if (isCodegraphWorkspacePath(snapshot.path)) {
-        await mcpRuntime.stop(CODEGRAPH_SERVER_ID)
+        await mcpRuntime.stop(CODEGRAPH_SERVER_ID, undefined, root)
       }
       await fsDelete({
         projectRoot: root,

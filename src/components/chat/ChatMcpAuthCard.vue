@@ -146,7 +146,7 @@ const handleSaveClient = async (): Promise<void> => {
         {{ auth.title }}
       </p>
       <p class="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-        <McpServerIcon :server-id="auth.serverId" />
+        <McpServerIcon :server-id="auth.serverId" :scope-key="auth.scopeKey" />
         <span>
           {{ auth.serverId }}
           <span v-if="auth.subagentLabel">

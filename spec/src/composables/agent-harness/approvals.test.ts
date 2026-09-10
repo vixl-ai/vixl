@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 import type { AgentHarnessState, AttentionHelpers } from '@/composables/agent-harness/types'
+import type { FleetProject } from '@/types/fleet/fleet-project'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { McpConfig, McpServerConfig } from '@/types/vixl/mcp-config'
 
@@ -39,11 +40,24 @@ vi.mock('@/composables/mcp-servers/config', () => ({
 }))
 
 import createApprovals from '@/composables/agent-harness/approvals'
+import {
+  requestMcpAuth,
+  resetMcpAuthGateForTests,
+} from '@/services/mcp/mcp-auth-gate'
+
+const fleetProject = (rootPath: string, index: number): FleetProject => ({
+  id: `p${index}`,
+  name: `proj-${index}`,
+  slug: `proj-${index}`,
+  rootPath,
+  lastOpened: '',
+})
 
 const buildState = (overrides?: {
   projectRoot?: string
   standalone?: boolean
   activeRootPath?: string | null
+  fleetRoots?: string[]
 }): {
   state: AgentHarnessState
   updateSetting: ReturnType<typeof vi.fn<(...args: unknown[]) => Promise<void>>>
@@ -53,13 +67,18 @@ const buildState = (overrides?: {
     .mockResolvedValue(undefined)
   const projectSettings: VixlSettings = { version: 1 }
   const personalSettings: VixlSettings = { version: 1 }
+  const chatRoot = overrides?.projectRoot ?? '/tmp/chat-root'
+  const fleetRoots = overrides?.fleetRoots ?? [chatRoot]
   const state = {
     options: {
       projectSlug: 'proj',
       chatId: 'chat-1',
-      projectRoot: overrides?.projectRoot ?? '/tmp/chat-root',
+      projectRoot: chatRoot,
       projectName: 'proj',
       standalone: overrides?.standalone ?? false,
+    },
+    fleet: {
+      projects: ref(fleetRoots.map(fleetProject)),
     },
     config: {
       activeRootPath: computed(() => overrides?.activeRootPath ?? '/tmp/fleet-root'),
@@ -162,6 +181,7 @@ describe('authenticatePendingMcpAuth', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    resetMcpAuthGateForTests()
     loadPersonalMcpConfig.mockResolvedValue({ servers: {} })
     loadProjectConfigForRoot.mockResolvedValue({ servers: {} })
     loadEffectiveSettings.mockResolvedValue({ version: 1 })
@@ -177,6 +197,7 @@ describe('authenticatePendingMcpAuth', () => {
         chatId: 'chat-1',
         toolCallId: 'tool-1',
         serverId: 'brave',
+        scopeKey: 'personal',
         kind: 'oauth',
         title: 'Authenticate Brave',
       },
@@ -188,13 +209,149 @@ describe('authenticatePendingMcpAuth', () => {
     expect(state.mcpServers.personalMcp.value.servers).toEqual({})
     expect(state.mcpServers.projectMcp.value.servers).toEqual({})
     expect(loadPersonalMcpConfig).toHaveBeenCalled()
+    expect(loadProjectConfigForRoot).not.toHaveBeenCalled()
+    expect(loadEffectiveSettings).toHaveBeenCalledWith(null)
     expect(state.mcpServers.authenticateServer).toHaveBeenCalledWith(
       'brave',
       personalServerConfig,
       expect.objectContaining({
         settings: { version: 1 },
+        scopeKey: 'personal',
       }),
     )
     expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('authenticates a project-scoped server with that scopeKey', async () => {
+    const projectServerConfig: McpServerConfig = {
+      command: 'npx',
+      args: ['-y', 'docs-mcp'],
+    }
+    loadProjectConfigForRoot.mockResolvedValue({
+      servers: { docs: projectServerConfig },
+    })
+    const { state } = buildState({ projectRoot: '/tmp/chat-root' })
+    state.pendingMcpAuth.value = [
+      {
+        chatId: 'chat-1',
+        toolCallId: 'tool-1',
+        serverId: 'docs',
+        scopeKey: '/tmp/chat-root',
+        kind: 'oauth',
+        title: 'Authenticate docs',
+      },
+    ]
+    const { authenticatePendingMcpAuth } = createApprovals(state, buildAttention())
+
+    await authenticatePendingMcpAuth('tool-1')
+
+    expect(loadProjectConfigForRoot).toHaveBeenCalledWith('/tmp/chat-root')
+    expect(loadEffectiveSettings).toHaveBeenCalledWith('/tmp/chat-root')
+    expect(state.mcpServers.authenticateServer).toHaveBeenCalledWith(
+      'docs',
+      projectServerConfig,
+      expect.objectContaining({
+        settings: { version: 1 },
+        scopeKey: '/tmp/chat-root',
+      }),
+    )
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('loads the entry scope root when it differs from options.projectRoot', async () => {
+    const projectServerConfig: McpServerConfig = {
+      command: 'npx',
+      args: ['-y', 'docs-mcp'],
+    }
+    loadProjectConfigForRoot.mockResolvedValue({
+      servers: { docs: projectServerConfig },
+    })
+    const { state } = buildState({
+      projectRoot: '/tmp/new-root',
+      fleetRoots: ['/tmp/new-root', '/tmp/old-root'],
+    })
+    state.pendingMcpAuth.value = [
+      {
+        chatId: 'chat-1',
+        toolCallId: 'tool-1',
+        serverId: 'docs',
+        scopeKey: '/tmp/old-root',
+        kind: 'oauth',
+        title: 'Authenticate docs',
+      },
+    ]
+    const { authenticatePendingMcpAuth } = createApprovals(state, buildAttention())
+
+    await authenticatePendingMcpAuth('tool-1')
+
+    expect(loadProjectConfigForRoot).toHaveBeenCalledWith('/tmp/old-root')
+    expect(loadEffectiveSettings).toHaveBeenCalledWith('/tmp/old-root')
+    expect(state.mcpServers.authenticateServer).toHaveBeenCalledWith(
+      'docs',
+      projectServerConfig,
+      expect.objectContaining({
+        settings: { version: 1 },
+        scopeKey: '/tmp/old-root',
+      }),
+    )
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('cancels when the entry scope root is no longer a known project', async () => {
+    const pending = requestMcpAuth({
+      chatId: 'chat-1',
+      toolCallId: 'tool-1',
+      serverId: 'docs',
+      scopeKey: '/tmp/old-root',
+      kind: 'oauth',
+      title: 'Authenticate docs',
+    })
+    const { state } = buildState({
+      projectRoot: '/tmp/new-root',
+      fleetRoots: ['/tmp/new-root'],
+    })
+    const { authenticatePendingMcpAuth } = createApprovals(state, buildAttention())
+
+    await authenticatePendingMcpAuth('tool-1')
+
+    expect(toastError).toHaveBeenCalledWith(
+      'MCP authentication cancelled',
+      expect.objectContaining({
+        description: 'The project for this MCP server is no longer available.',
+      }),
+    )
+    await expect(pending).resolves.toEqual({ action: 'cancelled' })
+    expect(loadProjectConfigForRoot).not.toHaveBeenCalled()
+    expect(loadEffectiveSettings).not.toHaveBeenCalled()
+    expect(state.mcpServers.authenticateServer).not.toHaveBeenCalled()
+  })
+
+  it('cancels when a project-scoped id now exists only in personal config', async () => {
+    loadPersonalMcpConfig.mockResolvedValue({
+      servers: { docs: personalServerConfig },
+    })
+    loadProjectConfigForRoot.mockResolvedValue({ servers: {} })
+    const pending = requestMcpAuth({
+      chatId: 'chat-1',
+      toolCallId: 'tool-1',
+      serverId: 'docs',
+      scopeKey: '/tmp/chat-root',
+      kind: 'oauth',
+      title: 'Authenticate docs',
+    })
+    const { state } = buildState({ projectRoot: '/tmp/chat-root' })
+    const { authenticatePendingMcpAuth } = createApprovals(state, buildAttention())
+
+    await authenticatePendingMcpAuth('tool-1')
+
+    expect(toastError).toHaveBeenCalledWith(
+      'MCP authentication cancelled',
+      expect.objectContaining({
+        description: 'This MCP server is no longer configured for that scope.',
+      }),
+    )
+    await expect(pending).resolves.toEqual({ action: 'cancelled' })
+    expect(loadEffectiveSettings).not.toHaveBeenCalled()
+    expect(state.mcpServers.authenticateServer).not.toHaveBeenCalled()
   })
 })

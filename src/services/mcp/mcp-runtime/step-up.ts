@@ -16,6 +16,7 @@ import {
 } from '@/services/mcp/oauth'
 import { getSecret } from '@/services/vixl/vixl-tauri'
 import type { McpServerState } from '@/services/vixl/vixl-tauri'
+import connectionKey from '@/services/mcp/connection-key'
 import type { McpRuntimeOptions } from './types'
 
 const MAX_STEP_UP = 2
@@ -59,8 +60,9 @@ const grantedScope = async (serverId: string): Promise<string | undefined> => {
 const challengeFor = (
   serverId: string,
   config: McpHttpServer | undefined,
+  scopeKey?: string | null,
 ): WwwAuthenticateChallenge | undefined =>
-  getHttpOauthChallenge(serverId) ??
+  getHttpOauthChallenge(serverId, scopeKey) ??
   (config ? getLastOAuthChallenge(config.url) : undefined)
 
 const callHttpToolWithStepUp = async (
@@ -69,18 +71,19 @@ const callHttpToolWithStepUp = async (
   args: Record<string, unknown>,
   config: McpServerConfig | undefined,
   authenticate: AuthenticateFn,
+  scopeKey?: string | null,
 ): Promise<unknown> => {
   const httpConfig =
     (config && isMcpHttpServer(config) ? config : undefined) ??
-    getHttpServerConfig(serverId)
-  const key = `${serverId}:${tool}`
+    getHttpServerConfig(serverId, scopeKey)
+  const key = `${connectionKey(scopeKey, serverId)}:${tool}`
 
   try {
-    const result = await callHttpTool(serverId, tool, args)
+    const result = await callHttpTool(serverId, tool, args, scopeKey)
     stepUpAttempts.delete(key)
     return result
   } catch (error) {
-    const challenge = challengeFor(serverId, httpConfig)
+    const challenge = challengeFor(serverId, httpConfig, scopeKey)
     if (!isInsufficientScope(error, challenge)) {
       throw error
     }
@@ -94,16 +97,24 @@ const callHttpToolWithStepUp = async (
     }
     stepUpAttempts.set(key, used + 1)
     const previous = unionScopes(
-      getHttpLastRequestedScope(serverId),
+      getHttpLastRequestedScope(serverId, scopeKey),
       await grantedScope(serverId),
     )
     const scope = unionScopes(previous, challenge?.scope)
     await authenticate(serverId, httpConfig, {
       skipTrustCheck: true,
       scope,
+      scopeKey,
       resourceMetadataUrl: challenge?.resourceMetadataUrl,
     })
-    return callHttpToolWithStepUp(serverId, tool, args, httpConfig, authenticate)
+    return callHttpToolWithStepUp(
+      serverId,
+      tool,
+      args,
+      httpConfig,
+      authenticate,
+      scopeKey,
+    )
   }
 }
 

@@ -1,7 +1,8 @@
 import type { McpTrustRecord, McpTrustScope } from '@/types/harness/permission'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import connectionKey from '@/services/mcp/connection-key'
 
-/** sessionId -> fingerprint trusted for this app session */
+/** connection key -> fingerprint trusted for this app session */
 export const sessionTrusts = new Map<string, string>()
 
 export const getMcpTrust = (
@@ -15,11 +16,13 @@ export const isMcpTrusted = (
   serverId: string,
   fingerprint: string,
   trustedInSession: Map<string, string> = sessionTrusts,
+  scopeKey?: string | null,
 ): boolean => {
   if (!fingerprint) {
     return false
   }
-  if (trustedInSession.get(serverId) === fingerprint) {
+  const key = connectionKey(scopeKey, serverId)
+  if (trustedInSession.get(key) === fingerprint) {
     return true
   }
   const record = getMcpTrust(settings, serverId)
@@ -43,6 +46,9 @@ export const upsertMcpTrustRecord = (
   return [...records, next]
 }
 
-export const clearSessionTrust = (serverId: string): void => {
-  sessionTrusts.delete(serverId)
+export const clearSessionTrust = (
+  serverId: string,
+  scopeKey?: string | null,
+): void => {
+  sessionTrusts.delete(connectionKey(scopeKey, serverId))
 }

@@ -125,7 +125,11 @@ export default () => {
 
     pending.value = true
     try {
-      const serverState = await mcpRuntime.getStatus(CODEGRAPH_SERVER_ID)
+      const serverState = await mcpRuntime.getStatus(
+        CODEGRAPH_SERVER_ID,
+        undefined,
+        root,
+      )
       if (generation !== refreshGeneration) {
         return
       }
@@ -158,7 +162,13 @@ export default () => {
       }
 
       connected.value = true
-      const raw = await mcpRuntime.callTool(CODEGRAPH_SERVER_ID, 'codegraph_status', {})
+      const raw = await mcpRuntime.callTool(
+        CODEGRAPH_SERVER_ID,
+        'codegraph_status',
+        {},
+        undefined,
+        root,
+      )
       if (generation !== refreshGeneration) {
         return
       }

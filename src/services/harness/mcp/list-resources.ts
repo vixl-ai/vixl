@@ -33,7 +33,7 @@ const listMcpResources = (ctx: HarnessToolContext) =>
       if (!allowed) {
         return { rejected: true, error: 'MCP resources denied' }
       }
-      return mcpRuntime.listResources(serverId)
+      return mcpRuntime.listResources(serverId, trust.scopeKey)
     },
   })
 

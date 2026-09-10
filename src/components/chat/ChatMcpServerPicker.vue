@@ -16,6 +16,7 @@ import useProjectMcpConfig from '@/composables/mcp-servers/use-project-mcp-confi
 import useMcpTrustChoice from '@/composables/mcp-servers/use-mcp-trust-choice'
 import { isMcpServerEnabled } from '@/schemas/mcp-config'
 import type { EffectiveMcpServer } from '@/services/mcp/merge-mcp-config'
+import connectionKey from '@/services/mcp/connection-key'
 import type { SettingsTab } from '@/composables/use-vixl-config'
 
 const props = defineProps<{
@@ -44,6 +45,19 @@ const { trustPending, trustSaving, requireTrust, handleTrustChoice } = useMcpTru
 const menuOpen = ref(false)
 const searchQuery = ref('')
 
+const scopeForServer = (server: EffectiveMcpServer): string =>
+  server.scope === 'personal' ? 'personal' : (props.projectRoot?.trim() || 'personal')
+
+const stateFor = (server: EffectiveMcpServer) =>
+  serverStates.value[connectionKey(scopeForServer(server), server.id)]
+
+const refreshPickerStates = async (): Promise<void> => {
+  await refreshStates('personal')
+  if (props.projectRoot) {
+    await refreshStates(props.projectRoot)
+  }
+}
+
 const effectiveServers = computed(() =>
   listUserMcpServers(personalMcp.value, localProjectConfig.value),
 )
@@ -61,7 +75,7 @@ const filteredServers = computed(() => {
 const connectedCount = computed(
   () =>
     effectiveServers.value.filter(
-      (server) => serverStates.value[server.id]?.status === 'connected',
+      (server) => stateFor(server)?.status === 'connected',
     ).length,
 )
 
@@ -69,7 +83,7 @@ const hasAuthRequired = computed(() =>
   effectiveServers.value.some(
     (server) =>
       isMcpServerEnabled(server.config) &&
-      serverStates.value[server.id]?.status === 'auth_required',
+      stateFor(server)?.status === 'auth_required',
   ),
 )
 
@@ -84,7 +98,7 @@ const refreshOnOpen = async (open: boolean): Promise<void> => {
   searchQuery.value = ''
   try {
     await reloadProjectConfig()
-    await refreshStates()
+    await refreshPickerStates()
   } catch (error) {
     toast.error('Failed to refresh MCP server status', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -122,6 +136,7 @@ const applyEnabledChange = async (
     const updated = await setServerEnabled(
       server.id,
       checked,
+      settingsTabForServer(server),
       props.projectRoot,
       useOverride ? overrideConfig : undefined,
       trustSettings.value,
@@ -143,8 +158,11 @@ const handleToggleChange = async (
   checked: boolean,
 ): Promise<void> => {
   if (checked) {
-    await requireTrust(server.id, server.config, () =>
-      applyEnabledChange(server, true),
+    await requireTrust(
+      server.id,
+      server.config,
+      () => applyEnabledChange(server, true),
+      scopeForServer(server),
     )
     return
   }
@@ -156,11 +174,14 @@ const handleLogin = async (server: EffectiveMcpServer): Promise<void> => {
     try {
       await authenticateServer(server.id, server.config, {
         settings: trustSettings.value,
+        scopeKey: scopeForServer(server),
       })
-    } catch {
-      return
+    } catch (error) {
+      if (error instanceof Error && error.message === 'OAuth callback aborted') {
+        return
+      }
     }
-  })
+  }, scopeForServer(server))
 }
 
 const handleTrustDialogOpen = (open: boolean): void => {
@@ -171,7 +192,7 @@ const handleTrustDialogOpen = (open: boolean): void => {
 
 onMounted(async () => {
   try {
-    await refreshStates()
+    await refreshPickerStates()
   } catch (error) {
     toast.error('Failed to refresh MCP server status', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -226,8 +247,9 @@ onMounted(async () => {
         </p>
         <ChatMcpServerPickerItem
           v-for="server in filteredServers"
-          :key="server.id"
+          :key="connectionKey(scopeForServer(server), server.id)"
           :server="server"
+          :scope-key="scopeForServer(server)"
           @login="handleLogin(server)"
           @settings="handleOpenInSettings(server)"
           @toggle="(checked) => handleToggleChange(server, checked)"
@@ -238,6 +260,7 @@ onMounted(async () => {
   <TrustServerDialog
     :open="trustPending !== null"
     :server-id="trustPending?.serverId ?? null"
+    :scope-key="trustPending?.scopeKey"
     :saving="trustSaving"
     :show-workspace="props.projectRoot !== null"
     @update:open="handleTrustDialogOpen"

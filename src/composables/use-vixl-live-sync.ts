@@ -45,6 +45,13 @@ export default () => {
     }
   }
 
+  const refreshMcpStates = async (rootPath: string | null): Promise<void> => {
+    await mcp.refreshStates()
+    if (rootPath) {
+      await mcp.refreshStates(rootPath)
+    }
+  }
+
   const applyChange = async (change: VixlFileChange): Promise<void> => {
     lastVixlFileChange.value = change
     vixlFileChangeToken.value += 1
@@ -56,7 +63,7 @@ export default () => {
 
     if (change.kind === 'mcp') {
       await mcp.loadConfigs(config.activeRootPath.value)
-      await mcp.refreshStates()
+      await refreshMcpStates(config.activeRootPath.value)
     }
   }
 
@@ -75,7 +82,7 @@ export default () => {
     await fleet.ensureDefaultProject()
     await config.refreshAll()
     await loadMcpConfigs(config.activeRootPath.value)
-    await mcp.refreshStates()
+    await refreshMcpStates(config.activeRootPath.value)
     await syncWatcher()
 
     unlisten = await listen<VixlFileChange>('vixl-file-changed', (event) => {
@@ -96,7 +103,7 @@ export default () => {
     async (rootPath) => {
       await config.refreshAll()
       await loadMcpConfigs(rootPath)
-      await mcp.refreshStates()
+      await refreshMcpStates(rootPath)
       await syncWatcher()
     },
   )

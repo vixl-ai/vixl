@@ -14,6 +14,7 @@ const props = defineProps<{
   serverId: string | null
   saving: boolean
   showWorkspace?: boolean
+  scopeKey?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -45,7 +46,11 @@ const handleChoice = (scope: McpTrustScope): void => {
       <div class="space-y-3 text-sm text-muted-foreground">
         <p>
           <span class="inline-flex items-center gap-2 font-mono font-medium text-foreground">
-            <ServerIcon v-if="serverId" :server-id="serverId" />
+            <ServerIcon
+              v-if="serverId"
+              :server-id="serverId"
+              :scope-key="scopeKey"
+            />
             {{ serverId }}
           </span>
           is an MCP server that can execute code on your machine (for example via npx or uvx).

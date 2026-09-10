@@ -6,7 +6,7 @@ import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
 const { readMcpConfig, mcpGetStatus } = vi.hoisted(() => ({
   readMcpConfig: vi.fn<(scope: string, projectRoot: string | null) => Promise<unknown>>(),
-  mcpGetStatus: vi.fn<(serverId: string) => Promise<unknown>>(),
+  mcpGetStatus: vi.fn<(serverId: string, config?: unknown, scopeKey?: string) => Promise<unknown>>(),
 }))
 
 vi.mock('@/services/vixl/vixl-tauri', () =>
@@ -18,7 +18,8 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
 vi.mock('@/services/mcp/mcp-runtime', () => ({
   default: {
     callTool: vi.fn<() => Promise<unknown>>(),
-    getStatus: (serverId: string) => mcpGetStatus(serverId),
+    getStatus: (serverId: string, config?: unknown, scopeKey?: string) =>
+      mcpGetStatus(serverId, config, scopeKey),
     start: vi.fn<() => Promise<void>>(),
     stop: vi.fn<() => Promise<void>>(),
   },

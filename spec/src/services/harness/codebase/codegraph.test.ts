@@ -72,10 +72,16 @@ vi.mock('@/services/harness/permission/gate', () => ({
 }))
 
 const mcpCallTool = vi.fn<
-  (serverId: string, toolName: string, args: Record<string, unknown>) => Promise<unknown>
+  (
+    serverId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    config?: unknown,
+    scopeKey?: string,
+  ) => Promise<unknown>
 >()
 const mcpGetStatus = vi.fn<
-  (serverId: string, config?: unknown) => Promise<unknown>
+  (serverId: string, config?: unknown, scopeKey?: string) => Promise<unknown>
 >()
 
 vi.mock('@/services/mcp/mcp-runtime', () => ({
@@ -84,8 +90,11 @@ vi.mock('@/services/mcp/mcp-runtime', () => ({
       serverId: string,
       toolName: string,
       args: Record<string, unknown>,
-    ) => mcpCallTool(serverId, toolName, args),
-    getStatus: (serverId: string, config?: unknown) => mcpGetStatus(serverId, config),
+      config?: unknown,
+      scopeKey?: string,
+    ) => mcpCallTool(serverId, toolName, args, config, scopeKey),
+    getStatus: (serverId: string, config?: unknown, scopeKey?: string) =>
+      mcpGetStatus(serverId, config, scopeKey),
     start: vi.fn<() => Promise<void>>(),
     stop: vi.fn<() => Promise<void>>(),
   },
@@ -205,7 +214,13 @@ describe('build-tools CodeGraph first-party tools', () => {
     const tools = buildTools(ctx)
     const result = await runTool(tools.codebase_status.execute, {}, 'tc-cg-status')
 
-    expect(mcpCallTool).toHaveBeenCalledWith('codegraph', 'codegraph_status', {})
+    expect(mcpCallTool).toHaveBeenCalledWith(
+      'codegraph',
+      'codegraph_status',
+      {},
+      undefined,
+      '/project',
+    )
     expect(gateToolPermission).not.toHaveBeenCalled()
     expect(result).toMatchObject({ ready: true, filesIndexed: 12 })
   })
@@ -234,9 +249,15 @@ describe('build-tools CodeGraph first-party tools', () => {
       'tc-cg-explore',
     )
 
-    expect(mcpCallTool).toHaveBeenCalledWith('codegraph', 'codegraph_explore', {
-      query: 'AuthService',
-    })
+    expect(mcpCallTool).toHaveBeenCalledWith(
+      'codegraph',
+      'codegraph_explore',
+      {
+        query: 'AuthService',
+      },
+      undefined,
+      '/project',
+    )
     expect(gateToolPermission).not.toHaveBeenCalled()
     expect(result).toMatchObject({
       summary: expect.any(String),

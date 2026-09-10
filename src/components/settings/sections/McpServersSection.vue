@@ -48,6 +48,7 @@ import {
   loadMcpInputValues,
   saveMcpInputValues,
 } from '@/services/mcp/resolve-mcp-inputs'
+import connectionKey from '@/services/mcp/connection-key'
 
 const props = defineProps<{
   tab: SettingsTab
@@ -62,7 +63,7 @@ const {
   authenticatingServers,
   startServer,
   refreshServer,
-  refreshAllServers,
+  refreshOrStartServer,
   authenticateServer,
   cancelAuthenticateServer,
   logoutServer,
@@ -72,7 +73,15 @@ const {
   listScopedMcpServers,
   refreshStates,
 } = useMcpServers()
-const { trustPending, trustSaving, requireTrust, handleTrustChoice } = useMcpTrustChoice()
+const fleet = useFleetRegistry()
+const connectionScope = computed((): string =>
+  props.tab === 'personal'
+    ? 'personal'
+    : (fleet.activeProject.value?.rootPath ?? 'personal'),
+)
+const { trustPending, trustSaving, requireTrust, handleTrustChoice } = useMcpTrustChoice(
+  () => (props.tab === 'personal' ? null : fleet.activeProject.value?.rootPath ?? null),
+)
 
 const expanded = ref<Record<string, boolean>>({})
 const refreshingAll = ref(false)
@@ -115,15 +124,18 @@ const toggleExpanded = (id: string): void => {
 const isAuthCapableServer = (serverConfig: McpServerConfig): boolean =>
   isMcpHttpServer(serverConfig)
 
-const serverStatus = (id: string): string => serverStates.value[id]?.status ?? 'stopped'
+const stateFor = (id: string) =>
+  serverStates.value[connectionKey(connectionScope.value, id)]
+
+const serverStatus = (id: string): string => stateFor(id)?.status ?? 'stopped'
 
 const statusTooltip = (id: string): string => {
   const status = serverStatus(id)
   if (status === 'error') {
-    return serverStates.value[id]?.error || 'Connection failed'
+    return stateFor(id)?.error || 'Connection failed'
   }
   if (status === 'auth_required') {
-    return serverStates.value[id]?.error || 'Authentication required'
+    return stateFor(id)?.error || 'Authentication required'
   }
   if (status === 'connected') {
     return 'Connected'
@@ -131,8 +143,15 @@ const statusTooltip = (id: string): string => {
   return 'Stopped'
 }
 
+const flagKey = (id: string): string =>
+  connectionKey(connectionScope.value, id)
+
 const isServerLoading = (id: string): boolean =>
-  loadingServers.value[id] === true || authenticatingServers.value[id] === true
+  loadingServers.value[flagKey(id)] === true ||
+  authenticatingServers.value[flagKey(id)] === true
+
+const isAuthenticating = (id: string): boolean =>
+  authenticatingServers.value[flagKey(id)] === true
 
 const isServerRunning = (id: string, serverConfig: McpServerConfig): boolean =>
   isMcpServerEnabled(serverConfig) && serverStatus(id) !== 'stopped'
@@ -187,17 +206,17 @@ const handleEnabledChange = async (
   if (enabled) {
     await requireTrust(id, serverConfig, async () => {
       try {
-        await setServerEnabled(id, true, config.activeRootPath.value)
+        await setServerEnabled(id, true, props.tab, config.activeRootPath.value)
       } catch (error) {
         toast.error('Failed to update MCP server', {
           description: error instanceof Error ? error.message : 'Unknown error',
         })
       }
-    })
+    }, connectionScope.value)
     return
   }
   try {
-    await setServerEnabled(id, false, config.activeRootPath.value)
+    await setServerEnabled(id, false, props.tab, config.activeRootPath.value)
   } catch (error) {
     toast.error('Failed to update MCP server', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -211,10 +230,15 @@ const handleRefreshServer = async (id: string, serverConfig: McpServerConfig): P
   }
   const status = serverStatus(id)
   if (status === 'connected') {
-    await refreshServer(id, serverConfig)
+    await refreshServer(id, serverConfig, { scopeKey: connectionScope.value })
     return
   }
-  await requireTrust(id, serverConfig, () => startServer(id, serverConfig))
+  await requireTrust(
+    id,
+    serverConfig,
+    () => startServer(id, serverConfig, { scopeKey: connectionScope.value }),
+    connectionScope.value,
+  )
 }
 
 const handleAuthAction = async (id: string, serverConfig: McpServerConfig): Promise<void> => {
@@ -223,14 +247,17 @@ const handleAuthAction = async (id: string, serverConfig: McpServerConfig): Prom
       try {
         await authenticateServer(id, serverConfig, {
           confirmAuthorizationServerOrigin: confirmAsOrigin,
+          scopeKey: connectionScope.value,
         })
-      } catch {
-        return
+      } catch (error) {
+        if (error instanceof Error && error.message === 'OAuth callback aborted') {
+          return
+        }
       }
-    })
+    }, connectionScope.value)
     return
   }
-  await logoutServer(id, serverConfig)
+  await logoutServer(id, serverConfig, connectionScope.value)
 }
 
 const openCreateServer = (): void => {
@@ -289,7 +316,7 @@ const handleManageSave = async (payload: {
 
 onMounted(async () => {
   try {
-    await refreshStates()
+    await refreshStates(connectionScope.value)
     await refreshSecretsBadges()
   } catch (error) {
     toast.error('Failed to refresh MCP server status', {
@@ -304,9 +331,11 @@ const refreshAll = async (): Promise<void> => {
   }
   refreshingAll.value = true
   try {
-    await refreshAllServers(
-      scopedServers.value.map((server) => ({ id: server.id, config: server.config })),
-    )
+    const scopeKey = connectionScope.value
+    for (const server of scopedServers.value) {
+      await refreshOrStartServer(server.id, server.config, { quiet: true, scopeKey })
+    }
+    toast.success('All servers refreshed')
   } finally {
     refreshingAll.value = false
   }
@@ -373,7 +402,7 @@ const refreshAll = async (): Promise<void> => {
           >
             <ChevronDown v-if="expanded[server.id]" class="h-4 w-4 shrink-0" />
             <ChevronRight v-else class="h-4 w-4 shrink-0" />
-            <McpServerIcon :server-id="server.id" />
+            <McpServerIcon :server-id="server.id" :scope-key="connectionScope" />
             <span class="truncate font-medium">{{ server.id }}</span>
             <Tooltip>
               <TooltipTrigger as-child>
@@ -409,10 +438,10 @@ const refreshAll = async (): Promise<void> => {
             </Tooltip>
           </button>
           <Badge
-            v-if="!isServerLoading(server.id) && serverStates[server.id]?.tools?.length"
+            v-if="!isServerLoading(server.id) && stateFor(server.id)?.tools?.length"
             variant="outline"
           >
-            {{ serverStates[server.id]?.tools?.length }} tools
+            {{ stateFor(server.id)?.tools?.length }} tools
           </Badge>
           <Badge v-if="secretsConfigured[server.id]" variant="secondary">
             Secrets configured
@@ -518,14 +547,14 @@ const refreshAll = async (): Promise<void> => {
                 {{ serverStatus(server.id) === 'auth_required' ? 'Log in' : 'Log out' }}
               </TooltipContent>
             </Tooltip>
-            <Tooltip v-if="authenticatingServers[server.id]">
+            <Tooltip v-if="isAuthenticating(server.id)">
               <TooltipTrigger as-child>
                 <Button
                   variant="ghost"
                   size="icon"
                   class="h-8 w-8"
                   aria-label="Cancel sign in"
-                  @click="cancelAuthenticateServer(server.id)"
+                  @click="cancelAuthenticateServer(server.id, connectionScope)"
                 >
                   <X class="h-4 w-4" />
                 </Button>
@@ -554,7 +583,7 @@ const refreshAll = async (): Promise<void> => {
           class="border-t border-border/50 px-4 py-3"
         >
           <div
-            v-for="tool in serverStates[server.id]?.tools ?? []"
+            v-for="tool in stateFor(server.id)?.tools ?? []"
             :key="tool.name"
             class="py-2 text-sm"
           >
@@ -594,7 +623,12 @@ const refreshAll = async (): Promise<void> => {
             handleAuthAction(secretsServerId, secretsServerConfig)
           "
           @log-out="
-            secretsServerId && logoutServer(secretsServerId, secretsServerConfig ?? undefined)
+            secretsServerId &&
+            logoutServer(
+              secretsServerId,
+              secretsServerConfig ?? undefined,
+              connectionScope,
+            )
           "
         />
       </DialogContent>
@@ -629,6 +663,7 @@ const refreshAll = async (): Promise<void> => {
     <TrustServerDialog
       :open="trustPending !== null"
       :server-id="trustPending?.serverId ?? null"
+      :scope-key="trustPending?.scopeKey ?? connectionScope"
       :saving="trustSaving"
       @update:open="
         (open) => {

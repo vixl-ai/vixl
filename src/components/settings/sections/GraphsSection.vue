@@ -146,7 +146,7 @@ const handleConfirmDelete = async (): Promise<void> => {
     const activeRoot = fleet.activeProject.value?.rootPath
     if (activeRoot && graph.projectRoot === activeRoot) {
       try {
-        await mcp.stopServer(CODEGRAPH_SERVER_ID, { quiet: true })
+        await mcp.stopServer(CODEGRAPH_SERVER_ID, { quiet: true, scopeKey: activeRoot })
       } catch (error) {
         toast.error('Failed to stop graph', {
           description: error instanceof Error ? error.message : 'Unknown error',

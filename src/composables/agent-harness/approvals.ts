@@ -44,6 +44,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
       chatId: entry.chatId,
       toolCallId: entry.toolCallId,
       serverId: entry.serverId,
+      scopeKey: entry.scopeKey,
       kind: entry.kind,
       title: entry.title,
       detail: entry.detail,
@@ -161,6 +162,15 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
     return answer === 'Trust'
   }
 
+  const cancelPendingAuth = (toolCallId: string, description: string): void => {
+    toast.error('MCP authentication cancelled', {
+      description,
+    })
+    resolveMcpAuth(toolCallId, { action: 'cancelled' })
+    syncPendingMcpAuth()
+    attention.maybeClearAttentionWhenGatesEmpty()
+  }
+
   const authenticatePendingMcpAuth = async (toolCallId: string): Promise<void> => {
     const entry =
       pendingMcpAuth.value.find((item) => item.toolCallId === toolCallId) ??
@@ -170,13 +180,27 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
       return
     }
 
-    const rootPath = options.standalone ? null : options.projectRoot
+    const authScopeKey = entry.scopeKey?.trim() || 'personal'
+    const authRoot = authScopeKey === 'personal' ? null : authScopeKey
+    if (authRoot) {
+      const known = state.fleet.projects.value.some(
+        (project) => project.rootPath === authRoot,
+      )
+      if (!known) {
+        cancelPendingAuth(
+          toolCallId,
+          'The project for this MCP server is no longer available.',
+        )
+        return
+      }
+    }
+
     let personal: McpConfig
-    let projectMcp: McpConfig = { servers: {} }
+    let projectMcp: McpConfig | null = null
     try {
       personal = await loadPersonalMcpConfig()
-      if (rootPath) {
-        projectMcp = await loadProjectConfigForRoot(rootPath)
+      if (authRoot) {
+        projectMcp = await loadProjectConfigForRoot(authRoot)
       }
     } catch (error) {
       toast.error('Failed to load MCP config', {
@@ -194,9 +218,19 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
       return
     }
 
+    const wantsProject = authRoot !== null
+    const isProjectScoped = server.scope === 'project' || server.scope === 'overridden'
+    if (wantsProject !== isProjectScoped) {
+      cancelPendingAuth(
+        toolCallId,
+        'This MCP server is no longer configured for that scope.',
+      )
+      return
+    }
+
     let settings: VixlSettings
     try {
-      settings = await loadEffectiveSettings(rootPath)
+      settings = await loadEffectiveSettings(authRoot)
     } catch (error) {
       toast.error('Failed to load project settings', {
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -208,8 +242,9 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
       await mcpServers.authenticateServer(entry.serverId, server.config, {
         confirmAuthorizationServerOrigin: confirmAsOriginForChat,
         settings,
+        scopeKey: authScopeKey,
       })
-      resolveMcpAuthForServer(entry.serverId, { action: 'authenticated' })
+      resolveMcpAuthForServer(entry.serverId, { action: 'authenticated' }, authScopeKey)
       syncPendingMcpAuth()
       attention.maybeClearAttentionWhenGatesEmpty()
     } catch (error) {

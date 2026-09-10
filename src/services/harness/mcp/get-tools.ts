@@ -32,11 +32,19 @@ const catalogEntry = async (
   server: EffectiveMcpServer,
   settings: VixlSettings,
   includeSchemas: boolean,
+  projectRoot: string,
 ) => {
+  const scopeKey = server.scope === 'personal' ? 'personal' : projectRoot
   const fingerprint = mcpServerFingerprint(server.config)
-  const trusted = isMcpTrusted(settings, server.id, fingerprint, sessionTrusts)
+  const trusted = isMcpTrusted(
+    settings,
+    server.id,
+    fingerprint,
+    sessionTrusts,
+    scopeKey,
+  )
   try {
-    const state = await mcpRuntime.getStatus(server.id)
+    const state = await mcpRuntime.getStatus(server.id, undefined, scopeKey)
     return {
       serverId: server.id,
       scope: server.scope,
@@ -82,11 +90,13 @@ const getMcpTools = (ctx: HarnessToolContext) =>
             error: `MCP server "${serverId}" was not found in any mcp.json config.`,
           }
         }
-        return catalogEntry(server, ctx.settings, true)
+        return catalogEntry(server, ctx.settings, true, ctx.projectRoot)
       }
 
       const catalog = await Promise.all(
-        servers.map((server) => catalogEntry(server, ctx.settings, false)),
+        servers.map((server) =>
+          catalogEntry(server, ctx.settings, false, ctx.projectRoot),
+        ),
       )
       return { servers: catalog }
     },

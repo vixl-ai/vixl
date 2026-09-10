@@ -27,8 +27,10 @@ const getMcpTool = (ctx: HarnessToolContext) =>
         }
       }
 
+      const scopeKey = server.scope === 'personal' ? 'personal' : ctx.projectRoot
+
       try {
-        const state = await mcpRuntime.getStatus(serverId)
+        const state = await mcpRuntime.getStatus(serverId, undefined, scopeKey)
         if (state.status === 'error' || state.status === 'stopped') {
           return {
             error:

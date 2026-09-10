@@ -52,7 +52,13 @@ const callManagedCodegraphTool = async (
       }
     })
     try {
-      return await mcpRuntime.callTool(serverId, args.mcpToolName, args.toolArgs)
+      return await mcpRuntime.callTool(
+        serverId,
+        args.mcpToolName,
+        args.toolArgs,
+        undefined,
+        ctx.projectRoot,
+      )
     } finally {
       setMcpElicitationHandler(previous)
     }
@@ -71,6 +77,7 @@ const callManagedCodegraphTool = async (
       chatId: ctx.chatId,
       toolCallId: args.toolCallId,
       serverId,
+      scopeKey: ctx.projectRoot,
       kind,
       title: ctx.subagentLabel
         ? `Authenticate ${serverId} (${ctx.subagentLabel})`

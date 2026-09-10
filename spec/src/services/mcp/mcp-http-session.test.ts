@@ -33,6 +33,7 @@ vi.mock('@ai-sdk/mcp', async (importOriginal) => {
 
 import { startHttpServer, stopHttpServer } from '@/services/mcp/mcp-http-client'
 import { httpServers } from '@/services/mcp/mcp-http-client/store'
+import connectionKey from '@/services/mcp/connection-key'
 
 type TransportConfig = {
   type?: string
@@ -107,7 +108,9 @@ describe('mcp http session interop', () => {
     expect(typeof first.onSessionExpired).toBe('function')
 
     first.onSessionIdChange?.('sess-legacy-1')
-    expect(httpServers.get('legacy-http')?.sessionId).toBe('sess-legacy-1')
+    expect(httpServers.get(connectionKey(undefined, 'legacy-http'))?.sessionId).toBe(
+      'sess-legacy-1',
+    )
 
     first.onSessionIdChange?.(undefined)
     first.onSessionExpired?.('sess-legacy-1')
@@ -121,8 +124,10 @@ describe('mcp http session interop', () => {
     expect(second.initialSessionId).toBeUndefined()
     expect(configOf(1).initialInitializeResult).toBeUndefined()
     expect(second.authProvider).toBe(authProvider)
-    expect(httpServers.get('legacy-http')?.sessionId).toBeNull()
-    expect(httpServers.get('legacy-http')?.state.status).toBe('connected')
+    expect(httpServers.get(connectionKey(undefined, 'legacy-http'))?.sessionId).toBeNull()
+    expect(httpServers.get(connectionKey(undefined, 'legacy-http'))?.state.status).toBe(
+      'connected',
+    )
   })
 
   it('does not pass session options for sse transports', async () => {
@@ -146,10 +151,14 @@ describe('mcp http session interop', () => {
       url: 'https://mcp.example/mcp',
     })
     transportOf(0).onSessionIdChange?.('sess-to-clear')
-    expect(httpServers.get('stop-http')?.sessionId).toBe('sess-to-clear')
+    expect(httpServers.get(connectionKey(undefined, 'stop-http'))?.sessionId).toBe(
+      'sess-to-clear',
+    )
 
     await stopHttpServer('stop-http')
-    expect(httpServers.get('stop-http')?.sessionId).toBeNull()
-    expect(httpServers.get('stop-http')?.state.status).toBe('stopped')
+    expect(httpServers.get(connectionKey(undefined, 'stop-http'))?.sessionId).toBeNull()
+    expect(httpServers.get(connectionKey(undefined, 'stop-http'))?.state.status).toBe(
+      'stopped',
+    )
   })
 })

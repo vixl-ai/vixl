@@ -1,9 +1,13 @@
 import type { McpHttpServer } from '@/types/vixl/mcp-config'
 import type { McpServerState } from '@/services/vixl/vixl-tauri'
+import connectionKey from '@/services/mcp/connection-key'
 import { httpServers, setEntryState } from './store'
 
-export const stopHttpServer = async (serverId: string): Promise<void> => {
-  const entry = httpServers.get(serverId)
+export const stopHttpServer = async (
+  serverId: string,
+  scopeKey?: string | null,
+): Promise<void> => {
+  const entry = httpServers.get(connectionKey(scopeKey, serverId))
   if (!entry) {
     return
   }
@@ -24,6 +28,7 @@ export const stopHttpServer = async (serverId: string): Promise<void> => {
       config: entry.config,
       authProvider: entry.authProvider,
       sessionId: null,
+      scopeKey: entry.scopeKey,
     },
   )
 }
@@ -32,6 +37,7 @@ export const markHttpAuthRequired = (
   serverId: string,
   config: McpHttpServer,
   error?: string | null,
+  scopeKey?: string | null,
 ): McpServerState =>
   setEntryState(
     serverId,
@@ -40,14 +46,21 @@ export const markHttpAuthRequired = (
       tools: [],
       error: error ?? null,
     },
-    { client: null, config, authProvider: undefined, sessionId: null },
+    {
+      client: null,
+      config,
+      authProvider: undefined,
+      sessionId: null,
+      scopeKey,
+    },
   )
 
 export const logoutHttpServer = async (
   serverId: string,
   config?: McpHttpServer,
+  scopeKey?: string | null,
 ): Promise<McpServerState> => {
-  const entry = httpServers.get(serverId)
+  const entry = httpServers.get(connectionKey(scopeKey, serverId))
   if (entry?.client) {
     try {
       await entry.client.close()
@@ -64,6 +77,7 @@ export const logoutHttpServer = async (
       config: config ?? entry?.config ?? { type: 'http', url: '' },
       authProvider: undefined,
       sessionId: null,
+      scopeKey: entry?.scopeKey ?? scopeKey,
     },
   )
 }

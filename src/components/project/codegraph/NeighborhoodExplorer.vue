@@ -276,7 +276,15 @@ const buildGraph = (
 const callCodegraphTool = async (
   tool: string,
   args: Record<string, unknown>,
-): Promise<unknown> => mcpRuntime.callTool(CODEGRAPH_SERVER_ID, tool, args)
+  scopeKey: string,
+): Promise<unknown> =>
+  mcpRuntime.callTool(
+    CODEGRAPH_SERVER_ID,
+    tool,
+    args,
+    undefined,
+    scopeKey,
+  )
 
 const valuesOrThrow = <T>(results: PromiseSettledResult<T>[]): T[] => {
   const failed = results.find(
@@ -338,10 +346,15 @@ const runSearch = async (rawQuery: string): Promise<void> => {
   }
 
   const generation = ++searchGeneration.value
+  const scopeKey = project.rootPath
   loading.value = true
   state.hasSearched = true
   try {
-    const status = await mcpRuntime.getStatus(CODEGRAPH_SERVER_ID)
+    const status = await mcpRuntime.getStatus(
+      CODEGRAPH_SERVER_ID,
+      undefined,
+      scopeKey,
+    )
     if (generation !== searchGeneration.value) {
       return
     }
@@ -359,13 +372,13 @@ const runSearch = async (rawQuery: string): Promise<void> => {
         callCodegraphTool('codegraph_search', {
           query,
           limit: 12,
-          projectPath: project.rootPath,
-        }),
+          projectPath: scopeKey,
+        }, scopeKey),
         callCodegraphTool('codegraph_files', {
           format: 'flat',
           includeMetadata: true,
-          projectPath: project.rootPath,
-        }),
+          projectPath: scopeKey,
+        }, scopeKey),
       ]),
     )
     if (generation !== searchGeneration.value) {
@@ -400,8 +413,8 @@ const runSearch = async (rawQuery: string): Promise<void> => {
       const nodeRaw = await callCodegraphTool('codegraph_node', {
         file: filePath,
         symbolsOnly: true,
-        projectPath: project.rootPath,
-      })
+        projectPath: scopeKey,
+      }, scopeKey)
       if (generation !== searchGeneration.value) {
         return
       }
@@ -432,7 +445,7 @@ const runSearch = async (rawQuery: string): Promise<void> => {
     const toolArgs: Record<string, unknown> = {
       symbol,
       limit: 20,
-      projectPath: project.rootPath,
+      projectPath: scopeKey,
     }
     if (fileHint) {
       toolArgs.file = fileHint
@@ -440,14 +453,14 @@ const runSearch = async (rawQuery: string): Promise<void> => {
 
     const [callersRaw, calleesRaw, impactRaw] = valuesOrThrow(
       await Promise.allSettled([
-        callCodegraphTool('codegraph_callers', toolArgs),
-        callCodegraphTool('codegraph_callees', toolArgs),
+        callCodegraphTool('codegraph_callers', toolArgs, scopeKey),
+        callCodegraphTool('codegraph_callees', toolArgs, scopeKey),
         callCodegraphTool('codegraph_impact', {
           symbol,
           ...(fileHint ? { file: fileHint } : {}),
           depth: 2,
-          projectPath: project.rootPath,
-        }),
+          projectPath: scopeKey,
+        }, scopeKey),
       ]),
     )
     if (generation !== searchGeneration.value) {

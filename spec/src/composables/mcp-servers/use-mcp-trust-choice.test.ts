@@ -99,6 +99,7 @@ describe('useMcpTrustChoice', () => {
       serverId: 'server-a',
       fingerprint: 'fp-a',
       action: firstAction,
+      scopeKey: 'personal',
     }
 
     const firstChoice = choice.handleTrustChoice('session')
@@ -112,6 +113,7 @@ describe('useMcpTrustChoice', () => {
       serverId: 'server-b',
       fingerprint: 'fp-b',
       action: secondAction,
+      scopeKey: 'personal',
     }
     const secondChoice = choice.handleTrustChoice('session')
     await vi.waitFor(() => {
@@ -133,6 +135,7 @@ describe('useMcpTrustChoice', () => {
       serverId: 'server-a',
       fingerprint: 'fp-a',
       action,
+      scopeKey: 'personal',
     }
 
     await choice.handleTrustChoice('always')
@@ -153,10 +156,13 @@ describe('useMcpTrustChoice', () => {
       serverId: 'server-a',
       fingerprint: 'fp-a',
       action,
+      scopeKey: 'personal',
     }
 
     await choice.handleTrustChoice('session')
 
+    expect(sessionTrusts.get(`${'personal'}\u001fserver-a`)).toBe('fp-a')
+    expect(sessionTrusts.get('server-a')).toBeUndefined()
     expect(toast.error).toHaveBeenCalledWith('Failed to start server', {
       description: 'npx spawn failed',
     })
@@ -194,6 +200,7 @@ describe('useMcpTrustChoice', () => {
       serverId: 'server-a',
       fingerprint: 'fp-a',
       action,
+      scopeKey: '/tmp/other-project',
     }
 
     await choice.handleTrustChoice('workspace')
@@ -211,5 +218,7 @@ describe('useMcpTrustChoice', () => {
     )
     expect(updateSetting).not.toHaveBeenCalled()
     expect(action).toHaveBeenCalledTimes(1)
+    expect(sessionTrusts.get(`${'/tmp/other-project'}\u001fserver-a`)).toBe('fp-a')
+    expect(sessionTrusts.get('server-a')).toBeUndefined()
   })
 })

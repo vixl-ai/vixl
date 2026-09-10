@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const cancelAuthenticate = vi.hoisted(() =>
-  vi.fn<(serverId: string) => boolean>(() => true),
+  vi.fn<(serverId: string, scopeKey?: string | null) => boolean>(() => true),
 )
 
 vi.mock('@/services/mcp/mcp-runtime', () => ({
   default: {
-    cancelAuthenticate: (serverId: string) => cancelAuthenticate(serverId),
+    cancelAuthenticate: (serverId: string, scopeKey?: string | null) =>
+      cancelAuthenticate(serverId, scopeKey),
   },
 }))
 
@@ -23,6 +24,7 @@ import {
   authenticatingServers,
   serverStates,
 } from '@/composables/mcp-servers/state'
+import connectionKey from '@/services/mcp/connection-key'
 
 describe('cancelAuthenticateServer', () => {
   beforeEach(() => {
@@ -34,18 +36,19 @@ describe('cancelAuthenticateServer', () => {
   })
 
   it('patches auth_required state and clears the authenticating flag', () => {
-    authenticatingServers.value = { github: true }
+    const key = connectionKey(undefined, 'github')
+    authenticatingServers.value = { [key]: true }
 
     cancelAuthenticateServer('github')
 
-    expect(cancelAuthenticate).toHaveBeenCalledWith('github')
-    expect(serverStates.value.github).toEqual({
+    expect(cancelAuthenticate).toHaveBeenCalledWith('github', undefined)
+    expect(serverStates.value[key]).toEqual({
       serverId: 'github',
       status: 'auth_required',
       tools: [],
       error: 'Authentication cancelled',
     })
-    expect(authenticatingServers.value.github).toBe(false)
+    expect(authenticatingServers.value[key]).toBe(false)
     expect(toast.success).toHaveBeenCalledWith('Authentication cancelled')
   })
 
@@ -54,8 +57,20 @@ describe('cancelAuthenticateServer', () => {
 
     cancelAuthenticateServer('github')
 
-    expect(cancelAuthenticate).toHaveBeenCalledWith('github')
-    expect(authenticatingServers.value.github).toBe(false)
-    expect(serverStates.value.github?.status).toBe('auth_required')
+    expect(cancelAuthenticate).toHaveBeenCalledWith('github', undefined)
+    expect(authenticatingServers.value[connectionKey(undefined, 'github')]).toBe(false)
+    expect(serverStates.value[connectionKey(undefined, 'github')]?.status).toBe('auth_required')
+  })
+
+  it('patches and clears flags under the provided scope key', () => {
+    const key = connectionKey('/tmp/project', 'github')
+    authenticatingServers.value = { [key]: true }
+
+    cancelAuthenticateServer('github', '/tmp/project')
+
+    expect(cancelAuthenticate).toHaveBeenCalledWith('github', '/tmp/project')
+    expect(serverStates.value[key]?.status).toBe('auth_required')
+    expect(authenticatingServers.value[key]).toBe(false)
+    expect(serverStates.value[connectionKey(undefined, 'github')]).toBeUndefined()
   })
 })

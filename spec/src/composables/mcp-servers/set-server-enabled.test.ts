@@ -74,7 +74,7 @@ describe('createSetServerEnabled', () => {
       startServer,
     )
 
-    await setServerEnabled('github', true, '/tmp/project')
+    await setServerEnabled('github', true, 'project', '/tmp/project')
 
     expect(setMcpServerEnabled).toHaveBeenCalledWith(
       'project',
@@ -86,7 +86,7 @@ describe('createSetServerEnabled', () => {
     expect(startServer).toHaveBeenCalledWith(
       'github',
       { ...existing, enabled: true },
-      { quiet: true, manageLoading: false },
+      { quiet: true, manageLoading: false, scopeKey: '/tmp/project' },
     )
     expect(stopServer).not.toHaveBeenCalled()
     expect(refreshStates).toHaveBeenCalledOnce()
@@ -106,7 +106,7 @@ describe('createSetServerEnabled', () => {
       startServer,
     )
 
-    await setServerEnabled('filesystem', false, '/tmp/project')
+    await setServerEnabled('filesystem', false, 'personal', '/tmp/project')
 
     expect(setMcpServerEnabled).toHaveBeenCalledWith(
       'personal',
@@ -119,6 +119,7 @@ describe('createSetServerEnabled', () => {
     expect(stopServer).toHaveBeenCalledWith('filesystem', {
       quiet: true,
       manageLoading: false,
+      scopeKey: 'personal',
     })
     expect(refreshStates).toHaveBeenCalledOnce()
     expect(personalMcp.value.inputs).toEqual([{ id: 'home', type: 'promptString' }])
@@ -135,7 +136,7 @@ describe('createSetServerEnabled', () => {
       startServer,
     )
 
-    await expect(setServerEnabled('filesystem', false, null)).rejects.toThrow('disk full')
+    await expect(setServerEnabled('filesystem', false, 'personal', null)).rejects.toThrow('disk full')
 
     expect(writeMcpConfig).not.toHaveBeenCalled()
     expect(startServer).not.toHaveBeenCalled()
@@ -157,6 +158,7 @@ describe('createSetServerEnabled', () => {
     const updated = await setServerEnabled(
       'github',
       true,
+      'project',
       '/tmp/other-project',
       override,
     )
@@ -173,7 +175,7 @@ describe('createSetServerEnabled', () => {
     expect(startServer).toHaveBeenCalledWith(
       'github',
       { ...overrideExisting, enabled: true },
-      { quiet: true, manageLoading: false },
+      { quiet: true, manageLoading: false, scopeKey: '/tmp/other-project' },
     )
   })
 
@@ -191,6 +193,7 @@ describe('createSetServerEnabled', () => {
       setServerEnabled(
         'github',
         true,
+        'project',
         '/tmp/other-project',
         { servers: { github: stdioServer(false) } },
       ),
@@ -210,12 +213,41 @@ describe('createSetServerEnabled', () => {
     )
     const settings = { version: 1 as const, 'agent.mcp.trust': [] }
 
-    await setServerEnabled('github', true, '/tmp/project', undefined, settings)
+    await setServerEnabled('github', true, 'project', '/tmp/project', undefined, settings)
 
     expect(startServer).toHaveBeenCalledWith(
       'github',
       { ...existing, enabled: true },
-      { quiet: true, manageLoading: false, settings },
+      { quiet: true, manageLoading: false, scopeKey: '/tmp/project', settings },
     )
+  })
+
+  it('toggles the personal connection when the same id is overridden in project', async () => {
+    const personalExisting = stdioServer(true)
+    const projectExisting = stdioServer(true)
+    personalMcp.value = { servers: { github: personalExisting } }
+    projectMcp.value = { servers: { github: projectExisting } }
+    const startServer = vi.fn<(...args: unknown[]) => Promise<void>>(async () => {})
+    const setServerEnabled = createSetServerEnabled(
+      vi.fn<(serverId: string, serverConfig: McpServerConfig) => void>(),
+      startServer,
+    )
+
+    await setServerEnabled('github', false, 'personal', '/tmp/project')
+
+    expect(setMcpServerEnabled).toHaveBeenCalledWith(
+      'personal',
+      'github',
+      false,
+      '/tmp/project',
+    )
+    expect(stopServer).toHaveBeenCalledWith('github', {
+      quiet: true,
+      manageLoading: false,
+      scopeKey: 'personal',
+    })
+    expect(startServer).not.toHaveBeenCalled()
+    expect(personalMcp.value.servers.github?.enabled).toBe(false)
+    expect(projectMcp.value.servers.github).toEqual(projectExisting)
   })
 })

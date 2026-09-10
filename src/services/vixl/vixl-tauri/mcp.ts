@@ -17,21 +17,26 @@ export const mcpStart = (
   command: string,
   args: string[],
   env?: Record<string, string>,
+  scopeKey?: string,
 ): Promise<McpServerState> =>
-  call('mcp_start', { serverId, command, args, env: env ?? null })
+  call('mcp_start', { serverId, command, args, env: env ?? null, scopeKey: scopeKey ?? null })
 
-export const mcpStop = (serverId: string): Promise<void> => call('mcp_stop', { serverId })
+export const mcpStop = (serverId: string, scopeKey?: string): Promise<void> =>
+  call('mcp_stop', { serverId, scopeKey: scopeKey ?? null })
 
-export const mcpRefresh = (serverId: string): Promise<McpServerState> =>
-  call('mcp_refresh', { serverId })
+export const mcpRefresh = (serverId: string, scopeKey?: string): Promise<McpServerState> =>
+  call('mcp_refresh', { serverId, scopeKey: scopeKey ?? null })
 
-export const mcpLogout = (serverId: string): Promise<void> => call('mcp_logout', { serverId })
+export const mcpLogout = (serverId: string, scopeKey?: string): Promise<void> =>
+  call('mcp_logout', { serverId, scopeKey: scopeKey ?? null })
 
-export const mcpStatus = (serverId: string): Promise<McpServerState> =>
-  call('mcp_status', { serverId })
+export const mcpStatus = (serverId: string, scopeKey?: string): Promise<McpServerState> =>
+  call('mcp_status', { serverId, scopeKey: scopeKey ?? null })
 
-export const mcpListStatuses = (): Promise<Record<string, McpServerState>> =>
-  call('mcp_list_statuses')
+export const mcpListStatuses = (
+  scopeKey?: string,
+): Promise<Record<string, McpServerState>> =>
+  call('mcp_list_statuses', { scopeKey: scopeKey ?? null })
 
 export const httpProxyRequest = (
   request: HttpProxyRequest,
@@ -42,4 +47,6 @@ export const mcpCallTool = (
   serverId: string,
   tool: string,
   args: Record<string, unknown>,
-): Promise<unknown> => call('mcp_call_tool', { serverId, tool, args })
+  scopeKey?: string,
+): Promise<unknown> =>
+  call('mcp_call_tool', { serverId, tool, args, scopeKey: scopeKey ?? null })

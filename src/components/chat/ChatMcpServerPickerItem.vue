@@ -19,9 +19,11 @@ import {
 import McpServerIcon from '@/components/mcp/ServerIcon.vue'
 import { isMcpServerEnabled } from '@/schemas/mcp-config'
 import type { EffectiveMcpServer } from '@/services/mcp/merge-mcp-config'
+import connectionKey from '@/services/mcp/connection-key'
 
 const props = defineProps<{
   server: EffectiveMcpServer
+  scopeKey: string
 }>()
 
 const emit = defineEmits<{
@@ -32,14 +34,16 @@ const emit = defineEmits<{
 
 const { serverStates, loadingServers, authenticatingServers } = useMcpServers()
 
+const stateKey = computed(() => connectionKey(props.scopeKey, props.server.id))
+
 const serverStatus = computed(
-  (): string => serverStates.value[props.server.id]?.status ?? 'stopped',
+  (): string => serverStates.value[stateKey.value]?.status ?? 'stopped',
 )
 
 const isLoading = computed(
   () =>
-    loadingServers.value[props.server.id] === true ||
-    authenticatingServers.value[props.server.id] === true,
+    loadingServers.value[stateKey.value] === true ||
+    authenticatingServers.value[stateKey.value] === true,
 )
 
 const enabled = computed(() => isMcpServerEnabled(props.server.config))
@@ -73,7 +77,7 @@ const statusLabel = computed((): string => {
 
 const statusTooltip = computed((): string => {
   if (serverStatus.value === 'error') {
-    const error = serverStates.value[props.server.id]?.error
+    const error = serverStates.value[stateKey.value]?.error
     if (error) {
       return error
     }
@@ -111,7 +115,7 @@ const handleToggle = (): void => {
 
 <template>
   <div class="flex items-center gap-1 rounded-md px-1.5 py-1.5">
-    <McpServerIcon :server-id="server.id" class="ml-1" />
+    <McpServerIcon :server-id="server.id" :scope-key="scopeKey" class="ml-1" />
     <span class="min-w-0 flex-1 truncate px-1 text-sm font-medium">
       {{ server.id }}
     </span>

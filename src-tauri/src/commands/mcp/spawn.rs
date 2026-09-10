@@ -12,7 +12,9 @@ use super::allowlist::validate_mcp_spawn;
 use super::env::validate_mcp_env;
 use super::resolve_cmd::{apply_resolved_path_env, resolve_command};
 use super::rpc::{json_rpc, json_rpc_notify, list_tools_internal, spawn_reader};
-use super::types::{parse_mcp_icons, set_state, McpProcess, McpServerState, MCP_PROCESSES};
+use super::types::{
+    mcp_connection_key, parse_mcp_icons, set_state, McpProcess, McpServerState, MCP_PROCESSES,
+};
 use crate::commands::codegraph::{codegraph_store_env_vars, prepare_codegraph_store};
 use crate::commands::fs::canonical_project_root;
 
@@ -23,12 +25,15 @@ pub async fn mcp_start(
     command: String,
     args: Vec<String>,
     env: Option<HashMap<String, String>>,
+    scope_key: Option<String>,
 ) -> Result<McpServerState, String> {
     validate_mcp_spawn(&command, &args)?;
     let env_overlay = env.unwrap_or_default();
     validate_mcp_env(&env_overlay)?;
     let program = resolve_command(&app, command.trim()).await?;
-    mcp_stop(server_id.clone()).await.ok();
+    let resolved_scope = scope_key.as_deref().unwrap_or("personal").to_string();
+    let connection_key = mcp_connection_key(scope_key.as_deref(), &server_id);
+    mcp_stop(server_id.clone(), scope_key.clone()).await.ok();
 
     let codegraph_path = if server_id == "codegraph" {
         extract_codegraph_project_path(&args)
@@ -46,7 +51,15 @@ pub async fn mcp_start(
         codegraph_store_dir = Some(prepared.graph_dir);
     }
 
-    set_state(&server_id, "starting", None, vec![], None).await;
+    set_state(
+        scope_key.as_deref(),
+        &server_id,
+        "starting",
+        None,
+        vec![],
+        None,
+    )
+    .await;
 
     let mut command_builder = Command::new(&program);
     command_builder
@@ -97,11 +110,16 @@ pub async fn mcp_start(
         next_id: Mutex::new(0),
     }));
 
-    spawn_reader(process.clone(), server_id.clone());
+    spawn_reader(
+        process.clone(),
+        connection_key.clone(),
+        resolved_scope.clone(),
+        server_id.clone(),
+    );
 
     {
         let mut processes = MCP_PROCESSES.lock().await;
-        processes.insert(server_id.clone(), process.clone());
+        processes.insert(connection_key, process.clone());
     }
 
     let fail = |message: String| async {
@@ -111,11 +129,19 @@ pub async fn mcp_start(
         } else {
             format!("{message}\n{stderr_text}")
         };
-        let _ = mcp_stop(server_id.clone()).await;
+        let _ = mcp_stop(server_id.clone(), scope_key.clone()).await;
         if let Some(project_path) = codegraph_path.as_deref() {
             kill_orphaned_codegraph(project_path, codegraph_store_dir.as_deref()).await;
         }
-        set_state(&server_id, "error", Some(full.clone()), vec![], None).await;
+        set_state(
+            scope_key.as_deref(),
+            &server_id,
+            "error",
+            Some(full.clone()),
+            vec![],
+            None,
+        )
+        .await;
         Err(full)
     };
 
@@ -159,10 +185,19 @@ pub async fn mcp_start(
         Ok(tools) => tools,
         Err(message) => return fail(message).await,
     };
-    set_state(&server_id, "connected", None, tools.clone(), icons.clone()).await;
+    set_state(
+        scope_key.as_deref(),
+        &server_id,
+        "connected",
+        None,
+        tools.clone(),
+        icons.clone(),
+    )
+    .await;
 
     Ok(McpServerState {
         server_id,
+        scope_key: resolved_scope,
         status: "connected".to_string(),
         error: None,
         tools,
@@ -217,10 +252,11 @@ async fn kill_orphaned_codegraph(project_path: &str, store_dir: Option<&Path>) {
 }
 
 #[tauri::command]
-pub async fn mcp_stop(server_id: String) -> Result<(), String> {
+pub async fn mcp_stop(server_id: String, scope_key: Option<String>) -> Result<(), String> {
+    let connection_key = mcp_connection_key(scope_key.as_deref(), &server_id);
     let process = {
         let mut processes = MCP_PROCESSES.lock().await;
-        processes.remove(&server_id)
+        processes.remove(&connection_key)
     };
 
     if let Some(process) = process {
@@ -242,6 +278,14 @@ pub async fn mcp_stop(server_id: String) -> Result<(), String> {
         let _ = guard.child.wait().await;
     }
 
-    set_state(&server_id, "stopped", None, vec![], None).await;
+    set_state(
+        scope_key.as_deref(),
+        &server_id,
+        "stopped",
+        None,
+        vec![],
+        None,
+    )
+    .await;
     Ok(())
 }

@@ -9,6 +9,7 @@ export const applyHttpClientTools = async (
   extras: {
     config: McpHttpServer
     authProvider?: OAuthClientProvider
+    scopeKey?: string | null
   },
 ): Promise<McpServerState> => {
   const listed = await client.listTools()
@@ -18,6 +19,11 @@ export const applyHttpClientTools = async (
   return setEntryState(
     serverId,
     { status: 'connected', tools, icons, error: null },
-    { client, config: extras.config, authProvider: extras.authProvider },
+    {
+      client,
+      config: extras.config,
+      authProvider: extras.authProvider,
+      scopeKey: extras.scopeKey,
+    },
   )
 }

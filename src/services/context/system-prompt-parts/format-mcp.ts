@@ -1,8 +1,21 @@
 import { migrateMcpConfig, isMcpServerEnabled } from '@/schemas/mcp-config'
+import connectionKey from '@/services/mcp/connection-key'
 import { listUserMcpServers } from '@/services/mcp/merge-mcp-config'
 import { mcpListStatuses, readMcpConfig } from '@/services/vixl/vixl-tauri'
 
 const MCP_START_HINT = 'start the server in Settings or call get_mcp_tools to check its status'
+
+const listStatusesForScope = async (
+  scopeKey?: string,
+): Promise<Awaited<ReturnType<typeof mcpListStatuses>>> => {
+  try {
+    return scopeKey === undefined
+      ? await mcpListStatuses()
+      : await mcpListStatuses(scopeKey)
+  } catch {
+    return {}
+  }
+}
 
 export default async (
   projectRoot: string,
@@ -23,16 +36,20 @@ export default async (
     return ''
   }
 
-  let bulkStatuses: Awaited<ReturnType<typeof mcpListStatuses>> = {}
-  try {
-    bulkStatuses = await mcpListStatuses()
-  } catch {
-    bulkStatuses = {}
+  const personalStatuses = await listStatusesForScope()
+  const projectStatuses =
+    standalone || !projectRoot.trim()
+      ? {}
+      : await listStatusesForScope(projectRoot)
+  const bulkStatuses = {
+    ...personalStatuses,
+    ...projectStatuses,
   }
 
   const lines: string[] = []
   for (const server of servers) {
-    const state = bulkStatuses[server.id]
+    const scopeKey = server.scope === 'personal' ? 'personal' : projectRoot
+    const state = bulkStatuses[connectionKey(scopeKey, server.id)]
     if (!state) {
       lines.push(`- ${server.id}: not running, ${MCP_START_HINT}`)
       continue

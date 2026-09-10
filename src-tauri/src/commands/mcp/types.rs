@@ -25,10 +25,16 @@ pub struct McpIcon {
 #[serde(rename_all = "camelCase")]
 pub struct McpServerState {
     pub server_id: String,
+    pub scope_key: String,
     pub status: String,
     pub error: Option<String>,
     pub tools: Vec<McpToolInfo>,
     pub icons: Option<Vec<McpIcon>>,
+}
+
+pub(crate) fn mcp_connection_key(scope_key: Option<&str>, server_id: &str) -> String {
+    let scope = scope_key.unwrap_or("personal");
+    format!("{scope}\u{1f}{server_id}")
 }
 
 pub(crate) struct McpProcess {
@@ -80,22 +86,46 @@ pub(crate) fn parse_mcp_icons(value: Option<&serde_json::Value>) -> Option<Vec<M
 }
 
 pub(crate) async fn set_state(
+    scope_key: Option<&str>,
     server_id: &str,
     status: &str,
     error: Option<String>,
     tools: Vec<McpToolInfo>,
     icons: Option<Vec<McpIcon>>,
 ) {
+    let resolved_scope = scope_key.unwrap_or("personal");
+    let connection_key = mcp_connection_key(scope_key, server_id);
     let mut states = MCP_STATES.lock().await;
-    let previous_icons = states.get(server_id).and_then(|state| state.icons.clone());
+    let previous_icons = states
+        .get(&connection_key)
+        .and_then(|state| state.icons.clone());
     states.insert(
-        server_id.to_string(),
+        connection_key,
         McpServerState {
             server_id: server_id.to_string(),
+            scope_key: resolved_scope.to_string(),
             status: status.to_string(),
             error,
             tools,
             icons: icons.or(previous_icons),
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::mcp_connection_key;
+
+    #[test]
+    fn connection_key_defaults_none_to_personal() {
+        assert_eq!(mcp_connection_key(None, "brave"), "personal\u{1f}brave");
+    }
+
+    #[test]
+    fn connection_key_uses_project_root() {
+        assert_eq!(
+            mcp_connection_key(Some("/Users/aidan/proj"), "brave"),
+            "/Users/aidan/proj\u{1f}brave"
+        );
+    }
 }

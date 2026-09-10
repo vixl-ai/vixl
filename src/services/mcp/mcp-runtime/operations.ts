@@ -24,6 +24,7 @@ import {
   type McpServerState,
 } from '@/services/vixl/vixl-tauri'
 import { applyOAuthCallback, getLastOAuthChallenge } from '@/services/mcp/oauth'
+import connectionKey from '@/services/mcp/connection-key'
 import { assertServerTrusted } from './trust'
 import { createTokenProvider, waitForOAuthCallback } from './oauth'
 import { start, startHttp } from './lifecycle'
@@ -43,10 +44,12 @@ const runAuthenticateHttp = async (
 ): Promise<McpServerState> => {
   assertServerTrusted(serverId, config, options)
 
-  const loopback = await oauthBeginLoopback(serverId)
+  const scopeKey = options?.scopeKey
+  const flowId = connectionKey(scopeKey, serverId)
+  const loopback = await oauthBeginLoopback(flowId)
   const abort = new AbortController()
-  oauthAbortControllers.set(serverId, abort)
-  const callbackPromise = waitForOAuthCallback(abort.signal, serverId)
+  oauthAbortControllers.set(flowId, abort)
+  const callbackPromise = waitForOAuthCallback(abort.signal, flowId)
 
   let result: McpServerState | undefined
   let failure: unknown
@@ -63,12 +66,12 @@ const runAuthenticateHttp = async (
     )
 
     const challenge =
-      getHttpOauthChallenge(serverId) ?? getLastOAuthChallenge(config.url)
+      getHttpOauthChallenge(serverId, scopeKey) ?? getLastOAuthChallenge(config.url)
     const scope = options?.scope ?? challenge?.scope
     const resourceMetadataUrl =
       options?.resourceMetadataUrl ?? challenge?.resourceMetadataUrl
     if (scope) {
-      setHttpLastRequestedScope(serverId, scope)
+      setHttpLastRequestedScope(serverId, scope, scopeKey)
     }
 
     const authBase = {
@@ -119,13 +122,14 @@ const runAuthenticateHttp = async (
         serverId,
         config,
         error instanceof Error ? error.message : 'Authentication failed',
+        options?.scopeKey,
       )
       failure = error
     }
   } finally {
-    oauthAbortControllers.delete(serverId)
+    oauthAbortControllers.delete(flowId)
     try {
-      await oauthCancelLoopback(serverId)
+      await oauthCancelLoopback(flowId)
     } catch (cancelError) {
       if (!(cancelError instanceof Error) && failure === undefined) {
         failure = cancelError
@@ -144,8 +148,11 @@ const runAuthenticateHttp = async (
   return result
 }
 
-export const cancelAuthenticate = (serverId: string): boolean => {
-  const controller = oauthAbortControllers.get(serverId)
+export const cancelAuthenticate = (
+  serverId: string,
+  scopeKey?: string | null,
+): boolean => {
+  const controller = oauthAbortControllers.get(connectionKey(scopeKey, serverId))
   if (!controller) {
     return false
   }
@@ -162,15 +169,16 @@ export const authenticate = async (
     return start(serverId, config, options)
   }
 
-  const existing = oauthInFlight.get(serverId)
+  const flowId = connectionKey(options?.scopeKey, serverId)
+  const existing = oauthInFlight.get(flowId)
   if (existing) {
     return existing
   }
 
   const flight = runAuthenticateHttp(serverId, config, options).finally(() => {
-    oauthInFlight.delete(serverId)
+    oauthInFlight.delete(flowId)
   })
-  oauthInFlight.set(serverId, flight)
+  oauthInFlight.set(flowId, flight)
   return flight
 }
 
@@ -179,27 +187,56 @@ export const callTool = async (
   tool: string,
   args: Record<string, unknown>,
   config?: McpServerConfig,
+  scopeKey?: string | null,
 ): Promise<unknown> => {
-  if (config ? isMcpHttpServer(config) : hasHttpServer(serverId)) {
-    return callHttpToolWithStepUp(serverId, tool, args, config, authenticate)
+  if (config ? isMcpHttpServer(config) : hasHttpServer(serverId, scopeKey)) {
+    return callHttpToolWithStepUp(
+      serverId,
+      tool,
+      args,
+      config,
+      authenticate,
+      scopeKey,
+    )
   }
-  return mcpCallTool(serverId, tool, args)
+  return mcpCallTool(serverId, tool, args, scopeKey ?? undefined)
 }
 
-export const listStatuses = async (): Promise<Record<string, McpServerState>> => {
-  const stdio = await mcpListStatuses()
-  return {
-    ...stdio,
-    ...listHttpStates(),
+const statusConnectionKey = (
+  key: string,
+  state: McpServerState,
+): string => {
+  const scoped = state as McpServerState & { scopeKey?: string }
+  if (scoped.scopeKey) {
+    return connectionKey(scoped.scopeKey, state.serverId)
   }
+  if (key.includes('\u001f')) {
+    return key
+  }
+  return connectionKey(undefined, state.serverId)
+}
+
+export const listStatuses = async (
+  scopeKey?: string | null,
+): Promise<Record<string, McpServerState>> => {
+  const stdio = await mcpListStatuses(scopeKey ?? undefined)
+  const merged: Record<string, McpServerState> = {}
+  for (const [key, state] of Object.entries(stdio)) {
+    merged[statusConnectionKey(key, state)] = state
+  }
+  for (const [key, state] of Object.entries(listHttpStates())) {
+    merged[statusConnectionKey(key, state)] = state
+  }
+  return merged
 }
 
 export const getStatus = async (
   serverId: string,
   config?: McpServerConfig,
+  scopeKey?: string | null,
 ): Promise<McpServerState> => {
-  if (config ? isMcpHttpServer(config) : hasHttpServer(serverId)) {
-    const httpState = getHttpState(serverId)
+  if (config ? isMcpHttpServer(config) : hasHttpServer(serverId, scopeKey)) {
+    const httpState = getHttpState(serverId, scopeKey)
     if (httpState) {
       return httpState
     }
@@ -210,37 +247,48 @@ export const getStatus = async (
       error: null,
     }
   }
-  return mcpStatus(serverId)
+  return mcpStatus(serverId, scopeKey ?? undefined)
 }
 
-export const listResources = async (serverId: string): Promise<unknown> => {
-  if (!hasHttpServer(serverId)) {
+export const listResources = async (
+  serverId: string,
+  scopeKey?: string | null,
+): Promise<unknown> => {
+  if (!hasHttpServer(serverId, scopeKey)) {
     throw new Error('MCP resources require a connected HTTP or SSE server')
   }
-  return listHttpResources(serverId)
+  return listHttpResources(serverId, scopeKey)
 }
 
-export const readResource = async (serverId: string, uri: string): Promise<unknown> => {
-  if (!hasHttpServer(serverId)) {
+export const readResource = async (
+  serverId: string,
+  uri: string,
+  scopeKey?: string | null,
+): Promise<unknown> => {
+  if (!hasHttpServer(serverId, scopeKey)) {
     throw new Error('MCP resources require a connected HTTP or SSE server')
   }
-  return readHttpResource(serverId, uri)
+  return readHttpResource(serverId, uri, scopeKey)
 }
 
-export const listPrompts = async (serverId: string): Promise<unknown> => {
-  if (!hasHttpServer(serverId)) {
+export const listPrompts = async (
+  serverId: string,
+  scopeKey?: string | null,
+): Promise<unknown> => {
+  if (!hasHttpServer(serverId, scopeKey)) {
     throw new Error('MCP prompts require a connected HTTP or SSE server')
   }
-  return listHttpPrompts(serverId)
+  return listHttpPrompts(serverId, scopeKey)
 }
 
 export const getPrompt = async (
   serverId: string,
   name: string,
   promptArgs?: Record<string, unknown>,
+  scopeKey?: string | null,
 ): Promise<unknown> => {
-  if (!hasHttpServer(serverId)) {
+  if (!hasHttpServer(serverId, scopeKey)) {
     throw new Error('MCP prompts require a connected HTTP or SSE server')
   }
-  return getHttpPrompt(serverId, name, promptArgs)
+  return getHttpPrompt(serverId, name, promptArgs, scopeKey)
 }

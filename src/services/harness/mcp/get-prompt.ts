@@ -35,7 +35,12 @@ const getMcpPrompt = (ctx: HarnessToolContext) =>
       if (!allowed) {
         return { rejected: true, error: 'MCP prompt denied' }
       }
-      return mcpRuntime.getPrompt(serverId, name, args as Record<string, unknown> | undefined)
+      return mcpRuntime.getPrompt(
+        serverId,
+        name,
+        args as Record<string, unknown> | undefined,
+        trust.scopeKey,
+      )
     },
   })
 

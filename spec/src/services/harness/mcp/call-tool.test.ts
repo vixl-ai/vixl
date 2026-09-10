@@ -72,10 +72,16 @@ vi.mock('@/services/harness/permission/gate', () => ({
 }))
 
 const mcpCallTool = vi.fn<
-  (serverId: string, toolName: string, args: Record<string, unknown>) => Promise<unknown>
+  (
+    serverId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    config?: unknown,
+    scopeKey?: string,
+  ) => Promise<unknown>
 >()
 const mcpGetStatus = vi.fn<
-  (serverId: string, config?: unknown) => Promise<unknown>
+  (serverId: string, config?: unknown, scopeKey?: string) => Promise<unknown>
 >()
 
 vi.mock('@/services/mcp/mcp-runtime', () => ({
@@ -84,8 +90,11 @@ vi.mock('@/services/mcp/mcp-runtime', () => ({
       serverId: string,
       toolName: string,
       args: Record<string, unknown>,
-    ) => mcpCallTool(serverId, toolName, args),
-    getStatus: (serverId: string, config?: unknown) => mcpGetStatus(serverId, config),
+      config?: unknown,
+      scopeKey?: string,
+    ) => mcpCallTool(serverId, toolName, args, config, scopeKey),
+    getStatus: (serverId: string, config?: unknown, scopeKey?: string) =>
+      mcpGetStatus(serverId, config, scopeKey),
     start: vi.fn<() => Promise<void>>(),
     stop: vi.fn<() => Promise<void>>(),
   },
@@ -250,9 +259,15 @@ describe('build-tools call_mcp_tool args normalization', () => {
       'tc-mcp-unwrap',
     )
 
-    expect(mcpCallTool).toHaveBeenCalledWith('brave', 'brave_web_search', {
-      query: 'Brave Search API',
-    })
+    expect(mcpCallTool).toHaveBeenCalledWith(
+      'brave',
+      'brave_web_search',
+      {
+        query: 'Brave Search API',
+      },
+      undefined,
+      'personal',
+    )
   })
 
   it('returns a missing-config error when the server is absent', async () => {

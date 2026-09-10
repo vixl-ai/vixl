@@ -49,6 +49,7 @@ import useContextUsage from '@/composables/use-context-usage'
 import useMcpServers from '@/composables/use-mcp-servers'
 import useVixlConfig from '@/composables/use-vixl-config'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
+import connectionKey from '@/services/mcp/connection-key'
 import normalizeCodegraphResult from '@/services/codegraph/normalize-codegraph-result'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
@@ -274,8 +275,11 @@ const handlePermissionLevelChange = (level: PermissionLevel): void => {
 const enrichMentionsBeforeSend = async (
   mentions: ContextMention[],
 ): Promise<ContextMention[]> => {
+  const codegraphScope =
+    promptWorkspaceRoot.value ?? fleet.activeProject.value?.rootPath ?? null
   const codegraphConnected =
-    mcpServers.serverStates.value[CODEGRAPH_SERVER_ID]?.status === 'connected'
+    mcpServers.serverStates.value[connectionKey(codegraphScope, CODEGRAPH_SERVER_ID)]
+      ?.status === 'connected'
   if (!codegraphConnected) {
     return mentions
   }
@@ -300,6 +304,8 @@ const enrichMentionsBeforeSend = async (
         CODEGRAPH_SERVER_ID,
         'codegraph_explore',
         { query: mention.query },
+        undefined,
+        codegraphScope,
       )
       const normalized = normalizeCodegraphResult.tool(raw)
       const content = [

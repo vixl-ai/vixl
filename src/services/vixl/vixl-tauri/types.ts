@@ -38,6 +38,7 @@ export type McpToolInfo = {
 
 export type McpServerState = {
   serverId: string
+  scopeKey?: string
   status: string
   error?: string | null
   tools: McpToolInfo[]

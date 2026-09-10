@@ -6,6 +6,7 @@ import {
   saveSettings,
 } from '@/services/config/vixl-config'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
+import connectionKey from '@/services/mcp/connection-key'
 import { sessionTrusts } from '@/services/mcp/mcp-trust'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
 import {
@@ -76,20 +77,20 @@ const ensureCodeGraphOnce = async (root: string): Promise<void> => {
   await pruneObsoleteCodegraphTrust(root)
 
   const server = buildCodegraphServer(root)
-  sessionTrusts.set(CODEGRAPH_SERVER_ID, mcpServerFingerprint(server))
+  sessionTrusts.set(connectionKey(root, CODEGRAPH_SERVER_ID), mcpServerFingerprint(server))
 
   const mcp = useMcpServers()
   await mcp.loadConfigs(root)
 
-  const existing = await mcpRuntime.getStatus(CODEGRAPH_SERVER_ID)
+  const existing = await mcpRuntime.getStatus(CODEGRAPH_SERVER_ID, undefined, root)
   if (existing.status === 'connected') {
     return
   }
 
-  await mcp.startServer(CODEGRAPH_SERVER_ID, server, { quiet: true })
+  await mcp.startServer(CODEGRAPH_SERVER_ID, server, { quiet: true, scopeKey: root })
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    const status = await mcpRuntime.getStatus(CODEGRAPH_SERVER_ID)
+    const status = await mcpRuntime.getStatus(CODEGRAPH_SERVER_ID, undefined, root)
     if (status.status === 'connected') {
       return
     }
@@ -99,7 +100,7 @@ const ensureCodeGraphOnce = async (root: string): Promise<void> => {
     await wait(250)
   }
 
-  const finalStatus = await mcpRuntime.getStatus(CODEGRAPH_SERVER_ID)
+  const finalStatus = await mcpRuntime.getStatus(CODEGRAPH_SERVER_ID, undefined, root)
   throw new Error(
     finalStatus.error ??
       `CodeGraph is ${finalStatus.status || 'not running'}`,

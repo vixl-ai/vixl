@@ -37,6 +37,7 @@ export const startHttp = async (
     )
   }
 
+  const scopeKey = options?.scopeKey
   let headers: Record<string, string> | undefined
   try {
     const resolved = await resolveServerTemplates(serverId, config)
@@ -46,7 +47,7 @@ export const startHttp = async (
       error instanceof Error &&
       error.message.startsWith('Missing MCP inputs')
     ) {
-      markHttpAuthRequired(serverId, config, 'auth_required:inputs')
+      markHttpAuthRequired(serverId, config, 'auth_required:inputs', scopeKey)
       throw new Error('auth_required:inputs')
     }
     throw error
@@ -73,6 +74,7 @@ export const startHttp = async (
   try {
     return await startHttpServer(serverId, resolvedConfig, {
       authProvider: provider,
+      scopeKey,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -82,7 +84,7 @@ export const startHttp = async (
       ) ||
       error instanceof Error && error.name === 'UnauthorizedError'
     ) {
-      return markHttpAuthRequired(serverId, resolvedConfig, message)
+      return markHttpAuthRequired(serverId, resolvedConfig, message, scopeKey)
     }
     throw error
   }
@@ -115,7 +117,13 @@ export const startStdio = async (
     throw error
   }
 
-  return mcpStart(serverId, config.command, args, serverEnv)
+  return mcpStart(
+    serverId,
+    config.command,
+    args,
+    serverEnv,
+    options?.scopeKey ?? undefined,
+  )
 }
 
 export const start = async (
@@ -135,37 +143,41 @@ export const start = async (
 export const stop = async (
   serverId: string,
   config?: McpServerConfig,
+  scopeKey?: string | null,
 ): Promise<void> => {
-  if (config ? isMcpHttpServer(config) : hasHttpServer(serverId)) {
-    await stopHttpServer(serverId)
+  if (config ? isMcpHttpServer(config) : hasHttpServer(serverId, scopeKey)) {
+    await stopHttpServer(serverId, scopeKey)
     return
   }
-  await mcpStop(serverId)
+  await mcpStop(serverId, scopeKey ?? undefined)
 }
 
 export const refresh = async (
   serverId: string,
   config?: McpServerConfig,
+  scopeKey?: string | null,
 ): Promise<McpServerState> => {
-  if (config ? isMcpHttpServer(config) : hasHttpServer(serverId)) {
-    return refreshHttpServer(serverId)
+  if (config ? isMcpHttpServer(config) : hasHttpServer(serverId, scopeKey)) {
+    return refreshHttpServer(serverId, scopeKey)
   }
-  return mcpRefresh(serverId)
+  return mcpRefresh(serverId, scopeKey ?? undefined)
 }
 
 export const logout = async (
   serverId: string,
   config?: McpServerConfig,
+  scopeKey?: string | null,
 ): Promise<void> => {
   await clearServerSecrets(serverId, config)
 
-  if (config ? isMcpHttpServer(config) : hasHttpServer(serverId)) {
+  if (config ? isMcpHttpServer(config) : hasHttpServer(serverId, scopeKey)) {
     await logoutHttpServer(
       serverId,
       config && isMcpHttpServer(config) ? config : undefined,
+      scopeKey,
     )
     return
   }
 
-  await mcpLogout(serverId)
+  await mcpLogout(serverId, scopeKey ?? undefined)
 }

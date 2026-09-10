@@ -4,6 +4,7 @@ export type PendingMcpAuthView = {
   chatId: string
   toolCallId: string
   serverId: string
+  scopeKey: string
   kind: McpAuthKind
   title: string
   detail?: string

@@ -82,6 +82,7 @@ import {
   authenticate,
   cancelAuthenticate,
 } from '@/services/mcp/mcp-runtime/operations'
+import connectionKey from '@/services/mcp/connection-key'
 
 const httpConfig: McpHttpServer = {
   type: 'http',
@@ -106,7 +107,31 @@ describe('cancelAuthenticate', () => {
 
     expect(cancelAuthenticate('github')).toBe(true)
     await expect(pending).rejects.toThrow('OAuth callback aborted')
-    expect(oauthCancelLoopback).toHaveBeenCalledWith('github')
+    expect(oauthBeginLoopback).toHaveBeenCalledWith(connectionKey(undefined, 'github'))
+    expect(oauthCancelLoopback).toHaveBeenCalledWith(connectionKey(undefined, 'github'))
     expect(cancelAuthenticate('github')).toBe(false)
+  })
+
+  it('lets two scopes authenticate the same server id independently', async () => {
+    const projectRoot = '/tmp/project-a'
+    const personalPending = authenticate('github', httpConfig, { skipTrustCheck: true })
+    const projectPending = authenticate('github', httpConfig, {
+      skipTrustCheck: true,
+      scopeKey: projectRoot,
+    })
+    await vi.waitFor(() => {
+      expect(auth).toHaveBeenCalledTimes(2)
+    })
+
+    expect(oauthBeginLoopback).toHaveBeenCalledWith(connectionKey(undefined, 'github'))
+    expect(oauthBeginLoopback).toHaveBeenCalledWith(connectionKey(projectRoot, 'github'))
+    expect(cancelAuthenticate('github')).toBe(true)
+    await expect(personalPending).rejects.toThrow('OAuth callback aborted')
+    expect(cancelAuthenticate('github')).toBe(false)
+    expect(cancelAuthenticate('github', projectRoot)).toBe(true)
+    await expect(projectPending).rejects.toThrow('OAuth callback aborted')
+    expect(oauthCancelLoopback).toHaveBeenCalledWith(connectionKey(undefined, 'github'))
+    expect(oauthCancelLoopback).toHaveBeenCalledWith(connectionKey(projectRoot, 'github'))
+    expect(cancelAuthenticate('github', projectRoot)).toBe(false)
   })
 })

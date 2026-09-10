@@ -1,8 +1,12 @@
 import type { McpServerState } from '@/services/vixl/vixl-tauri'
+import connectionKey from '@/services/mcp/connection-key'
 import { httpServers, isUnauthorized, setEntryState, syncHttpChallengeFromFetch } from './store'
 
-export const listHttpResources = async (serverId: string): Promise<unknown> => {
-  const entry = httpServers.get(serverId)
+export const listHttpResources = async (
+  serverId: string,
+  scopeKey?: string | null,
+): Promise<unknown> => {
+  const entry = httpServers.get(connectionKey(scopeKey, serverId))
   if (!entry?.client) {
     throw new Error('Server not running')
   }
@@ -12,16 +16,20 @@ export const listHttpResources = async (serverId: string): Promise<unknown> => {
 export const readHttpResource = async (
   serverId: string,
   uri: string,
+  scopeKey?: string | null,
 ): Promise<unknown> => {
-  const entry = httpServers.get(serverId)
+  const entry = httpServers.get(connectionKey(scopeKey, serverId))
   if (!entry?.client) {
     throw new Error('Server not running')
   }
   return entry.client.readResource({ uri })
 }
 
-export const listHttpPrompts = async (serverId: string): Promise<unknown> => {
-  const entry = httpServers.get(serverId)
+export const listHttpPrompts = async (
+  serverId: string,
+  scopeKey?: string | null,
+): Promise<unknown> => {
+  const entry = httpServers.get(connectionKey(scopeKey, serverId))
   if (!entry?.client) {
     throw new Error('Server not running')
   }
@@ -32,8 +40,9 @@ export const getHttpPrompt = async (
   serverId: string,
   name: string,
   promptArgs?: Record<string, unknown>,
+  scopeKey?: string | null,
 ): Promise<unknown> => {
-  const entry = httpServers.get(serverId)
+  const entry = httpServers.get(connectionKey(scopeKey, serverId))
   if (!entry?.client) {
     throw new Error('Server not running')
   }
@@ -47,8 +56,9 @@ export const callHttpTool = async (
   serverId: string,
   name: string,
   args: Record<string, unknown>,
+  scopeKey?: string | null,
 ): Promise<unknown> => {
-  const entry = httpServers.get(serverId)
+  const entry = httpServers.get(connectionKey(scopeKey, serverId))
   if (!entry?.client) {
     throw new Error('Server not running')
   }
@@ -59,20 +69,23 @@ export const callHttpTool = async (
       arguments: args,
     })
   } catch (error) {
-    syncHttpChallengeFromFetch(serverId)
+    syncHttpChallengeFromFetch(serverId, scopeKey)
     if (isUnauthorized(error)) {
       setEntryState(serverId, {
         status: 'auth_required',
         tools: entry.state.tools,
         error: error instanceof Error ? error.message : 'Authentication required',
-      })
+      }, { scopeKey: entry.scopeKey })
     }
     throw error
   }
 }
 
-export const getHttpState = (serverId: string): McpServerState | undefined =>
-  httpServers.get(serverId)?.state
+export const getHttpState = (
+  serverId: string,
+  scopeKey?: string | null,
+): McpServerState | undefined =>
+  httpServers.get(connectionKey(scopeKey, serverId))?.state
 
 export const listHttpStates = (): Record<string, McpServerState> => {
   const states: Record<string, McpServerState> = {}
@@ -82,5 +95,7 @@ export const listHttpStates = (): Record<string, McpServerState> => {
   return states
 }
 
-export const hasHttpServer = (serverId: string): boolean =>
-  httpServers.has(serverId)
+export const hasHttpServer = (
+  serverId: string,
+  scopeKey?: string | null,
+): boolean => httpServers.has(connectionKey(scopeKey, serverId))

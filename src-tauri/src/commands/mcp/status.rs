@@ -2,19 +2,44 @@ use std::collections::HashMap;
 
 use super::rpc::{json_rpc, list_tools_internal};
 use super::spawn::mcp_stop;
-use super::types::{set_state, McpServerState, McpToolInfo, MCP_PROCESSES, MCP_STATES};
+use super::types::{
+    mcp_connection_key, set_state, McpServerState, McpToolInfo, MCP_PROCESSES, MCP_STATES,
+};
+
+fn resolved_scope_key(scope_key: Option<&str>) -> String {
+    scope_key.unwrap_or("personal").to_string()
+}
+
+fn split_connection_key(connection_key: &str) -> (&str, &str) {
+    connection_key
+        .split_once('\u{1f}')
+        .unwrap_or(("personal", connection_key))
+}
 
 #[tauri::command]
-pub async fn mcp_refresh(server_id: String) -> Result<McpServerState, String> {
-    set_state(&server_id, "refreshing", None, vec![], None).await;
+pub async fn mcp_refresh(
+    server_id: String,
+    scope_key: Option<String>,
+) -> Result<McpServerState, String> {
+    let connection_key = mcp_connection_key(scope_key.as_deref(), &server_id);
+    set_state(
+        scope_key.as_deref(),
+        &server_id,
+        "refreshing",
+        None,
+        vec![],
+        None,
+    )
+    .await;
 
     let process = {
         let processes = MCP_PROCESSES.lock().await;
-        processes.get(&server_id).cloned()
+        processes.get(&connection_key).cloned()
     };
 
     let Some(process) = process else {
         set_state(
+            scope_key.as_deref(),
             &server_id,
             "stopped",
             Some("Server not running".to_string()),
@@ -26,15 +51,26 @@ pub async fn mcp_refresh(server_id: String) -> Result<McpServerState, String> {
     };
 
     let tools = list_tools_internal(&process).await?;
-    set_state(&server_id, "connected", None, tools.clone(), None).await;
+    set_state(
+        scope_key.as_deref(),
+        &server_id,
+        "connected",
+        None,
+        tools.clone(),
+        None,
+    )
+    .await;
 
     let icons = {
         let states = MCP_STATES.lock().await;
-        states.get(&server_id).and_then(|state| state.icons.clone())
+        states
+            .get(&connection_key)
+            .and_then(|state| state.icons.clone())
     };
 
     Ok(McpServerState {
         server_id: server_id.clone(),
+        scope_key: resolved_scope_key(scope_key.as_deref()),
         status: "connected".to_string(),
         error: None,
         tools,
@@ -43,22 +79,34 @@ pub async fn mcp_refresh(server_id: String) -> Result<McpServerState, String> {
 }
 
 #[tauri::command]
-pub async fn mcp_logout(server_id: String) -> Result<(), String> {
-    mcp_stop(server_id.clone()).await?;
-    set_state(&server_id, "auth_required", None, vec![], None).await;
+pub async fn mcp_logout(server_id: String, scope_key: Option<String>) -> Result<(), String> {
+    mcp_stop(server_id.clone(), scope_key.clone()).await?;
+    set_state(
+        scope_key.as_deref(),
+        &server_id,
+        "auth_required",
+        None,
+        vec![],
+        None,
+    )
+    .await;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn mcp_list_tools(server_id: String) -> Result<Vec<McpToolInfo>, String> {
-    let state = mcp_status(server_id.clone()).await?;
+pub async fn mcp_list_tools(
+    server_id: String,
+    scope_key: Option<String>,
+) -> Result<Vec<McpToolInfo>, String> {
+    let state = mcp_status(server_id, scope_key).await?;
     Ok(state.tools)
 }
 
-async fn sync_process_liveness(server_id: &str) -> Option<McpServerState> {
+async fn sync_process_liveness(connection_key: &str) -> Option<McpServerState> {
+    let (scope, server_id) = split_connection_key(connection_key);
     let process = {
         let processes = MCP_PROCESSES.lock().await;
-        processes.get(server_id).cloned()
+        processes.get(connection_key).cloned()
     };
 
     if let Some(process) = process {
@@ -69,20 +117,20 @@ async fn sync_process_liveness(server_id: &str) -> Option<McpServerState> {
 
         if is_running {
             let states = MCP_STATES.lock().await;
-            return states.get(server_id).cloned();
+            return states.get(connection_key).cloned();
         }
 
         let mut processes = MCP_PROCESSES.lock().await;
-        processes.remove(server_id);
+        processes.remove(connection_key);
         drop(processes);
-        set_state(server_id, "stopped", None, vec![], None).await;
+        set_state(Some(scope), server_id, "stopped", None, vec![], None).await;
         let states = MCP_STATES.lock().await;
-        return states.get(server_id).cloned();
+        return states.get(connection_key).cloned();
     }
 
     let should_mark_stopped = {
         let states = MCP_STATES.lock().await;
-        states.get(server_id).map(|state| {
+        states.get(connection_key).map(|state| {
             state.status == "connected"
                 || state.status == "starting"
                 || state.status == "refreshing"
@@ -90,20 +138,25 @@ async fn sync_process_liveness(server_id: &str) -> Option<McpServerState> {
     };
 
     if should_mark_stopped == Some(true) {
-        set_state(server_id, "stopped", None, vec![], None).await;
+        set_state(Some(scope), server_id, "stopped", None, vec![], None).await;
     }
 
     let states = MCP_STATES.lock().await;
-    states.get(server_id).cloned()
+    states.get(connection_key).cloned()
 }
 
 #[tauri::command]
-pub async fn mcp_status(server_id: String) -> Result<McpServerState, String> {
-    if let Some(state) = sync_process_liveness(&server_id).await {
+pub async fn mcp_status(
+    server_id: String,
+    scope_key: Option<String>,
+) -> Result<McpServerState, String> {
+    let connection_key = mcp_connection_key(scope_key.as_deref(), &server_id);
+    if let Some(state) = sync_process_liveness(&connection_key).await {
         return Ok(state);
     }
     Ok(McpServerState {
         server_id,
+        scope_key: resolved_scope_key(scope_key.as_deref()),
         status: "stopped".to_string(),
         error: None,
         tools: vec![],
@@ -112,7 +165,9 @@ pub async fn mcp_status(server_id: String) -> Result<McpServerState, String> {
 }
 
 #[tauri::command]
-pub async fn mcp_list_statuses() -> Result<HashMap<String, McpServerState>, String> {
+pub async fn mcp_list_statuses(
+    scope_key: Option<String>,
+) -> Result<HashMap<String, McpServerState>, String> {
     let state_ids: Vec<String> = {
         let states = MCP_STATES.lock().await;
         states.keys().cloned().collect()
@@ -125,8 +180,13 @@ pub async fn mcp_list_statuses() -> Result<HashMap<String, McpServerState>, Stri
     let mut all_ids: std::collections::HashSet<String> = state_ids.into_iter().collect();
     all_ids.extend(process_ids);
 
+    let prefix = format!("{}\u{1f}", resolved_scope_key(scope_key.as_deref()));
+
     let mut result = HashMap::new();
     for id in all_ids {
+        if !id.starts_with(&prefix) {
+            continue;
+        }
         if let Some(state) = sync_process_liveness(&id).await {
             result.insert(id, state);
         }
@@ -140,10 +200,12 @@ pub async fn mcp_call_tool(
     server_id: String,
     tool: String,
     args: serde_json::Value,
+    scope_key: Option<String>,
 ) -> Result<serde_json::Value, String> {
+    let connection_key = mcp_connection_key(scope_key.as_deref(), &server_id);
     let process = {
         let processes = MCP_PROCESSES.lock().await;
-        processes.get(&server_id).cloned()
+        processes.get(&connection_key).cloned()
     };
 
     let Some(process) = process else {

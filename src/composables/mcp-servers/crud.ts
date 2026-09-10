@@ -3,12 +3,11 @@ import formatUnknownError from '@/utils/format-unknown-error'
 import type { McpConfig, McpServerConfig } from '@/types/vixl/mcp-config'
 import type { McpInputDefinition } from '@/types/vixl/mcp-config'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
-import { listEffectiveMcpServers } from '@/services/mcp/merge-mcp-config'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
 import { listRequiredInputIdsForServer } from '@/services/mcp/resolve-mcp-inputs'
 import { mcpKnownSecretKeys } from '@/services/mcp/mcp-keychain-keys'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
-import { sessionTrusts } from '@/services/mcp/mcp-trust'
+import { clearSessionTrust } from '@/services/mcp/mcp-trust'
 import { isInternalMcpServer } from '@/types/codegraph/managed-codegraph'
 import { deleteSecret, setMcpServerEnabled } from '@/services/vixl/vixl-tauri'
 import type { SettingsTab } from '@/composables/use-vixl-config'
@@ -21,9 +20,13 @@ type AssertTrustedFn = (
   serverId: string,
   serverConfig: McpServerConfig,
   settings?: VixlSettings,
+  scopeKey?: string | null,
 ) => void
 
 type StartServerFn = ReturnType<typeof createStartServer>
+
+const scopeKeyFor = (tab: SettingsTab, rootPath: string | null): string =>
+  tab === 'personal' ? 'personal' : (rootPath?.trim() || 'personal')
 
 const removeMcpSecrets = async (keys: string[]): Promise<void> => {
   const failures: string[] = []
@@ -59,7 +62,7 @@ export const addServer = async (
     },
   }
   await saveScopedConfig(tab, next, rootPath)
-  await refreshStates()
+  await refreshStates(scopeKeyFor(tab, rootPath))
 }
 
 export const upsertServer = async (
@@ -79,10 +82,11 @@ export const upsertServer = async (
   const nextServers = { ...scoped.servers }
   const previousId = options?.previousId
   const secretKeys = new Set<string>()
+  const scopeKey = scopeKeyFor(tab, rootPath)
 
   if (previousId && previousId !== serverId) {
     delete nextServers[previousId]
-    await mcpRuntime.stop(previousId)
+    await mcpRuntime.stop(previousId, undefined, scopeKey)
     const previous = scoped.servers[previousId]
     if (previous) {
       for (const key of mcpKnownSecretKeys(
@@ -107,9 +111,9 @@ export const upsertServer = async (
     )) {
       secretKeys.add(key)
     }
-    sessionTrusts.delete(serverId)
+    clearSessionTrust(serverId, scopeKey)
     if (previousId) {
-      sessionTrusts.delete(previousId)
+      clearSessionTrust(previousId, scopeKey)
     }
   }
 
@@ -134,7 +138,7 @@ export const upsertServer = async (
     },
     rootPath,
   )
-  await refreshStates()
+  await refreshStates(scopeKey)
 }
 
 export const deleteServer = async (
@@ -145,14 +149,15 @@ export const deleteServer = async (
   const scoped = tab === 'personal' ? personalMcp.value : projectMcp.value
   const removed = scoped.servers[serverId]
   const { [serverId]: _removed, ...rest } = scoped.servers
+  const scopeKey = scopeKeyFor(tab, rootPath)
   await saveScopedConfig(tab, { servers: rest }, rootPath)
-  await mcpRuntime.stop(serverId, removed)
+  await mcpRuntime.stop(serverId, removed, scopeKey)
   if (removed) {
     await removeMcpSecrets(
       mcpKnownSecretKeys(serverId, listRequiredInputIdsForServer(removed)),
     )
   }
-  await refreshStates()
+  await refreshStates(scopeKey)
 }
 
 export const updateServer = async (
@@ -171,26 +176,13 @@ export const createSetServerEnabled = (
 ) => async (
   serverId: string,
   enabled: boolean,
+  tab: SettingsTab,
   rootPath: string | null,
   projectConfigOverride?: McpConfig,
   settings?: VixlSettings,
 ): Promise<McpConfig | undefined> => {
+  const scopeKey = scopeKeyFor(tab, rootPath)
   const projectConfig = projectConfigOverride ?? projectMcp.value
-  const effective = listEffectiveMcpServers(personalMcp.value, projectConfig)
-  const server = effective.find((item) => item.id === serverId)
-  if (!server) {
-    toast.error('MCP server not found', {
-      description: serverId,
-    })
-    return
-  }
-
-  if (enabled) {
-    assertTrustedOrThrow(serverId, server.config, settings)
-  }
-
-  const tab: SettingsTab =
-    server.scope === 'personal' ? 'personal' : 'project'
   const scoped = tab === 'personal' ? personalMcp.value : projectConfig
   const existing = scoped.servers[serverId]
   if (!existing) {
@@ -198,6 +190,10 @@ export const createSetServerEnabled = (
       description: `${serverId} (${tab})`,
     })
     return
+  }
+
+  if (enabled) {
+    assertTrustedOrThrow(serverId, existing, settings, scopeKey)
   }
 
   if (tab === 'project' && !rootPath) {
@@ -230,12 +226,13 @@ export const createSetServerEnabled = (
         await startServer(serverId, nextConfig, {
           quiet: true,
           manageLoading: false,
+          scopeKey,
           ...(settings !== undefined ? { settings } : {}),
         })
       } else {
-        await stopServer(serverId, { quiet: true, manageLoading: false })
+        await stopServer(serverId, { quiet: true, manageLoading: false, scopeKey })
       }
-      await refreshStates()
+      await refreshStates(scopeKey)
     } catch (error) {
       if (tab === 'personal') {
         personalMcp.value = scoped
@@ -244,7 +241,7 @@ export const createSetServerEnabled = (
       }
       throw error
     }
-  })
+  }, scopeKey)
 
   if (useProjectOverride) {
     return nextScoped

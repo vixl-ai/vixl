@@ -34,7 +34,7 @@ const readMcpResource = (ctx: HarnessToolContext) =>
       if (!allowed) {
         return { rejected: true, error: 'MCP resource read denied' }
       }
-      return mcpRuntime.readResource(serverId, uri)
+      return mcpRuntime.readResource(serverId, uri, trust.scopeKey)
     },
   })
 
