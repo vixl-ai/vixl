@@ -1,6 +1,7 @@
 import {
   authenticate,
   callTool,
+  cancelAuthenticate,
   getPrompt,
   getStatus,
   listPrompts,
@@ -18,6 +19,7 @@ const mcpRuntime = {
   refresh,
   logout,
   authenticate,
+  cancelAuthenticate,
   callTool,
   listStatuses,
   getStatus,

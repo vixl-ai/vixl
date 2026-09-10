@@ -14,6 +14,14 @@ pub async fn mcp_refresh(server_id: String) -> Result<McpServerState, String> {
     };
 
     let Some(process) = process else {
+        set_state(
+            &server_id,
+            "stopped",
+            Some("Server not running".to_string()),
+            vec![],
+            None,
+        )
+        .await;
         return Err("Server not running".to_string());
     };
 

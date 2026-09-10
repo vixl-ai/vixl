@@ -148,8 +148,16 @@ export const refreshServer = async (
         toast.success(`${serverId} refreshed (${state.tools.length} tools)`)
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
       toast.error('Refresh failed', {
-        description: error instanceof Error ? error.message : 'Unknown error',
+        description: message,
+      })
+      const notRunning = message.includes('Server not running')
+      patchServerState(serverId, {
+        serverId,
+        status: notRunning ? 'stopped' : 'error',
+        tools: [],
+        error: message,
       })
     }
   })
@@ -163,7 +171,7 @@ export const createRefreshOrStartServer = (
   options?: { quiet?: boolean },
 ): Promise<void> => {
   const status = serverStates.value[serverId]?.status ?? 'stopped'
-  if (status === 'connected' || status === 'error' || status === 'refreshing') {
+  if (status === 'connected') {
     await refreshServer(serverId, config, options)
     return
   }
@@ -215,6 +223,9 @@ export const createAuthenticateServer = (
       resolveMcpAuthForServer(serverId, { action: 'authenticated' })
       toast.success(`${serverId} authenticated`)
     } catch (error) {
+      if (error instanceof Error && error.message === 'OAuth callback aborted') {
+        throw error
+      }
       patchServerState(serverId, {
         serverId,
         status: 'auth_required',

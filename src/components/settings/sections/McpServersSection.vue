@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Square,
   Trash2,
+  X,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
@@ -63,6 +64,7 @@ const {
   refreshServer,
   refreshAllServers,
   authenticateServer,
+  cancelAuthenticateServer,
   logoutServer,
   upsertServer,
   deleteServer,
@@ -114,6 +116,20 @@ const isAuthCapableServer = (serverConfig: McpServerConfig): boolean =>
   isMcpHttpServer(serverConfig)
 
 const serverStatus = (id: string): string => serverStates.value[id]?.status ?? 'stopped'
+
+const statusTooltip = (id: string): string => {
+  const status = serverStatus(id)
+  if (status === 'error') {
+    return serverStates.value[id]?.error || 'Connection failed'
+  }
+  if (status === 'auth_required') {
+    return serverStates.value[id]?.error || 'Authentication required'
+  }
+  if (status === 'connected') {
+    return 'Connected'
+  }
+  return 'Stopped'
+}
 
 const isServerLoading = (id: string): boolean =>
   loadingServers.value[id] === true || authenticatingServers.value[id] === true
@@ -194,7 +210,7 @@ const handleRefreshServer = async (id: string, serverConfig: McpServerConfig): P
     return
   }
   const status = serverStatus(id)
-  if (status === 'connected' || status === 'error' || status === 'refreshing') {
+  if (status === 'connected') {
     await refreshServer(id, serverConfig)
     return
   }
@@ -359,31 +375,38 @@ const refreshAll = async (): Promise<void> => {
             <ChevronRight v-else class="h-4 w-4 shrink-0" />
             <McpServerIcon :server-id="server.id" />
             <span class="truncate font-medium">{{ server.id }}</span>
-            <Loader2
-              v-if="
-                isServerLoading(server.id) ||
-                serverStatus(server.id) === 'starting' ||
-                serverStatus(server.id) === 'refreshing'
-              "
-              class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground"
-            />
-            <CheckCircle2
-              v-else-if="
-                isMcpServerEnabled(server.config) && serverStatus(server.id) === 'connected'
-              "
-              class="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
-            />
-            <AlertCircle
-              v-else-if="isMcpServerEnabled(server.config) && serverStatus(server.id) === 'error'"
-              class="h-3.5 w-3.5 shrink-0 text-destructive"
-            />
-            <ShieldAlert
-              v-else-if="
-                isMcpServerEnabled(server.config) && serverStatus(server.id) === 'auth_required'
-              "
-              class="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400"
-            />
-            <Circle v-else class="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="inline-flex shrink-0">
+                  <Loader2
+                    v-if="
+                      isServerLoading(server.id) ||
+                      serverStatus(server.id) === 'starting' ||
+                      serverStatus(server.id) === 'refreshing'
+                    "
+                    class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground"
+                  />
+                  <CheckCircle2
+                    v-else-if="
+                      isMcpServerEnabled(server.config) && serverStatus(server.id) === 'connected'
+                    "
+                    class="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                  />
+                  <AlertCircle
+                    v-else-if="isMcpServerEnabled(server.config) && serverStatus(server.id) === 'error'"
+                    class="h-3.5 w-3.5 shrink-0 text-destructive"
+                  />
+                  <ShieldAlert
+                    v-else-if="
+                      isMcpServerEnabled(server.config) && serverStatus(server.id) === 'auth_required'
+                    "
+                    class="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+                  />
+                  <Circle v-else class="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{{ statusTooltip(server.id) }}</TooltipContent>
+            </Tooltip>
           </button>
           <Badge
             v-if="!isServerLoading(server.id) && serverStates[server.id]?.tools?.length"
@@ -415,7 +438,7 @@ const refreshAll = async (): Promise<void> => {
               </TooltipTrigger>
               <TooltipContent>Edit server</TooltipContent>
             </Tooltip>
-            <Tooltip>
+            <Tooltip v-if="listRequiredInputIdsForServer(server.config).length > 0">
               <TooltipTrigger as-child>
                 <Button
                   variant="ghost"
@@ -484,6 +507,7 @@ const refreshAll = async (): Promise<void> => {
                   size="icon"
                   class="h-8 w-8"
                   :aria-label="serverStatus(server.id) === 'auth_required' ? 'Log in' : 'Log out'"
+                  :disabled="isServerLoading(server.id)"
                   @click="handleAuthAction(server.id, server.config)"
                 >
                   <LogIn v-if="serverStatus(server.id) === 'auth_required'" class="h-4 w-4" />
@@ -493,6 +517,20 @@ const refreshAll = async (): Promise<void> => {
               <TooltipContent>
                 {{ serverStatus(server.id) === 'auth_required' ? 'Log in' : 'Log out' }}
               </TooltipContent>
+            </Tooltip>
+            <Tooltip v-if="authenticatingServers[server.id]">
+              <TooltipTrigger as-child>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="h-8 w-8"
+                  aria-label="Cancel sign in"
+                  @click="cancelAuthenticateServer(server.id)"
+                >
+                  <X class="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Cancel sign in</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger as-child>

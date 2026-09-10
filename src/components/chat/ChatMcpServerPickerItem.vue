@@ -71,6 +71,16 @@ const statusLabel = computed((): string => {
   return 'Stopped'
 })
 
+const statusTooltip = computed((): string => {
+  if (serverStatus.value === 'error') {
+    const error = serverStates.value[props.server.id]?.error
+    if (error) {
+      return error
+    }
+  }
+  return statusLabel.value
+})
+
 const statusIconClass = computed((): string => {
   if (isLoading.value) {
     return 'text-muted-foreground'
@@ -168,7 +178,7 @@ const handleToggle = (): void => {
         </span>
       </TooltipTrigger>
       <TooltipContent>
-        {{ statusLabel }}
+        {{ statusTooltip }}
       </TooltipContent>
     </Tooltip>
 

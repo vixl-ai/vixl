@@ -31,6 +31,7 @@ import type { McpRuntimeOptions } from './types'
 import callHttpToolWithStepUp from './step-up'
 
 const oauthInFlight = new Map<string, Promise<McpServerState>>()
+const oauthAbortControllers = new Map<string, AbortController>()
 
 const isOAuthCallbackAborted = (error: unknown): boolean =>
   error instanceof Error && error.message === 'OAuth callback aborted'
@@ -44,6 +45,7 @@ const runAuthenticateHttp = async (
 
   const loopback = await oauthBeginLoopback(serverId)
   const abort = new AbortController()
+  oauthAbortControllers.set(serverId, abort)
   const callbackPromise = waitForOAuthCallback(abort.signal, serverId)
 
   let result: McpServerState | undefined
@@ -121,6 +123,7 @@ const runAuthenticateHttp = async (
       failure = error
     }
   } finally {
+    oauthAbortControllers.delete(serverId)
     try {
       await oauthCancelLoopback(serverId)
     } catch (cancelError) {
@@ -139,6 +142,15 @@ const runAuthenticateHttp = async (
   }
 
   return result
+}
+
+export const cancelAuthenticate = (serverId: string): boolean => {
+  const controller = oauthAbortControllers.get(serverId)
+  if (!controller) {
+    return false
+  }
+  controller.abort()
+  return true
 }
 
 export const authenticate = async (

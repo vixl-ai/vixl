@@ -12,6 +12,7 @@ import {
   updateServer,
   upsertServer,
 } from './crud'
+import cancelAuthenticateServer from './cancel-authenticate-server'
 import {
   createAssertTrustedOrThrow,
   createAuthenticateServer,
@@ -61,6 +62,7 @@ const useMcpServers = () => {
     refreshOrStartServer,
     refreshAllServers,
     authenticateServer,
+    cancelAuthenticateServer,
     logoutServer,
     addServer,
     updateServer,
