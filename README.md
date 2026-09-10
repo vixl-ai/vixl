@@ -9,7 +9,7 @@
   <a href="https://github.com/vixl-ai/vixl/actions/workflows/deploy-docs.yml"><img src="https://github.com/vixl-ai/vixl/actions/workflows/deploy-docs.yml/badge.svg" alt="Deploy docs" /></a>
   <a href="https://vixl.app/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Docs" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License: MIT" /></a>
-  <a href="https://vixl.app/"><img src="https://img.shields.io/badge/status-alpha-orange.svg" alt="Status: Alpha" /></a>
+  <a href="https://vixl.app/"><img src="https://img.shields.io/badge/status-beta-blue.svg" alt="Status: Beta" /></a>
   <a href="https://github.com/vixl-ai/vixl/stargazers"><img src="https://img.shields.io/github/stars/vixl-ai/vixl?style=flat" alt="GitHub stars" /></a>
 </p>
 

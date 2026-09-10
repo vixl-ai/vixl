@@ -107,8 +107,8 @@ Maintainers handle releases. Contributors do not need to publish builds.
 3. Tag and push, or run the **Release** workflow manually:
 
 ```bash
-git tag v0.1.0-alpha.0
-git push origin v0.1.0-alpha.0
+git tag v0.1.0-beta.1
+git push origin v0.1.0-beta.1
 ```
 
 The [Release](.github/workflows/release.yml) workflow builds macOS (arm64), Linux x64, and Windows via [`tauri-action`](https://v2.tauri.app/distribute/pipelines/github/), uploads installers to a GitHub Release, then attaches `SHA256SUMS.txt` and `SHA512SUMS.txt` and publishes the release.
