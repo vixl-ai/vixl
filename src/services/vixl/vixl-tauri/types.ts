@@ -64,6 +64,8 @@ export type WebFetchResponse = {
   status: number
   body: string
   headers: Record<string, string>
+  isImage?: boolean
+  bodyBase64?: string
 }
 
 export type ChatMetaRecord = {

@@ -1,6 +1,7 @@
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { PermissionCapabilityKey, PermissionLevel } from '@/types/harness/permission'
+import type { StagedImage } from '@/types/harness/staged-image'
 import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 
 type HarnessToolContext = {
@@ -18,6 +19,8 @@ type HarnessToolContext = {
   sessionDenies: Set<string>
   sandboxEnabled: boolean
   supportsVision: boolean
+  /** Present when the parent model can take user-message images. Subagents may omit this. */
+  stageImage?: (image: StagedImage) => Promise<void>
   onPendingApproval: (entry: PendingApprovalView) => void
   persistPermission?: (
     capability: PermissionCapabilityKey,

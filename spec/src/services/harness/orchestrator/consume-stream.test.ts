@@ -169,7 +169,7 @@ describe('consumeStream parent prepareStep', () => {
     expect(prepareParentCompactStep).toHaveBeenCalledTimes(1)
     expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({
-        prepareStep: prepareStep,
+        prepareStep: expect.any(Function),
       }),
     )
     expect(prepareStep).toHaveBeenCalledWith({

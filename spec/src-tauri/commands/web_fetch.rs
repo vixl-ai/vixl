@@ -1,7 +1,9 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use app_lib::commands::http::{is_blocked_ip, is_blocked_proxy_host};
-use app_lib::commands::web_fetch::{accept_header_for_format, WebFetchFormat};
+use app_lib::commands::web_fetch::{
+    accept_header_for_format, is_image_content_type, WebFetchFormat,
+};
 
 #[test]
 fn blocks_metadata_and_link_local() {
@@ -58,4 +60,15 @@ fn accept_header_matches_format() {
     accept_header_for_format(WebFetchFormat::Html),
     "text/html;q=1.0, application/xhtml+xml;q=0.9, text/plain;q=0.8, text/markdown;q=0.7, */*;q=0.1"
   );
+}
+
+#[test]
+fn image_content_type_matches_image_mime() {
+    assert!(is_image_content_type("image/png"));
+    assert!(is_image_content_type("IMAGE/JPEG"));
+    assert!(is_image_content_type("image/webp; charset=binary"));
+    assert!(is_image_content_type("image/svg+xml"));
+    assert!(!is_image_content_type("text/html"));
+    assert!(!is_image_content_type("application/pdf"));
+    assert!(!is_image_content_type("application/octet-stream"));
 }
