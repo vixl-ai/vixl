@@ -1,3 +1,4 @@
+import { toast } from 'vue-sonner'
 import {
   convertToModelMessages,
   type LanguageModel,
@@ -13,8 +14,10 @@ import filterMessagesForActiveContext, {
   type FilteredActiveContextMessages,
 } from '@/services/context/filter-messages-for-active-context'
 import {
-  generateCheckpoint,
   persistCompactionCheckpoint,
+  resolveCompactHighWater,
+  resolveCompactWindow,
+  runCompactRewrite,
 } from '@/services/harness/compact'
 import resolveModelVision from '@/services/harness/resolve-model-vision'
 import { resolveSideTaskCallOptions } from '@/services/models/resolve-model-call-options'
@@ -44,6 +47,7 @@ export type CompactSessionResult = {
   summary: string
   includeFromCreatedAt: string
   checkpointLineId: string
+  usedFallback: boolean
 }
 
 const toNativePrefix = async (input: {
@@ -125,40 +129,60 @@ export default async (input: CompactSessionInput): Promise<CompactSessionResult>
     }
 
     const callOptions = resolveSideTaskCallOptions(settings, modelRef)
-    const compacted = await generateCheckpoint({
-      model,
-      modelRef,
+    const result = await runCompactRewrite({
+      checkpointInput: {
+        model,
+        modelRef,
+        system: frozenSystem ?? '',
+        providerOptions: callOptions.providerOptions,
+        tools: {},
+        messages: nativeMessages,
+        focus: focus ?? 'none',
+        signal: signal ?? new AbortController().signal,
+      },
       system: frozenSystem ?? '',
-      providerOptions: callOptions.providerOptions,
-      tools: {},
       messages: nativeMessages,
-      focus: focus ?? 'none',
-      signal: signal ?? new AbortController().signal,
+      highWater: resolveCompactHighWater(settings, modelRef),
+      hardWindow: resolveCompactWindow(settings, modelRef),
     })
 
-    if (input.onEvent) {
-      await captureBillableUsage({
-        projectSlug,
-        chatId,
-        turnId: input.turnId ?? `session:${chatId}`,
-        source: 'compaction',
-        providerId: compacted.modelRef.providerId,
-        modelId: compacted.modelRef.modelId,
-        usage: compacted.usage,
-        providerMetadata: compacted.providerMetadata,
-        responseId: compacted.responseId,
-        settings,
-        onEvent: input.onEvent,
-      })
-    }
-
-    return persistCompactionCheckpoint({
+    const compacted = result.compacted
+    const checkpoint = await persistCompactionCheckpoint({
       projectSlug,
       chatId,
-      summary: compacted.summary,
+      summary: result.summary,
       focus,
       messages,
     })
+
+    if (input.onEvent && compacted) {
+      try {
+        await captureBillableUsage({
+          projectSlug,
+          chatId,
+          turnId: input.turnId ?? `session:${chatId}`,
+          source: 'compaction',
+          providerId: compacted.modelRef.providerId,
+          modelId: compacted.modelRef.modelId,
+          usage: compacted.usage,
+          providerMetadata: compacted.providerMetadata,
+          responseId: compacted.responseId,
+          settings,
+          onEvent: input.onEvent,
+        })
+      } catch (error) {
+        toast.error('Failed to record compaction usage', {
+          description:
+            error instanceof Error ? error.message : 'Unknown error',
+        })
+      }
+    }
+
+    return {
+      ...checkpoint,
+      usedFallback:
+        compacted === null || result.summary !== compacted.summary,
+    }
   } catch (error) {
     throw new Error(formatUnknownError(error))
   }
