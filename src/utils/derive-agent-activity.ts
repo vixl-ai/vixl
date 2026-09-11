@@ -95,13 +95,15 @@ export default (args: DeriveAgentActivityArgs): string | null => {
     return null
   }
 
+  // submitted: prefill, stream not open. streaming: decode, nothing
+  // renderable yet.
   if (!args.turn || !hasTurnContent(args.turn)) {
-    return 'Working'
+    return args.status === 'submitted' ? 'Processing' : 'Generating'
   }
 
   const lastStep = args.turn.steps.at(-1)
   if (!lastStep) {
-    return 'Working'
+    return 'Generating'
   }
 
   const hasText =
@@ -113,10 +115,11 @@ export default (args: DeriveAgentActivityArgs): string | null => {
   }
 
   // Tools finished and the model is being called again, including an empty
-  // next step after prior content. Streaming text or reasoning with no
-  // completed-tool wait owns the UI instead.
+  // next step after prior content. Same underlying state as submitted.
+  // Streaming text or reasoning with no completed-tool wait owns the UI
+  // instead.
   if (lastStep.tools.length > 0 || (!hasText && !hasReasoning)) {
-    return 'Processing request'
+    return 'Processing'
   }
 
   return null

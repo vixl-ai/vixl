@@ -185,17 +185,37 @@ describe('deriveAgentActivity', () => {
     ).toBeNull()
   })
 
-  it('shows Working before first content', () => {
+  it('shows Processing before first content when submitted', () => {
     expect(
       deriveAgentActivity({
         status: 'submitted',
         turn: turn({}),
         runningSubagents: [],
       }),
-    ).toBe('Working')
+    ).toBe('Processing')
   })
 
-  it('shows Processing request after last-step tools finish', () => {
+  it('shows Generating before first content when streaming', () => {
+    expect(
+      deriveAgentActivity({
+        status: 'streaming',
+        turn: turn({}),
+        runningSubagents: [],
+      }),
+    ).toBe('Generating')
+  })
+
+  it('shows Generating when the turn has text but no steps', () => {
+    expect(
+      deriveAgentActivity({
+        status: 'streaming',
+        turn: turn({ text: 'The backend manages a' }),
+        runningSubagents: [],
+      }),
+    ).toBe('Generating')
+  })
+
+  it('shows Processing after last-step tools finish', () => {
     expect(
       deriveAgentActivity({
         status: 'streaming',
@@ -218,10 +238,10 @@ describe('deriveAgentActivity', () => {
         }),
         runningSubagents: [],
       }),
-    ).toBe('Processing request')
+    ).toBe('Processing')
   })
 
-  it('shows Processing request after last-step tools finish with preamble', () => {
+  it('shows Processing after last-step tools finish with preamble', () => {
     expect(
       deriveAgentActivity({
         status: 'streaming',
@@ -244,10 +264,10 @@ describe('deriveAgentActivity', () => {
         }),
         runningSubagents: [],
       }),
-    ).toBe('Processing request')
+    ).toBe('Processing')
   })
 
-  it('shows Processing request on an empty next step after done tools', () => {
+  it('shows Processing on an empty next step after done tools', () => {
     expect(
       deriveAgentActivity({
         status: 'streaming',
@@ -276,7 +296,7 @@ describe('deriveAgentActivity', () => {
         }),
         runningSubagents: [],
       }),
-    ).toBe('Processing request')
+    ).toBe('Processing')
   })
 
   it('hides sticky activity while streaming text with no completed-tool wait', () => {
@@ -298,7 +318,7 @@ describe('deriveAgentActivity', () => {
     ).toBeNull()
   })
 
-  it('hides Working and Processing request while compacting', () => {
+  it('hides activity while compacting', () => {
     expect(
       deriveAgentActivity({
         status: 'streaming',

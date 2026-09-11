@@ -12,7 +12,7 @@ export default (subagent: SubagentTimelineItem): string | null => {
 
   const tools = subagent.tools
   if (tools.length === 0) {
-    return 'Working'
+    return 'Generating'
   }
 
   const running = [...tools].reverse().find((tool) => tool.status === 'running')
@@ -22,7 +22,7 @@ export default (subagent: SubagentTimelineItem): string | null => {
 
   const last = tools.at(-1)
   if (!last) {
-    return 'Working'
+    return 'Generating'
   }
   return formatToolRunLabel(last)
 }
