@@ -112,7 +112,9 @@ export default () => {
     const chatId = meta?.id ?? null
 
     if (chatStore.loading.value) {
-      contextUsage.bindChat(chatId)
+      if (chatId) {
+        contextUsage.bindChat(chatId)
+      }
       return
     }
 

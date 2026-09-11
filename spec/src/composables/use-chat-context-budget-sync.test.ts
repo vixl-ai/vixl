@@ -129,6 +129,28 @@ describe('useChatContextBudgetSync', () => {
     expect(bindChat).toHaveBeenCalledWith('chat-1')
   })
 
+  it('does not unbind during cold hydration while loading and meta is still null', async () => {
+    loading.value = true
+    meta.value = null
+    const { default: useChatContextBudgetSync } = await import(
+      '@/composables/use-chat-context-budget-sync'
+    )
+    const sync = useChatContextBudgetSync()
+    const refresh = refreshFns.current.at(-1)
+    const bindChat = bindChatFns.current.at(-1)
+    expect(refresh).toBeDefined()
+    expect(bindChat).toBeDefined()
+    refresh?.mockClear()
+    bindChat?.mockClear()
+
+    await sync.refreshContextBudget()
+    await flushDeferredRefresh()
+
+    expect(refresh).not.toHaveBeenCalled()
+    expect(bindChat).not.toHaveBeenCalled()
+    expect(bindChat).not.toHaveBeenCalledWith(null)
+  })
+
   it('binds null and skips refresh when there is no active chat', async () => {
     meta.value = null
     const { default: useChatContextBudgetSync } = await import(
