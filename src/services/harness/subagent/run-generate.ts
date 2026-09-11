@@ -108,6 +108,8 @@ const runSubagentGenerate = async (args: {
   const nestedCtx: HarnessToolContext = {
     ...ctx,
     supportsVision,
+    // Subagents opt out of image staging: generateText has no stage drain.
+    stageImage: undefined,
     onHarnessEvent: emitNestedEvent,
     onPendingApproval: (entry) => {
       ctx.onPendingApproval({ ...entry, subagentId, subagentLabel: safeName })

@@ -34,6 +34,8 @@ import resolveModelRefForCall from '@/services/models/resolve-model-ref-for-call
 import { toast } from 'vue-sonner'
 import formatUnknownError from '@/utils/format-unknown-error'
 import resolveModelVision from '@/services/harness/resolve-model-vision'
+import { stageImage } from '@/services/harness/image-stage'
+import type { StagedImage } from '@/types/harness/staged-image'
 import {
   filterToolsForMode,
   injectContextIntoLastUserMessage,
@@ -248,6 +250,16 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
       sessionDenies,
       sandboxEnabled: settings['agent.sandbox.enabled'] ?? true,
       supportsVision,
+      ...(supportsVision
+        ? {
+            stageImage: (image: StagedImage) =>
+              stageImage({
+                chatId,
+                turnId: assistantId,
+                image,
+              }),
+          }
+        : {}),
       onPendingApproval: (entry) => {
         onEvent({
           type: 'tool-pending-approval',

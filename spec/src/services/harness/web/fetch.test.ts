@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import type { StagedImage } from '@/types/harness/staged-image'
+import type {
+  WebFetchRequest,
+  WebFetchResponse,
+} from '@/services/vixl/vixl-tauri/types'
 
 const gateToolPermission = vi.hoisted(() =>
   vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
 )
 
 const webFetch = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  vi.fn<(request: WebFetchRequest) => Promise<WebFetchResponse>>(),
 )
 
 const convertWebContent = vi.hoisted(() =>
@@ -174,5 +179,85 @@ describe('web_fetch tool', () => {
     const result = await execute({ url: 'not a url' })
     expect(result).toEqual({ error: 'Invalid URL' })
     expect(webFetch).not.toHaveBeenCalled()
+  })
+
+  it('stages vision images and returns loadedIntoContext', async () => {
+    const stageImage = vi.fn<(image: StagedImage) => Promise<void>>(
+      async () => undefined,
+    )
+    webFetch.mockResolvedValue({
+      status: 200,
+      body: '',
+      headers: { 'Content-Type': 'image/png' },
+      isImage: true,
+      bodyBase64: 'aaaa',
+    })
+
+    const result = await execute(
+      { url: 'https://github.com/user-attachments/assets/shot.png' },
+      { ...baseCtx(), supportsVision: true, stageImage },
+    )
+
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capability: 'web.fetch:github.com',
+        action: 'web.fetch',
+      }),
+    )
+    expect(webFetch).toHaveBeenCalledTimes(1)
+    expect(convertWebContent).not.toHaveBeenCalled()
+    expect(stageImage).toHaveBeenCalledWith({
+      dataUrl: 'data:image/png;base64,aaaa',
+      mediaType: 'image/png',
+      source: 'https://github.com/user-attachments/assets/shot.png',
+    })
+    expect(result).toEqual({
+      status: 200,
+      contentType: 'image/png',
+      isImage: true,
+      loadedIntoContext: true,
+    })
+  })
+
+  it('returns a cannot-view-images error when stageImage is absent', async () => {
+    webFetch.mockResolvedValue({
+      status: 200,
+      body: '',
+      headers: { 'Content-Type': 'image/png' },
+      isImage: true,
+      bodyBase64: 'aaaa',
+    })
+
+    const result = await execute({
+      url: 'https://example.com/shot.png',
+    })
+
+    expect(webFetch).toHaveBeenCalledTimes(1)
+    expect(convertWebContent).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      error: 'This URL is an image and this model cannot view images.',
+      status: 200,
+      contentType: 'image/png',
+    })
+  })
+
+  it('leaves non-image responses unchanged', async () => {
+    const stageImage = vi.fn<(image: StagedImage) => Promise<void>>(
+      async () => undefined,
+    )
+
+    const result = (await execute(
+      { url: 'https://example.com/docs' },
+      { ...baseCtx(), supportsVision: true, stageImage },
+    )) as Record<string, unknown>
+
+    expect(stageImage).not.toHaveBeenCalled()
+    expect(convertWebContent).toHaveBeenCalled()
+    expect(result.status).toBe(200)
+    expect(result.isImage).toBeUndefined()
+    expect(result.loadedIntoContext).toBeUndefined()
+    expect(String(result.text)).toContain(
+      'Untrusted web content from https://example.com/docs',
+    )
   })
 })

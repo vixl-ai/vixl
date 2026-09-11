@@ -29,10 +29,15 @@ const headerValue = (
   return undefined
 }
 
+const imageMediaType = (contentType: string): string => {
+  const mime = contentType.split(';')[0]?.trim()
+  return mime || contentType
+}
+
 const webFetchTool = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Fetch an http(s) URL as markdown (default), text, or html. No JavaScript.',
+      'Fetch an http(s) URL as markdown (default), text, or html. No JavaScript. Image URLs are loaded into context automatically for vision models.',
     inputSchema: z.object({
       url: z.string().describe('http or https URL to fetch'),
       max_length: z
@@ -105,6 +110,51 @@ const webFetchTool = (ctx: HarnessToolContext) =>
 
         const contentType =
           headerValue(response.headers, 'content-type') ?? ''
+
+        if (response.isImage) {
+          if (!ctx.stageImage) {
+            return {
+              error:
+                'This URL is an image and this model cannot view images.',
+              status: response.status,
+              contentType,
+            }
+          }
+
+          if (!response.bodyBase64) {
+            return {
+              error: 'Image response was missing body data.',
+              status: response.status,
+              contentType,
+            }
+          }
+
+          const mediaType = imageMediaType(contentType)
+          try {
+            await ctx.stageImage({
+              dataUrl: `data:${mediaType};base64,${response.bodyBase64}`,
+              mediaType,
+              source: parsed.href,
+            })
+          } catch (error) {
+            return {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to load image into context',
+              status: response.status,
+              contentType,
+            }
+          }
+
+          return {
+            status: response.status,
+            contentType,
+            isImage: true as const,
+            loadedIntoContext: true as const,
+          }
+        }
+
         const converted = convertWebContent({
           body: response.body,
           contentType,

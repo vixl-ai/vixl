@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import type { StagedImage } from '@/types/harness/staged-image'
 import estimateTextTokens from '@/utils/estimate-text-tokens'
 
 const generateText = vi.hoisted(() =>
@@ -231,6 +232,25 @@ describe('runSubagentGenerate pending approval tagging', () => {
     const nestedCtx = buildHarnessTools.mock.calls[0]?.[0] as HarnessToolContext
     expect(nestedCtx.sessionAllows).toBe(ctx.sessionAllows)
     expect(nestedCtx.sessionDenies).toBe(ctx.sessionDenies)
+  })
+
+  it('does not inherit parent stageImage on nested tool context', async () => {
+    const stageImage = vi.fn<(image: StagedImage) => Promise<void>>()
+    const ctx = { ...baseCtx(), stageImage }
+    await runSubagentGenerate({
+      ctx,
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'describe the screenshot',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+
+    const nestedCtx = buildHarnessTools.mock.calls[0]?.[0] as HarnessToolContext
+    expect(nestedCtx.stageImage).toBeUndefined()
+    expect(stageImage).not.toHaveBeenCalled()
   })
 })
 

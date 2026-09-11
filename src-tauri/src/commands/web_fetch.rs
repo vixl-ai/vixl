@@ -41,6 +41,8 @@ pub struct WebFetchResponse {
     pub body: String,
     pub headers: HashMap<String, String>,
     pub truncated: bool,
+    pub is_image: bool,
+    pub body_base64: Option<String>,
 }
 
 pub fn accept_header_for_format(format: WebFetchFormat) -> &'static str {
@@ -57,14 +59,22 @@ pub fn accept_header_for_format(format: WebFetchFormat) -> &'static str {
   }
 }
 
-fn is_binary_content_type(content_type: &str) -> bool {
-    let mime = content_type
+fn mime_essence(content_type: &str) -> String {
+    content_type
         .split(';')
         .next()
         .unwrap_or(content_type)
         .trim()
-        .to_ascii_lowercase();
+        .to_ascii_lowercase()
+}
+
+fn is_binary_content_type(content_type: &str) -> bool {
+    let mime = mime_essence(content_type);
     mime == "application/pdf" || mime == "application/octet-stream"
+}
+
+pub fn is_image_content_type(content_type: &str) -> bool {
+    mime_essence(content_type).starts_with("image/")
 }
 
 fn build_request_headers(format: WebFetchFormat) -> HeaderMap {
@@ -141,6 +151,24 @@ pub async fn web_fetch(request: WebFetchRequest) -> Result<WebFetchResponse, Str
     }
 
     let bytes = read_body_capped(response).await?;
+
+    if let Some(content_type) = response_headers.get("content-type") {
+        if is_image_content_type(content_type) {
+            let encoded = base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                &bytes,
+            );
+            return Ok(WebFetchResponse {
+                status,
+                body: String::new(),
+                headers: response_headers,
+                truncated: false,
+                is_image: true,
+                body_base64: Some(encoded),
+            });
+        }
+    }
+
     let body = String::from_utf8(bytes).map_err(|_| {
         "Response content is binary (not valid UTF-8) and cannot be fetched as text".to_string()
     })?;
@@ -150,5 +178,7 @@ pub async fn web_fetch(request: WebFetchRequest) -> Result<WebFetchResponse, Str
         body,
         headers: response_headers,
         truncated: false,
+        is_image: false,
+        body_base64: None,
     })
 }

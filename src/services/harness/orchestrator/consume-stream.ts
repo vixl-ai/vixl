@@ -5,6 +5,7 @@ import { rejectPendingForChat } from '@/services/harness/permission/approval-gat
 import { rejectPendingQuestionsForChat } from '@/services/harness/permission/question-gate'
 import { rejectPendingMcpAuthForChat } from '@/services/mcp/mcp-auth-gate'
 import enrichToolError from '@/services/harness/enrich-tool-error'
+import { clearStagedImages } from '@/services/harness/image-stage'
 import { killShellsForChat } from '@/services/harness/shell/registry'
 import { abort as abortSubagentsForChat } from '@/services/harness/subagent/registry'
 import {
@@ -22,6 +23,7 @@ import {
 } from './helpers'
 import { persistLine } from './persistence'
 import prepareParentCompactStep from './prepare-compact-step'
+import prepareImageStep from './prepare-image-step'
 import type { PreparedHarnessStream } from './prepare-stream'
 
 export default async (prepared: PreparedHarnessStream): Promise<void> => {
@@ -87,25 +89,30 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
       isLoopFinished(),
       () => getPlanExecutionSession(workspace.projectSlug, chatId).createdPlanThisTurn,
     ],
-    prepareStep: prepareParentCompactStep({
-      settings,
-      model,
-      modelRef: callModel.optionRef,
-      system,
-      providerOptions: callOptions.providerOptions,
-      tools,
-      signal,
-      workspace,
+    prepareStep: prepareImageStep({
       chatId,
       turnId: assistantId,
-      messages,
-      onEvent,
+      inner: prepareParentCompactStep({
+        settings,
+        model,
+        modelRef: callModel.optionRef,
+        system,
+        providerOptions: callOptions.providerOptions,
+        tools,
+        signal,
+        workspace,
+        chatId,
+        turnId: assistantId,
+        messages,
+        onEvent,
+      }),
     }),
     abortSignal: signal,
     onAbort: async () => {
       rejectPendingForChat(chatId)
       rejectPendingQuestionsForChat(chatId)
       rejectPendingMcpAuthForChat(chatId)
+      clearStagedImages({ chatId, turnId: assistantId })
       await killShellsForChat(chatId)
       abortSubagentsForChat(chatId)
       if (steps.trailingText || steps.assistantReasoning) {
@@ -287,21 +294,25 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     setTurnResponseMessages(chatId, responseMessages)
   }
 
-  if (streamError && !signal.aborted) {
-    throw streamError
-  }
+  try {
+    if (streamError && !signal.aborted) {
+      throw streamError
+    }
 
-  if (!signal.aborted && (steps.trailingText || steps.assistantReasoning)) {
-    await persistLine(workspace.projectSlug, chatId, {
-      id: assistantId,
-      role: 'assistant',
-      parts: [
-        ...(steps.assistantReasoning
-          ? [{ type: 'reasoning', text: steps.assistantReasoning }]
-          : []),
-        ...(steps.trailingText ? [{ type: 'text', text: steps.trailingText }] : []),
-      ],
-      createdAt: nowIso(),
-    })
+    if (!signal.aborted && (steps.trailingText || steps.assistantReasoning)) {
+      await persistLine(workspace.projectSlug, chatId, {
+        id: assistantId,
+        role: 'assistant',
+        parts: [
+          ...(steps.assistantReasoning
+            ? [{ type: 'reasoning', text: steps.assistantReasoning }]
+            : []),
+          ...(steps.trailingText ? [{ type: 'text', text: steps.trailingText }] : []),
+        ],
+        createdAt: nowIso(),
+      })
+    }
+  } finally {
+    clearStagedImages({ chatId, turnId: assistantId })
   }
 }

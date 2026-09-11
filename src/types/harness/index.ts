@@ -1,4 +1,5 @@
 export type { HarnessToolContext } from '@/types/harness/tool-context'
+export type { StagedImage } from '@/types/harness/staged-image'
 export type { HarnessWorkspace } from '@/types/harness/harness-workspace'
 export type { HarnessStreamInput } from '@/types/harness/harness-stream-input'
 export type {
