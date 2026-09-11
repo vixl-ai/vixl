@@ -15,6 +15,8 @@ import dropUnresolvedAgentMentions from '@/services/agents/drop-unresolved-agent
 import buildMentionHighlights from '@/utils/build-mention-highlights'
 import collectExplicitAgentMentions from '@/utils/collect-explicit-agent-mentions'
 import { loadEffectiveSettings } from '@/services/config/vixl-config'
+import filenameWithMediaTypeExtension from '@/utils/filename-with-media-type-extension'
+import normalizeImageDataUrl from '@/utils/normalize-image-data-url'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
 export type SendArgs = {
@@ -162,68 +164,99 @@ export default (
       })
     }
 
-    if (!args.skipUserMessage) {
-      const fileParts = args.files ?? []
-
-      const parts: Array<
-        | { type: 'text'; text: string }
-        | { type: 'file'; mediaType: string; url: string; filename?: string }
-      > = [{ type: 'text', text: args.text }]
-
-      // Always keep file parts on the UI message so the thread can show
-      // thumbnails. Non-vision models get text placeholders later, only for
-      // convertToModelMessages in the orchestrator.
-      for (const file of fileParts) {
-        const url = file.url
-        if (url?.startsWith('file://')) {
-          parts.push({
-            type: 'text',
-            text: `[Attachment unavailable: ${file.filename || url}]`,
-          })
-          continue
-        }
-
-        if (url) {
-          parts.push({
-            type: 'file',
-            mediaType: file.mediaType || 'image/png',
-            url,
-            filename: file.filename,
-          })
-        }
-      }
-
-      const skillNames = (
-        await listSlashSkillIndex(projectRoot).catch(() => [])
-      ).map((skill) => skill.name)
-      const agentNames = agentIndex.map((agent) => agent.name)
-
-      const mentionHighlights = buildMentionHighlights(
-        args.text,
-        mentions,
-        skillNames,
-        agentNames,
-      )
-
-      session.appendLocalMessage({
-        id: crypto.randomUUID(),
-        role: 'user',
-        parts,
-        metadata: {
-          createdAt: new Date().toISOString(),
-          model: args.model,
-          ...(mentionHighlights.length > 0 ? { mentionHighlights } : {}),
-        },
-      })
-    }
-
-    const turnId = crypto.randomUUID()
-    session.startAgentTurn(turnId)
-
     const controller = new AbortController()
     abortController.value = controller
 
     try {
+      if (!args.skipUserMessage) {
+        const fileParts = args.files ?? []
+
+        const parts: Array<
+          | { type: 'text'; text: string }
+          | { type: 'file'; mediaType: string; url: string; filename?: string }
+        > = [{ type: 'text', text: args.text }]
+
+        // Always keep file parts on the UI message so the thread can show
+        // thumbnails. Non-vision models get text placeholders later, only for
+        // convertToModelMessages in the orchestrator.
+        for (const file of fileParts) {
+          const url = file.url
+          if (url?.startsWith('file://')) {
+            parts.push({
+              type: 'text',
+              text: `[Attachment unavailable: ${file.filename || url}]`,
+            })
+            continue
+          }
+
+          if (!url) {
+            continue
+          }
+
+          let mediaType = file.mediaType || 'image/png'
+          let partUrl = url
+          let filename = file.filename
+          if (url.startsWith('data:') && mediaType.startsWith('image/')) {
+            const normalized = await normalizeImageDataUrl({
+              dataUrl: url,
+              mediaType,
+            })
+            if (normalized.mediaType !== mediaType) {
+              filename = filenameWithMediaTypeExtension(
+                filename,
+                normalized.mediaType,
+              )
+            }
+            mediaType = normalized.mediaType
+            partUrl = normalized.dataUrl
+          }
+          parts.push({
+            type: 'file',
+            mediaType,
+            url: partUrl,
+            filename,
+          })
+        }
+
+        if (controller.signal.aborted) {
+          status.value = 'ready'
+          await fleetSidebar.refreshSlug(options.projectSlug)
+          return
+        }
+
+        const skillNames = (
+          await listSlashSkillIndex(projectRoot).catch(() => [])
+        ).map((skill) => skill.name)
+        const agentNames = agentIndex.map((agent) => agent.name)
+
+        const mentionHighlights = buildMentionHighlights(
+          args.text,
+          mentions,
+          skillNames,
+          agentNames,
+        )
+
+        session.appendLocalMessage({
+          id: crypto.randomUUID(),
+          role: 'user',
+          parts,
+          metadata: {
+            createdAt: new Date().toISOString(),
+            model: args.model,
+            ...(mentionHighlights.length > 0 ? { mentionHighlights } : {}),
+          },
+        })
+      }
+
+      if (controller.signal.aborted) {
+        status.value = 'ready'
+        await fleetSidebar.refreshSlug(options.projectSlug)
+        return
+      }
+
+      const turnId = crypto.randomUUID()
+      session.startAgentTurn(turnId)
+
       await runOrchestrator({
         workspace: options,
         projectSlug: options.projectSlug,
@@ -262,6 +295,9 @@ export default (
         err instanceof Error &&
         (err.name === 'TimeoutError' || /timeout/i.test(err.message))
       const message = err instanceof Error ? err.message : 'Unknown error'
+      const payloadHint = /invalid json response body/i.test(message)
+        ? ' The provider rejected the request payload. Try smaller or fewer images.'
+        : ''
       if (aborted) {
         status.value = 'ready'
         session.finishAgentTurn()
@@ -276,14 +312,14 @@ export default (
           ? 'The model took too long to respond.'
           : message.includes('No output generated')
             ? 'The model returned an empty response. Check your API key and model ID in Settings.'
-            : message,
+            : `${message}${payloadHint}`,
       })
       session.finishAgentTurn()
       attention.applyTurnEndAttention('error')
       toast.error('Agent run failed', {
         description: error.value.includes('No output generated')
           ? 'The model returned an empty response. Check your Gateway API key and model ID in Settings.'
-          : error.value,
+          : `${error.value}${payloadHint}`,
       })
       await fleetSidebar.refreshSlug(options.projectSlug)
     } finally {
