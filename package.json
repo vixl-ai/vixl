@@ -71,6 +71,7 @@
     "@xterm/xterm": "^6.0.0",
     "ai": "^7.0.29",
     "ansi-to-vue3": "^0.1.2",
+    "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dompurify": "3.4.13",

@@ -15,6 +15,12 @@ const listConfiguredProviders = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => string[]>(() => ['openai']),
 )
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
+const normalizeImageDataUrl = vi.hoisted(() =>
+  vi.fn<(args: { dataUrl: string; mediaType: string }) => Promise<{
+    dataUrl: string
+    mediaType: string
+  }>>(async (args) => args),
+)
 
 vi.mock('@/services/vixl/vixl-tauri', () =>
   mockVixlTauri({
@@ -63,6 +69,12 @@ vi.mock('vue-sonner', () => ({
   toast: {
     error: (...args: unknown[]) => toastError(...args),
   },
+}))
+
+vi.mock('@/utils/normalize-image-data-url', () => ({
+  default: (
+    args: { dataUrl: string; mediaType: string },
+  ) => normalizeImageDataUrl(args),
 }))
 
 import createSend from '@/composables/agent-harness/send'
@@ -565,5 +577,185 @@ describe('agent-harness send persist model/mode', () => {
       expect.objectContaining({ text: '   ' }),
     )
     expect(runOrchestrator).not.toHaveBeenCalled()
+  })
+
+  it('normalizes image data-url parts before appending them', async () => {
+    normalizeImageDataUrl.mockResolvedValueOnce({
+      dataUrl: 'data:image/png;base64,BBB',
+      mediaType: 'image/png',
+    })
+    const state = buildState()
+    const { send } = createSend(state, buildAttention(), {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'look',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      internal: true,
+      files: [
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          url: 'data:image/png;base64,AAA',
+          filename: 'shot.png',
+        },
+      ],
+    })
+
+    expect(normalizeImageDataUrl).toHaveBeenCalledWith({
+      dataUrl: 'data:image/png;base64,AAA',
+      mediaType: 'image/png',
+    })
+    expect(state.session.appendLocalMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parts: [
+          { type: 'text', text: 'look' },
+          {
+            type: 'file',
+            mediaType: 'image/png',
+            url: 'data:image/png;base64,BBB',
+            filename: 'shot.png',
+          },
+        ],
+      }),
+    )
+  })
+
+  it('adjusts the filename extension when normalized media type changes', async () => {
+    normalizeImageDataUrl.mockResolvedValueOnce({
+      dataUrl: 'data:image/png;base64,BBB',
+      mediaType: 'image/png',
+    })
+    const state = buildState()
+    const { send } = createSend(state, buildAttention(), {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'look',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      internal: true,
+      files: [
+        {
+          type: 'file',
+          mediaType: 'image/webp',
+          url: 'data:image/webp;base64,AAA',
+          filename: 'shot.webp',
+        },
+      ],
+    })
+
+    expect(state.session.appendLocalMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parts: [
+          { type: 'text', text: 'look' },
+          {
+            type: 'file',
+            mediaType: 'image/png',
+            url: 'data:image/png;base64,BBB',
+            filename: 'shot.png',
+          },
+        ],
+      }),
+    )
+  })
+
+  it('leaves non-image file parts untouched', async () => {
+    const state = buildState()
+    const { send } = createSend(state, buildAttention(), {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'look',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      internal: true,
+      files: [
+        {
+          type: 'file',
+          mediaType: 'application/pdf',
+          url: 'data:application/pdf;base64,AAA',
+          filename: 'notes.pdf',
+        },
+      ],
+    })
+
+    expect(normalizeImageDataUrl).not.toHaveBeenCalled()
+    expect(state.session.appendLocalMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parts: [
+          { type: 'text', text: 'look' },
+          {
+            type: 'file',
+            mediaType: 'application/pdf',
+            url: 'data:application/pdf;base64,AAA',
+            filename: 'notes.pdf',
+          },
+        ],
+      }),
+    )
+  })
+
+  it('bails out when aborted while normalizing images', async () => {
+    let resolveNormalize: (value: {
+      dataUrl: string
+      mediaType: string
+    }) => void = () => undefined
+    normalizeImageDataUrl.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveNormalize = resolve
+      }),
+    )
+    const state = buildState()
+    const { send } = createSend(state, buildAttention(), {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    const sending = send({
+      text: 'look',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      internal: true,
+      files: [
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          url: 'data:image/png;base64,AAA',
+          filename: 'shot.png',
+        },
+      ],
+    })
+
+    await vi.waitFor(() => {
+      expect(normalizeImageDataUrl).toHaveBeenCalled()
+      expect(state.abortController.value).not.toBeNull()
+    })
+    expect(state.status.value).toBe('submitted')
+
+    state.abortController.value?.abort()
+    state.status.value = 'ready'
+    resolveNormalize({
+      dataUrl: 'data:image/png;base64,BBB',
+      mediaType: 'image/png',
+    })
+    await sending
+
+    expect(state.session.appendLocalMessage).not.toHaveBeenCalled()
+    expect(state.session.startAgentTurn).not.toHaveBeenCalled()
+    expect(runOrchestrator).not.toHaveBeenCalled()
+    expect(state.status.value).toBe('ready')
+    expect(state.abortController.value).toBeNull()
   })
 })
