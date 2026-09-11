@@ -294,4 +294,55 @@ describe('chat session registry isolation', () => {
     releaseMeta?.(metaFor('chat-a'))
     await hydrating
   })
+
+  it('does not reset bound usage after selectChat before hydrate when loading is false', async () => {
+    const { default: useChatStore, resetChatSessionsForTests } = await import(
+      '@/composables/use-chat-store'
+    )
+    const { default: useContextUsage } = await import(
+      '@/composables/use-context-usage'
+    )
+    const { default: useChatContextBudgetSync } = await import(
+      '@/composables/use-chat-context-budget-sync'
+    )
+    resetChatSessionsForTests()
+    const store = useChatStore()
+    const contextUsage = useContextUsage()
+    const sync = useChatContextBudgetSync()
+
+    store.selectChat('proj', 'chat-a')
+    expect(store.chatId.value).toBe('chat-a')
+    expect(store.meta.value).toBeNull()
+    expect(store.loading.value).toBe(false)
+
+    contextUsage.setBudget({
+      modelId: 'test/model',
+      limit: 262_000,
+      promptUsed: 5_000,
+      reservedOutput: 33_000,
+      safetyBuffer: 2_000,
+      free: 222_000,
+      used: 5_000,
+      buckets: [{ id: 'messages', label: 'Conversation', tokens: 5_000 }],
+    })
+    contextUsage.setLastStepUsage({
+      promptTokens: 51_000,
+      inputTokens: 51_000,
+      outputTokens: 1_200,
+      cacheReadTokens: 47_000,
+      cacheWriteTokens: 0,
+    })
+    expect(contextUsage.promptUsed.value).toBe(51_000)
+
+    await sync.refreshContextBudget()
+    await nextTick()
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 0)
+    })
+
+    expect(store.meta.value).toBeNull()
+    expect(store.loading.value).toBe(false)
+    expect(contextUsage.lastStepUsage.value?.inputTokens).toBe(51_000)
+    expect(contextUsage.promptUsed.value).toBe(51_000)
+  })
 })

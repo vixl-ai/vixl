@@ -37,7 +37,7 @@ const useChatStore = () => {
     () => getActiveSession()?.editingMessageId.value ?? null,
   )
   const editDraftText = computed(() => getActiveSession()?.editDraftText.value ?? '')
-  const chatId = computed(() => meta.value?.id ?? null)
+  const chatId = computed(() => getActiveSession()?.chatId ?? null)
   const todos = computed(() => todosFromTimeline(timeline.value))
 
   const forChat = (projectSlug: string, chatIdValue: string): SessionMutations =>

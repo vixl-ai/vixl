@@ -109,17 +109,21 @@ export default () => {
 
   const refreshContextBudget = async (): Promise<void> => {
     const meta = chatStore.meta.value
-    const chatId = meta?.id ?? null
+    const selectedChatId = chatStore.chatId.value ?? meta?.id ?? null
 
     if (chatStore.loading.value) {
-      if (chatId) {
-        contextUsage.bindChat(chatId)
+      if (selectedChatId) {
+        contextUsage.bindChat(selectedChatId)
       }
       return
     }
 
-    if (!meta) {
+    if (!selectedChatId) {
       contextUsage.bindChat(null)
+      return
+    }
+
+    if (!meta) {
       return
     }
 
@@ -128,7 +132,7 @@ export default () => {
       (meta.model ? normalizeStoredModelRef(meta.model) ?? meta.model : '') ||
       ''
     if (!modelId) {
-      contextUsage.bindChat(chatId)
+      contextUsage.bindChat(selectedChatId)
       return
     }
 
@@ -139,7 +143,7 @@ export default () => {
       ? meta.projectRoot
       : project?.rootPath ?? meta.projectRoot
     if (!projectRoot) {
-      contextUsage.bindChat(chatId)
+      contextUsage.bindChat(selectedChatId)
       return
     }
 
@@ -163,7 +167,7 @@ export default () => {
       frozenSnapshot,
       mentions: draftMentions.value,
       activeContext: meta.activeContext ?? null,
-      chatId,
+      chatId: selectedChatId,
     })
   }
 
@@ -188,6 +192,7 @@ export default () => {
           () => chatStore.meta.value?.model,
           () => chatStore.meta.value?.mode,
           () => chatStore.meta.value?.prefixSnapshot?.hash,
+          () => chatStore.chatId.value,
           () => chatStore.meta.value?.id,
           () => chatStore.meta.value?.activeContext?.includeFromCreatedAt,
           () => chatStore.meta.value?.activeContext?.summary,
