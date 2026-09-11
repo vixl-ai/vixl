@@ -25,7 +25,6 @@ const hasItems = computed(() => props.items.length > 0)
 const highlightedItems = computed(() =>
   props.items.map((entry) => ({
     entry,
-    kindLabel: entry.kind === 'agent' ? 'agent' : 'skill',
     label: `/${entry.name}`,
     segments: highlightQueryMatches(`/${entry.name}`, props.query),
   })),
@@ -115,9 +114,6 @@ defineExpose({
           :key="`${item.label}:${segmentIndex}`"
           :class="segment.matched ? 'chat-skill-match' : 'text-muted-foreground'"
         >{{ segment.text }}</span>
-        <span
-          class="ml-1.5 font-sans text-[10px] text-muted-foreground"
-        >{{ item.kindLabel }}</span>
       </span>
     </button>
   </div>
