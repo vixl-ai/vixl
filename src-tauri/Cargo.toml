@@ -1,6 +1,6 @@
 [package]
 name = "vixl"
-version = "0.1.0-beta.5"
+version = "0.0.1"
 description = "Local-first BYOK Agents UI"
 authors = ["Aidan Hibbard"]
 license = "MIT"

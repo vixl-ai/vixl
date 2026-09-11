@@ -117,7 +117,7 @@ Do not inject empty `APPLE_*` secrets: GitHub passes empty strings and macOS bun
 
 ### OTA updates
 
-The Release workflow signs updater artifacts and uploads a static `latest.json` to each GitHub Release (via tauri-action defaults). The app's updater checks `https://github.com/vixl-ai/vixl/releases/download/v{{current_version}}/latest.json` (Tauri substitutes the running app version).
+The Release workflow signs updater artifacts and uploads a static `latest.json` to each GitHub Release (via tauri-action defaults). The app's updater checks `https://github.com/vixl-ai/vixl/releases/latest/download/latest.json`, which always resolves to the newest published release.
 
 Required repo secret for OTA: `TAURI_SIGNING_PRIVATE_KEY` (minisign key, passwordless). Optional: `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if a password-protected key is used.
 
@@ -126,8 +126,6 @@ Required repo secret for OTA: `TAURI_SIGNING_PRIVATE_KEY` (minisign key, passwor
 The public key is embedded in `src-tauri/tauri.conf.json` under `plugins.updater.pubkey`.
 
 Apple notarization (`APPLE_*` secrets) is separate from the updater minisign signature: one is for Gatekeeper trust, the other is for OTA integrity.
-
-GitHub `/releases/latest` only resolves the latest non-prerelease, non-draft release. Current Release workflow tags are prereleases (`prerelease: true`), so `/releases/latest/download/latest.json` 404s. Keep using the versioned `/releases/download/v{{current_version}}/latest.json` URL while shipping prereleases. Releases must still be published (not draft) so the asset URL resolves. The checksums job already flips draft to false after all matrix legs, so clients never see a partial `latest.json`.
 
 ### Verify a download
 

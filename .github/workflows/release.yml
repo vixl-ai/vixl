@@ -104,12 +104,12 @@ jobs:
           tagName: v__VERSION__
           releaseName: vixl v__VERSION__
           releaseBody: |
-            Beta prerelease for vixl v__VERSION__. This is an early preview, not a stable release.
+            vixl v__VERSION__
 
             Checksums (`SHA256SUMS.txt`, `SHA512SUMS.txt`) are attached after all platform builds finish.
             See CONTRIBUTING.md for how to verify downloads.
           releaseDraft: true
-          prerelease: true
+          prerelease: false
           tauriScript: npm run tauri
           args: ${{ matrix.args }}
           updaterJsonPreferNsis: true
@@ -153,9 +153,7 @@ jobs:
           sha512sum -- "${files[@]}" > SHA512SUMS.txt
 
           {
-            echo "## vixl v${VERSION} (beta)"
-            echo
-            echo "This is a beta prerelease, not a stable release."
+            echo "## vixl v${VERSION}"
             echo
             echo "Installers and bundles for macOS, Linux, and Windows are attached below."
             echo
@@ -190,5 +188,4 @@ jobs:
           gh release edit "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --notes-file RELEASE_NOTES.md \
-            --prerelease \
             --draft=false
