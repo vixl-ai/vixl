@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { resolveModelCallOptions } from '@/services/models/resolve-model-call-options'
+import {
+  resolveModelCallOptions,
+  resolveSideTaskCallOptions,
+} from '@/services/models/resolve-model-call-options'
 import toCachedInstructions from '@/services/models/to-cached-instructions'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
@@ -91,5 +94,48 @@ describe('resolveModelCallOptions prompt cache', () => {
       modelId: 'openai/gpt-5',
     })
     expect(options.providerOptions?.anthropic).toBeUndefined()
+  })
+})
+
+describe('resolveSideTaskCallOptions no-reasoning', () => {
+  it('requests none through shared call options when the model allows it', () => {
+    const openai = resolveSideTaskCallOptions(settings, {
+      providerId: 'openai',
+      modelId: 'gpt-5.1',
+    })
+    expect(openai.reasoning).toBe('none')
+    expect(openai.providerOptions?.openai).toEqual({
+      reasoningEffort: 'none',
+    })
+
+    const custom = resolveSideTaskCallOptions(
+      {
+        version: 1,
+        'providers.custom.local': {
+          type: 'openai-compatible',
+          name: 'Local',
+          baseURL: 'http://127.0.0.1:11434/v1',
+          models: [
+            {
+              id: 'qwen3',
+              supportsReasoningEffort: ['none', 'low', 'high'],
+            },
+          ],
+        },
+      } as VixlSettings,
+      { providerId: 'local', modelId: 'qwen3' },
+    )
+    expect(custom.reasoning).toBe('none')
+    expect(custom.providerOptions?.local).toEqual({
+      reasoningEffort: 'none',
+    })
+  })
+
+  it('omits none when the model does not support that effort', () => {
+    const options = resolveSideTaskCallOptions(settings, {
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-4-6',
+    })
+    expect(options.reasoning).toBeUndefined()
   })
 })

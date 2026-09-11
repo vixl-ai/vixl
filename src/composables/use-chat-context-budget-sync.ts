@@ -108,34 +108,50 @@ export default () => {
   }
 
   const refreshContextBudget = async (): Promise<void> => {
+    const meta = chatStore.meta.value
+    const selectedChatId = chatStore.chatId.value ?? meta?.id ?? null
+
     if (chatStore.loading.value) {
+      if (selectedChatId) {
+        contextUsage.bindChat(selectedChatId)
+      }
       return
     }
 
-    const meta = chatStore.meta.value
+    if (!selectedChatId) {
+      contextUsage.bindChat(null)
+      return
+    }
+
+    if (!meta) {
+      return
+    }
+
     const modelId =
       draftModelRef.value ||
-      (meta?.model ? normalizeStoredModelRef(meta.model) ?? meta.model : '') ||
+      (meta.model ? normalizeStoredModelRef(meta.model) ?? meta.model : '') ||
       ''
     if (!modelId) {
+      contextUsage.bindChat(selectedChatId)
       return
     }
 
-    const mode = draftMode.value || meta?.mode || 'agent'
+    const mode = draftMode.value || meta.mode || 'agent'
     const project = fleet.activeProject.value
-    const standalone = meta?.projectSlug === HOME_CHAT_SLUG
+    const standalone = meta.projectSlug === HOME_CHAT_SLUG
     const projectRoot = standalone
-      ? meta?.projectRoot
-      : project?.rootPath ?? meta?.projectRoot
+      ? meta.projectRoot
+      : project?.rootPath ?? meta.projectRoot
     if (!projectRoot) {
+      contextUsage.bindChat(selectedChatId)
       return
     }
 
     const projectName = standalone
       ? 'Home'
-      : project?.name ?? meta?.projectSlug ?? 'Home'
+      : project?.name ?? meta.projectSlug ?? 'Home'
 
-    const frozenSnapshot = meta ? getFrozenPrefix(meta) : null
+    const frozenSnapshot = getFrozenPrefix(meta)
     const timeline = chatStore.timeline.value
     const messages = chatStore.messages.value
 
@@ -150,8 +166,8 @@ export default () => {
       standalone,
       frozenSnapshot,
       mentions: draftMentions.value,
-      activeContext: meta?.activeContext ?? null,
-      chatId: meta?.id,
+      activeContext: meta.activeContext ?? null,
+      chatId: selectedChatId,
     })
   }
 
@@ -176,6 +192,7 @@ export default () => {
           () => chatStore.meta.value?.model,
           () => chatStore.meta.value?.mode,
           () => chatStore.meta.value?.prefixSnapshot?.hash,
+          () => chatStore.chatId.value,
           () => chatStore.meta.value?.id,
           () => chatStore.meta.value?.activeContext?.includeFromCreatedAt,
           () => chatStore.meta.value?.activeContext?.summary,

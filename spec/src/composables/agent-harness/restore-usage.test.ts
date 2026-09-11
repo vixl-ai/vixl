@@ -42,6 +42,7 @@ const record = (
 const buildState = (overrides?: {
   status?: 'ready' | 'streaming'
   sessionActive?: boolean
+  disposed?: boolean
 }): AgentHarnessState => {
   const setLastStepUsage = vi.fn<(usage: unknown) => void>()
   return {
@@ -57,6 +58,7 @@ const buildState = (overrides?: {
       lastStepUsage: ref(null),
       setLastStepUsage,
     },
+    disposed: ref(overrides?.disposed ?? false),
     chatStore: {
       isSessionActive: () => overrides?.sessionActive ?? true,
     },
@@ -166,6 +168,24 @@ describe('restoreUsageLedger', () => {
     ])
 
     const state = buildState({ sessionActive: false })
+    const { restoreUsageLedger } = createRestoreUsage(state)
+    await restoreUsageLedger()
+
+    expect(state.turnUsageByTurnId.value['turn-a']?.inputTokens).toBe(100)
+    expect(state.contextUsage.setLastStepUsage).not.toHaveBeenCalled()
+  })
+
+  it('skips last-step when the harness is disposed', async () => {
+    readUsageLedger.mockResolvedValue([
+      record({
+        id: 'row-1',
+        turnId: 'turn-a',
+        source: 'main',
+        at: '2026-01-01T00:00:00.000Z',
+      }),
+    ])
+
+    const state = buildState({ disposed: true, sessionActive: true })
     const { restoreUsageLedger } = createRestoreUsage(state)
     await restoreUsageLedger()
 

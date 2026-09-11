@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelMessage, UIMessage } from 'ai'
+import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
 const generateCheckpoint = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{
     summary: string
-    usage: undefined
-    providerMetadata: undefined
-    responseId: undefined
+    usage: undefined | { inputTokens: number; outputTokens: number }
+    providerMetadata: undefined | Record<string, unknown>
+    responseId: undefined | string
     modelRef: { providerId: string; modelId: string }
   }>>(),
 )
@@ -19,6 +20,10 @@ const persistCompactionCheckpoint = vi.hoisted(() =>
     checkpointLineId: string
   }>>(),
 )
+const captureBillableUsage = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<void>>(),
+)
+const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 const createModel = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 )
@@ -41,6 +46,16 @@ vi.mock('@/services/providers/create-model', () => ({
   default: (...args: unknown[]) => createModel(...args),
 }))
 
+vi.mock('@/services/billing/capture-billable-usage', () => ({
+  default: (...args: unknown[]) => captureBillableUsage(...args),
+}))
+
+vi.mock('vue-sonner', () => ({
+  toast: {
+    error: (...args: unknown[]) => toastError(...args),
+  },
+}))
+
 vi.mock('@/services/harness/resolve-model-vision', () => ({
   default: (...args: unknown[]) => resolveModelVision(...args),
 }))
@@ -51,13 +66,27 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
   }),
 )
 
-import { compactBudgets } from '@/services/harness/compact'
+import { compactBudgets, stillExceedsMessage } from '@/services/harness/compact'
 import compactSession from '@/services/harness/compact-session'
+
+const hugeContent = 'x'.repeat(800_000)
 
 const settings = (): VixlSettings =>
   ({
     version: 1,
     'models.default': 'ollama::qwen',
+  }) as VixlSettings
+
+const tinyWindowSettings = (): VixlSettings =>
+  ({
+    version: 1,
+    'models.default': 'local::qwen',
+    'providers.custom.local': {
+      type: 'openai-compatible',
+      name: 'Local',
+      baseURL: 'http://127.0.0.1:11434/v1',
+      models: [{ id: 'qwen', contextWindow: 80, maxOutputTokens: 40 }],
+    },
   }) as VixlSettings
 
 const userMessage = (id: string, text: string, createdAt?: string): UIMessage => ({
@@ -103,6 +132,8 @@ describe('compactSession', () => {
       includeFromCreatedAt: '2026-01-01T00:00:00.000Z',
       checkpointLineId: 'cp-1',
     })
+    captureBillableUsage.mockResolvedValue(undefined)
+    toastError.mockReset()
   })
 
   it('throws before generating a checkpoint when there is nothing to compact', async () => {
@@ -191,5 +222,155 @@ describe('compactSession', () => {
     const serialized = JSON.stringify(call.messages)
     expect(serialized).toContain('new work')
     expect(serialized).not.toContain('stale turn')
+  })
+
+  it('returns usedFallback false and bills when a paid checkpoint succeeds', async () => {
+    generateCheckpoint.mockResolvedValue({
+      summary: 'recap',
+      usage: { inputTokens: 2, outputTokens: 1 },
+      providerMetadata: undefined,
+      responseId: 'r1',
+      modelRef: { providerId: 'ollama', modelId: 'qwen' },
+    })
+    const onEvent = vi.fn<(event: HarnessEvent) => void>()
+    const messages = [
+      userMessage('u1', 'check the file'),
+      assistantMessage('a1', 'done'),
+    ]
+
+    const result = await compactSession(compactInput({ messages, onEvent }))
+
+    expect(result.usedFallback).toBe(false)
+    expect(persistCompactionCheckpoint).toHaveBeenCalledWith(
+      expect.objectContaining({ summary: 'recap' }),
+    )
+    expect(captureBillableUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'compaction',
+        providerId: 'ollama',
+        modelId: 'qwen',
+        responseId: 'r1',
+        usage: { inputTokens: 2, outputTokens: 1 },
+      }),
+    )
+  })
+
+  it('keeps the persisted checkpoint when recording usage fails', async () => {
+    captureBillableUsage.mockRejectedValue(new Error('billing network failed'))
+    const onEvent = vi.fn<(event: HarnessEvent) => void>()
+    const messages = [
+      userMessage('u1', 'check the file'),
+      assistantMessage('a1', 'done'),
+    ]
+
+    const result = await compactSession(compactInput({ messages, onEvent }))
+
+    expect(result.usedFallback).toBe(false)
+    expect(result.checkpointLineId).toBe('cp-1')
+    expect(persistCompactionCheckpoint).toHaveBeenCalledTimes(1)
+    expect(toastError).toHaveBeenCalledWith(
+      'Failed to record compaction usage',
+      expect.objectContaining({ description: 'billing network failed' }),
+    )
+  })
+
+  it('persists a deterministic fallback summary when checkpoint generation fails', async () => {
+    generateCheckpoint.mockRejectedValue(new Error('prompt is too long'))
+    const messages = [
+      userMessage('u1', 'check the file'),
+      assistantMessage('a1', 'working'),
+    ]
+
+    const result = await compactSession(
+      compactInput({ messages, onEvent: vi.fn<(event: HarnessEvent) => void>() }),
+    )
+
+    expect(result.usedFallback).toBe(true)
+    expect(generateCheckpoint).toHaveBeenCalledTimes(1)
+    expect(captureBillableUsage).not.toHaveBeenCalled()
+    expect(persistCompactionCheckpoint).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: expect.stringContaining('Deterministic compaction fallback'),
+      }),
+    )
+  })
+
+  it('skips generation and persists fallback when the prompt is already over the hard window', async () => {
+    const messages = [userMessage('u1', hugeContent)]
+
+    const result = await compactSession(
+      compactInput({ messages, onEvent: vi.fn<(event: HarnessEvent) => void>() }),
+    )
+
+    expect(generateCheckpoint).not.toHaveBeenCalled()
+    expect(captureBillableUsage).not.toHaveBeenCalled()
+    expect(result.usedFallback).toBe(true)
+    expect(persistCompactionCheckpoint).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: expect.stringContaining('Deterministic compaction fallback'),
+      }),
+    )
+  })
+
+  it('bills a paid checkpoint when the persisted summary is the overflow fallback', async () => {
+    generateCheckpoint.mockResolvedValue({
+      summary: 'M'.repeat(800_000),
+      usage: { inputTokens: 40, outputTokens: 20 },
+      providerMetadata: { paid: true },
+      responseId: 'r-paid',
+      modelRef: { providerId: 'ollama', modelId: 'qwen' },
+    })
+    const onEvent = vi.fn<(event: HarnessEvent) => void>()
+    const messages = [
+      userMessage('u1', 'Find the auth bug.'),
+      assistantMessage('a1', 'Inspecting token refresh.'),
+    ]
+
+    const result = await compactSession(compactInput({ messages, onEvent }))
+
+    expect(result.usedFallback).toBe(true)
+    expect(persistCompactionCheckpoint).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: expect.stringContaining('Deterministic compaction fallback'),
+      }),
+    )
+    expect(captureBillableUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'compaction',
+        providerId: 'ollama',
+        modelId: 'qwen',
+        responseId: 'r-paid',
+        usage: { inputTokens: 40, outputTokens: 20 },
+      }),
+    )
+  })
+
+  it('rethrows abort and persists nothing', async () => {
+    const controller = new AbortController()
+    generateCheckpoint.mockImplementation(async () => {
+      controller.abort()
+      throw new Error('aborted')
+    })
+    const messages = [
+      userMessage('u1', 'check the file'),
+      assistantMessage('a1', 'working'),
+    ]
+
+    await expect(
+      compactSession(compactInput({ messages, signal: controller.signal })),
+    ).rejects.toThrow('aborted')
+    expect(persistCompactionCheckpoint).not.toHaveBeenCalled()
+    expect(captureBillableUsage).not.toHaveBeenCalled()
+  })
+
+  it('throws the shared still-exceeds message when bounding cannot fit under high water', async () => {
+    const messages = [userMessage('u1', hugeContent)]
+
+    await expect(
+      compactSession(
+        compactInput({ messages, settings: tinyWindowSettings() }),
+      ),
+    ).rejects.toThrow(stillExceedsMessage('none'))
+    expect(persistCompactionCheckpoint).not.toHaveBeenCalled()
   })
 })

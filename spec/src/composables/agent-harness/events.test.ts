@@ -70,6 +70,10 @@ const buildState = (): AgentHarnessState =>
       refreshContextBudget: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     },
     compacting: ref(false),
+    disposed: ref(false),
+    chatStore: {
+      isSessionActive: vi.fn<() => boolean>().mockReturnValue(true),
+    },
   }) as unknown as AgentHarnessState
 
 const buildAttention = (): AttentionHelpers =>
@@ -412,5 +416,74 @@ describe('agent-harness events workspace-moved', () => {
       description: 'no graph',
     })
     expect(refreshSlug).not.toHaveBeenCalled()
+  })
+})
+
+describe('agent-harness events visible context gating', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const fireVisibleContextEvents = (state: AgentHarnessState): void => {
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'context-budget',
+      modelId: 'gpt-4o',
+      used: 999,
+      promptUsed: 999,
+      limit: 128_000,
+      reservedOutput: 8_192,
+      safetyBuffer: 2_000,
+      free: 0,
+      buckets: [],
+    })
+    handleEvent({
+      type: 'context-usage',
+      modelId: 'gpt-4o',
+      promptTokens: 50,
+      inputTokens: 50,
+      outputTokens: 5,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    })
+    handleEvent({
+      type: 'billable-usage',
+      record: billableRecord({ id: 'row-bg', source: 'main' }),
+    })
+    handleEvent({
+      type: 'compaction',
+      summary: 'recap',
+      focus: null,
+    })
+  }
+
+  it('does not let an inactive harness overwrite visible context', () => {
+    const state = buildState()
+    vi.mocked(state.chatStore.isSessionActive).mockReturnValue(false)
+
+    fireVisibleContextEvents(state)
+
+    expect(state.billableUsageRecords.value).toHaveLength(1)
+    expect(state.session.appendLocalCompaction).toHaveBeenCalledWith('recap', null)
+    expect(state.compacting.value).toBe(false)
+    expect(state.contextUsage.setBudget).not.toHaveBeenCalled()
+    expect(state.contextUsage.setLastStepUsage).not.toHaveBeenCalled()
+    expect(state.contextUsage.clearLastStepUsage).not.toHaveBeenCalled()
+    expect(state.contextBudgetSync.refreshContextBudget).not.toHaveBeenCalled()
+  })
+
+  it('does not let a disposed harness write visible context', () => {
+    const state = buildState()
+    state.disposed.value = true
+
+    fireVisibleContextEvents(state)
+
+    expect(state.billableUsageRecords.value).toHaveLength(1)
+    expect(state.session.appendLocalCompaction).toHaveBeenCalledWith('recap', null)
+    expect(state.contextUsage.setBudget).not.toHaveBeenCalled()
+    expect(state.contextUsage.setLastStepUsage).not.toHaveBeenCalled()
+    expect(state.contextUsage.clearLastStepUsage).not.toHaveBeenCalled()
+    expect(state.contextBudgetSync.refreshContextBudget).not.toHaveBeenCalled()
   })
 })

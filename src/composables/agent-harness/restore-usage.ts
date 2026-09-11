@@ -4,6 +4,7 @@ import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
 import type { TurnUsageAggregate } from '@/types/billing/turn-usage-aggregate'
 import aggregateTurnUsage from '@/services/billing/aggregate-turn-usage'
 import readUsageLedger from '@/services/billing/read-usage-ledger'
+import canWriteVisibleContext from './can-write-visible-context'
 import lastStepUsageFromRecord from './last-step-usage-from-record'
 import type { AgentHarnessState } from './types'
 
@@ -50,7 +51,7 @@ const aggregatesByTurnId = (
 
 export default (state: AgentHarnessState) => {
   const restoreUsageLedger = async (): Promise<void> => {
-    const { options, billableUsageRecords, turnUsageByTurnId, contextUsage, chatStore, status } =
+    const { options, billableUsageRecords, turnUsageByTurnId, contextUsage, status } =
       state
 
     try {
@@ -60,8 +61,7 @@ export default (state: AgentHarnessState) => {
       turnUsageByTurnId.value = aggregatesByTurnId(merged)
 
       const lastStep = latestMainLastStep(merged)
-      const isActive = chatStore.isSessionActive(options.projectSlug, options.chatId)
-      if (!lastStep || !isActive || status.value !== 'ready') {
+      if (!lastStep || !canWriteVisibleContext(state) || status.value !== 'ready') {
         return
       }
 

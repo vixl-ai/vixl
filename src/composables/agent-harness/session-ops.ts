@@ -8,6 +8,7 @@ import chatRouteFor from '@/utils/chat-route-for'
 import formatUnknownError from '@/utils/format-unknown-error'
 import router from '@/router'
 import { loadEffectiveSettings } from '@/services/config/vixl-config'
+import canWriteVisibleContext from './can-write-visible-context'
 import type { AgentHarnessState } from './types'
 
 type SessionOpsDeps = {
@@ -70,9 +71,13 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
         includeFromCreatedAt: result.includeFromCreatedAt,
         summary: result.summary,
       })
-      contextUsage.clearLastStepUsage()
+      if (canWriteVisibleContext(state)) {
+        contextUsage.clearLastStepUsage()
+      }
       toast.success('Context compacted', {
-        description: 'Conversation history has been summarized.',
+        description: result.usedFallback
+          ? 'A deterministic fallback summary was used.'
+          : 'Conversation history has been summarized.',
       })
     } catch (err) {
       toast.error('Compaction failed', {
@@ -105,6 +110,7 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
 
     compacting.value = true
     let summary = ''
+    let usedFallback = false
     try {
       const compactResult = await compactSession({
         projectSlug: options.projectSlug,
@@ -120,6 +126,7 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
         onEvent: deps.handleEvent,
       })
       summary = compactResult.summary
+      usedFallback = compactResult.usedFallback
       session.appendLocalCompaction(compactResult.summary, null)
       session.patchMetaActiveContext({
         checkpointLineId: compactResult.checkpointLineId,
@@ -164,7 +171,9 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
 
       await router.push(chatRouteFor(options.projectSlug, newChat.id))
       toast.success('Handoff created', {
-        description: 'New chat opened with context from previous session.',
+        description: usedFallback
+          ? 'New chat opened with a deterministic fallback summary.'
+          : 'New chat opened with context from previous session.',
       })
     } catch (err) {
       toast.error('Handoff failed: could not create new chat', {

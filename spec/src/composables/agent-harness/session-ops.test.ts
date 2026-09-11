@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 import type { AgentHarnessState } from '@/composables/agent-harness/types'
+import type { ChatMetaRecord } from '@/services/vixl/vixl-tauri/types'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const compactSession = vi.hoisted(() =>
@@ -8,6 +9,7 @@ const compactSession = vi.hoisted(() =>
     summary: string
     checkpointLineId: string
     includeFromCreatedAt: string
+    usedFallback: boolean
   }>>(),
 )
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
@@ -25,7 +27,7 @@ vi.mock('@/services/harness/write-handoff', () => ({
 }))
 
 vi.mock('@/services/vixl/vixl-tauri', () => ({
-  createChat: vi.fn<(...args: unknown[]) => Promise<{ id: string }>>(),
+  createChat: vi.fn<(...args: unknown[]) => Promise<ChatMetaRecord>>(),
 }))
 
 vi.mock('@/services/chat/pending-message', () => ({
@@ -56,6 +58,8 @@ vi.mock('vue-sonner', () => ({
 }))
 
 import createSessionOps from '@/composables/agent-harness/session-ops'
+import { createChat } from '@/services/vixl/vixl-tauri'
+import router from '@/router'
 
 const settings = (): VixlSettings => ({ version: 1 })
 
@@ -63,7 +67,23 @@ const compactResult = {
   summary: 'Short recap',
   checkpointLineId: 'cp-1',
   includeFromCreatedAt: '2026-01-01T00:00:00.000Z',
+  usedFallback: false,
 }
+
+const newChatMeta = (): ChatMetaRecord => ({
+  id: 'chat-2',
+  title: 'Handoff from Chat',
+  projectSlug: 'proj',
+  projectRoot: '/tmp/proj',
+  mode: 'agent',
+  model: 'local::qwen',
+  status: 'idle',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  forkedFrom: null,
+  pinned: false,
+  pinnedAt: null,
+})
 
 const buildState = (overrides?: {
   status?: 'ready' | 'streaming' | 'submitted'
@@ -103,7 +123,11 @@ const buildState = (overrides?: {
     },
     status: ref(overrides?.status ?? 'ready'),
     compacting,
+    disposed: ref(false),
     contextUsage: { clearLastStepUsage: vi.fn<() => void>() },
+    chatStore: {
+      isSessionActive: () => true,
+    },
   } as unknown as AgentHarnessState
 }
 
@@ -243,6 +267,27 @@ describe('sessionOps compactChat', () => {
     expect(compactSession.mock.calls[0]?.[0]).not.toHaveProperty('transcript')
     expect(toastSuccess).toHaveBeenCalled()
   })
+
+  it('keeps a success toast with fallback copy when compaction used a deterministic summary', async () => {
+    compactSession.mockResolvedValue({
+      ...compactResult,
+      usedFallback: true,
+    })
+    const state = buildState()
+    const { compactChat } = createSessionOps(state, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      maybeDrainQueue: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await compactChat()
+
+    expect(toastSuccess).toHaveBeenCalledWith(
+      'Context compacted',
+      expect.objectContaining({
+        description: 'A deterministic fallback summary was used.',
+      }),
+    )
+  })
 })
 
 describe('sessionOps createHandoff', () => {
@@ -318,6 +363,32 @@ describe('sessionOps createHandoff', () => {
     expect(compactSession.mock.calls[0]?.[0]).not.toHaveProperty('transcript')
     expect(writeHandoff).toHaveBeenCalledWith(
       expect.objectContaining({ summary: compactResult.summary }),
+    )
+  })
+
+  it('reflects a deterministic fallback summary in the handoff success toast', async () => {
+    compactSession.mockResolvedValue({
+      ...compactResult,
+      usedFallback: true,
+    })
+    vi.mocked(createChat).mockResolvedValue(newChatMeta())
+    vi.mocked(router.push).mockResolvedValue(undefined as never)
+    const state = buildState()
+    const { createHandoff } = createSessionOps(state, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      maybeDrainQueue: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await createHandoff()
+
+    expect(writeHandoff).toHaveBeenCalledWith(
+      expect.objectContaining({ summary: compactResult.summary }),
+    )
+    expect(toastSuccess).toHaveBeenCalledWith(
+      'Handoff created',
+      expect.objectContaining({
+        description: 'New chat opened with a deterministic fallback summary.',
+      }),
     )
   })
 })

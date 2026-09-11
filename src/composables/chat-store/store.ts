@@ -1,6 +1,7 @@
 import { computed } from 'vue'
 import type { ChatMeta } from '@/types/chat/chat-meta'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
+import useContextUsage from '@/composables/use-context-usage'
 import {
   createChat,
   listChats,
@@ -24,6 +25,7 @@ import rekeyChatSession from './rekey'
 import type { SessionMutations } from './types'
 
 const useChatStore = () => {
+  const contextUsage = useContextUsage()
   const meta = computed(() => getActiveSession()?.meta.value ?? null)
   const messages = computed(() => getActiveSession()?.messages.value ?? [])
   const timeline = computed(() => getActiveSession()?.timeline.value ?? [])
@@ -35,7 +37,7 @@ const useChatStore = () => {
     () => getActiveSession()?.editingMessageId.value ?? null,
   )
   const editDraftText = computed(() => getActiveSession()?.editDraftText.value ?? '')
-  const chatId = computed(() => meta.value?.id ?? null)
+  const chatId = computed(() => getActiveSession()?.chatId ?? null)
   const todos = computed(() => todosFromTimeline(timeline.value))
 
   const forChat = (projectSlug: string, chatIdValue: string): SessionMutations =>
@@ -52,6 +54,7 @@ const useChatStore = () => {
   const selectChat = (projectSlug: string, chatIdValue: string): SessionMutations => {
     const session = getOrCreateSession(projectSlug, chatIdValue)
     activeKey.value = session.key
+    contextUsage.bindChat(chatIdValue)
     return bindSessionMutations(session)
   }
 
@@ -60,6 +63,7 @@ const useChatStore = () => {
     sessions.delete(key)
     if (activeKey.value === key) {
       activeKey.value = null
+      contextUsage.bindChat(null)
     }
   }
 
@@ -77,6 +81,8 @@ const useChatStore = () => {
   ): Promise<'keepLive' | 'warmIdle' | 'cold'> => {
     const session = getOrCreateSession(projectSlug, chatIdValue)
     activeKey.value = session.key
+
+    contextUsage.bindChat(chatIdValue)
 
     const keepLive =
       session.warm &&
@@ -148,6 +154,7 @@ const useChatStore = () => {
     session.editDraftText.value = ''
     session.warm = true
     activeKey.value = session.key
+    contextUsage.bindChat(record.id)
     return session.meta.value
   }
 
@@ -158,6 +165,7 @@ const useChatStore = () => {
 
   const clearChatState = (): void => {
     activeKey.value = null
+    contextUsage.bindChat(null)
   }
 
   const facade = createActiveSessionFacade()

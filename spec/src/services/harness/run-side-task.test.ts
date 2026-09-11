@@ -153,16 +153,141 @@ describe('runSideTask chat title fallback', () => {
     )
   })
 
-  it('returns null without retry when primary passes quality-gate reject', async () => {
-    generateText.mockResolvedValueOnce({ text: 'New Agent' })
+  it('retries distinct fallback on empty output, then persists', async () => {
+    generateText
+      .mockResolvedValueOnce({ text: '   ' })
+      .mockResolvedValueOnce({ text: 'Auth Refactor' })
 
     const title = await runSideTask(baseInput())
+
+    expect(title).toBe('Auth Refactor')
+    expect(generateText).toHaveBeenCalledTimes(2)
+    expect(createModel).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        providerId: 'openai',
+        modelId: 'gpt-4o',
+      }),
+    )
+    expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', {
+      title: 'Auth Refactor',
+    })
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('retries distinct fallback on default-title output, then persists', async () => {
+    generateText
+      .mockResolvedValueOnce({ text: 'New Agent' })
+      .mockResolvedValueOnce({ text: 'Auth Refactor' })
+
+    const title = await runSideTask(baseInput())
+
+    expect(title).toBe('Auth Refactor')
+    expect(generateText).toHaveBeenCalledTimes(2)
+    expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', {
+      title: 'Auth Refactor',
+    })
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('retries distinct fallback on prompt-echo output and does not persist the echo', async () => {
+    generateText
+      .mockResolvedValueOnce({ text: 'Please refactor the auth module carefully' })
+      .mockResolvedValueOnce({ text: 'Auth Refactor' })
+
+    const title = await runSideTask(baseInput())
+
+    expect(title).toBe('Auth Refactor')
+    expect(generateText).toHaveBeenCalledTimes(2)
+    expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', {
+      title: 'Auth Refactor',
+    })
+    expect(updateChatMeta).not.toHaveBeenCalledWith(
+      'proj',
+      'chat-1',
+      expect.objectContaining({
+        title: expect.stringMatching(/Please refactor/i),
+      }),
+    )
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('does not retry the same model when fallback matches primary', async () => {
+    generateText.mockResolvedValueOnce({ text: '' })
+
+    const title = await runSideTask({
+      ...baseInput(),
+      fallbackProviderId: 'ollama',
+      fallbackModelId: 'qwen',
+    })
 
     expect(title).toBeNull()
     expect(generateText).toHaveBeenCalledTimes(1)
     expect(createModel).toHaveBeenCalledTimes(1)
     expect(updateChatMeta).not.toHaveBeenCalled()
     expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('fails quietly when distinct fallback also fails the quality gate', async () => {
+    generateText
+      .mockResolvedValueOnce({ text: 'New Chat' })
+      .mockResolvedValueOnce({ text: 'New Agent' })
+
+    const title = await runSideTask(baseInput())
+
+    expect(title).toBeNull()
+    expect(generateText).toHaveBeenCalledTimes(2)
+    expect(updateChatMeta).not.toHaveBeenCalled()
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('passes shared no-reasoning call options for models that support none', async () => {
+    generateText.mockResolvedValueOnce({ text: 'Auth Refactor' })
+
+    const title = await runSideTask({
+      ...baseInput(),
+      settings: {
+        ...baseSettings(),
+        'models.title': 'openai::gpt-5.1',
+      },
+    })
+
+    expect(title).toBe('Auth Refactor')
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reasoning: 'none',
+        providerOptions: {
+          openai: {
+            reasoningEffort: 'none',
+          },
+        },
+      }),
+    )
+    expect(createModel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerId: 'openai',
+        modelId: 'gpt-5.1',
+        disableThinking: true,
+      }),
+    )
+  })
+
+  it('omits reasoning on generateText when the model cannot disable it', async () => {
+    generateText.mockResolvedValueOnce({ text: 'Auth Refactor' })
+
+    await runSideTask({
+      ...baseInput(),
+      settings: {
+        ...baseSettings(),
+        'models.title': 'anthropic::claude-sonnet-4-6',
+      },
+    })
+
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reasoning: undefined,
+      }),
+    )
   })
 
   it('persists title on happy path with no toast', async () => {

@@ -64,6 +64,7 @@ export type AgentHarnessState = {
   mcpAuthPollTimer: { current: ReturnType<typeof setInterval> | null }
   sessionAllows: Set<string>
   sessionDenies: Set<string>
+  disposed: Ref<boolean>
 }
 
 export type AttentionHelpers = {
