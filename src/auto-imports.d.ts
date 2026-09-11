@@ -158,7 +158,6 @@ declare global {
   const useChatContextBudgetSync: typeof import('./composables/use-chat-context-budget-sync').default
   const useChatPromptBridge: typeof import('./composables/use-chat-prompt-bridge').default
   const useChatPromptEditor: typeof import('./composables/use-chat-prompt-editor').default
-  const useChatSkills: typeof import('./composables/use-chat-skills').default
   const useChatStore: typeof import('./composables/use-chat-store').default
   const useClipboard: typeof import('@vueuse/core').useClipboard
   const useClipboardItems: typeof import('@vueuse/core').useClipboardItems
@@ -539,7 +538,6 @@ declare module 'vue' {
     readonly useChatContextBudgetSync: UnwrapRef<typeof import('./composables/use-chat-context-budget-sync')['default']>
     readonly useChatPromptBridge: UnwrapRef<typeof import('./composables/use-chat-prompt-bridge')['default']>
     readonly useChatPromptEditor: UnwrapRef<typeof import('./composables/use-chat-prompt-editor')['default']>
-    readonly useChatSkills: UnwrapRef<typeof import('./composables/use-chat-skills')['default']>
     readonly useChatStore: UnwrapRef<typeof import('./composables/use-chat-store')['default']>
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>
     readonly useClipboardItems: UnwrapRef<typeof import('@vueuse/core')['useClipboardItems']>

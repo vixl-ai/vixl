@@ -185,7 +185,6 @@
     "useChatContextBudgetSync": true,
     "useChatPromptBridge": true,
     "useChatPromptEditor": true,
-    "useChatSkills": true,
     "useChatStore": true,
     "useClipboard": true,
     "useClipboardItems": true,

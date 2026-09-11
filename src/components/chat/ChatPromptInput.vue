@@ -29,12 +29,10 @@ import {
 } from '@/components/ai-elements/prompt-input'
 import ChatGitBranchSelect from '@/components/chat/GitBranchSelect.vue'
 import ChatMcpServerPicker from '@/components/chat/ChatMcpServerPicker.vue'
-import ChatSkillsPicker from '@/components/chat/ChatSkillsPicker.vue'
 import ChatPermissionDial from '@/components/chat/ChatPermissionDial.vue'
 import ChatPromptAttachments from '@/components/chat/ChatPromptAttachments.vue'
 import ChatPromptEditSync from '@/components/chat/ChatPromptEditSync.vue'
 import ChatPromptMentionSync from '@/components/chat/ChatPromptMentionSync.vue'
-import ChatPromptSkillSync from '@/components/chat/ChatPromptSkillSync.vue'
 import ChatQueueHandlers from '@/components/chat/ChatQueueHandlers.vue'
 import ChatPromptEditor from '@/components/chat/prompt-editor/ChatPromptEditor.vue'
 import type { QueuedChatMessage } from '@/types/chat/queued-chat-message'
@@ -521,7 +519,6 @@ watch(
         <PromptInputBody>
           <ChatPromptEditSync />
           <ChatPromptMentionSync />
-          <ChatPromptSkillSync />
           <ChatPromptEditor
             class="max-h-28 min-h-10"
             placeholder="@ for context, / for commands"
@@ -601,7 +598,6 @@ watch(
       </div>
       <div class="flex min-w-0 items-center gap-1">
         <ChatMcpServerPicker :project-root="promptWorkspaceRoot" />
-        <ChatSkillsPicker :mode="session.selectedMode" />
       </div>
     </div>
   </div>

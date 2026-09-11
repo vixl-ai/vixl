@@ -17,16 +17,5 @@ describe('use-chat-prompt-bridge', () => {
     expect(consumed).toEqual({ type: 'file', path: 'src/utils/foo.ts' })
     expect(bridge.consumePendingMention()).toBeNull()
   })
-
-  it('appendSkill bumps the token and consume clears the pending skill', async () => {
-    const useChatPromptBridge = (await import('@/composables/use-chat-prompt-bridge')).default
-    const bridge = useChatPromptBridge()
-
-    const before = bridge.skillAppendToken.value
-    bridge.appendSkill('ask')
-    expect(bridge.skillAppendToken.value).toBe(before + 1)
-
-    expect(bridge.consumePendingSkill()).toBe('/ask')
-    expect(bridge.consumePendingSkill()).toBeNull()
-  })
 })
+
