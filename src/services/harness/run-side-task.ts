@@ -98,6 +98,7 @@ export default async (input: ChatTitleTaskInput): Promise<string | null> => {
       frequencyPenalty: callOptions.frequencyPenalty,
       presencePenalty: callOptions.presencePenalty,
       seed: callOptions.seed,
+      reasoning: callOptions.reasoning,
       providerOptions: callOptions.providerOptions,
       prompt: loadPrompt('side-tasks/chat-title.md', {
         prompt: truncateTitlePrompt(input.prompt),
@@ -141,20 +142,32 @@ export default async (input: ChatTitleTaskInput): Promise<string | null> => {
     return null
   }
 
+  const distinctFallback =
+    chatFallback !== null &&
+    modelRefKey(chatFallback) !== modelRefKey(primaryModel)
+      ? chatFallback
+      : null
+
   let title: string | null
+  let usedFallback = false
   try {
     title = await generateTitleWithModel(primaryModel)
   } catch (primaryError) {
-    const canRetry =
-      chatFallback !== null &&
-      modelRefKey(chatFallback) !== modelRefKey(primaryModel)
-
-    if (!canRetry) {
+    if (!distinctFallback) {
       return toastTitleFailure(primaryError)
     }
 
+    usedFallback = true
     try {
-      title = await generateTitleWithModel(chatFallback)
+      title = await generateTitleWithModel(distinctFallback)
+    } catch (fallbackError) {
+      return toastTitleFailure(fallbackError)
+    }
+  }
+
+  if (!title && distinctFallback && !usedFallback) {
+    try {
+      title = await generateTitleWithModel(distinctFallback)
     } catch (fallbackError) {
       return toastTitleFailure(fallbackError)
     }

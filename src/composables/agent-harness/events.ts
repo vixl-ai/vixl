@@ -1,4 +1,3 @@
-import { toast } from 'vue-sonner'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
@@ -6,7 +5,7 @@ import { mapMetaStatusToChatStatus } from '@/services/harness/orchestrator'
 import mapSubagentResultStatus from '@/utils/map-subagent-result-status'
 import mergeToolRunArgs from '@/utils/merge-tool-run-args'
 import toolArgsPath from '@/utils/tool-args-path'
-import lastStepUsageFromRecord from './last-step-usage-from-record'
+import applyVisibleContextEvent from './apply-visible-context-event'
 import rebindWorkspace from './rebind-workspace'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
@@ -33,8 +32,6 @@ export default (
     pendingApprovals,
     billableUsageRecords,
     turnUsageByTurnId,
-    contextUsage,
-    contextBudgetSync,
     compacting,
   } = state
 
@@ -215,41 +212,10 @@ export default (
       pendingApprovals.value = [...pendingApprovals.value, view]
       attention.setChatAttention('needs_approval')
     }
-    if (event.type === 'context-budget') {
-      contextUsage.setBudget({
-        modelId: event.modelId,
-        used: event.used,
-        promptUsed: event.promptUsed,
-        limit: event.limit,
-        reservedOutput: event.reservedOutput,
-        safetyBuffer: event.safetyBuffer,
-        free: event.free,
-        buckets: event.buckets,
-      })
-    }
-    if (event.type === 'context-usage') {
-      contextUsage.setLastStepUsage({
-        promptTokens: event.promptTokens,
-        inputTokens: event.inputTokens,
-        outputTokens: event.outputTokens,
-        cacheReadTokens: event.cacheReadTokens,
-        cacheWriteTokens: event.cacheWriteTokens,
-      })
-      // Recount from timeline so Conversation includes tool I/O from this step.
-      contextBudgetSync.refreshContextBudget().catch((error) => {
-        toast.error('Failed to refresh context usage', {
-          description: error instanceof Error ? error.message : 'Unknown error',
-        })
-      })
-    }
     if (event.type === 'billable-usage') {
       const existing = billableUsageRecords.value
       const without = existing.filter((entry) => entry.id !== event.record.id)
       billableUsageRecords.value = [...without, event.record]
-      const lastStep = lastStepUsageFromRecord(event.record)
-      if (lastStep) {
-        contextUsage.setLastStepUsage(lastStep)
-      }
     }
     if (event.type === 'turn-usage') {
       turnUsageByTurnId.value = {
@@ -282,13 +248,7 @@ export default (
     }
     if (event.type === 'compaction') {
       session.appendLocalCompaction(event.summary, event.focus)
-      contextUsage.clearLastStepUsage()
       compacting.value = false
-      contextBudgetSync.refreshContextBudget().catch((error) => {
-        toast.error('Failed to refresh context usage', {
-          description: error instanceof Error ? error.message : 'Unknown error',
-        })
-      })
     }
     if (event.type === 'turn-aborted') {
       status.value = 'ready'
@@ -298,6 +258,7 @@ export default (
     if (event.type === 'workspace-moved') {
       return rebindWorkspace(state, event)
     }
+    applyVisibleContextEvent(state, event)
   }
 
   return { handleEvent }

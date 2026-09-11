@@ -80,6 +80,7 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     mcpAuthPollTimer: { current: null },
     sessionAllows: new Set<string>(),
     sessionDenies: new Set<string>(),
+    disposed: ref(false),
   }
 
   const attention = createHelpers(state)
@@ -153,6 +154,7 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     cancelQueued: lifecycle.cancelQueued,
     editQueued: lifecycle.editQueued,
     dispose: lifecycle.dispose,
+    markDisposed: lifecycle.markDisposed,
   }
 }
 

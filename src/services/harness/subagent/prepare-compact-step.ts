@@ -7,9 +7,9 @@ import type { HarnessEvent } from '@/types/harness/harness-event'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import {
   estimatePromptTokens,
-  generateCheckpoint,
-  rewriteModelMessages,
   resolveCompactHighWater,
+  resolveCompactWindow,
+  runCompactRewrite,
 } from '@/services/harness/compact'
 
 type PrepareCompactStepInput = {
@@ -39,57 +39,55 @@ export default (input: PrepareCompactStepInput) =>
 
     input.emitNestedEvent({ type: 'compaction-started' })
     try {
-      const compacted = await generateCheckpoint({
-        model: input.model,
-        modelRef,
+      const compactedRewrite = await runCompactRewrite({
+        checkpointInput: {
+          model: input.model,
+          modelRef,
+          system,
+          providerOptions: input.providerOptions,
+          tools: input.tools,
+          messages: options.messages,
+          focus: 'subagent',
+          signal: input.signal,
+        },
         system,
-        providerOptions: input.providerOptions,
-        tools: input.tools,
         messages: options.messages,
-        focus: 'subagent',
-        signal: input.signal,
+        highWater,
+        hardWindow: resolveCompactWindow(settings, modelRef),
       })
-      const rewritten = rewriteModelMessages(options.messages, compacted.summary)
-      const compactedEstimate = estimatePromptTokens(system, rewritten)
-      if (compactedEstimate > highWater) {
-        throw new Error(
-          'Subagent context still exceeds the model window after compaction',
-        )
-      }
 
       input.emitNestedEvent({
         type: 'compaction',
-        summary: compacted.summary,
+        summary: compactedRewrite.summary,
         focus: 'subagent',
       })
 
-      try {
-        await captureBillableUsage({
-          projectSlug: input.projectSlug,
-          chatId: input.chatId,
-          turnId: input.turnId,
-          source: 'compaction',
-          providerId: compacted.modelRef.providerId,
-          modelId: compacted.modelRef.modelId,
-          usage: compacted.usage,
-          providerMetadata: compacted.providerMetadata,
-          responseId: compacted.responseId,
-          subagentId: input.subagentId,
-          settings,
-          onEvent: input.onBillEvent,
-        })
-      } catch (error) {
-        // The rewrite is already applied, so an unexpected billing failure must
-        // not abort the turn. captureBillableUsage toasts its own known
-        // persist/enrich failures, so anything reaching here is unexpected:
-        // surface it once and keep going.
-        toast.error('Failed to record compaction usage', {
-          description:
-            error instanceof Error ? error.message : 'Unknown error',
-        })
+      const compacted = compactedRewrite.compacted
+      if (compacted) {
+        try {
+          await captureBillableUsage({
+            projectSlug: input.projectSlug,
+            chatId: input.chatId,
+            turnId: input.turnId,
+            source: 'compaction',
+            providerId: compacted.modelRef.providerId,
+            modelId: compacted.modelRef.modelId,
+            usage: compacted.usage,
+            providerMetadata: compacted.providerMetadata,
+            responseId: compacted.responseId,
+            subagentId: input.subagentId,
+            settings,
+            onEvent: input.onBillEvent,
+          })
+        } catch (error) {
+          toast.error('Failed to record compaction usage', {
+            description:
+              error instanceof Error ? error.message : 'Unknown error',
+          })
+        }
       }
 
-      return { messages: rewritten }
+      return { messages: compactedRewrite.messages }
     } finally {
       input.emitNestedEvent({ type: 'compaction-ended' })
     }

@@ -8,6 +8,7 @@ import chatRouteFor from '@/utils/chat-route-for'
 import formatUnknownError from '@/utils/format-unknown-error'
 import router from '@/router'
 import { loadEffectiveSettings } from '@/services/config/vixl-config'
+import canWriteVisibleContext from './can-write-visible-context'
 import type { AgentHarnessState } from './types'
 
 type SessionOpsDeps = {
@@ -70,7 +71,9 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
         includeFromCreatedAt: result.includeFromCreatedAt,
         summary: result.summary,
       })
-      contextUsage.clearLastStepUsage()
+      if (canWriteVisibleContext(state)) {
+        contextUsage.clearLastStepUsage()
+      }
       toast.success('Context compacted', {
         description: 'Conversation history has been summarized.',
       })

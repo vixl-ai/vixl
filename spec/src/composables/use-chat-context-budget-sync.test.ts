@@ -10,6 +10,10 @@ const refreshFns = vi.hoisted(() => ({
   current: [] as Array<ReturnType<typeof vi.fn>>,
 }))
 
+const bindChatFns = vi.hoisted(() => ({
+  current: [] as Array<ReturnType<typeof vi.fn>>,
+}))
+
 const loading = ref(false)
 const timeline = ref<ChatTimelineItem[]>([])
 const messages = ref<UIMessage[]>([])
@@ -30,8 +34,10 @@ vi.mock('@/composables/use-chat-store', () => ({
 vi.mock('@/composables/use-context-usage', () => ({
   default: () => {
     const refresh = vi.fn<() => Promise<void>>(async () => undefined)
+    const bindChat = vi.fn<(chatId: string | null) => void>()
     refreshFns.current.push(refresh)
-    return { refresh }
+    bindChatFns.current.push(bindChat)
+    return { refresh, bindChat }
   },
 }))
 
@@ -94,6 +100,7 @@ describe('useChatContextBudgetSync', () => {
   beforeEach(() => {
     vi.resetModules()
     refreshFns.current = []
+    bindChatFns.current = []
     loading.value = false
     timeline.value = []
     messages.value = []
@@ -110,12 +117,36 @@ describe('useChatContextBudgetSync', () => {
     )
     const sync = useChatContextBudgetSync()
     const refresh = refreshFns.current.at(-1)
+    const bindChat = bindChatFns.current.at(-1)
     expect(refresh).toBeDefined()
+    expect(bindChat).toBeDefined()
+    bindChat?.mockClear()
 
     await sync.refreshContextBudget()
     await flushDeferredRefresh()
 
     expect(refresh).not.toHaveBeenCalled()
+    expect(bindChat).toHaveBeenCalledWith('chat-1')
+  })
+
+  it('binds null and skips refresh when there is no active chat', async () => {
+    meta.value = null
+    const { default: useChatContextBudgetSync } = await import(
+      '@/composables/use-chat-context-budget-sync'
+    )
+    const sync = useChatContextBudgetSync()
+    const refresh = refreshFns.current.at(-1)
+    const bindChat = bindChatFns.current.at(-1)
+    expect(refresh).toBeDefined()
+    expect(bindChat).toBeDefined()
+    refresh?.mockClear()
+    bindChat?.mockClear()
+
+    await sync.refreshContextBudget()
+    await flushDeferredRefresh()
+
+    expect(refresh).not.toHaveBeenCalled()
+    expect(bindChat).toHaveBeenCalledWith(null)
   })
 
   it('applies refresh when loading is false and model and project root exist', async () => {

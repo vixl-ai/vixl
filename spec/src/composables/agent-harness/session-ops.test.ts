@@ -103,7 +103,11 @@ const buildState = (overrides?: {
     },
     status: ref(overrides?.status ?? 'ready'),
     compacting,
+    disposed: ref(false),
     contextUsage: { clearLastStepUsage: vi.fn<() => void>() },
+    chatStore: {
+      isSessionActive: () => true,
+    },
   } as unknown as AgentHarnessState
 }
 

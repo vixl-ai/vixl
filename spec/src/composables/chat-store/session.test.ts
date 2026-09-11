@@ -145,4 +145,92 @@ describe('chat session registry isolation', () => {
       ),
     ).toBe(true)
   })
+
+  it('clears context usage when the active chat becomes null', async () => {
+    const { default: useChatStore, resetChatSessionsForTests } = await import(
+      '@/composables/use-chat-store'
+    )
+    const { default: useContextUsage } = await import(
+      '@/composables/use-context-usage'
+    )
+    resetChatSessionsForTests()
+    const store = useChatStore()
+    const contextUsage = useContextUsage()
+
+    await store.loadChat('proj', 'chat-a')
+    contextUsage.setBudget({
+      modelId: 'test/model',
+      limit: 262_000,
+      promptUsed: 5_000,
+      reservedOutput: 33_000,
+      safetyBuffer: 2_000,
+      free: 222_000,
+      used: 5_000,
+      buckets: [{ id: 'messages', label: 'Conversation', tokens: 5_000 }],
+    })
+    contextUsage.setLastStepUsage({
+      promptTokens: 51_000,
+      inputTokens: 51_000,
+      outputTokens: 1_200,
+      cacheReadTokens: 47_000,
+      cacheWriteTokens: 0,
+    })
+    expect(contextUsage.promptUsed.value).toBe(51_000)
+
+    store.clearChatState()
+
+    expect(store.meta.value).toBeNull()
+    expect(contextUsage.lastStepUsage.value).toBeNull()
+    expect(contextUsage.promptUsed.value).toBe(0)
+  })
+
+  it('does not inherit context fill after delete then create with the same project and model', async () => {
+    const vixl = await import('@/services/vixl/vixl-tauri')
+    const { default: useChatStore, resetChatSessionsForTests } = await import(
+      '@/composables/use-chat-store'
+    )
+    const { default: useContextUsage } = await import(
+      '@/composables/use-context-usage'
+    )
+    resetChatSessionsForTests()
+    const store = useChatStore()
+    const contextUsage = useContextUsage()
+
+    await store.loadChat('proj', 'chat-a')
+    contextUsage.setBudget({
+      modelId: 'test/model',
+      limit: 262_000,
+      promptUsed: 5_000,
+      reservedOutput: 33_000,
+      safetyBuffer: 2_000,
+      free: 222_000,
+      used: 5_000,
+      buckets: [{ id: 'messages', label: 'Conversation', tokens: 5_000 }],
+    })
+    contextUsage.setLastStepUsage({
+      promptTokens: 51_000,
+      inputTokens: 51_000,
+      outputTokens: 1_200,
+      cacheReadTokens: 47_000,
+      cacheWriteTokens: 0,
+    })
+    expect(contextUsage.promptUsed.value).toBe(51_000)
+
+    store.dropSession('proj', 'chat-a')
+    expect(store.meta.value).toBeNull()
+    expect(contextUsage.lastStepUsage.value).toBeNull()
+    expect(contextUsage.promptUsed.value).toBe(0)
+
+    vi.mocked(vixl.createChat).mockResolvedValueOnce(metaFor('chat-new'))
+    await store.createNewChat({
+      projectSlug: 'proj',
+      projectRoot: '/proj',
+      mode: 'agent',
+      model: 'test/model',
+    })
+
+    expect(store.meta.value?.id).toBe('chat-new')
+    expect(contextUsage.lastStepUsage.value).toBeNull()
+    expect(contextUsage.promptUsed.value).toBe(0)
+  })
 })

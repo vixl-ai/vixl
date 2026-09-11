@@ -3,6 +3,7 @@ import formatUnknownError from '@/utils/format-unknown-error'
 import { makeHarnessKey } from './helpers'
 
 type CachedHarness = {
+  markDisposed: () => void
   dispose: () => Promise<void>
 }
 
@@ -44,13 +45,15 @@ export const dropAgentHarness = (projectSlug: string, chatId: string): void => {
   const key = makeHarnessKey(projectSlug, chatId)
   const existing = harnessCache.get(key)
   harnessCache.delete(key)
-  if (existing) {
-    existing.dispose().catch((error: unknown) => {
-      toast.error('Failed to stop chat session', {
-        description: formatUnknownError(error),
-      })
-    })
+  if (!existing) {
+    return
   }
+  existing.markDisposed()
+  existing.dispose().catch((error: unknown) => {
+    toast.error('Failed to stop chat session', {
+      description: formatUnknownError(error),
+    })
+  })
 }
 
 export const resetAgentHarnessCacheForTests = (): void => {

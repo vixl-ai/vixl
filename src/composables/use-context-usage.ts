@@ -43,7 +43,7 @@ export type RefreshContextUsageInput = {
   standalone?: boolean
   frozenSnapshot?: PrefixSnapshot | null
   activeContext?: ActiveContextSlice | null
-  chatId?: string
+  chatId?: string | null
 }
 
 export default () => {
@@ -81,12 +81,21 @@ export default () => {
     () => lastStepUsage.value?.inputTokens ?? null,
   )
 
+  const resetVisibleUsage = (): void => {
+    lastStepUsage.value = null
+    estimatedPromptUsed.value = 0
+    estimatedFree.value = 0
+    buckets.value = []
+    refreshGeneration += 1
+    pending.value = false
+  }
+
   const bindChat = (chatId: string | null): void => {
     if (boundChatId.value === chatId) {
       return
     }
     boundChatId.value = chatId
-    lastStepUsage.value = null
+    resetVisibleUsage()
   }
 
   const clearLastStepUsage = (): void => {
@@ -111,9 +120,7 @@ export default () => {
   }
 
   const refresh = async (input: RefreshContextUsageInput): Promise<void> => {
-    if (input.chatId !== undefined) {
-      bindChat(input.chatId)
-    }
+    bindChat(input.chatId ?? null)
 
     const generation = ++refreshGeneration
     pending.value = true

@@ -122,7 +122,12 @@ export default (
   const editQueued = (id: string): QueuedChatMessage | undefined =>
     messageQueue.items.value.find((entry) => entry.id === id)
 
+  const markDisposed = (): void => {
+    state.disposed.value = true
+  }
+
   const dispose = async (): Promise<void> => {
+    markDisposed()
     await stop()
     messageQueue.clear()
   }
@@ -134,5 +139,6 @@ export default (
     cancelQueued,
     editQueued,
     dispose,
+    markDisposed,
   }
 }
