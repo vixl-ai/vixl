@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { toast } from 'vue-sonner'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
@@ -11,7 +11,7 @@ type UpdateProgress = {
 }
 
 const checking = ref(false)
-const updateAvailable = ref<Update | null>(null)
+const updateAvailable = shallowRef<Update | null>(null)
 const downloading = ref(false)
 const progress = ref<UpdateProgress | null>(null)
 const lastCheckedAt = ref<Date | null>(null)
