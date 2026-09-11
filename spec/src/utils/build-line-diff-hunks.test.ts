@@ -189,7 +189,7 @@ describe('formatToolRunLabel', () => {
           status: 'running',
         }),
       ),
-    ).toBe('Writing plan…')
+    ).toBe('Writing plan')
   })
 
   it('labels spawn_subagent as Starting while running', () => {
@@ -201,7 +201,7 @@ describe('formatToolRunLabel', () => {
           args: { agentName: 'Reading auth' },
         }),
       ),
-    ).toBe('Starting Reading auth…')
+    ).toBe('Starting Reading auth')
   })
 
   it('omits path when omitPathHint is set', () => {
@@ -249,7 +249,7 @@ describe('formatToolRunLabel', () => {
           args: { url: 'https://example.com/docs' },
         }),
       ),
-    ).toBe('Fetching https://example.com/docs…')
+    ).toBe('Fetching https://example.com/docs')
     expect(
       formatToolRunLabel(
         toolRun({

@@ -64,7 +64,7 @@ describe('deriveSubagentActivity', () => {
           ],
         }),
       ),
-    ).toBe('Reading app/pages/index.vue…')
+    ).toBe('Reading app/pages/index.vue')
   })
 
   it('returns Compacting while the subagent is compacting', () => {

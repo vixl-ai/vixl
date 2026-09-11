@@ -140,7 +140,7 @@ const formatSpawnSubagentLabel = (run: ToolRun): string => {
     ''
   const name = agentName.trim() || 'Sub-agent'
   if (run.status === 'running') {
-    return `Starting ${name}…`
+    return `Starting ${name}`
   }
   if (run.status === 'rejected') {
     return `${name} (rejected)`
@@ -158,7 +158,7 @@ const formatCallMcpToolLabel = (run: ToolRun): string => {
   const raw = mcpToolName(run.args)
   const humanized = raw ? humanizeToolName(raw) : 'MCP tool'
   if (run.status === 'running') {
-    return `Calling ${humanized}…`
+    return `Calling ${humanized}`
   }
   if (run.status === 'rejected') {
     return `Called ${humanized} (rejected)`
@@ -177,7 +177,7 @@ const formatTerminalRunLabel = (run: ToolRun, isRunning: boolean): string => {
   const prefix = mapped ?? (isRunning ? 'Running command' : 'Ran command')
   const target = desc.length > 0 ? ` ${desc}` : ''
   if (isRunning) {
-    return `${prefix}${target}…`
+    return `${prefix}${target}`
   }
   if (run.status === 'rejected') {
     return `${prefix}${target} (rejected)`
@@ -217,7 +217,7 @@ export default (run: ToolRun, options?: { omitPathHint?: boolean }): string => {
     if (HOLD_PATH_TOOLS.has(run.name)) {
       return `${prefix}${target}`
     }
-    return `${prefix}${target}…`
+    return `${prefix}${target}`
   }
   if (run.status === 'rejected') {
     return `${prefix}${target} (rejected)`

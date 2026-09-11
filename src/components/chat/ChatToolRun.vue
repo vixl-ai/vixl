@@ -206,7 +206,7 @@ const diffCounts = computed(() => {
         as="p"
         class="text-muted-foreground"
       >
-        Running…
+        Running
       </AiElementsShimmerShimmer>
       <p v-if="ownerTitle" class="text-muted-foreground">Held by {{ ownerTitle }}</p>
       <div v-if="argsText">

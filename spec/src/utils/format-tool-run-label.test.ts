@@ -37,7 +37,7 @@ describe('formatToolRunLabel call_mcp_tool', () => {
           args: { serverId: 'brave', tool: 'brave_web_search', args: { query: 'Brave Search API' } },
         }),
       ),
-    ).toBe('Calling Brave Web Search…')
+    ).toBe('Calling Brave Web Search')
     expect(
       formatToolRunLabel(
         toolRun({
@@ -57,7 +57,7 @@ describe('formatToolRunLabel call_mcp_tool', () => {
           args: { serverId: 'nuxt-docs', tool: 'get-page', args: { path: '/getting-started' } },
         }),
       ),
-    ).toBe('Calling Get Page…')
+    ).toBe('Calling Get Page')
     expect(
       formatToolRunLabel(
         toolRun({
@@ -77,7 +77,7 @@ describe('formatToolRunLabel call_mcp_tool', () => {
           args: { serverId: 'brave' },
         }),
       ),
-    ).toBe('Calling MCP tool…')
+    ).toBe('Calling MCP tool')
     expect(
       formatToolRunLabel(
         toolRun({
@@ -132,7 +132,7 @@ describe('formatToolRunLabel call_mcp_tool', () => {
           status: 'running',
         }),
       ),
-    ).toBe('Listing MCP tools…')
+    ).toBe('Listing MCP tools')
     expect(
       formatToolRunLabel(
         toolRun({
@@ -150,7 +150,7 @@ describe('formatToolRunLabel call_mcp_tool', () => {
           status: 'running',
         }),
       ),
-    ).toBe('Fetching MCP tool schema…')
+    ).toBe('Fetching MCP tool schema')
     expect(
       formatToolRunLabel(
         toolRun({
@@ -169,7 +169,7 @@ describe('formatToolRunLabel call_mcp_tool', () => {
           args: { agentName: 'generalPurpose', description: 'Scan auth helpers' },
         }),
       ),
-    ).toBe('Starting generalPurpose…')
+    ).toBe('Starting generalPurpose')
     expect(
       formatToolRunLabel(
         toolRun({
@@ -188,7 +188,7 @@ describe('formatToolRunLabel call_mcp_tool', () => {
           status: 'running',
         }),
       ),
-    ).toBe('Calling Custom Widget Tool…')
+    ).toBe('Calling Custom Widget Tool')
     expect(
       formatToolRunLabel(
         toolRun({

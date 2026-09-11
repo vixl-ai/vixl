@@ -51,7 +51,7 @@ describe('ChatToolRun empty running', () => {
 
     expect(collapsibleCount(wrapper)).toBe(0)
     expect(triggerCount(wrapper)).toBe(0)
-    expect(wrapper.html()).not.toContain('Running…')
+    expect(wrapper.html()).not.toContain('Running')
     expect(wrapper.html()).not.toMatch(/chevron/i)
     expect(wrapper.html()).toMatch(/todos/i)
   })

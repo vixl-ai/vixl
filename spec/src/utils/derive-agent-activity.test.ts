@@ -388,6 +388,6 @@ describe('deriveAgentActivity', () => {
         }),
         runningSubagents: [],
       }),
-    ).toBe('Starting Reading auth…')
+    ).toBe('Starting Reading auth')
   })
 })
