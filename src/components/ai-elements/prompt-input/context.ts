@@ -231,7 +231,6 @@ export function usePromptInputProvider(props: {
           message: errorMessage,
         })
       }
-      console.error('Submission failed:', e)
     }
     finally {
       isLoading.value = false

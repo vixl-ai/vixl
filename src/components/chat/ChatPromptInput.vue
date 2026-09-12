@@ -60,6 +60,7 @@ import type { PermissionLevel } from '@/types/harness/permission'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { FileUIPart } from 'ai'
 import contextMentionFromNode from '@/utils/context-mention-from-node'
+import normalizeAttachmentFiles from '@/utils/normalize-attachment-files'
 
 const PREFETCH_MIN_FREE_TOKENS = 4000
 const PREFETCH_MAX_CONTENT_CHARS = 12_000
@@ -364,17 +365,39 @@ const handleSubmit = async (payload: PromptInputMessage): Promise<void> => {
   }
   contextBudgetSync.setDraftMentions(mentions)
 
+  const normalizedFiles = await normalizeAttachmentFiles(files)
+
   emit('submit', {
-    text: text || (files.length > 0 ? fallbackText : ''),
+    text: text || (normalizedFiles.length > 0 ? fallbackText : ''),
     mode: session.selectedMode,
     model: session.selectedModelRef,
     projectId: props.showProjectSelect
       ? session.selectedProjectId
       : fleet.activeProject.value?.id ?? null,
     permissionLevel: localPermissionLevel.value,
-    files,
+    files: normalizedFiles,
     mentions,
   })
+}
+
+const handlePromptInputError = (err: { code: string, message: string }): void => {
+  if (err.code === 'accept') {
+    toast.error('File type not supported')
+    return
+  }
+  if (err.code === 'max_file_size') {
+    toast.error('File is too large')
+    return
+  }
+  if (err.code === 'max_files') {
+    toast.error('Too many files')
+    return
+  }
+  if (err.code === 'submit_error') {
+    toast.error(err.message || 'Could not send message')
+    return
+  }
+  toast.error(err.message || 'Could not attach files')
 }
 
 const handleCancelEdit = (): void => {
@@ -513,6 +536,7 @@ watch(
         :class="promptInputClass"
         multiple
         @submit="handleSubmit"
+        @error="handlePromptInputError"
       >
         <ChatPromptAttachments />
         <ChatQueueHandlers ref="queueHandlersRef" />

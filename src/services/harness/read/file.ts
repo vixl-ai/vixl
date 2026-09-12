@@ -78,11 +78,27 @@ const readFile = (ctx: HarnessToolContext) =>
         })
       }
 
-      await ctx.stageImage({
-        dataUrl: `data:${mimeType};base64,${base64}`,
-        mediaType: mimeType,
-        source: resolvedPath,
-      })
+      try {
+        await ctx.stageImage({
+          dataUrl: `data:${mimeType};base64,${base64}`,
+          mediaType: mimeType,
+          source: resolvedPath,
+        })
+      } catch (error) {
+        return {
+          ...imageReadResult({
+            path: resolvedPath,
+            mimeType,
+            sizeBytes: sizeBytes ?? null,
+            content: result.content || null,
+            base64: null,
+          }),
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Failed to load image into context',
+        }
+      }
 
       return {
         path: resolvedPath,

@@ -5,6 +5,9 @@ import bytesToDataUrl from '@/utils/bytes-to-data-url'
 const MAX_SIZE_MB = 3.75
 const MAX_RAW_BYTES = MAX_SIZE_MB * 1024 * 1024
 const MAX_EDGE_PX = 2000
+const LOSSY_FILE_TYPE = 'image/jpeg'
+const OVER_BUDGET_MESSAGE =
+  'Image could not be compressed under the 3.75MB provider limit'
 
 const isProviderAcceptedImageType = (mediaType: string): boolean =>
   mediaType === 'image/png' || mediaType === 'image/jpeg'
@@ -29,6 +32,11 @@ const withinDimensionLimit = async (blob: Blob): Promise<boolean | null> => {
   }
 }
 
+const wrapNormalizeError = (error: unknown): Error => {
+  const message = error instanceof Error ? error.message : 'Unknown error'
+  return new Error(`Failed to normalize image for provider: ${message}`)
+}
+
 export default async (args: {
   dataUrl: string
   mediaType: string
@@ -39,34 +47,37 @@ export default async (args: {
     return args
   }
 
+  let compressed: File
   try {
     const file = await fileFromDataUrl(dataUrl, mediaType)
-    const keepNativeType = isProviderAcceptedImageType(mediaType)
 
-    if (keepNativeType && file.size <= MAX_RAW_BYTES) {
+    if (isProviderAcceptedImageType(mediaType) && file.size <= MAX_RAW_BYTES) {
       const dimensionsOk = await withinDimensionLimit(file)
       if (dimensionsOk === true) {
         return args
       }
     }
 
-    const fileType = keepNativeType ? undefined : 'image/png'
-    const compressed = await imageCompression(file, {
+    compressed = await imageCompression(file, {
       maxSizeMB: MAX_SIZE_MB,
       maxWidthOrHeight: MAX_EDGE_PX,
       initialQuality: 0.8,
       useWebWorker: true,
-      fileType,
+      fileType: LOSSY_FILE_TYPE,
     })
+  } catch (error) {
+    throw wrapNormalizeError(error)
+  }
 
-    const bytes = new Uint8Array(await compressed.arrayBuffer())
-    const resultType = compressed.type || fileType || mediaType
+  if (compressed.size > MAX_RAW_BYTES) {
+    throw new Error(OVER_BUDGET_MESSAGE)
+  }
 
-    return {
-      dataUrl: bytesToDataUrl(bytes, resultType),
-      mediaType: resultType,
-    }
-  } catch {
-    return args
+  const bytes = new Uint8Array(await compressed.arrayBuffer())
+  const resultType = compressed.type || LOSSY_FILE_TYPE
+
+  return {
+    dataUrl: bytesToDataUrl(bytes, resultType),
+    mediaType: resultType,
   }
 }

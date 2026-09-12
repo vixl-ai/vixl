@@ -15,8 +15,7 @@ import dropUnresolvedAgentMentions from '@/services/agents/drop-unresolved-agent
 import buildMentionHighlights from '@/utils/build-mention-highlights'
 import collectExplicitAgentMentions from '@/utils/collect-explicit-agent-mentions'
 import { loadEffectiveSettings } from '@/services/config/vixl-config'
-import filenameWithMediaTypeExtension from '@/utils/filename-with-media-type-extension'
-import normalizeImageDataUrl from '@/utils/normalize-image-data-url'
+import normalizeAttachmentFiles from '@/utils/normalize-attachment-files'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
 export type SendArgs = {
@@ -166,11 +165,25 @@ export default (
 
     const controller = new AbortController()
     abortController.value = controller
+    let turnStarted = false
 
     try {
-      if (!args.skipUserMessage) {
-        const fileParts = args.files ?? []
+      let files: FileUIPart[]
+      try {
+        files = await normalizeAttachmentFiles(args.files ?? [])
+      } catch (normalizeError) {
+        toast.error('Could not attach image', {
+          description:
+            normalizeError instanceof Error
+              ? normalizeError.message
+              : 'Unknown error',
+        })
+        status.value = 'ready'
+        await fleetSidebar.refreshSlug(options.projectSlug)
+        return
+      }
 
+      if (!args.skipUserMessage) {
         const parts: Array<
           | { type: 'text'; text: string }
           | { type: 'file'; mediaType: string; url: string; filename?: string }
@@ -179,7 +192,7 @@ export default (
         // Always keep file parts on the UI message so the thread can show
         // thumbnails. Non-vision models get text placeholders later, only for
         // convertToModelMessages in the orchestrator.
-        for (const file of fileParts) {
+        for (const file of files) {
           const url = file.url
           if (url?.startsWith('file://')) {
             parts.push({
@@ -193,28 +206,11 @@ export default (
             continue
           }
 
-          let mediaType = file.mediaType || 'image/png'
-          let partUrl = url
-          let filename = file.filename
-          if (url.startsWith('data:') && mediaType.startsWith('image/')) {
-            const normalized = await normalizeImageDataUrl({
-              dataUrl: url,
-              mediaType,
-            })
-            if (normalized.mediaType !== mediaType) {
-              filename = filenameWithMediaTypeExtension(
-                filename,
-                normalized.mediaType,
-              )
-            }
-            mediaType = normalized.mediaType
-            partUrl = normalized.dataUrl
-          }
           parts.push({
             type: 'file',
-            mediaType,
-            url: partUrl,
-            filename,
+            mediaType: file.mediaType || 'image/png',
+            url,
+            filename: file.filename,
           })
         }
 
@@ -256,6 +252,7 @@ export default (
 
       const turnId = crypto.randomUUID()
       session.startAgentTurn(turnId)
+      turnStarted = true
 
       await runOrchestrator({
         workspace: options,
@@ -300,22 +297,26 @@ export default (
         : ''
       if (aborted) {
         status.value = 'ready'
-        session.finishAgentTurn()
+        if (turnStarted) {
+          session.finishAgentTurn()
+        }
         await fleetSidebar.refreshSlug(options.projectSlug)
         return
       }
       error.value = message
       status.value = 'error'
-      session.setAgentTurnError({
-        kind: timedOut ? 'timeout' : 'error',
-        message: timedOut
-          ? 'The model took too long to respond.'
-          : message.includes('No output generated')
-            ? 'The model returned an empty response. Check your API key and model ID in Settings.'
-            : `${message}${payloadHint}`,
-      })
-      session.finishAgentTurn()
-      attention.applyTurnEndAttention('error')
+      if (turnStarted) {
+        session.setAgentTurnError({
+          kind: timedOut ? 'timeout' : 'error',
+          message: timedOut
+            ? 'The model took too long to respond.'
+            : message.includes('No output generated')
+              ? 'The model returned an empty response. Check your API key and model ID in Settings.'
+              : `${message}${payloadHint}`,
+        })
+        session.finishAgentTurn()
+        attention.applyTurnEndAttention('error')
+      }
       toast.error('Agent run failed', {
         description: error.value.includes('No output generated')
           ? 'The model returned an empty response. Check your Gateway API key and model ID in Settings.'

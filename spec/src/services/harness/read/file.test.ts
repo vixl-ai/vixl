@@ -167,6 +167,46 @@ describe('read_file tool images', () => {
     })
   })
 
+  it('returns a tool error when stageImage throws', async () => {
+    const stageImage = vi.fn<
+      (image: { dataUrl: string; mediaType: string; source: string }) => Promise<void>
+    >(async () => {
+      throw new Error('Image could not be compressed under the 3.75MB provider limit')
+    })
+    fsReadFile.mockResolvedValueOnce({
+      path: 'shot.png',
+      content: '',
+      totalLines: 0,
+      offset: 1,
+      limit: 0,
+      isImage: true,
+      mimeType: 'image/png',
+      sizeBytes: 12,
+      base64: 'aaaa',
+    })
+
+    const result = await execute(
+      { path: 'shot.png', include_base64: true },
+      baseCtx({ supportsVision: true, stageImage }),
+    )
+
+    expect(stageImage).toHaveBeenCalledWith({
+      dataUrl: 'data:image/png;base64,aaaa',
+      mediaType: 'image/png',
+      source: 'shot.png',
+    })
+    expect(result).toEqual({
+      path: 'shot.png',
+      isImage: true,
+      mimeType: 'image/png',
+      sizeBytes: 12,
+      content: null,
+      base64: null,
+      error: 'Image could not be compressed under the 3.75MB provider limit',
+    })
+    expect(result).not.toHaveProperty('loadedIntoContext')
+  })
+
   it('returns text file results unchanged', async () => {
     const textResult = {
       path: 'src/a.ts',

@@ -758,4 +758,83 @@ describe('agent-harness send persist model/mode', () => {
     expect(state.status.value).toBe('ready')
     expect(state.abortController.value).toBeNull()
   })
+
+  it('does not mark a prior turn or append a user message when image normalize fails', async () => {
+    normalizeImageDataUrl.mockRejectedValueOnce(
+      new Error('Image could not be compressed under the 3.75MB provider limit'),
+    )
+    const state = buildState()
+    const attention = buildAttention()
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'look',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      internal: true,
+      files: [
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          url: 'data:image/png;base64,AAA',
+          filename: 'shot.png',
+        },
+      ],
+    })
+
+    expect(toastError).toHaveBeenCalledWith(
+      'Could not attach image',
+      expect.objectContaining({
+        description: 'Image could not be compressed under the 3.75MB provider limit',
+      }),
+    )
+    expect(toastError).not.toHaveBeenCalledWith(
+      'Agent run failed',
+      expect.anything(),
+    )
+    expect(state.session.appendLocalMessage).not.toHaveBeenCalled()
+    expect(state.session.startAgentTurn).not.toHaveBeenCalled()
+    expect(state.session.setAgentTurnError).not.toHaveBeenCalled()
+    expect(state.session.finishAgentTurn).not.toHaveBeenCalled()
+    expect(attention.applyTurnEndAttention).not.toHaveBeenCalled()
+    expect(runOrchestrator).not.toHaveBeenCalled()
+    expect(state.status.value).toBe('ready')
+  })
+
+  it('still records a turn error when the orchestrator fails after start', async () => {
+    runOrchestrator.mockRejectedValueOnce(new Error('provider down'))
+    const state = buildState()
+    const attention = buildAttention()
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+      internal: true,
+    })
+
+    expect(state.session.startAgentTurn).toHaveBeenCalledTimes(1)
+    expect(state.session.setAgentTurnError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'error',
+        message: 'provider down',
+      }),
+    )
+    expect(state.session.finishAgentTurn).toHaveBeenCalledTimes(1)
+    expect(attention.applyTurnEndAttention).toHaveBeenCalledWith('error')
+    expect(toastError).toHaveBeenCalledWith(
+      'Agent run failed',
+      expect.objectContaining({ description: 'provider down' }),
+    )
+  })
 })
