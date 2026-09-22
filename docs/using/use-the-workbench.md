@@ -33,7 +33,7 @@ See [Review and restore changes](/using/review-and-restore-changes). Plus menu C
 
 ## Plan tabs
 
-`create_plan`, Settings > Plans, and the project Plans tab open `.vixl/plans/<id>/PLAN.md` as a plan tab. Header: Orchestrate, Build / Build in new chat. Body: todos, markdown, [mermaid](https://mermaid.js.org). See [Work with plans](/using/work-with-plans).
+`create_plan`, Settings > Plans, and the project Plans tab open `.vixl/plans/<id>/PLAN.md` as a plan tab. Header: Orchestrate, Build. Body: todos, markdown, [mermaid](https://mermaid.js.org). See [Work with plans](/using/work-with-plans).
 
 ## Agent shells
 

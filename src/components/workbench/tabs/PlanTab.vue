@@ -1,18 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { CheckCircle2Icon, Hammer, MessageSquarePlus, Network } from '@lucide/vue'
+import { CheckCircle2Icon, Hammer, Network } from '@lucide/vue'
 import { Markdown } from 'vue-stream-markdown'
 import 'vue-stream-markdown/index.css'
 import { toast } from 'vue-sonner'
 import { Alert, AlertDescription, AlertTitle } from '@/components/shadcn/ui/alert'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/shadcn/ui/dropdown-menu'
 import {
   Tooltip,
   TooltipContent,
@@ -56,7 +50,6 @@ const loading = ref(false)
 const parseError = ref<string | null>(null)
 const orchestrateOpen = ref(false)
 const buildNowOpen = ref(false)
-const buildFreshChat = ref(false)
 
 const { buildChatId, buildChatStatus, buildChatMissing, missingChatIds } = usePlanBuildStatus({
   projectId: () => props.tab.projectId,
@@ -186,16 +179,6 @@ const handleBuildNow = (): void => {
   buildNowOpen.value = true
 }
 
-const handleBuildFromMenu = (): void => {
-  buildFreshChat.value = false
-  handleBuildNow()
-}
-
-const handleBuildInNewChatFromMenu = (): void => {
-  buildFreshChat.value = true
-  handleBuildNow()
-}
-
 const handleBuildSlotClick = (): void => {
   if (buildChatStatus.value === 'running') {
     handleOpenBuildChat().catch((error) => {
@@ -314,32 +297,19 @@ watch(
           </TooltipTrigger>
           <TooltipContent class="z-60">Open the active build chat</TooltipContent>
         </Tooltip>
-        <Tooltip v-else-if="!allTodosDone" :disable-closing-trigger="true">
+        <Tooltip v-else-if="!allTodosDone">
           <TooltipTrigger as-child>
             <span class="inline-flex shrink-0">
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="h-8 w-8"
-                    :disabled="buildDisabled"
-                    aria-label="Build"
-                  >
-                    <Hammer class="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" class="z-60">
-                  <DropdownMenuItem @click="handleBuildFromMenu">
-                    <Hammer class="mr-2 h-4 w-4" />
-                    Build
-                  </DropdownMenuItem>
-                  <DropdownMenuItem @click="handleBuildInNewChatFromMenu">
-                    <MessageSquarePlus class="mr-2 h-4 w-4" />
-                    Build in new chat
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+                :disabled="buildDisabled"
+                aria-label="Build"
+                @click="handleBuildNow"
+              >
+                <Hammer class="h-4 w-4" />
+              </Button>
             </span>
           </TooltipTrigger>
           <TooltipContent class="z-60">Build</TooltipContent>
@@ -396,7 +366,6 @@ watch(
     />
     <BuildPlanDialog
       v-model:open="buildNowOpen"
-      :fresh-chat="buildFreshChat"
       :disabled="building || buildChatStatus === 'running'"
       @confirm="handleBuildNowConfirm"
     />

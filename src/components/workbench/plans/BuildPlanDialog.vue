@@ -14,16 +14,10 @@ import {
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
 
-const props = withDefaults(
-  defineProps<{
-    open: boolean
-    disabled?: boolean
-    freshChat?: boolean
-  }>(),
-  {
-    freshChat: false,
-  },
-)
+const props = defineProps<{
+  open: boolean
+  disabled?: boolean
+}>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
@@ -50,15 +44,9 @@ const canConfirm = computed(
     !props.disabled,
 )
 
-const dialogTitle = computed(() =>
-  props.freshChat ? 'Build plan in new chat' : 'Build plan',
-)
-
-const showFreshChatCheckbox = computed(() => !props.freshChat)
-
 const syncDefaults = (): void => {
   model.value = resolveModelForRole('agent', settings.value) ?? ''
-  freshChatChecked.value = props.freshChat
+  freshChatChecked.value = false
 }
 
 watch(
@@ -98,7 +86,7 @@ const handleConfirm = (): void => {
   <Dialog :open="open" @update:open="handleOpenChange">
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>{{ dialogTitle }}</DialogTitle>
+        <DialogTitle>Build plan</DialogTitle>
       </DialogHeader>
       <div class="space-y-4 py-2">
         <div class="space-y-2">
@@ -112,7 +100,7 @@ const handleConfirm = (): void => {
             @update:model-value="handleModelChange"
           />
         </div>
-        <div v-if="showFreshChatCheckbox" class="flex items-center gap-2">
+        <div class="flex items-center gap-2">
           <Checkbox
             id="build-plan-fresh-chat"
             v-model="freshChatChecked"

@@ -29,19 +29,17 @@ You can also start from Settings or the project Plans tab. New plan offers Chat 
 
 The tab shows the title, the YAML todos (Pending, In progress, Completed, Cancelled), then the markdown body with mermaid blocks rendered.
 
-While todos remain open, the header has Orchestrate (network icon) and Build (hammer). Orchestrate opens Orchestrate plan, with Parent (default orchestrator role) and Subagent (default nested subagent role). The dialog button is Orchestrate. Build is a menu of Build and Build in new chat.
+While todos remain open, the header has Orchestrate (network icon) and Build (hammer). Orchestrate opens Orchestrate plan, with Parent (default orchestrator role) and Subagent (default nested subagent role). The dialog button is Orchestrate. Build opens the Build plan dialog.
 
 If a build chat is already running, the Build slot swaps to Open the active build chat (running dots). Orchestrate stays visible and is disabled. When every todo is completed or cancelled, Build and Orchestrate hide and a Done check appears.
 
 A document that does not parse disables actions.
 
-## Build vs Build in new chat
+## Build
 
-Build opens a dialog titled Build plan. Pick a Model. Optional checkbox: Build in a fresh chat (new context). Click Build.
+Build opens a dialog titled Build plan. Pick a Model. Optional checkbox: Build in a fresh chat (new context). Unchecked by default. Click Build.
 
-Build in new chat opens Build plan in new chat and skips the checkbox (fresh chat is already on). Click Build there too.
-
-Build without a fresh chat reuses `lastBuildChatId`, else `sourceChatId`, if that chat still exists and is not running. Missing both, Vixl creates a new chat titled with the plan title. Build in new chat always creates that new chat.
+Without the checkbox, Build reuses `lastBuildChatId`, else `sourceChatId`, if that chat still exists and is not running. Missing both, Vixl creates a new chat titled with the plan title. With the checkbox checked, Build always creates a fresh chat.
 
 Build starts (or resumes) the chat in Agent mode with the chosen model and a pending handoff that tells the agent to read `PLAN.md` and work through its todos. Orchestrate starts Orchestrator mode, locks `subagentModel` on the chat, and tells the parent to spawn one background sub-agent per todo. See [Best practices](/using/best-practices) for why the buttons are split that way.
 
