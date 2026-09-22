@@ -87,6 +87,18 @@ describe('mode allowlists mcp tools', () => {
   })
 })
 
+describe('mode allowlists update_plan', () => {
+  it('includes update_plan in plan, agent, and orchestrator', () => {
+    expect(MODE_TOOL_ALLOWLIST.plan).toContain('update_plan')
+    expect(MODE_TOOL_ALLOWLIST.agent).toContain('update_plan')
+    expect(MODE_TOOL_ALLOWLIST.orchestrator).toContain('update_plan')
+  })
+
+  it('excludes update_plan from ask', () => {
+    expect(MODE_TOOL_ALLOWLIST.ask).not.toContain('update_plan')
+  })
+})
+
 describe('mode allowlists update_todos', () => {
   it('includes update_todos in agent and orchestrator', () => {
     expect(MODE_TOOL_ALLOWLIST.agent).toContain('update_todos')

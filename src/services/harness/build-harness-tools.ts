@@ -30,7 +30,7 @@ import {
   codebaseStatus,
 } from '@/services/harness/codebase'
 import { runTerminal, terminalOutput, stopTerminal } from '@/services/harness/shell'
-import { createPlanTool, updatePlanTodo } from '@/services/harness/plan'
+import { createPlanTool, updatePlan, updatePlanTodo } from '@/services/harness/plan'
 import { askUser } from '@/services/harness/ask'
 import { loadSkillTool } from '@/services/harness/skill'
 import { lspQuery, diagnostics } from '@/services/harness/lsp'
@@ -69,6 +69,7 @@ const buildHarnessTools = (ctx: HarnessToolContext) => ({
   ask_user: askUser(ctx),
   load_skill: loadSkillTool(ctx),
   create_plan: createPlanTool(ctx),
+  update_plan: updatePlan(ctx),
   update_plan_todo: updatePlanTodo(ctx),
   update_todos: updateTodos(),
   run_terminal: runTerminal(ctx),

@@ -12,7 +12,7 @@ Coordinate work through sub-agents.
 - Never mutate files or run shell from the parent.
 - Exception: after a folder or worktree exists, the parent may call `move_workspace` before spawning implementers. Do not spawn implementers until the chat is on that workspace.
 - Network via user MCP only (no built-in fetch).
-- Prefer `update_todos` for in-chat task lists. Use `create_plan` only when a durable plan document and Build / Orchestrate handoff are needed. Keep `update_plan_todo` for plan-backed work after Build / Orchestrate.
+- Prefer `update_todos` for in-chat task lists. Use `create_plan` only when a durable plan document and Build / Orchestrate handoff are needed. `update_plan` revises the body; `update_plan_todo` for todos after Build / Orchestrate.
 
 ## Workflow
 

@@ -140,3 +140,40 @@ export const updatePlanTodos = (
 
   return nextContent
 }
+
+const rewriteFrontmatterTitle = (yaml: string, title: string): string => {
+  const lines = yaml.split('\n')
+  let replaced = false
+  const nextLines = lines.map((line) => {
+    if (!replaced && line.trim().startsWith('title:')) {
+      replaced = true
+      return `title: ${JSON.stringify(title)}`
+    }
+    return line
+  })
+  return nextLines.join('\n')
+}
+
+export const updatePlanBody = (
+  existingContent: string,
+  input: { body: string; title?: string },
+): string => {
+  const frontmatterMatch = existingContent.match(FRONTMATTER_RE)
+  if (!frontmatterMatch) {
+    throw new Error('Plan file is missing YAML frontmatter (expected --- delimiters).')
+  }
+
+  let yaml = frontmatterMatch[1] ?? ''
+  if (input.title !== undefined) {
+    yaml = rewriteFrontmatterTitle(yaml, input.title)
+  }
+  const body = input.body.trim()
+  const nextContent = `---\n${yaml}\n---\n\n${body}\n`
+  const parsed = parsePlan(nextContent)
+  if (parsed.parseError) {
+    throw new Error(parsed.parseError)
+  }
+  validatePlanDocument(parsed.frontmatter, body)
+
+  return nextContent
+}

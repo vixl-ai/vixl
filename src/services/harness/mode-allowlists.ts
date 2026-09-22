@@ -39,6 +39,7 @@ const ASK_TOOLS = [
 const PLAN_TOOLS = [
   ...ASK_TOOLS,
   'create_plan',
+  'update_plan',
   'update_plan_todo',
 ] as const
 
@@ -67,6 +68,7 @@ const ORCHESTRATOR_TOOLS = [
   'read_mcp_resource',
   'get_mcp_prompt',
   'create_plan',
+  'update_plan',
   'update_plan_todo',
   'update_todos',
   'spawn_subagent',
@@ -115,6 +117,7 @@ export const MODE_TOOL_ALLOWLIST: Record<VixlChatMode, string[]> = {
     'read_mcp_resource',
     'get_mcp_prompt',
     'create_plan',
+    'update_plan',
     'update_plan_todo',
     'update_todos',
     'spawn_subagent',

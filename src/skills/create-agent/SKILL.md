@@ -27,7 +27,7 @@ Frontmatter:
 
 Body after frontmatter is the sub-agent system prompt. It is not copied into the parent prompt. `/name` spawns it via `spawn_subagent` with `agentName`.
 
-Nested agents never get `spawn_subagent`, `steer_subagent`, `create_plan`, `update_plan_todo`, `update_todos`, `ask_user`, `move_workspace`, or `resolve_models`.
+Nested agents never get `spawn_subagent`, `steer_subagent`, `create_plan`, `update_plan`, `update_plan_todo`, `update_todos`, `ask_user`, `move_workspace`, or `resolve_models`.
 
 ## Example
 

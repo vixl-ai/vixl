@@ -35,6 +35,7 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   read_mcp_resource: 'Read a resource URI from an MCP server',
   get_mcp_prompt: 'Retrieve a prompt template from an MCP server',
   create_plan: 'Create a plan document',
+  update_plan: 'Update an existing plan body',
   update_plan_todo: 'Update a plan todo item',
   update_todos: 'Create, update, complete, cancel, or remove in-chat todos (full list)',
   spawn_subagent: 'Spawn sub-agent (background: end turn, harness resumes)',

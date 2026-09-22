@@ -13,7 +13,7 @@ A plan is a `PLAN.md` under [`.vixl/plans/`](/concepts/the-vixl-directory): `.vi
 
 Settings > Plans and the project Plans tab can create a plan without a chat.
 
-[Plan mode](/concepts/chat-modes) can research (reads, grep, git status/diff/log/branch, shell for investigation, [MCP](https://modelcontextprotocol.io), spawn_subagent) and can call `create_plan` / `update_plan_todo`. It cannot mutate source files.
+[Plan mode](/concepts/chat-modes) can research (reads, grep, git status/diff/log/branch, shell for investigation, [MCP](https://modelcontextprotocol.io), spawn_subagent) and can call `create_plan` / `update_plan` / `update_plan_todo`. It cannot mutate source files.
 
 Required `PLAN.md` sections: Summary, Context, Architecture ([mermaid](https://mermaid.js.org) diagram), Approach, Test plan.
 
@@ -21,7 +21,7 @@ Required `PLAN.md` sections: Summary, Context, Architecture ([mermaid](https://m
 2. Describe the work in the chat input.
 3. Send.
 
-When `create_plan` succeeds, Vixl opens a plan tab and the agent is told to stop. Mutation tools stay blocked until you click Build or Orchestrate on that tab. A second `create_plan` is refused until then. `update_plan_todo` and in-chat `update_todos` still work.
+When `create_plan` succeeds, Vixl opens a plan tab and the agent is told to stop. Mutation tools stay blocked until you click Build or Orchestrate on that tab. A second `create_plan` is refused until then. `update_plan` still works while a plan awaits Build / Orchestrate. `update_plan_todo` and in-chat `update_todos` still work.
 
 You can also start from Settings or the project Plans tab. New plan offers Chat (a new Plan-mode chat) or Form (Title, Todos, Description). Form saves with Create plan. Click a row to open it in the workbench.
 

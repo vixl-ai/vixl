@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import createPlan, { mergePlanTodos, updatePlanTodos } from '@/services/plans/write-plan'
+import createPlan, {
+  mergePlanTodos,
+  updatePlanBody,
+  updatePlanTodos,
+} from '@/services/plans/write-plan'
 import parsePlan from '@/services/plans/parse-plan'
 
 describe('mergePlanTodos', () => {
@@ -46,5 +50,80 @@ describe('updatePlanTodos', () => {
     expect(parsed.frontmatter?.todos).toEqual([
       { id: 'only', content: 'Replacement todo', status: 'completed' },
     ])
+  })
+})
+
+describe('updatePlanBody', () => {
+  const created = createPlan({
+    title: 'Body swap',
+    body: '## Goal\n\nShip it.\n',
+    todos: [
+      { id: 'keep', content: 'Keep me', status: 'in_progress' },
+      { id: 'queued', content: 'Still pending', status: 'pending' },
+    ],
+  })
+
+  it('replaces the body and preserves frontmatter and todos', () => {
+    const original = parsePlan(created.content)
+    const next = updatePlanBody(created.content, {
+      body: '## Summary\n\nRevised body.\n',
+    })
+
+    const parsed = parsePlan(next)
+    expect(parsed.parseError).toBeUndefined()
+    expect(parsed.body).toBe('## Summary\n\nRevised body.')
+    expect(parsed.frontmatter?.id).toBe(original.frontmatter?.id)
+    expect(parsed.frontmatter?.title).toBe('Body swap')
+    expect(parsed.frontmatter?.createdAt).toBe(original.frontmatter?.createdAt)
+    expect(parsed.frontmatter?.mode).toBe('plan')
+    expect(parsed.frontmatter?.todos).toEqual(original.frontmatter?.todos)
+  })
+
+  it('updates the frontmatter title when provided', () => {
+    const original = parsePlan(created.content)
+    const next = updatePlanBody(created.content, {
+      body: '## Summary\n\nRevised body.\n',
+      title: 'Revised title',
+    })
+
+    const parsed = parsePlan(next)
+    expect(parsed.parseError).toBeUndefined()
+    expect(parsed.frontmatter?.title).toBe('Revised title')
+    expect(parsed.frontmatter?.id).toBe(original.frontmatter?.id)
+    expect(parsed.frontmatter?.todos).toEqual(original.frontmatter?.todos)
+    expect(parsed.body).toBe('## Summary\n\nRevised body.')
+  })
+
+  it('keeps the existing title when title is omitted', () => {
+    const next = updatePlanBody(created.content, {
+      body: '## Summary\n\nRevised body.\n',
+    })
+
+    const parsed = parsePlan(next)
+    expect(parsed.frontmatter?.title).toBe('Body swap')
+  })
+
+  it('throws when YAML frontmatter is missing', () => {
+    expect(() =>
+      updatePlanBody('## Goal\n\nNo frontmatter.\n', {
+        body: '## Summary\n\nRevised body.\n',
+      }),
+    ).toThrow('Plan file is missing YAML frontmatter (expected --- delimiters).')
+  })
+
+  it('throws when the reconstructed document fails validation', () => {
+    const invalid = `---
+id: broken
+title: "Broken"
+createdAt: not-a-datetime
+mode: plan
+todos: []
+---
+
+Old body
+`
+    expect(() =>
+      updatePlanBody(invalid, { body: '## Summary\n\nRevised body.\n' }),
+    ).toThrow(/Invalid plan frontmatter/)
   })
 })

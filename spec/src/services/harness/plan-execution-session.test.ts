@@ -6,6 +6,7 @@ import {
   getPlanExecutionSession,
   hydratePlanExecutionSession,
   markCreatedPlanThisTurn,
+  resolvePlanPath,
   resolveUpdatePlanTodoPath,
   setActivePlanPath,
 } from '@/services/harness/plan-execution-session'
@@ -26,7 +27,7 @@ describe('assertCreatePlanNotAwaitingPlanGo', () => {
     })
 
     expect(() => assertCreatePlanNotAwaitingPlanGo(projectSlug, chatId)).toThrow(
-      `Plan awaiting user Go (${planPath}). Wait for Build / Orchestrate, or call update_plan_todo / update_todos. Do not create another plan.`,
+      `Plan awaiting user Go (${planPath}). Wait for Build / Orchestrate, or call update_plan to revise the body, update_plan_todo for todos. Do not create another plan.`,
     )
   })
 
@@ -41,8 +42,65 @@ describe('assertCreatePlanNotAwaitingPlanGo', () => {
     })
 
     expect(() => assertCreatePlanNotAwaitingPlanGo(projectSlug, chatId)).toThrow(
-      `Plan awaiting user Go (${planPath}).`,
+      `Plan awaiting user Go (${planPath}). Wait for Build / Orchestrate, or call update_plan to revise the body, update_plan_todo for todos. Do not create another plan.`,
     )
+  })
+})
+
+describe('resolvePlanPath', () => {
+  beforeEach(() => {
+    dropPlanExecutionSession(projectSlug, chatId)
+  })
+
+  it('resolves to the active awaiting plan when planPath is omitted', () => {
+    const planPath = '.vixl/plans/active/PLAN.md'
+    markCreatedPlanThisTurn(projectSlug, chatId, {
+      planPath,
+      planId: 'active',
+    })
+    const session = getPlanExecutionSession(projectSlug, chatId)
+
+    expect(resolvePlanPath(undefined, session.awaitingPlanGo)).toBe(planPath)
+  })
+
+  it('prefers an explicit planPath over awaitingPlanGo and activePlanPath', () => {
+    markCreatedPlanThisTurn(projectSlug, chatId, {
+      planPath: '.vixl/plans/awaiting/PLAN.md',
+      planId: 'awaiting',
+    })
+    const session = getPlanExecutionSession(projectSlug, chatId)
+    const explicit = '.vixl/plans/explicit/PLAN.md'
+    const active = '.vixl/plans/active/PLAN.md'
+
+    expect(resolvePlanPath(explicit, session.awaitingPlanGo, active)).toBe(explicit)
+  })
+
+  it('prefers awaitingPlanGo over activePlanPath when planPath is omitted', () => {
+    markCreatedPlanThisTurn(projectSlug, chatId, {
+      planPath: '.vixl/plans/awaiting/PLAN.md',
+      planId: 'awaiting',
+    })
+    const session = getPlanExecutionSession(projectSlug, chatId)
+    const active = '.vixl/plans/bound/PLAN.md'
+
+    expect(resolvePlanPath(undefined, session.awaitingPlanGo, active)).toBe(
+      '.vixl/plans/awaiting/PLAN.md',
+    )
+  })
+
+  it('resolves to activePlanPath when planPath and awaitingPlanGo are absent', () => {
+    const session = getPlanExecutionSession(projectSlug, chatId)
+    const active = '.vixl/plans/bound/PLAN.md'
+
+    expect(resolvePlanPath(undefined, session.awaitingPlanGo, active)).toBe(active)
+  })
+
+  it('returns null when planPath, awaitingPlanGo, and activePlanPath are absent', () => {
+    const session = getPlanExecutionSession(projectSlug, chatId)
+
+    expect(
+      resolvePlanPath(undefined, session.awaitingPlanGo, session.activePlanPath),
+    ).toBeNull()
   })
 })
 
@@ -121,6 +179,10 @@ describe('resolveUpdatePlanTodoPath', () => {
     const session = getPlanExecutionSession(projectSlug, chatId)
 
     expect(resolveUpdatePlanTodoPath(undefined, session.awaitingPlanGo)).toBeNull()
+  })
+
+  it('is an alias of resolvePlanPath', () => {
+    expect(resolveUpdatePlanTodoPath).toBe(resolvePlanPath)
   })
 })
 

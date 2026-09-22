@@ -72,7 +72,7 @@ const TOOL_CATEGORIES: Array<{ label: string; tools: string[] }> = [
   },
   {
     label: 'Plans',
-    tools: ['create_plan', 'update_plan_todo', 'update_todos'],
+    tools: ['create_plan', 'update_plan', 'update_plan_todo', 'update_todos'],
   },
   {
     label: 'Subagents',

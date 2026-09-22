@@ -7,7 +7,7 @@ description: Orchestrator mode locks the Vixl parent to guiding sub-agents; it d
 
 [Orchestrator mode](/concepts/chat-modes) is the lock: the parent guides sub-agents. It does not write files, edit, patch, delete, move files, run shell, or run [git](https://git-scm.com) mutations itself.
 
-The mode allowlist is reads, codebase tools, git status/diff/log/branch, lsp, diagnostics, `load_skill`, `ask_user`, `web_fetch`, [MCP](https://modelcontextprotocol.io) getters/calls, `create_plan`, `update_plan_todo`, `update_todos`, `spawn_subagent`, `steer_subagent`, `resolve_models`, and `move_workspace`. The built-in skill says: Never mutate files or run shell from the parent. Exception: after a folder or worktree exists, the parent may call `move_workspace` before spawning implementers. The skill also says network via user MCP only; `web_fetch` is still on the allowlist.
+The mode allowlist is reads, codebase tools, git status/diff/log/branch, lsp, diagnostics, `load_skill`, `ask_user`, `web_fetch`, [MCP](https://modelcontextprotocol.io) getters/calls, `create_plan`, `update_plan`, `update_plan_todo`, `update_todos`, `spawn_subagent`, `steer_subagent`, `resolve_models`, and `move_workspace`. The built-in skill says: Never mutate files or run shell from the parent. Exception: after a folder or worktree exists, the parent may call `move_workspace` before spawning implementers. The skill also says network via user MCP only; `web_fetch` is still on the allowlist.
 
 Approvals still apply. See [Permissions and approvals](/concepts/permissions-and-approvals).
 
@@ -15,7 +15,7 @@ Approvals still apply. See [Permissions and approvals](/concepts/permissions-and
 
 The parent calls `spawn_subagent`. `agentName` is a catalog custom-agent name, or a 2 to 6 word verb phrase for a generic helper. `prompt` is the task. `mode` is `blocking` (default) or `background`. Optional `model` is an exact `provider::modelId` from `resolve_models` (ignored when a plan locked a subagent model). `capabilities` is `read-only` (default) or `write`.
 
-Ask and Plan cannot spawn write-capable helpers. Nested agents cannot spawn further sub-agents. They also do not get `steer_subagent`, `create_plan`, `update_plan_todo`, `update_todos`, `ask_user`, `move_workspace`, or `resolve_models`.
+Ask and Plan cannot spawn write-capable helpers. Nested agents cannot spawn further sub-agents. They also do not get `steer_subagent`, `create_plan`, `update_plan`, `update_plan_todo`, `update_todos`, `ask_user`, `move_workspace`, or `resolve_models`.
 
 Read-only nested tools: reads, codebase, git status/diff/log/branch, lsp, diagnostics, `load_skill`, `web_fetch`, MCP. Write adds write/edit/patch/delete/move, the terminal suite, and git commit/checkout/branch_create.
 
