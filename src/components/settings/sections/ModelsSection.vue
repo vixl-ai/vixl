@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CircleHelpIcon, TriangleAlertIcon } from '@lucide/vue'
+import { CircleHelpIcon, RotateCcwIcon, TriangleAlertIcon } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { Button } from '@/components/shadcn/ui/button'
 import { Label } from '@/components/shadcn/ui/label'
 import { Switch } from '@/components/shadcn/ui/switch'
 import {
@@ -162,15 +161,19 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
                 Using the default model. Prefer a small, low-cost model for this background task.
               </TooltipContent>
             </Tooltip>
-            <Button
-              v-if="role.id !== 'default' && role.id !== 'orchestrator' && isRoleOverridden(role)"
-              variant="ghost"
-              size="sm"
-              class="h-7 px-2 text-xs"
-              @click="clearRoleOverride(role)"
-            >
-              Use default
-            </Button>
+            <Tooltip v-if="role.id !== 'default' && role.id !== 'orchestrator' && isRoleOverridden(role)">
+              <TooltipTrigger as-child>
+                <button
+                  type="button"
+                  class="inline-flex text-muted-foreground hover:text-foreground"
+                  :aria-label="`Use default model for ${role.label}`"
+                  @click="clearRoleOverride(role)"
+                >
+                  <RotateCcwIcon class="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Use default</TooltipContent>
+            </Tooltip>
           </div>
 
           <div
@@ -194,15 +197,19 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
                   <Label class="text-xs font-normal text-muted-foreground">
                     Parent
                   </Label>
-                  <Button
-                    v-if="isRoleOverridden(role)"
-                    variant="ghost"
-                    size="sm"
-                    class="h-6 px-2 text-xs"
-                    @click="clearRoleOverride(role)"
-                  >
-                    Use default
-                  </Button>
+                  <Tooltip v-if="isRoleOverridden(role)">
+                    <TooltipTrigger as-child>
+                      <button
+                        type="button"
+                        class="inline-flex text-muted-foreground hover:text-foreground"
+                        aria-label="Use default"
+                        @click="clearRoleOverride(role)"
+                      >
+                        <RotateCcwIcon class="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Use default</TooltipContent>
+                  </Tooltip>
                 </div>
                 <ModelsOptionsModelOptionsRow
                   :model-value="roleModelValue(role)"
@@ -232,15 +239,19 @@ const modelPlaceholder = (role: ModelRoleDefinition): string => {
                       {{ subagentRole.description }}
                     </TooltipContent>
                   </Tooltip>
-                  <Button
-                    v-if="isRoleOverridden(subagentRole)"
-                    variant="ghost"
-                    size="sm"
-                    class="h-6 px-2 text-xs"
-                    @click="clearRoleOverride(subagentRole)"
-                  >
-                    Use default
-                  </Button>
+                  <Tooltip v-if="isRoleOverridden(subagentRole)">
+                    <TooltipTrigger as-child>
+                      <button
+                        type="button"
+                        class="inline-flex text-muted-foreground hover:text-foreground"
+                        aria-label="Use default"
+                        @click="clearRoleOverride(subagentRole)"
+                      >
+                        <RotateCcwIcon class="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Use default</TooltipContent>
+                  </Tooltip>
                 </div>
                 <ModelsOptionsModelOptionsRow
                   :model-value="roleModelValue(subagentRole)"
