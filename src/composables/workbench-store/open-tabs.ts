@@ -140,6 +140,9 @@ export const openPlan = async (
     (tab) => tab.type === 'plan' && (tab.payload as PlanPayload).planId === planId,
   )
   if (existing) {
+    if (label !== undefined && label !== existing.label) {
+      existing.label = label
+    }
     focusTab(existing.id)
     return
   }

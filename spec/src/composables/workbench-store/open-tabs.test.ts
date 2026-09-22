@@ -88,3 +88,52 @@ describe('openPlan home workspace', () => {
     expect(tabs.value[0]?.projectId).toBe('proj-1')
   })
 })
+
+describe('openPlan label', () => {
+  beforeEach(async () => {
+    const { tabs, activeTabId, homeRootPath, homeRoot } = await import(
+      '@/composables/workbench-store/state'
+    )
+    tabs.value = []
+    activeTabId.value = null
+    homeRootPath.value = null
+    homeRoot.promise = null
+  })
+
+  afterEach(async () => {
+    const { tabs, activeTabId, homeRootPath, homeRoot } = await import(
+      '@/composables/workbench-store/state'
+    )
+    tabs.value = []
+    activeTabId.value = null
+    homeRootPath.value = null
+    homeRoot.promise = null
+  })
+
+  it('updates the existing plan tab label when a new label is provided', async () => {
+    const { openPlan } = await import('@/composables/workbench-store/open-tabs')
+    const { tabs, activeTabId } = await import('@/composables/workbench-store/state')
+
+    await openPlan('proj-1', 'fleet-plan', '.vixl/plans/fleet-plan/PLAN.md', 'Old title')
+    const existingId = tabs.value[0]?.id
+
+    await openPlan('proj-1', 'fleet-plan', '.vixl/plans/fleet-plan/PLAN.md', 'New title')
+
+    expect(tabs.value).toHaveLength(1)
+    expect(tabs.value[0]?.id).toBe(existingId)
+    expect(tabs.value[0]?.label).toBe('New title')
+    expect(activeTabId.value).toBe(existingId)
+  })
+
+  it('keeps the existing plan tab label when label is omitted', async () => {
+    const { openPlan } = await import('@/composables/workbench-store/open-tabs')
+    const { tabs } = await import('@/composables/workbench-store/state')
+
+    await openPlan('proj-1', 'fleet-plan', '.vixl/plans/fleet-plan/PLAN.md', 'Old title')
+
+    await openPlan('proj-1', 'fleet-plan', '.vixl/plans/fleet-plan/PLAN.md')
+
+    expect(tabs.value).toHaveLength(1)
+    expect(tabs.value[0]?.label).toBe('Old title')
+  })
+})
