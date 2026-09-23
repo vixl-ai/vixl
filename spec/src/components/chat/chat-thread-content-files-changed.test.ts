@@ -390,13 +390,14 @@ describe('ChatThreadContent subagent map stability', () => {
     const mounted = mountContent([firstTurn, subagent, liveTurn], 'streaming')
 
     const turns = agentTurns(mounted)
-    const byToolCallId = turns[0]?.props('subagentsByToolCallId') as Map<
-      string,
-      SubagentTimelineItem
-    >
-    const byId = turns[0]?.props('subagentsById') as Map<string, SubagentTimelineItem>
-    const mappedSubagent = byId.get('sub-1')
-    expect(byToolCallId.get('spawn-1')?.subagentId).toBe('sub-1')
+    const byToolCallId = turns[0]?.props('subagentsByToolCallId') as
+      | Map<string, SubagentTimelineItem>
+      | undefined
+    const byId = turns[0]?.props('subagentsById') as
+      | Map<string, SubagentTimelineItem>
+      | undefined
+    const mappedSubagent = byId?.get('sub-1')
+    expect(byToolCallId?.get('spawn-1')?.subagentId).toBe('sub-1')
     expect(mappedSubagent?.toolCallId).toBe('spawn-1')
 
     await mounted.setProps({
@@ -411,15 +412,14 @@ describe('ChatThreadContent subagent map stability', () => {
     })
 
     const nextTurns = agentTurns(mounted)
+    const nextById = nextTurns[0]?.props('subagentsById') as
+      | Map<string, SubagentTimelineItem>
+      | undefined
     expect(nextTurns[0]?.props('subagentsByToolCallId')).toBe(byToolCallId)
-    expect(nextTurns[0]?.props('subagentsById')).toBe(byId)
+    expect(nextById).toBe(byId)
     expect(nextTurns[1]?.props('subagentsByToolCallId')).toBe(byToolCallId)
     expect(nextTurns[1]?.props('subagentsById')).toBe(byId)
-    expect(
-      (nextTurns[0]?.props('subagentsById') as Map<string, SubagentTimelineItem>).get(
-        'sub-1',
-      ),
-    ).toBe(mappedSubagent)
+    expect(nextById?.get('sub-1')).toBe(mappedSubagent)
   })
 
   it('rebuilds subagent Maps when a subagent item is replaced', async () => {
@@ -429,10 +429,9 @@ describe('ChatThreadContent subagent map stability', () => {
     const liveTurn = agentTurn('t2', [])
     const mounted = mountContent([firstTurn, subagent, liveTurn])
 
-    const beforeById = agentTurns(mounted)[0]?.props('subagentsById') as Map<
-      string,
-      SubagentTimelineItem
-    >
+    const beforeById = agentTurns(mounted)[0]?.props('subagentsById') as
+      | Map<string, SubagentTimelineItem>
+      | undefined
     const nextSubagent: SubagentTimelineItem = {
       ...subagent,
       status: 'running',
@@ -442,13 +441,12 @@ describe('ChatThreadContent subagent map stability', () => {
       timeline: [firstTurn, nextSubagent, liveTurn],
     })
 
-    const afterById = agentTurns(mounted)[0]?.props('subagentsById') as Map<
-      string,
-      SubagentTimelineItem
-    >
+    const afterById = agentTurns(mounted)[0]?.props('subagentsById') as
+      | Map<string, SubagentTimelineItem>
+      | undefined
     expect(afterById).not.toBe(beforeById)
-    expect(afterById.get('sub-1')?.status).toBe('running')
-    expect(afterById.get('sub-1')?.summary).toBe('working')
+    expect(afterById?.get('sub-1')?.status).toBe('running')
+    expect(afterById?.get('sub-1')?.summary).toBe('working')
   })
 })
 
