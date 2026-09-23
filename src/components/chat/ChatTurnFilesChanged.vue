@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { usePersistedCollapsibleOpen } from '@/composables/use-chat-turn-open-state'
 import { ChevronRightIcon, Undo2Icon } from '@lucide/vue'
 import type { AggregatedTurnFileChange } from '@/types/harness/file-checkpoint'
 import {
@@ -37,13 +38,14 @@ const props = defineProps<{
   restoreChanges?: AggregatedTurnFileChange[]
   restoreEnabled?: boolean
   restoreDiscardsLatestMessage?: boolean
+  persistKey?: string
 }>()
 
 const emit = defineEmits<{
   restore: []
 }>()
 
-const open = ref(false)
+const { open } = usePersistedCollapsibleOpen(() => props.persistKey)
 const confirmOpen = ref(false)
 
 const totals = computed(() => {

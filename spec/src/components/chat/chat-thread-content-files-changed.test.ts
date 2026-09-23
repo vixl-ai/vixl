@@ -25,6 +25,10 @@ vi.mock('vue-sonner', () => ({
 const scroller = vi.hoisted(() => ({
   scrollToEnd: vi.fn<(...args: unknown[]) => void>(),
   handleContentChange: vi.fn<() => void>(),
+  windowedMessageIds: { value: null as Set<string> | null },
+  itemPlaceholderHeight: (_messageId: string) => 160,
+  setItemIds: vi.fn<(ids: string[]) => void>(),
+  setPinnedMessageIds: vi.fn<(ids: string[]) => void>(),
 }))
 
 vi.mock('@/components/shadcn/ui/message-scroller/useMessageScroller', async (importOriginal) => {
@@ -42,6 +46,10 @@ vi.mock('@/components/shadcn/ui/message-scroller/useMessageScroller', async (imp
     useMessageScrollerContext: () => ({
       handleContentChange: scroller.handleContentChange,
       scrollToEnd: scroller.scrollToEnd,
+      windowedMessageIds: scroller.windowedMessageIds,
+      itemPlaceholderHeight: scroller.itemPlaceholderHeight,
+      setItemIds: scroller.setItemIds,
+      setPinnedMessageIds: scroller.setPinnedMessageIds,
     }),
   }
 })
@@ -196,6 +204,9 @@ afterEach(() => {
   wrapper = null
   scroller.scrollToEnd.mockClear()
   scroller.handleContentChange.mockClear()
+  scroller.setItemIds.mockClear()
+  scroller.setPinnedMessageIds.mockClear()
+  scroller.windowedMessageIds.value = null
 })
 
 describe('ChatThreadContent files changed', () => {

@@ -1,5 +1,14 @@
 import type { ComputedRef, InjectionKey, Ref, ShallowRef } from "vue"
 import { computed, getCurrentScope, inject, onMounted, onScopeDispose, provide, shallowRef, watch } from "vue"
+import {
+  computeWindowedIds,
+  DEFAULT_ITEM_HEIGHT,
+  DEFAULT_OVERSCAN_PX,
+  estimateItemsHeight,
+  FALLBACK_VIEWPORT_HEIGHT,
+  itemIdsEqual,
+  windowedIdSetsEqual,
+} from "./compute-windowed-ids"
 
 // -----------------------------------------------------------------------------
 // Public types
@@ -373,6 +382,11 @@ export interface MessageScrollerContext {
   setPreserveScrollOnPrepend: (value: boolean) => void
   syncAfterScroll: () => void
   userScrollIntent: () => void
+  windowedMessageIds: Readonly<ShallowRef<Set<string> | null>>
+  itemPlaceholderHeight: (messageId: string) => number
+  setItemIds: (ids: string[]) => void
+  setPinnedMessageIds: (ids: string[]) => void
+  reportItemHeight: (messageId: string, height: number) => void
 }
 
 export type RegisterMessage = (
@@ -418,6 +432,10 @@ function createEngine(props: MessageScrollerProviderProps) {
   const autoscrolling = shallowRef(false)
   const scrollable = shallowRef<MessageScrollerScrollable>(EMPTY_SCROLLABLE)
   const visibility = shallowRef<MessageScrollerVisibilityState>(EMPTY_VISIBILITY)
+  const windowedMessageIds = shallowRef<Set<string> | null>(null)
+  const itemHeights = new Map<string, number>()
+  let windowItemIds: string[] = []
+  let pinnedMessageIds: string[] = []
   const scrollableAttr = computed(() => {
     const attr = [scrollable.value.start && "start", scrollable.value.end && "end"]
       .filter(Boolean)
@@ -447,6 +465,114 @@ function createEngine(props: MessageScrollerProviderProps) {
     ) {
       mode = "free-scrolling"
     }
+  }
+
+  function layoutMetrics() {
+    const padding = content ? getPadding(content) : { end: 0, start: 0 }
+    const gap = content ? getRowGap(content) : spacerGap
+    return { gap, padding }
+  }
+
+  function itemOffsetTop(messageId: string): number | null {
+    const { gap, padding } = layoutMetrics()
+    let y = padding.start
+    for (const id of windowItemIds) {
+      if (id === messageId)
+        return y
+      y += (itemHeights.get(id) ?? DEFAULT_ITEM_HEIGHT) + gap
+    }
+    return null
+  }
+
+  function itemPlaceholderHeight(messageId: string): number {
+    return itemHeights.get(messageId) ?? DEFAULT_ITEM_HEIGHT
+  }
+
+  function setWindowed(next: Set<string> | null) {
+    if (windowedIdSetsEqual(windowedMessageIds.value, next))
+      return
+    windowedMessageIds.value = next
+  }
+
+  function recomputeWindow() {
+    if (windowItemIds.length === 0) {
+      setWindowed(null)
+      return
+    }
+    const measuredViewport = viewport && viewport.clientHeight >= 1
+      ? viewport.clientHeight
+      : 0
+    const viewportHeight = measuredViewport > 0
+      ? measuredViewport
+      : (autoScroll() ? FALLBACK_VIEWPORT_HEIGHT : 0)
+    if (viewportHeight < 1) {
+      setWindowed(null)
+      return
+    }
+    const { gap, padding } = layoutMetrics()
+    const followBottom = mode === "following-bottom" || (!viewport && autoScroll())
+    let scrollTop = viewport?.scrollTop ?? 0
+    if (followBottom) {
+      const total = estimateItemsHeight({
+        gap,
+        heights: itemHeights,
+        itemIds: windowItemIds,
+        paddingEnd: padding.end,
+        paddingStart: padding.start,
+      })
+      scrollTop = Math.max(0, total - viewportHeight)
+    }
+    setWindowed(computeWindowedIds({
+      gap,
+      heights: itemHeights,
+      itemIds: windowItemIds,
+      overscanPx: Math.max(DEFAULT_OVERSCAN_PX, viewportHeight),
+      paddingStart: padding.start,
+      pinnedIds: pinnedMessageIds,
+      scrollTop,
+      viewportHeight,
+    }))
+  }
+
+  function setItemIds(ids: string[]) {
+    if (itemIdsEqual(ids, windowItemIds))
+      return
+    windowItemIds = ids.slice()
+    const live = new Set(windowItemIds)
+    for (const id of itemHeights.keys()) {
+      if (!live.has(id))
+        itemHeights.delete(id)
+    }
+    recomputeWindow()
+  }
+
+  function setPinnedMessageIds(ids: string[]) {
+    if (itemIdsEqual(ids, pinnedMessageIds))
+      return
+    pinnedMessageIds = ids.slice()
+    recomputeWindow()
+  }
+
+  function reportItemHeight(messageId: string, height: number) {
+    if (!Number.isFinite(height) || height < 1)
+      return
+    const rounded = Math.round(height)
+    const previous = itemHeights.get(messageId)
+    if (previous === rounded)
+      return
+    itemHeights.set(messageId, rounded)
+    if (
+      previous !== undefined
+      && viewport
+      && mode !== "following-bottom"
+      && mode !== "settling-jump"
+    ) {
+      const delta = rounded - previous
+      const offset = itemOffsetTop(messageId)
+      if (delta !== 0 && offset !== null && offset < viewport.scrollTop - SCROLL_EPSILON)
+        viewport.scrollTop += delta
+    }
+    recomputeWindow()
   }
 
   function commitScrollState() {
@@ -553,6 +679,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     mode = "free-scrolling"
     scrollTo(0, { behavior })
     scheduleVisibilitySync()
+    recomputeWindow()
     return true
   }
 
@@ -564,6 +691,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     mode = autoScroll() ? "following-bottom" : "free-scrolling"
     scrollTo(maxScrollTop(viewport), { autoscrolling: true, behavior })
     scheduleVisibilitySync()
+    recomputeWindow()
     return true
   }
 
@@ -596,6 +724,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     streamingTurn = keepPreviousPeek ? element : null
     scrollTo(targetScrollTop, { behavior })
     scheduleVisibilitySync()
+    recomputeWindow()
     return true
   }
 
@@ -777,6 +906,7 @@ function createEngine(props: MessageScrollerProviderProps) {
 
     applyContentChange(children, previousCount, previousFirst)
     capturePrependAnchor()
+    recomputeWindow()
   }
 
   function handleResize() {
@@ -789,15 +919,17 @@ function createEngine(props: MessageScrollerProviderProps) {
       // The reply streaming below the anchor consumes the tail spacer as it
       // grows. Once the last of it is gone the reply has filled the viewport
       // and the reader is genuinely at the live edge, so autoScroll hands off
-      // from the anchor hold to following the bottom. Requiring the >0 → 0
+      // from the anchor hold to following the bottom. Requiring the >0 -> 0
       // transition keeps a turn taller than the viewport (placed with no
       // spacer) held instead of yanked to the end.
       if (autoScroll() && previousSpacerHeight > 0 && spacerHeight === 0)
         scrollToEnd({ behavior: "auto" })
+      recomputeWindow()
       return
     }
     scheduleStateCommit()
     scheduleVisibilitySync()
+    recomputeWindow()
   }
 
   // --- visibility observation ------------------------------------------------
@@ -896,15 +1028,18 @@ function createEngine(props: MessageScrollerProviderProps) {
     // in which case observeVisibility() bailed out. Retry now it exists.
     if (element)
       observeVisibility()
+    recomputeWindow()
   }
 
   function setContentElement(element: HTMLElement | null) {
     content = element
+    recomputeWindow()
   }
 
   function setSpacerElement(element: HTMLElement | null) {
     spacer = element
     spacerGap = getRowGap(element?.parentElement ?? null)
+    recomputeWindow()
   }
 
   function setPreserveScrollOnPrepend(value: boolean) {
@@ -915,6 +1050,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     commitScrollState()
     scheduleVisibilitySync()
     capturePrependAnchor()
+    recomputeWindow()
   }
 
   function onAutoScrollChange() {
@@ -964,6 +1100,11 @@ function createEngine(props: MessageScrollerProviderProps) {
     setPreserveScrollOnPrepend,
     syncAfterScroll,
     userScrollIntent,
+    windowedMessageIds,
+    itemPlaceholderHeight,
+    setItemIds,
+    setPinnedMessageIds,
+    reportItemHeight,
   }
 
   return {

@@ -4,6 +4,7 @@ import { Collapsible } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import { useVModel } from '@vueuse/core'
 import { computed, provide, ref, watch } from 'vue'
+import { bindPersistedOpen, useChatTurnOpenState } from '@/composables/use-chat-turn-open-state'
 import { ReasoningKey } from './context'
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
   open?: boolean
   defaultOpen?: boolean
   duration?: number
+  persistKey?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -25,9 +27,24 @@ const emit = defineEmits<{
   (e: 'update:duration', value: number): void
 }>()
 
+const persistStore = useChatTurnOpenState()
+const persistKey = computed(() => props.persistKey)
+const persistedInitial =
+  !props.isStreaming && persistKey.value
+    ? persistStore?.get(persistKey.value)
+    : undefined
+
 const isOpen = useVModel(props, 'open', emit, {
-  defaultValue: props.defaultOpen,
+  defaultValue: persistedInitial ?? props.defaultOpen,
   passive: true,
+})
+
+if (persistedInitial !== undefined) {
+  isOpen.value = persistedInitial
+}
+
+const { setProgrammatic } = bindPersistedOpen(isOpen, persistKey, {
+  write: () => !props.isStreaming,
 })
 
 const internalDuration = ref<number | undefined>(props.duration)
@@ -50,7 +67,7 @@ watch(() => props.duration, (newVal) => {
 watch(() => props.isStreaming, (streaming, _prev, onCleanup) => {
   if (streaming) {
     wasStreaming.value = true
-    isOpen.value = true
+    setProgrammatic(true)
 
     if (startTime.value === null && props.duration === undefined) {
       startTime.value = Date.now()
@@ -70,7 +87,7 @@ watch(() => props.isStreaming, (streaming, _prev, onCleanup) => {
 
   if (!hasAutoClosed.value && isOpen.value) {
     const timer = setTimeout(() => {
-      isOpen.value = false
+      setProgrammatic(false)
       hasAutoClosed.value = true
     }, AUTO_CLOSE_DELAY)
 

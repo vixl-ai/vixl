@@ -29,6 +29,10 @@ import {
   collectMutationsAfterUserMessage,
 } from '@/services/harness/restore-file-checkpoints'
 import deriveAgentActivity from '@/utils/derive-agent-activity'
+import {
+  collectChatTurnOpenLiveIds,
+  provideChatTurnOpenState,
+} from '@/composables/use-chat-turn-open-state'
 
 const props = defineProps<{
   timeline: ChatTimelineItem[]
@@ -151,7 +155,23 @@ const sameCompletedFileTools = (
 }
 
 const { scrollToEnd } = useMessageScroller()
-const { handleContentChange } = useMessageScrollerContext()
+const {
+  handleContentChange,
+  itemPlaceholderHeight,
+  setItemIds,
+  setPinnedMessageIds,
+  windowedMessageIds,
+} = useMessageScrollerContext()
+
+const turnOpenState = provideChatTurnOpenState()
+
+watch(
+  () => props.timeline,
+  (timeline) => {
+    turnOpenState.prune(collectChatTurnOpenLiveIds(timeline))
+  },
+  { immediate: true },
+)
 
 const isLive = computed(() => props.status === 'streaming' || props.status === 'submitted')
 
@@ -467,6 +487,59 @@ const agentTurnActivityLabel = (index: number): string | null => {
   return activityLabel.value
 }
 
+type VisibleTimelineRow = {
+  id: string
+  index: number
+  item: ChatTimelineItem
+  placeholderHeight?: number
+}
+
+const timelineRows = computed((): VisibleTimelineRow[] => {
+  const items = visibleTimeline.value
+  const windowed = windowedMessageIds.value
+  const pinTail =
+    isLive.value || Boolean(activityLabel.value) || props.compacting === true
+  const lastIndex = items.length - 1
+  return items.map((item, index) => {
+    const id = timelineItemId(item, index)
+    const mount =
+      (pinTail && index === lastIndex) ||
+      windowed == null ||
+      windowed.has(id)
+    return {
+      id,
+      index,
+      item,
+      placeholderHeight: mount ? undefined : itemPlaceholderHeight(id),
+    }
+  })
+})
+
+watch(
+  [visibleTimeline, trailingActivityLabel, isLive, activityLabel, () => props.compacting],
+  () => {
+    const items = visibleTimeline.value
+    const ids = items.map((item, index) => timelineItemId(item, index))
+    if (trailingActivityLabel.value) {
+      ids.push('live-activity')
+    }
+    setItemIds(ids)
+
+    const pinned: string[] = []
+    if (isLive.value || activityLabel.value || props.compacting) {
+      const lastItem = items[items.length - 1]
+      if (lastItem) {
+        pinned.push(timelineItemId(lastItem, items.length - 1))
+      }
+      if (trailingActivityLabel.value) {
+        pinned.push('live-activity')
+      }
+    }
+    setPinnedMessageIds(pinned)
+  },
+  { immediate: true },
+)
+
 const followLiveOutput = async (): Promise<void> => {
   if (!isLive.value && !activityLabel.value && !props.compacting) {
     return
@@ -540,38 +613,39 @@ watch(
         class="mx-auto w-full min-w-0 max-w-3xl gap-6 overflow-x-hidden p-4 pb-2"
       >
         <MessageScrollerItem
-          v-for="(item, index) in visibleTimeline"
-          :key="timelineItemId(item, index)"
-          :message-id="timelineItemId(item, index)"
-          :scroll-anchor="isLastItem(index) && !trailingActivityLabel && !compacting"
+          v-for="row in timelineRows"
+          :key="row.id"
+          :message-id="row.id"
+          :scroll-anchor="isLastItem(row.index) && !trailingActivityLabel && !compacting"
+          :placeholder-height="row.placeholderHeight"
           class="min-w-0 max-w-full"
         >
           <ChatMessageTurn
-            v-if="item.type === 'user'"
-            :message="item.message"
+            v-if="row.item.type === 'user'"
+            :message="row.item.message"
             :editable="!readOnly && !isLive"
           />
           <ChatCompactionMarker
-            v-else-if="item.type === 'compaction'"
+            v-else-if="row.item.type === 'compaction'"
           />
           <ChatSubAgentTurn
-            v-else-if="item.type === 'subagent'"
-            :subagent="item"
+            v-else-if="row.item.type === 'subagent'"
+            :subagent="row.item"
             @stop-subagent="emit('stopSubagent', $event)"
           />
           <ChatAgentTurn
-            v-else-if="item.type === 'agent-turn'"
-            :turn="item.turn"
-            :status="isLastItem(index) ? status : 'ready'"
-            :activity-label="agentTurnActivityLabel(index)"
+            v-else-if="row.item.type === 'agent-turn'"
+            :turn="row.item.turn"
+            :status="isLastItem(row.index) ? status : 'ready'"
+            :activity-label="agentTurnActivityLabel(row.index)"
             :subagents-by-tool-call-id="subagentsByToolCallId"
             :subagents-by-id="subagentsById"
-            :restore-enabled="!readOnly && !isLive && (index !== lastVisibleAgentTurnIndex || lastTurnCanRestore)"
-            :chat-file-changes="index === lastVisibleAgentTurnIndex ? chatFileChanges : null"
-            :restore-changes="index === lastVisibleAgentTurnIndex ? lastTurnRestoreChanges : undefined"
-            :restore-discards-latest-message="index === lastVisibleAgentTurnIndex ? hasUserMessageAfterLastTurn : undefined"
+            :restore-enabled="!readOnly && !isLive && (row.index !== lastVisibleAgentTurnIndex || lastTurnCanRestore)"
+            :chat-file-changes="row.index === lastVisibleAgentTurnIndex ? chatFileChanges : null"
+            :restore-changes="row.index === lastVisibleAgentTurnIndex ? lastTurnRestoreChanges : undefined"
+            :restore-discards-latest-message="row.index === lastVisibleAgentTurnIndex ? hasUserMessageAfterLastTurn : undefined"
             @retry="emit('retry')"
-            @restore-files="emit('restoreFiles', item.turn.id)"
+            @restore-files="emit('restoreFiles', row.item.turn.id)"
             @stop-subagent="emit('stopSubagent', $event)"
           />
         </MessageScrollerItem>

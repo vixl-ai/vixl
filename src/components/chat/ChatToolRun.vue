@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
+import {
+  chatTurnOpenKeys,
+  usePersistedCollapsibleOpen,
+} from '@/composables/use-chat-turn-open-state'
 import { ChevronRightIcon, XIcon } from '@lucide/vue'
 import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import type { ToolRun } from '@/types/harness/tool-run'
@@ -54,7 +58,9 @@ const formatDetail = (value: unknown): string => {
   }
 }
 
-const open = ref(false)
+const { open } = usePersistedCollapsibleOpen(
+  () => chatTurnOpenKeys.tool(props.run.toolCallId),
+)
 
 const hasArtifactChip = computed(
   () => props.run.artifact !== undefined && props.run.status === 'done',

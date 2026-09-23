@@ -28,6 +28,7 @@ import {
 import formatToolGroupHeader from '@/utils/format-tool-group-header'
 import resolveSpawnSubagent from '@/utils/resolve-spawn-subagent'
 import segmentStepTools from '@/utils/segment-step-tools'
+import { chatTurnOpenKeys } from '@/composables/use-chat-turn-open-state'
 
 const props = defineProps<{
   turn: AgentTurn
@@ -112,6 +113,7 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
           (isStepStreaming(index) && step.text.trim().length === 0 && step.tools.length === 0)
           || hasSpawnSubagent
         "
+        :persist-key="chatTurnOpenKeys.reasoning(turn.id, step.id)"
         class="mb-0 w-full max-w-prose"
       >
         <AiElementsReasoningReasoningTrigger />
@@ -150,6 +152,7 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
           v-else
           :is-streaming="isStepStreaming(index)"
           :default-open="isStepStreaming(index)"
+          :persist-key="chatTurnOpenKeys.chainOfThought(turn.id, step.id, segmentIndex)"
           class="w-full max-w-full"
         >
           <AiElementsChainOfThoughtChainOfThoughtHeader>
@@ -202,6 +205,7 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
       :restore-changes="restoreChanges"
       :restore-enabled="restoreEnabled === true"
       :restore-discards-latest-message="restoreDiscardsLatestMessage"
+      :persist-key="chatTurnOpenKeys.filesChanged(turn.id)"
       @restore="emit('restoreFiles')"
     />
 

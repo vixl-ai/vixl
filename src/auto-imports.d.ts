@@ -8,6 +8,8 @@
 // biome-ignore lint: disable
 export {}
 declare global {
+  const CHAT_TURN_OPEN_STATE_KEY: typeof import('./composables/use-chat-turn-open-state').CHAT_TURN_OPEN_STATE_KEY
+  const CONTEXT_BUDGET_STREAM_DEBOUNCE_MS: typeof import('./composables/use-chat-context-budget-sync').CONTEXT_BUDGET_STREAM_DEBOUNCE_MS
   const EffectScope: typeof import('vue').EffectScope
   const FileTreeGitDecorationKey: typeof import('./composables/use-git-status').FileTreeGitDecorationKey
   const FileTreeProjectIdKey: typeof import('./composables/use-file-tree-node-menu').FileTreeProjectIdKey
@@ -18,8 +20,11 @@ declare global {
   const FileTreeStartRenameKey: typeof import('./composables/use-file-tree-node-menu').FileTreeStartRenameKey
   const asyncComputed: typeof import('@vueuse/core').asyncComputed
   const autoResetRef: typeof import('@vueuse/core').autoResetRef
+  const bindPersistedOpen: typeof import('./composables/use-chat-turn-open-state').bindPersistedOpen
   const chatProjectSlugForId: typeof import('./composables/use-fleet-sidebar').chatProjectSlugForId
   const chatTitleForId: typeof import('./composables/use-fleet-sidebar').chatTitleForId
+  const chatTurnOpenKeys: typeof import('./composables/use-chat-turn-open-state').chatTurnOpenKeys
+  const collectChatTurnOpenLiveIds: typeof import('./composables/use-chat-turn-open-state').collectChatTurnOpenLiveIds
   const computed: typeof import('vue').computed
   const computedAsync: typeof import('@vueuse/core').computedAsync
   const computedEager: typeof import('@vueuse/core').computedEager
@@ -28,6 +33,7 @@ declare global {
   const controlledComputed: typeof import('@vueuse/core').controlledComputed
   const controlledRef: typeof import('@vueuse/core').controlledRef
   const createApp: typeof import('vue').createApp
+  const createChatTurnOpenState: typeof import('./composables/use-chat-turn-open-state').createChatTurnOpenState
   const createDisposableDirective: typeof import('@vueuse/core').createDisposableDirective
   const createEventHook: typeof import('@vueuse/core').createEventHook
   const createGlobalState: typeof import('@vueuse/core').createGlobalState
@@ -54,6 +60,7 @@ declare global {
   const ignorableWatch: typeof import('@vueuse/core').ignorableWatch
   const inject: typeof import('vue').inject
   const injectLocal: typeof import('@vueuse/core').injectLocal
+  const isChatTurnOpenKeyLive: typeof import('./composables/use-chat-turn-open-state').isChatTurnOpenKeyLive
   const isDefined: typeof import('@vueuse/core').isDefined
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
@@ -85,6 +92,7 @@ declare global {
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
   const pausableWatch: typeof import('@vueuse/core').pausableWatch
   const provide: typeof import('vue').provide
+  const provideChatTurnOpenState: typeof import('./composables/use-chat-turn-open-state').provideChatTurnOpenState
   const provideLocal: typeof import('@vueuse/core').provideLocal
   const reactify: typeof import('@vueuse/core').reactify
   const reactifyObject: typeof import('@vueuse/core').reactifyObject
@@ -162,6 +170,7 @@ declare global {
   const useChatPromptEditor: typeof import('./composables/use-chat-prompt-editor').default
   const useChatStackPills: typeof import('./composables/use-chat-stack-pills').default
   const useChatStore: typeof import('./composables/use-chat-store').default
+  const useChatTurnOpenState: typeof import('./composables/use-chat-turn-open-state').useChatTurnOpenState
   const useClipboard: typeof import('@vueuse/core').useClipboard
   const useClipboardItems: typeof import('@vueuse/core').useClipboardItems
   const useCloned: typeof import('@vueuse/core').useCloned
@@ -256,6 +265,7 @@ declare global {
   const useParentElement: typeof import('@vueuse/core').useParentElement
   const usePerformanceObserver: typeof import('@vueuse/core').usePerformanceObserver
   const usePermission: typeof import('@vueuse/core').usePermission
+  const usePersistedCollapsibleOpen: typeof import('./composables/use-chat-turn-open-state').usePersistedCollapsibleOpen
   const usePlanBuildActions: typeof import('./composables/use-plan-build-actions').default
   const usePlanBuildStatus: typeof import('./composables/use-plan-build-status').default
   const usePointer: typeof import('@vueuse/core').usePointer
@@ -363,6 +373,9 @@ declare global {
   export type { AgentHarnessOptions, ToolRun, SubagentEntry, ApprovalResolution, PendingApprovalView, McpAuthResolution, PendingMcpAuthView } from './composables/use-agent-harness'
   import('./composables/use-agent-harness')
   // @ts-ignore
+  export type { ChatTurnOpenState } from './composables/use-chat-turn-open-state'
+  import('./composables/use-chat-turn-open-state')
+  // @ts-ignore
   export type { CodegraphStatusState } from './composables/use-codegraph-status'
   import('./composables/use-codegraph-status')
   // @ts-ignore
@@ -393,6 +406,8 @@ import { UnwrapRef } from 'vue'
 declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
+    readonly CHAT_TURN_OPEN_STATE_KEY: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['CHAT_TURN_OPEN_STATE_KEY']>
+    readonly CONTEXT_BUDGET_STREAM_DEBOUNCE_MS: UnwrapRef<typeof import('./composables/use-chat-context-budget-sync')['CONTEXT_BUDGET_STREAM_DEBOUNCE_MS']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly FileTreeGitDecorationKey: UnwrapRef<typeof import('./composables/use-git-status')['FileTreeGitDecorationKey']>
     readonly FileTreeProjectIdKey: UnwrapRef<typeof import('./composables/use-file-tree-node-menu')['FileTreeProjectIdKey']>
@@ -403,8 +418,11 @@ declare module 'vue' {
     readonly FileTreeStartRenameKey: UnwrapRef<typeof import('./composables/use-file-tree-node-menu')['FileTreeStartRenameKey']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
+    readonly bindPersistedOpen: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['bindPersistedOpen']>
     readonly chatProjectSlugForId: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['chatProjectSlugForId']>
     readonly chatTitleForId: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['chatTitleForId']>
+    readonly chatTurnOpenKeys: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['chatTurnOpenKeys']>
+    readonly collectChatTurnOpenLiveIds: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['collectChatTurnOpenLiveIds']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('@vueuse/core')['computedAsync']>
     readonly computedEager: UnwrapRef<typeof import('@vueuse/core')['computedEager']>
@@ -413,6 +431,7 @@ declare module 'vue' {
     readonly controlledComputed: UnwrapRef<typeof import('@vueuse/core')['controlledComputed']>
     readonly controlledRef: UnwrapRef<typeof import('@vueuse/core')['controlledRef']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
+    readonly createChatTurnOpenState: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['createChatTurnOpenState']>
     readonly createDisposableDirective: UnwrapRef<typeof import('@vueuse/core')['createDisposableDirective']>
     readonly createEventHook: UnwrapRef<typeof import('@vueuse/core')['createEventHook']>
     readonly createGlobalState: UnwrapRef<typeof import('@vueuse/core')['createGlobalState']>
@@ -439,6 +458,7 @@ declare module 'vue' {
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
+    readonly isChatTurnOpenKeyLive: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['isChatTurnOpenKeyLive']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
@@ -470,6 +490,7 @@ declare module 'vue' {
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
+    readonly provideChatTurnOpenState: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['provideChatTurnOpenState']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
     readonly reactify: UnwrapRef<typeof import('@vueuse/core')['reactify']>
     readonly reactifyObject: UnwrapRef<typeof import('@vueuse/core')['reactifyObject']>
@@ -547,6 +568,7 @@ declare module 'vue' {
     readonly useChatPromptEditor: UnwrapRef<typeof import('./composables/use-chat-prompt-editor')['default']>
     readonly useChatStackPills: UnwrapRef<typeof import('./composables/use-chat-stack-pills')['default']>
     readonly useChatStore: UnwrapRef<typeof import('./composables/use-chat-store')['default']>
+    readonly useChatTurnOpenState: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['useChatTurnOpenState']>
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>
     readonly useClipboardItems: UnwrapRef<typeof import('@vueuse/core')['useClipboardItems']>
     readonly useCloned: UnwrapRef<typeof import('@vueuse/core')['useCloned']>
@@ -641,6 +663,7 @@ declare module 'vue' {
     readonly useParentElement: UnwrapRef<typeof import('@vueuse/core')['useParentElement']>
     readonly usePerformanceObserver: UnwrapRef<typeof import('@vueuse/core')['usePerformanceObserver']>
     readonly usePermission: UnwrapRef<typeof import('@vueuse/core')['usePermission']>
+    readonly usePersistedCollapsibleOpen: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['usePersistedCollapsibleOpen']>
     readonly usePlanBuildActions: UnwrapRef<typeof import('./composables/use-plan-build-actions')['default']>
     readonly usePlanBuildStatus: UnwrapRef<typeof import('./composables/use-plan-build-status')['default']>
     readonly usePointer: UnwrapRef<typeof import('@vueuse/core')['usePointer']>

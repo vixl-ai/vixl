@@ -20,3 +20,10 @@ export {
   useMessageScrollerScrollable,
   useMessageScrollerVisibility,
 } from "./useMessageScroller"
+
+export {
+  computeWindowedIds,
+  DEFAULT_ITEM_HEIGHT,
+  DEFAULT_OVERSCAN_PX,
+  estimateItemsHeight,
+} from "./compute-windowed-ids"
