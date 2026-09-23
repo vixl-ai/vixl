@@ -1,7 +1,6 @@
 import { computed, ref, shallowRef } from 'vue'
 import type { ChatStatus } from 'ai'
 import type { AgentHarnessOptions } from '@/types/harness/agent-harness-options'
-import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { SubagentEntry } from '@/types/harness/subagent-entry'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
@@ -72,7 +71,6 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     toolRuns: shallowRef<ToolRun[]>([]),
     subagents: shallowRef<SubagentEntry[]>([]),
     abortController: ref<AbortController | null>(null),
-    liveEvents: ref<HarnessEvent[]>([]),
     sessionPermissionLevel: ref<PermissionLevel | null>(null),
     lastRunConfig: ref<LastRunConfig | null>(null),
     resumingBackgroundBatch: ref(false),
@@ -136,7 +134,6 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     lastRunConfig: state.lastRunConfig,
     toolRuns: state.toolRuns,
     subagents: state.subagents,
-    liveEvents: state.liveEvents,
     billableUsageRecords: state.billableUsageRecords,
     turnUsageByTurnId: state.turnUsageByTurnId,
     usageBySubagentId,

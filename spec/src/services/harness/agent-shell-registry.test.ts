@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { computed } from 'vue'
 import type { AgentShellRecord } from '@/types/harness/agent-shell'
 import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 import { mockTauriEvent } from '../../test-utils/mocks/tauri-event'
@@ -161,5 +162,36 @@ describe('agent-shell-registry', () => {
     await killPromise
 
     expect(getAgentShell(shell.shellId)?.status).toBe('completed')
+  })
+
+  it('lets running-shell consumers refresh from the registry revision', async () => {
+    const {
+      agentShellRevision,
+      createAgentShell,
+      killAgentShell,
+      listShellsForChat,
+    } = await import('@/services/harness/shell/registry')
+
+    const runningShells = computed(() =>
+      agentShellRevision.value >= 0
+        ? listShellsForChat('chat-1').filter((shell) => shell.status === 'running')
+        : [],
+    )
+
+    expect(runningShells.value).toEqual([])
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'sleep 10',
+    })
+
+    expect(runningShells.value.map((entry) => entry.shellId)).toEqual([
+      shell.shellId,
+    ])
+
+    await killAgentShell(shell.shellId)
+
+    expect(runningShells.value).toEqual([])
   })
 })

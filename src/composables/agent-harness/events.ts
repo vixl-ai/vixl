@@ -28,7 +28,6 @@ export default (
     status,
     toolRuns,
     subagents,
-    liveEvents,
     pendingApprovals,
     billableUsageRecords,
     turnUsageByTurnId,
@@ -36,7 +35,6 @@ export default (
   } = state
 
   const handleEvent = (event: HarnessEvent): void | Promise<void> => {
-    liveEvents.value = [...liveEvents.value, event]
     if (event.type === 'text-delta') {
       session.appendLocalTextDelta(event.delta, event.messageId, event.stepId)
       status.value = 'streaming'

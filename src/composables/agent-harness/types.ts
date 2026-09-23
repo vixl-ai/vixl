@@ -6,7 +6,6 @@ import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
 import type { TurnUsageAggregate } from '@/types/billing/turn-usage-aggregate'
 import type { AgentHarnessOptions } from '@/types/harness/agent-harness-options'
 import type { ContextMention } from '@/types/harness/context-mention'
-import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { PermissionLevel } from '@/types/harness/permission'
 import type { SubagentEntry } from '@/types/harness/subagent-entry'
 import type { ToolRun } from '@/types/harness/tool-run'
@@ -54,7 +53,6 @@ export type AgentHarnessState = {
   toolRuns: ShallowRef<ToolRun[]>
   subagents: ShallowRef<SubagentEntry[]>
   abortController: Ref<AbortController | null>
-  liveEvents: Ref<HarnessEvent[]>
   sessionPermissionLevel: Ref<PermissionLevel | null>
   lastRunConfig: Ref<LastRunConfig | null>
   resumingBackgroundBatch: Ref<boolean>

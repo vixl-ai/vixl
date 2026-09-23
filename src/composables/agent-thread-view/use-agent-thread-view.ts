@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, unref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { ChatStatus } from 'ai'
 import type { PermissionLevel } from '@/types/harness/permission'
@@ -13,7 +13,10 @@ import useVixlConfig from '@/composables/use-vixl-config'
 import useMcpServers from '@/composables/use-mcp-servers'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { HOME_CHAT_SLUG, isHomeChatSlug } from '@/constants/home-chat'
-import { listShellsForChat } from '@/services/harness/shell/registry'
+import {
+  agentShellRevision,
+  listShellsForChat,
+} from '@/services/harness/shell/registry'
 import buildSubagentTimeline from '@/utils/build-subagent-timeline'
 import { createHandlers } from './handlers'
 import { bindAgentThreadLifecycle } from './lifecycle'
@@ -151,12 +154,11 @@ export default () => {
     isSubagentView.value ? [] : (paintedSession.value?.todos.value ?? []),
   )
 
-  const runningShells = computed(() => {
-    // Touch liveEvents so terminal lifecycle events re-run this computed.
-    const liveEventCount = unref(harness.value?.liveEvents)?.length ?? 0
-    const shells = listShellsForChat(chatId.value).filter((shell) => shell.status === 'running')
-    return liveEventCount < 0 ? [] : shells
-  })
+  const runningShells = computed(() =>
+    agentShellRevision.value >= 0
+      ? listShellsForChat(chatId.value).filter((shell) => shell.status === 'running')
+      : [],
+  )
 
   const activePermissionLevel = computed((): PermissionLevel => {
     return sessionPermissionLevel.value

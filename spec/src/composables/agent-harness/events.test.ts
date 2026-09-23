@@ -57,7 +57,6 @@ const buildState = (): AgentHarnessState =>
     status: ref('ready'),
     toolRuns: shallowRef([]),
     subagents: shallowRef([]),
-    liveEvents: ref([]),
     pendingApprovals: shallowRef([]),
     billableUsageRecords: shallowRef([]),
     turnUsageByTurnId: shallowRef({}),
