@@ -199,4 +199,37 @@ describe('useContextUsage', () => {
     expect(contextUsage.promptUsed.value).toBe(0)
     expect(contextUsage.lastStepUsage.value).toBeNull()
   })
+
+  it('discards a slower first refresh when a second refresh starts', async () => {
+    let resolveFirst: ((budget: ContextBudget) => void) | undefined
+    let resolveSecond: ((budget: ContextBudget) => void) | undefined
+    countContextBudget
+      .mockImplementationOnce(
+        () =>
+          new Promise<ContextBudget>((resolve) => {
+            resolveFirst = resolve
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<ContextBudget>((resolve) => {
+            resolveSecond = resolve
+          }),
+      )
+    const { default: useContextUsage } = await import(
+      '@/composables/use-context-usage'
+    )
+    const contextUsage = useContextUsage()
+
+    const first = contextUsage.refresh(refreshInput('chat-a'))
+    const second = contextUsage.refresh(refreshInput('chat-a'))
+
+    resolveFirst?.(sampleBudget(11_000))
+    await first
+    expect(contextUsage.promptUsed.value).toBe(0)
+
+    resolveSecond?.(sampleBudget(22_000))
+    await second
+    expect(contextUsage.promptUsed.value).toBe(22_000)
+  })
 })

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, ref } from 'vue'
 import type { ChatMeta } from '@/types/chat/chat-meta'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
@@ -19,6 +19,8 @@ const timeline = ref<ChatTimelineItem[]>([])
 const messages = ref<UIMessage[]>([])
 const meta = ref<ChatMeta | null>(null)
 const chatId = ref<string | null>(null)
+const activeTurnId = ref<string | null>(null)
+const activeStepId = ref<string | null>(null)
 const activeProject = ref<FleetProject | null>(null)
 const serverStates = ref<Record<string, { status: string; tools: unknown[] }>>({})
 const effectiveSettings = ref(defaultVixlSettings())
@@ -30,6 +32,8 @@ vi.mock('@/composables/use-chat-store', () => ({
     messages,
     meta,
     chatId,
+    activeTurnId,
+    activeStepId,
   }),
 }))
 
@@ -108,6 +112,8 @@ describe('useChatContextBudgetSync', () => {
     messages.value = []
     meta.value = sampleMeta()
     chatId.value = 'chat-1'
+    activeTurnId.value = null
+    activeStepId.value = null
     activeProject.value = sampleProject()
     serverStates.value = {}
     effectiveSettings.value = defaultVixlSettings()
@@ -251,5 +257,145 @@ describe('useChatContextBudgetSync', () => {
 
     expect(secondRefresh).toHaveBeenCalled()
     secondScope.stop()
+  })
+})
+
+const streamingTurn = (
+  toolStatus: 'running' | 'done' | 'error' | 'rejected' = 'running',
+): ChatTimelineItem => ({
+  type: 'agent-turn',
+  turn: {
+    id: 'turn-1',
+    text: `chunk-${toolStatus}`,
+    steps: [
+      {
+        id: 'step-1',
+        text: 'hello',
+        reasoning: '',
+        tools: [
+          {
+            toolCallId: 'tc-1',
+            name: 'read_file',
+            status: toolStatus,
+          },
+        ],
+      },
+    ],
+  },
+})
+
+describe('useChatContextBudgetSync refresh scheduling', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.clearAllTimers()
+    vi.useRealTimers()
+  })
+
+  const flushPromptRefresh = async (): Promise<void> => {
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(0)
+  }
+
+  const latestRefresh = (): ReturnType<typeof vi.fn> => {
+    const refresh = refreshFns.current.at(-1)
+    expect(refresh).toBeDefined()
+    return refresh as ReturnType<typeof vi.fn>
+  }
+
+  it('coalesces a burst of streaming timeline changes into one trailing recount', async () => {
+    const { default: useChatContextBudgetSync, CONTEXT_BUDGET_STREAM_DEBOUNCE_MS } =
+      await import('@/composables/use-chat-context-budget-sync')
+    useChatContextBudgetSync()
+    await flushPromptRefresh()
+    const refresh = latestRefresh()
+    refresh.mockClear()
+
+    activeTurnId.value = 'turn-1'
+    await flushPromptRefresh()
+    refresh.mockClear()
+
+    for (let index = 0; index < 8; index += 1) {
+      timeline.value = [{ type: 'compaction', summary: `chunk-${index}`, focus: null }]
+    }
+
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(CONTEXT_BUDGET_STREAM_DEBOUNCE_MS - 1)
+    expect(refresh).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('recounts promptly on turn start, step finish, tool completion, and idle timeline changes', async () => {
+    const { default: useChatContextBudgetSync, CONTEXT_BUDGET_STREAM_DEBOUNCE_MS } =
+      await import('@/composables/use-chat-context-budget-sync')
+    useChatContextBudgetSync()
+    await flushPromptRefresh()
+    const refresh = latestRefresh()
+    refresh.mockClear()
+
+    activeTurnId.value = 'turn-1'
+    activeStepId.value = 'step-1'
+    timeline.value = [streamingTurn('running')]
+    await flushPromptRefresh()
+    expect(refresh).toHaveBeenCalledTimes(1)
+    refresh.mockClear()
+
+    await vi.advanceTimersByTimeAsync(CONTEXT_BUDGET_STREAM_DEBOUNCE_MS)
+    expect(refresh).not.toHaveBeenCalled()
+
+    activeStepId.value = null
+    await flushPromptRefresh()
+    expect(refresh).toHaveBeenCalledTimes(1)
+    refresh.mockClear()
+
+    timeline.value = [streamingTurn('done')]
+    await flushPromptRefresh()
+    expect(refresh).toHaveBeenCalledTimes(1)
+    refresh.mockClear()
+
+    activeTurnId.value = null
+    await flushPromptRefresh()
+    expect(refresh).toHaveBeenCalledTimes(1)
+    refresh.mockClear()
+
+    timeline.value = [{ type: 'compaction', summary: 'idle append', focus: null }]
+    await flushPromptRefresh()
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not start a second recount while one is already running', async () => {
+    let release: (() => void) | undefined
+    const { default: useChatContextBudgetSync, CONTEXT_BUDGET_STREAM_DEBOUNCE_MS } =
+      await import('@/composables/use-chat-context-budget-sync')
+    useChatContextBudgetSync()
+    await flushPromptRefresh()
+    const refresh = latestRefresh()
+    refresh.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve
+        }),
+    )
+    refresh.mockClear()
+
+    activeTurnId.value = 'turn-1'
+    await flushPromptRefresh()
+    expect(refresh).toHaveBeenCalledTimes(1)
+
+    for (let index = 0; index < 6; index += 1) {
+      timeline.value = [{ type: 'compaction', summary: `live-${index}`, focus: null }]
+    }
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(CONTEXT_BUDGET_STREAM_DEBOUNCE_MS)
+    expect(refresh).toHaveBeenCalledTimes(1)
+
+    release?.()
+    await Promise.resolve()
+    await nextTick()
+    expect(refresh).toHaveBeenCalledTimes(2)
   })
 })

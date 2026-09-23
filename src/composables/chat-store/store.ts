@@ -31,6 +31,12 @@ const useChatStore = () => {
   const messages = computed(() => getActiveSession()?.messages.value ?? [])
   const timeline = computed(() => getActiveSession()?.timeline.value ?? [])
   const loading = computed(() => getActiveSession()?.loading.value ?? false)
+  const activeTurnId = computed(
+    () => getActiveSession()?.activeTurnId.value ?? null,
+  )
+  const activeStepId = computed(
+    () => getActiveSession()?.activeStepId.value ?? null,
+  )
   const pendingQuestion = computed(
     () => getActiveSession()?.pendingQuestion.value ?? null,
   )
@@ -181,6 +187,8 @@ const useChatStore = () => {
     messages,
     timeline,
     loading,
+    activeTurnId,
+    activeStepId,
     chatId,
     pendingQuestion,
     todos,
