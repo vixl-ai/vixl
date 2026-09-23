@@ -57,11 +57,13 @@ describe('chat session registry isolation', () => {
     const sessionA = store.forChat('proj', 'chat-a')
     sessionA.startAgentTurn('turn-a')
     sessionA.appendLocalTextDelta('hello from A', 'turn-a')
+    sessionA.flushPendingStreamDeltas()
 
     await store.loadChat('proj', 'chat-b')
     const sessionB = store.forChat('proj', 'chat-b')
     sessionB.startAgentTurn('turn-b')
     sessionB.appendLocalTextDelta('hello from B', 'turn-b')
+    sessionB.flushPendingStreamDeltas()
 
     expect(
       store.timeline.value.some(
@@ -96,6 +98,7 @@ describe('chat session registry isolation', () => {
     const sessionA = store.forChat('proj', 'chat-a')
     sessionA.startAgentTurn('turn-a')
     sessionA.appendLocalTextDelta('keep me', 'turn-a')
+    sessionA.flushPendingStreamDeltas()
     // Mark warm without wiping timeline: loadChat on empty disk after mutations
     // would hydrate empty. Use isSessionWarm via create path instead.
     await store.loadChat('proj', 'chat-a')
@@ -103,6 +106,7 @@ describe('chat session registry isolation', () => {
     const warmA = store.forChat('proj', 'chat-a')
     warmA.startAgentTurn('turn-a')
     warmA.appendLocalTextDelta('keep me', 'turn-a')
+    warmA.flushPendingStreamDeltas()
 
     store.clearChatState()
 
@@ -127,6 +131,7 @@ describe('chat session registry isolation', () => {
     const warm = store.forChat('proj', 'chat-a')
     warm.startAgentTurn('turn-a')
     warm.appendLocalTextDelta('cached', 'turn-a')
+    warm.flushPendingStreamDeltas()
     warm.finishAgentTurn()
     expect(store.isSessionWarm('proj', 'chat-a')).toBe(true)
 

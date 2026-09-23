@@ -12,6 +12,10 @@ import {
 import { chatMetaSchema } from '@/schemas/chat-meta'
 import { fileDiffListSchema } from '@/schemas/file-diff'
 import { updateChatMeta } from '@/services/vixl/vixl-tauri'
+import {
+  clearPendingStreamDeltasForSession,
+  disposeAllPendingStreamDeltas,
+} from './stream-delta-buffer'
 import type { ChatSession } from './types'
 
 export const sessions = new Map<string, ChatSession>()
@@ -156,6 +160,7 @@ export const mapMeta = (record: {
   })
 
 export const clearActiveTurnState = (session: ChatSession): void => {
+  clearPendingStreamDeltasForSession(session)
   session.activeTurnId.value = null
   session.activeStepId.value = null
   session.pendingStepText.value = ''
@@ -207,6 +212,7 @@ export const clearCompletedOrErrorAttention = async (
 }
 
 export const resetChatSessionsForTests = (): void => {
+  disposeAllPendingStreamDeltas()
   sessions.clear()
   activeKey.value = null
 }

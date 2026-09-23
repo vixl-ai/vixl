@@ -80,6 +80,18 @@ const createActiveSessionFacade = () => {
     })
   }
 
+  const flushPendingStreamDeltas = (): void => {
+    withActiveSession(undefined, (_session, api) => {
+      api.flushPendingStreamDeltas()
+    })
+  }
+
+  const disposePendingStreamDeltas = (): void => {
+    withActiveSession(undefined, (_session, api) => {
+      api.disposePendingStreamDeltas()
+    })
+  }
+
   const setAgentTurnError = (turnError: AgentTurnError): void => {
     withActiveSession(undefined, (_session, api) => {
       api.setAgentTurnError(turnError)
@@ -268,6 +280,8 @@ const createActiveSessionFacade = () => {
     appendLocalReasoningDelta,
     upsertLocalToolRun,
     finishAgentTurn,
+    flushPendingStreamDeltas,
+    disposePendingStreamDeltas,
     setAgentTurnError,
     appendLocalTodoUpdate,
     upsertLocalSubagentStart,

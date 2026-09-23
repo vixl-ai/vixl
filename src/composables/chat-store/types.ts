@@ -44,6 +44,8 @@ export type SessionMutations = {
   appendLocalReasoningDelta: (delta: string, messageId?: string, stepId?: string) => void
   upsertLocalToolRun: (run: ToolRun) => void
   finishAgentTurn: () => void
+  flushPendingStreamDeltas: () => void
+  disposePendingStreamDeltas: () => void
   setAgentTurnError: (turnError: AgentTurnError) => void
   appendLocalTodoUpdate: (todos: TodoItem[]) => void
   upsertLocalSubagentStart: (subagent: {

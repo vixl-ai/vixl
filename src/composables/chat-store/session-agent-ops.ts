@@ -12,6 +12,7 @@ import {
   updateTimelineTurn,
   upsertToolInStep,
 } from './message-parsing'
+import { createPendingStreamDeltaBuffer } from './stream-delta-buffer'
 
 type TurnOps = {
   getActiveTurn: () => AgentTurn | null
@@ -23,6 +24,8 @@ type TurnOps = {
   appendLocalReasoningDelta: (delta: string, messageId?: string, stepId?: string) => void
   upsertLocalToolRun: (run: ToolRun) => void
   finishAgentTurn: () => void
+  flushPendingStreamDeltas: () => void
+  disposePendingStreamDeltas: () => void
 }
 
 const createSessionAgentOps = (session: ChatSession): TurnOps => {
@@ -78,60 +81,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     updateAssistantMessage(session, turn)
   }
 
-  const startAgentStep = (stepId: string): void => {
-    const current = ensureActiveTurn()
-    if (!current) {
-      return
-    }
-    if (session.activeStepId.value && session.activeStepId.value !== stepId) {
-      const index = getStepIndex(current, session.activeStepId.value)
-      if (index >= 0) {
-        const steps = [...current.steps]
-        steps[index] = closeRunningTools(steps[index]!)
-        patchActiveTurn({ ...current, steps })
-      }
-    }
-    session.activeStepId.value = stepId
-    const leadingText = session.pendingStepText.value
-    session.pendingStepText.value = ''
-    const withStep = ensureStep(getActiveTurn() ?? current, stepId)
-    if (leadingText) {
-      const step =
-        withStep.steps.find((item) => item.id === stepId) ?? createStep(stepId)
-      patchActiveTurn(
-        patchStep(withStep, stepId, {
-          text: step.text + leadingText,
-        }),
-      )
-      return
-    }
-    patchActiveTurn(withStep)
-  }
-
-  const finishAgentStep = (): void => {
-    const current = getActiveTurn()
-    if (!current || !session.activeStepId.value) {
-      return
-    }
-    const index = getStepIndex(current, session.activeStepId.value)
-    if (index >= 0) {
-      const steps = [...current.steps]
-      steps[index] = closeRunningTools(steps[index]!)
-      patchActiveTurn({ ...current, steps })
-    }
-    session.activeStepId.value = null
-  }
-
-  const ensureActiveStep = (): string => {
-    if (session.activeStepId.value) {
-      return session.activeStepId.value
-    }
-    const stepId = crypto.randomUUID()
-    startAgentStep(stepId)
-    return stepId
-  }
-
-  const appendLocalTextDelta = (
+  const applyLocalTextDelta = (
     delta: string,
     messageId?: string,
     stepId?: string,
@@ -169,7 +119,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     session.pendingStepText.value += delta
   }
 
-  const appendLocalReasoningDelta = (
+  const applyLocalReasoningDelta = (
     delta: string,
     messageId?: string,
     stepId?: string,
@@ -205,6 +155,69 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     )
   }
 
+  const pending = createPendingStreamDeltaBuffer(session, (entry) => {
+    if (entry.kind === 'text') {
+      applyLocalTextDelta(entry.text, entry.messageId, entry.stepId)
+      return
+    }
+    applyLocalReasoningDelta(entry.text, entry.messageId, entry.stepId)
+  })
+
+  const startAgentStep = (stepId: string): void => {
+    pending.flush()
+    const current = ensureActiveTurn()
+    if (!current) {
+      return
+    }
+    if (session.activeStepId.value && session.activeStepId.value !== stepId) {
+      const index = getStepIndex(current, session.activeStepId.value)
+      if (index >= 0) {
+        const steps = [...current.steps]
+        steps[index] = closeRunningTools(steps[index]!)
+        patchActiveTurn({ ...current, steps })
+      }
+    }
+    session.activeStepId.value = stepId
+    const leadingText = session.pendingStepText.value
+    session.pendingStepText.value = ''
+    const withStep = ensureStep(getActiveTurn() ?? current, stepId)
+    if (leadingText) {
+      const step =
+        withStep.steps.find((item) => item.id === stepId) ?? createStep(stepId)
+      patchActiveTurn(
+        patchStep(withStep, stepId, {
+          text: step.text + leadingText,
+        }),
+      )
+      return
+    }
+    patchActiveTurn(withStep)
+  }
+
+  const finishAgentStep = (): void => {
+    pending.flush()
+    const current = getActiveTurn()
+    if (!current || !session.activeStepId.value) {
+      return
+    }
+    const index = getStepIndex(current, session.activeStepId.value)
+    if (index >= 0) {
+      const steps = [...current.steps]
+      steps[index] = closeRunningTools(steps[index]!)
+      patchActiveTurn({ ...current, steps })
+    }
+    session.activeStepId.value = null
+  }
+
+  const ensureActiveStep = (): string => {
+    if (session.activeStepId.value) {
+      return session.activeStepId.value
+    }
+    const stepId = crypto.randomUUID()
+    startAgentStep(stepId)
+    return stepId
+  }
+
   const findTurnWithTool = (
     toolCallId: string,
   ): { turn: AgentTurn; step: AgentStep } | null => {
@@ -222,6 +235,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
   }
 
   const upsertLocalToolRun = (run: ToolRun): void => {
+    pending.flush()
     const existing = findTurnWithTool(run.toolCallId)
     if (existing && existing.turn.id !== session.activeTurnId.value) {
       const updatedStep = upsertToolInStep(existing.step, run)
@@ -241,6 +255,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
   }
 
   const finishAgentTurn = (): void => {
+    pending.flush()
     finishAgentStep()
     const current = getActiveTurn()
     if (current) {
@@ -266,10 +281,16 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     startAgentStep,
     finishAgentStep,
     ensureActiveStep,
-    appendLocalTextDelta,
-    appendLocalReasoningDelta,
+    appendLocalTextDelta: (delta, messageId, stepId) => {
+      pending.enqueue('text', delta, messageId, stepId)
+    },
+    appendLocalReasoningDelta: (delta, messageId, stepId) => {
+      pending.enqueue('reasoning', delta, messageId, stepId)
+    },
     upsertLocalToolRun,
     finishAgentTurn,
+    flushPendingStreamDeltas: pending.flush,
+    disposePendingStreamDeltas: pending.dispose,
   }
 }
 

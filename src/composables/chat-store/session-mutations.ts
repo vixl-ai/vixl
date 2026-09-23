@@ -108,6 +108,7 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
       }
     },
     startAgentTurn: (turnId: string): void => {
+      agent.flushPendingStreamDeltas()
       session.turnIdRemap.clear()
       session.activeTurnId.value = turnId
       session.activeStepId.value = null
@@ -126,7 +127,10 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
     appendLocalReasoningDelta: agent.appendLocalReasoningDelta,
     upsertLocalToolRun: agent.upsertLocalToolRun,
     finishAgentTurn: agent.finishAgentTurn,
+    flushPendingStreamDeltas: agent.flushPendingStreamDeltas,
+    disposePendingStreamDeltas: agent.disposePendingStreamDeltas,
     setAgentTurnError: (turnError: AgentTurnError): void => {
+      agent.flushPendingStreamDeltas()
       const current = agent.getActiveTurn()
       if (current) {
         agent.patchActiveTurn({ ...current, error: turnError })
