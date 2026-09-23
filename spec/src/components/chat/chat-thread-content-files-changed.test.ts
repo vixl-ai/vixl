@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { shallowMount, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, shallowMount, type VueWrapper } from '@vue/test-utils'
 
 vi.hoisted(() => {
   Object.defineProperty(document, 'queryCommandSupported', {
@@ -141,12 +141,15 @@ const agentTurnStub = {
 
 let wrapper: VueWrapper | null = null
 
-const mountContent = (timeline: ChatTimelineItem[]): VueWrapper => {
+const mountContent = (
+  timeline: ChatTimelineItem[],
+  status: 'ready' | 'streaming' | 'submitted' = 'ready',
+): VueWrapper => {
   wrapper = shallowMount(ChatThreadContent, {
     props: {
       timeline,
       pendingApprovals: [],
-      status: 'ready',
+      status,
     },
     global: {
       renderStubDefaultSlot: true,
@@ -191,6 +194,8 @@ const agentTurns = (mounted: VueWrapper) => {
 afterEach(() => {
   wrapper?.unmount()
   wrapper = null
+  scroller.scrollToEnd.mockClear()
+  scroller.handleContentChange.mockClear()
 })
 
 describe('ChatThreadContent files changed', () => {
@@ -309,5 +314,179 @@ describe('ChatThreadContent files changed', () => {
     const lastTurns = agentTurns(withoutTrailingUser)
     expect(lastTurns).toHaveLength(1)
     expect(lastTurns[0]?.props('restoreDiscardsLatestMessage')).toBe(false)
+  })
+
+  it('keeps chatFileChanges and restoreChanges identity across text-only flushes', async () => {
+    const firstTurn = agentTurn('t1', [editRun('t1-tool', 'a.ts')])
+    const liveTurn = agentTurn('t2', [])
+    const user = userItem('u1', 'do both')
+    const mounted = mountContent([user, firstTurn, liveTurn], 'streaming')
+
+    const turns = agentTurns(mounted)
+    const chatFileChanges = turns[1]?.props('chatFileChanges')
+    const restoreChanges = turns[1]?.props('restoreChanges')
+    expect(chatFileChanges).toEqual([
+      { path: 'a.ts', operation: 'update', additions: 1, deletions: 0 },
+    ])
+    expect(restoreChanges).toEqual([
+      { path: 'a.ts', operation: 'update', additions: 1, deletions: 0 },
+    ])
+
+    await mounted.setProps({
+      timeline: [
+        user,
+        firstTurn,
+        {
+          type: 'agent-turn',
+          turn: { ...makeTurn('t2', []), text: 'streaming' },
+        },
+      ],
+    })
+
+    const nextTurns = agentTurns(mounted)
+    expect(nextTurns[0]?.props('chatFileChanges')).toBeNull()
+    expect(nextTurns[1]?.props('chatFileChanges')).toBe(chatFileChanges)
+    expect(nextTurns[1]?.props('restoreChanges')).toBe(restoreChanges)
+  })
+
+  it('rebuilds chatFileChanges when a completed file tool is added', async () => {
+    const user = userItem('u1', 'edit')
+    const firstTurn = agentTurn('t1', [editRun('t1-tool', 'a.ts')])
+    const liveTurn = agentTurn('t2', [])
+    const mounted = mountContent([user, firstTurn, liveTurn])
+
+    const before = agentTurns(mounted)[1]?.props('chatFileChanges')
+    const nextLive = agentTurn('t2', [editRun('t2-tool', 'b.ts')])
+    await mounted.setProps({
+      timeline: [user, firstTurn, nextLive],
+    })
+
+    const after = agentTurns(mounted)[1]?.props('chatFileChanges')
+    expect(after).not.toBe(before)
+    expect(after).toEqual([
+      { path: 'a.ts', operation: 'update', additions: 1, deletions: 0 },
+      { path: 'b.ts', operation: 'update', additions: 1, deletions: 0 },
+    ])
+  })
+})
+
+describe('ChatThreadContent subagent map stability', () => {
+  it('reuses subagent Maps when subagent items are unchanged', async () => {
+    const subagent = makeSubagent('sub-1', [])
+    subagent.toolCallId = 'spawn-1'
+    const firstTurn = agentTurn('t1', [])
+    const liveTurn = agentTurn('t2', [])
+    const mounted = mountContent([firstTurn, subagent, liveTurn], 'streaming')
+
+    const turns = agentTurns(mounted)
+    const byToolCallId = turns[0]?.props('subagentsByToolCallId') as Map<
+      string,
+      SubagentTimelineItem
+    >
+    const byId = turns[0]?.props('subagentsById') as Map<string, SubagentTimelineItem>
+    const mappedSubagent = byId.get('sub-1')
+    expect(byToolCallId.get('spawn-1')?.subagentId).toBe('sub-1')
+    expect(mappedSubagent?.toolCallId).toBe('spawn-1')
+
+    await mounted.setProps({
+      timeline: [
+        firstTurn,
+        subagent,
+        {
+          type: 'agent-turn',
+          turn: { ...makeTurn('t2', []), text: 'more' },
+        },
+      ],
+    })
+
+    const nextTurns = agentTurns(mounted)
+    expect(nextTurns[0]?.props('subagentsByToolCallId')).toBe(byToolCallId)
+    expect(nextTurns[0]?.props('subagentsById')).toBe(byId)
+    expect(nextTurns[1]?.props('subagentsByToolCallId')).toBe(byToolCallId)
+    expect(nextTurns[1]?.props('subagentsById')).toBe(byId)
+    expect(
+      (nextTurns[0]?.props('subagentsById') as Map<string, SubagentTimelineItem>).get(
+        'sub-1',
+      ),
+    ).toBe(mappedSubagent)
+  })
+
+  it('rebuilds subagent Maps when a subagent item is replaced', async () => {
+    const subagent = makeSubagent('sub-1', [])
+    subagent.toolCallId = 'spawn-1'
+    const firstTurn = agentTurn('t1', [])
+    const liveTurn = agentTurn('t2', [])
+    const mounted = mountContent([firstTurn, subagent, liveTurn])
+
+    const beforeById = agentTurns(mounted)[0]?.props('subagentsById') as Map<
+      string,
+      SubagentTimelineItem
+    >
+    const nextSubagent: SubagentTimelineItem = {
+      ...subagent,
+      status: 'running',
+      summary: 'working',
+    }
+    await mounted.setProps({
+      timeline: [firstTurn, nextSubagent, liveTurn],
+    })
+
+    const afterById = agentTurns(mounted)[0]?.props('subagentsById') as Map<
+      string,
+      SubagentTimelineItem
+    >
+    expect(afterById).not.toBe(beforeById)
+    expect(afterById.get('sub-1')?.status).toBe('running')
+    expect(afterById.get('sub-1')?.summary).toBe('working')
+  })
+})
+
+describe('ChatThreadContent stream scroll coalescing', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('runs followLiveOutput at most once per animation frame', async () => {
+    const raf: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      raf.push(cb)
+      return raf.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      raf[id - 1] = () => undefined
+    })
+
+    const liveTurn = {
+      type: 'agent-turn' as const,
+      turn: { ...makeTurn('t1', []), text: 'a' },
+    }
+    const mounted = mountContent([liveTurn], 'streaming')
+
+    await mounted.setProps({
+      timeline: [
+        { type: 'agent-turn', turn: { ...makeTurn('t1', []), text: 'ab' } },
+      ],
+    })
+    await mounted.setProps({
+      timeline: [
+        { type: 'agent-turn', turn: { ...makeTurn('t1', []), text: 'abc' } },
+      ],
+    })
+    await mounted.setProps({
+      timeline: [
+        { type: 'agent-turn', turn: { ...makeTurn('t1', []), text: 'abcd' } },
+      ],
+    })
+
+    expect(scroller.scrollToEnd).not.toHaveBeenCalled()
+    expect(scroller.handleContentChange).not.toHaveBeenCalled()
+    expect(raf).toHaveLength(1)
+
+    raf[0]!(0)
+    await flushPromises()
+
+    expect(scroller.handleContentChange).toHaveBeenCalledTimes(1)
+    expect(scroller.scrollToEnd).toHaveBeenCalledTimes(1)
+    expect(scroller.scrollToEnd).toHaveBeenCalledWith({ behavior: 'auto' })
   })
 })
