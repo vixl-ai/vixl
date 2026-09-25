@@ -11,7 +11,7 @@ Examples:
 
 Rules:
 - 3 to 6 words
-- Output only the title, nothing else
+- Output only the title
 - Do not reuse the user's opening words or quote or copy the message
 
 User message:

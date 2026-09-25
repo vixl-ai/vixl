@@ -13,7 +13,9 @@ describe('load-prompt', () => {
     expect(rendered).not.toContain('{{projectRoot}}')
     expect(rendered).toContain('Workspace tools run only against this repo.')
     expect(rendered).toContain('ask_user')
-    expect(rendered).toContain('Never silently switch.')
+    expect(rendered).toContain(
+      'If the user names a different project, use ask_user or tell them to open a chat in that project.',
+    )
   })
 
   it('renders plan-build handoff with path and title', () => {
@@ -23,7 +25,7 @@ describe('load-prompt', () => {
     })
 
     expect(rendered).toBe(
-      'Execute the plan in `.vixl/plans/my-plan.md` (My plan). Read the plan, work through its todos, and implement the changes.',
+      'Start the plan in `.vixl/plans/my-plan.md` (My plan) \n\nComplete its todos',
     )
   })
 
@@ -49,18 +51,31 @@ describe('load-prompt', () => {
     })
 
     expect(rendered).toContain(
-      'Orchestrate execution of the plan in `.vixl/plans/my-plan.md` (My plan).',
+      'Orchestrate the plan in `.vixl/plans/my-plan.md` (My plan).',
+    )
+    expect(rendered).toContain('Use anthropic::claude-sonnet-4 to handle all work.')
+    expect(rendered).toContain('Do not pass `model` to spawn_subagent;')
+    expect(rendered).toContain(
+      'The harness has locked the model to the users selected choice.',
     )
     expect(rendered).toContain(
-      'Subagent model lock: anthropic::claude-sonnet-4. Do not pass `model` to spawn_subagent; the harness uses the locked model.',
+      'If an early todo creates a worktree or needs a workspace move, sequence that create, then parent `move_workspace`, then implementers;',
     )
     expect(rendered).toContain(
-      'After spawning, leave a one-line visible status covering what was spawned, what is still running, and what happens next.',
+      'After spawning, leave a one-line visible status covering what was spawned, what is still running, and what happens next. Do not poll with `terminal_output`.',
     )
-    expect(rendered).toContain('Do not poll with `terminal_output`.')
     expect(rendered).toContain(
       'End the turn; the harness resumes as each background subagent finishes.',
     )
+    expect(rendered).toContain(
+      'Review outputs, update plan todo status with `update_plan_todo`, and continue.',
+    )
+    expect(rendered).toContain(
+      'Todos still go through `update_plan_todo`. Never write code or mutate files directly;',
+    )
+    expect(rendered).toContain('Delegate all implementation to sub-agents.')
     expect(rendered).not.toContain('{{subagentModel}}')
+    expect(rendered).not.toContain('{{planPath}}')
+    expect(rendered).not.toContain('{{planTitle}}')
   })
 })

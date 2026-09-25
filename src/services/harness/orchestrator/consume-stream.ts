@@ -17,14 +17,11 @@ import { getPlanExecutionSession } from '@/services/harness/plan-execution-sessi
 import toCachedInstructions from '@/services/models/to-cached-instructions'
 import emitContextUsage from './emit-context-usage'
 import extractPartialToolFields from './extract-partial-tool-fields'
-import {
-  nowIso,
-  resolveStreamError,
-  resolveToolErrorMessage,
-} from './helpers'
+import { nowIso, resolveStreamError, resolveToolErrorMessage } from './helpers'
 import { persistLine } from './persistence'
 import prepareParentCompactStep from './prepare-compact-step'
 import prepareImageStep from './prepare-image-step'
+import repairToolCall from './repair-tool-call'
 import type { PreparedHarnessStream } from './prepare-stream'
 
 export default async (prepared: PreparedHarnessStream): Promise<void> => {
@@ -76,6 +73,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     instructions: toCachedInstructions(system, callOptions.providerOptions),
     messages: finalModelMessages,
     tools,
+    repairToolCall,
     maxOutputTokens: callOptions.maxOutputTokens,
     temperature: callOptions.temperature,
     topP: callOptions.topP,

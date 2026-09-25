@@ -80,6 +80,7 @@
     "clsx": "^2.1.1",
     "dompurify": "3.4.13",
     "embla-carousel-vue": "^8.6.0",
+    "jsonrepair": "^3.15.0",
     "linkedom": "^0.18.13",
     "media-chrome": "^4.19.2",
     "mermaid": "^11.16.1",
