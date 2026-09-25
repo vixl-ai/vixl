@@ -78,26 +78,25 @@ jobs:
 
       - run: npm ci
 
-      # Fork pull requests cannot read repository secrets. Export the updater
-      # signing key only when it is available so unsigned fork builds skip
-      # signing instead of failing to decode an empty key.
-      - name: Configure updater signing
-        env:
-          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          if [ -n "$SIGNING_KEY" ]; then
-            echo "TAURI_SIGNING_PRIVATE_KEY<<VIXL_SIGNING_EOF" >> "$GITHUB_ENV"
-            echo "$SIGNING_KEY" >> "$GITHUB_ENV"
-            echo "VIXL_SIGNING_EOF" >> "$GITHUB_ENV"
-            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$SIGNING_KEY_PASSWORD" >> "$GITHUB_ENV"
-          else
-            echo "Updater signing key unavailable, building without updater signatures"
-          fi
-
-      - uses: tauri-apps/tauri-action@v1
+      # Fork pull requests cannot read repository secrets, and the bundler
+      # fails when the updater key is missing, so build those unsigned.
+      - name: Build unsigned
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        uses: tauri-apps/tauri-action@v1
         env:
           NO_STRIP: 'true'
+        with:
+          tauriScript: npm run tauri
+          args: --no-sign
+          uploadWorkflowArtifacts: true
+
+      - name: Build signed
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: tauri-apps/tauri-action@v1
+        env:
+          NO_STRIP: 'true'
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tauriScript: npm run tauri
           uploadWorkflowArtifacts: true
