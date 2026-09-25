@@ -9,21 +9,23 @@ A short list of opinions I had when creating this project.
 
 ## No humanizing the bot (unless you want to I guess?)
 
-Using other agent UIs I found they tend to "decorate" what the agent is doing, which feels, odd.
+A LLM is not something to humanize, and the moment you begin to it's hard to tell what the real underlying state of the system is.
 
-When working with local LLMs especially it's helpful to know the current state of the process.
+A number of harnesses decorate server processing with descriptions such as "planning next moves."
 
-Vixl labels the current state by always using terms such as "processing" never using marketing buzzwords.
+Usually we'd really call that prefill, or processing.
 
-While some would argue that "reasoning" and "thinking" also humanize the bot, I agree, but it's the default ai elements ships with.
+However in order to hide delays, or intermittent token generation so the user doesn't see how many tokens are really being used.
 
-Feel free to open an issue for this, if you can come up with something that feels better than "ITG" and reads cleanly in the chat flow.
+Companies ideal is:
 
-Not humanizing the bot, also makes it a great blankslate.
+User prompt -> something (hidden) -> result.
 
-Sometimes LLMs might be used for creative work, or other where its helpful to have it assume a personality when responding.
+Second to that Vixl does not call the LLM "you" or humanize its tasks in any system prompt.
 
-## Plans get saved
+Vixl does not attatch as a co-author.
+
+## Plans get persisted
 
 "Planning" or the concept of todo files is something everyone is familiar with.
 

@@ -11,9 +11,9 @@ Local LLMs helped me manage media on my local Jellyfin server, and test harnesse
 
 At work I had used the Vercel AI SDK countless times to build features, so this project felt like a fun side project to see what it would take to give myself a "cloud feeling local LLM ux."
 
-Like all personal projects Vixl does have opinions, you can read about the [Philosophy](/getting-started/philosophy), however I try to strictly limit them.
-
 The resulting project is now my daily driver at work.
+
+Like all personal projects Vixl does have opinions, you can read about the [Philosophy](/getting-started/philosophy), however I try to strictly limit them.
 
 ## Start here
 
