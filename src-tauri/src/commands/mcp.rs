@@ -1,4 +1,5 @@
 mod allowlist;
+mod cwd;
 mod env;
 #[path = "mcp/resolve-command.rs"]
 mod resolve_cmd;

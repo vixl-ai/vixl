@@ -9,6 +9,7 @@ use tokio::process::Command;
 use tokio::sync::Mutex;
 
 use super::allowlist::validate_mcp_spawn;
+use super::cwd::mcp_stdio_working_dir;
 use super::env::{merge_mcp_env_file, validate_mcp_env};
 use super::resolve_cmd::{apply_resolved_path_env, resolve_command};
 use super::rpc::{json_rpc, json_rpc_notify, list_tools_internal, spawn_reader};
@@ -30,6 +31,7 @@ pub async fn mcp_start(
     env_file: Option<String>,
 ) -> Result<McpServerState, String> {
     validate_mcp_spawn(&command, &args)?;
+    let working_dir = mcp_stdio_working_dir(scope_key.as_deref())?;
     let personal_dir = user_vixl_dir(&app)?;
     let env_overlay = merge_mcp_env_file(
         env_file.as_deref(),
@@ -79,6 +81,9 @@ pub async fn mcp_start(
     #[cfg(unix)]
     {
         command_builder.process_group(0);
+    }
+    if let Some(dir) = working_dir {
+        command_builder.current_dir(dir);
     }
     for (key, value) in &env_overlay {
         command_builder.env(key, value);

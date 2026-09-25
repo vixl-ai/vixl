@@ -51,7 +51,7 @@ A stdio server has `command` (required) plus optional `args`, `env`, `envFile`, 
 
 `command` must be a PATH basename, not a filesystem path. Allowed names: `npx`, `npm`, `node`, `pnpm`, `yarn`, `bun`, `bunx`, `deno`, `uvx`, `uv`, `python`, `python3`, `pipx`, `codegraph`, `docker`, `podman`, `nerdctl`. Typical forms: `npx -y <pkg>`, `uvx <pkg>`, or `docker run`.
 
-Stdio is a [Tauri](https://v2.tauri.app/) child process over stdin/stdout. It does not use the JS MCP SDK.
+Stdio is a [Tauri](https://v2.tauri.app/) child process over stdin/stdout. It does not use the JS MCP SDK. A project stdio server starts in that project's folder, not the directory Vixl was launched from. Relative args such as `server/mcp/index.ts` resolve against `<repo>`. If the project folder is missing, start fails instead of waiting on a handshake. Personal servers are not given a project working directory. There is no `cwd` field.
 
 ## HTTP and SSE servers
 

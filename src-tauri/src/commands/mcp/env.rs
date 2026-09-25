@@ -127,7 +127,7 @@ fn resolve_mcp_env_file_path(
     Ok(resolved)
 }
 
-fn project_root_from_scope(scope_key: Option<&str>) -> Option<&str> {
+pub(crate) fn project_root_from_scope(scope_key: Option<&str>) -> Option<&str> {
     let scope = scope_key?.trim();
     if scope.is_empty() || scope == "personal" {
         return None;
