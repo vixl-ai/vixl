@@ -34,7 +34,7 @@ Command defaults to `npx`. Copy: "PATH basename only (for example npx, uvx, or d
 
 Allowed basenames: `npx`, `npm`, `node`, `pnpm`, `yarn`, `bun`, `bunx`, `deno`, `uvx`, `uv`, `python`, `python3`, `pipx`, `codegraph`, `docker`, `podman`, `nerdctl`.
 
-Args are comma-separated. Env rows become `${input:KEY}` secrets. Stdio is a [Tauri](https://tauri.app) child process: JSON-RPC over stdin/stdout.
+Args are comma-separated. Env rows become `${input:KEY}` secrets. Stdio is a [Tauri](https://tauri.app) child process: JSON-RPC over stdin/stdout. Project servers start in that connection's project folder, even when Vixl itself was started somewhere else, so relative args resolve against the repo. Personal servers do not.
 
 ### http and sse
 
