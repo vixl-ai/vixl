@@ -9,6 +9,9 @@ hero:
     - theme: brand
       text: Get Started
       link: /getting-started/
+    - theme: alt
+      text: GitHub
+      link: https://github.com/vixl-ai/vixl
 features:
   - title: Four modes
     details: Agent, Ask, Plan, and Orchestrator in an offline-capable desktop app.
