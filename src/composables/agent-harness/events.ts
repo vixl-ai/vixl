@@ -43,6 +43,9 @@ export default (
       session.appendLocalReasoningDelta(event.delta, event.messageId, event.stepId)
       status.value = 'streaming'
     }
+    if (event.type === 'reasoning-duration') {
+      session.setLocalReasoningSeconds(event.stepId, event.seconds)
+    }
     if (event.type === 'tool-input-start') {
       if (HOLD_PATH_TOOLS.has(event.name)) {
         status.value = 'streaming'

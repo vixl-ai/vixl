@@ -28,8 +28,36 @@ export default (options: StepControllerOptions) => {
   let currentStepText = ''
   let collectedStepText = ''
   let stepOpen = false
+  let reasoningStartedAt: number | null = null
+  let reasoningSealed = false
+  let sealedReasoningSeconds = 0
   const startedToolIds = new Set<string>()
   const completedToolIds = new Set<string>()
+
+  const resetReasoningClock = (): void => {
+    reasoningStartedAt = null
+    reasoningSealed = false
+  }
+
+  const sealReasoningDuration = (): void => {
+    if (reasoningSealed || !currentStepId) {
+      return
+    }
+    reasoningSealed = true
+    if (reasoningStartedAt === null) {
+      return
+    }
+    const elapsedMs = Date.now() - reasoningStartedAt
+    const seconds = Math.max(1, Math.ceil(elapsedMs / 1000))
+    sealedReasoningSeconds += seconds
+    onEvent({ type: 'reasoning-duration', stepId: currentStepId, seconds })
+  }
+
+  const noteReasoningDelta = (): void => {
+    if (reasoningStartedAt === null && !reasoningSealed) {
+      reasoningStartedAt = Date.now()
+    }
+  }
 
   const beginStep = async (): Promise<void> => {
     if (stepOpen) {
@@ -38,6 +66,7 @@ export default (options: StepControllerOptions) => {
     currentStepId = crypto.randomUUID()
     currentStepText = ''
     stepOpen = true
+    resetReasoningClock()
     onEvent({ type: 'step-start', stepId: currentStepId })
     await persistStepBoundary(persistSlug(), chatId, currentStepId, 'start')
   }
@@ -46,6 +75,7 @@ export default (options: StepControllerOptions) => {
     if (!stepOpen) {
       return
     }
+    sealReasoningDuration()
     if (currentStepText.trim()) {
       collectedStepText = collectedStepText
         ? `${collectedStepText}\n\n${currentStepText}`
@@ -74,6 +104,7 @@ export default (options: StepControllerOptions) => {
       return
     }
     startedToolIds.add(toolCallId)
+    sealReasoningDuration()
     onEvent({ type: 'tool-start', toolCallId, name, args })
     await persistToolRun(
       persistSlug(),
@@ -160,10 +191,15 @@ export default (options: StepControllerOptions) => {
     get stepOpen() {
       return stepOpen
     },
+    get sealedReasoningSeconds() {
+      return sealedReasoningSeconds
+    },
     beginStep,
     finishStep,
     ensureStepOpen,
     emitToolStart,
     emitToolResult,
+    noteReasoningDelta,
+    sealReasoningDuration,
   }
 }

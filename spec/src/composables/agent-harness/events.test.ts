@@ -41,6 +41,7 @@ const buildState = (): AgentHarnessState =>
       upsertLocalToolRun: vi.fn<(...args: unknown[]) => void>(),
       appendLocalTextDelta: vi.fn<(...args: unknown[]) => void>(),
       appendLocalReasoningDelta: vi.fn<(...args: unknown[]) => void>(),
+      setLocalReasoningSeconds: vi.fn<(...args: unknown[]) => void>(),
       appendLocalTodoUpdate: vi.fn<(...args: unknown[]) => void>(),
       upsertLocalSubagentStart: vi.fn<(...args: unknown[]) => void>(),
       appendLocalSubagentToolEvent: vi.fn<(...args: unknown[]) => void>(),
@@ -484,6 +485,25 @@ describe('agent-harness events visible context gating', () => {
     expect(state.contextUsage.setLastStepUsage).not.toHaveBeenCalled()
     expect(state.contextUsage.clearLastStepUsage).not.toHaveBeenCalled()
     expect(state.contextBudgetSync.refreshContextBudget).not.toHaveBeenCalled()
+  })
+})
+
+describe('agent-harness events reasoning-duration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('applies sealed seconds onto the step', () => {
+    const state = buildState()
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'reasoning-duration',
+      stepId: 'step-1',
+      seconds: 4,
+    })
+
+    expect(state.session.setLocalReasoningSeconds).toHaveBeenCalledWith('step-1', 4)
   })
 })
 

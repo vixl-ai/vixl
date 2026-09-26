@@ -759,3 +759,113 @@ describe('hydrate-harness createdAt stamp', () => {
     expect(acc.pendingTurn?.createdAt).toBeUndefined()
   })
 })
+
+describe('hydrate-lines reasoning duration', () => {
+  it('copies duration onto the step that receives reasoning text', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      {
+        id: 'asst-1',
+        role: 'assistant',
+        parts: [
+          { type: 'reasoning', text: 'think', duration: 4 },
+          { type: 'text', text: 'hi' },
+        ],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      flushTurn,
+    )
+    const item = acc.nextTimeline[0]
+    expect(item?.type).toBe('agent-turn')
+    if (item?.type !== 'agent-turn') {
+      return
+    }
+    expect(item.turn.steps[0]?.reasoning).toBe('think')
+    expect(item.turn.steps[0]?.reasoningSeconds).toBe(4)
+  })
+
+  it('does not set reasoningSeconds when duration is missing', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      {
+        id: 'asst-1',
+        role: 'assistant',
+        parts: [{ type: 'reasoning', text: 'think' }, { type: 'text', text: 'hi' }],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      flushTurn,
+    )
+    const item = acc.nextTimeline[0]
+    expect(item?.type).toBe('agent-turn')
+    if (item?.type !== 'agent-turn') {
+      return
+    }
+    expect(item.turn.steps[0]?.reasoning).toBe('think')
+    expect(item.turn.steps[0]?.reasoningSeconds).toBeUndefined()
+  })
+
+  it('attaches duration to the earliest step when tools already created steps', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'tool-run',
+        toolCallId: 'tc-1',
+        name: 'read_file',
+        status: 'done',
+        stepId: 'step-1',
+        args: { path: 'a.ts' },
+        result: { content: 'ok' },
+      },
+      noopFlush,
+      '2026-01-01T00:00:00.000Z',
+    )
+    applyHydrateLine(
+      acc,
+      {
+        id: 'asst-1',
+        role: 'assistant',
+        parts: [{ type: 'reasoning', text: 'plan', duration: 6 }],
+        createdAt: '2026-01-01T00:00:02.000Z',
+      },
+      flushTurn,
+    )
+    const item = acc.nextTimeline.find((entry) => entry.type === 'agent-turn')
+    expect(item?.type).toBe('agent-turn')
+    if (item?.type !== 'agent-turn') {
+      return
+    }
+    expect(item.turn.steps[0]?.reasoning).toBe('plan')
+    expect(item.turn.steps[0]?.reasoningSeconds).toBe(6)
+  })
+
+  it('sums durations when multiple reasoning parts are present', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      {
+        id: 'asst-1',
+        role: 'assistant',
+        parts: [
+          { type: 'reasoning', text: 'a', duration: 2 },
+          { type: 'reasoning', text: 'b', duration: 3 },
+        ],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      flushTurn,
+    )
+    const item = acc.nextTimeline[0]
+    expect(item?.type).toBe('agent-turn')
+    if (item?.type !== 'agent-turn') {
+      return
+    }
+    expect(item.turn.steps[0]?.reasoning).toBe('ab')
+    expect(item.turn.steps[0]?.reasoningSeconds).toBe(5)
+  })
+})

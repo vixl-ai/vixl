@@ -17,8 +17,8 @@ import { getPlanExecutionSession } from '@/services/harness/plan-execution-sessi
 import toCachedInstructions from '@/services/models/to-cached-instructions'
 import emitContextUsage from './emit-context-usage'
 import extractPartialToolFields from './extract-partial-tool-fields'
-import { nowIso, resolveStreamError, resolveToolErrorMessage } from './helpers'
-import { persistLine } from './persistence'
+import { resolveStreamError, resolveToolErrorMessage } from './helpers'
+import persistAssistantLine from './persist-assistant-line'
 import prepareParentCompactStep from './prepare-compact-step'
 import prepareImageStep from './prepare-image-step'
 import repairToolCall from './repair-tool-call'
@@ -68,6 +68,18 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     })
   }
 
+  const persistCollectedAssistant = async (aborted?: boolean): Promise<void> => {
+    await persistAssistantLine({
+      projectSlug: workspace.projectSlug,
+      chatId,
+      assistantId,
+      reasoningText: steps.assistantReasoning,
+      reasoningSeconds: steps.sealedReasoningSeconds,
+      trailingText: steps.trailingText,
+      ...(aborted ? { aborted: true } : {}),
+    })
+  }
+
   const result = streamText({
     model,
     instructions: toCachedInstructions(system, callOptions.providerOptions),
@@ -114,20 +126,8 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
       clearStagedImages({ chatId, turnId: assistantId })
       await killShellsForChat(chatId)
       abortSubagentsForChat(chatId)
-      if (steps.trailingText || steps.assistantReasoning) {
-        await persistLine(workspace.projectSlug, chatId, {
-          id: assistantId,
-          role: 'assistant',
-          parts: [
-            ...(steps.assistantReasoning
-              ? [{ type: 'reasoning', text: steps.assistantReasoning }]
-              : []),
-            ...(steps.trailingText ? [{ type: 'text', text: steps.trailingText }] : []),
-          ],
-          createdAt: nowIso(),
-          aborted: true,
-        })
-      }
+      steps.sealReasoningDuration()
+      await persistCollectedAssistant(true)
       onEvent({
         type: 'turn-aborted',
         reason: 'user-stop',
@@ -159,6 +159,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
 
     if (part.type === 'reasoning-delta') {
       await steps.ensureStepOpen()
+      steps.noteReasoningDelta()
       steps.assistantReasoning += part.text
       onEvent({
         type: 'reasoning-delta',
@@ -171,6 +172,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
 
     if (part.type === 'text-delta') {
       if (steps.stepOpen) {
+        steps.sealReasoningDuration()
         steps.currentStepText += part.text
         onEvent({
           type: 'text-delta',
@@ -302,18 +304,8 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
       throw streamError
     }
 
-    if (!signal.aborted && (steps.trailingText || steps.assistantReasoning)) {
-      await persistLine(workspace.projectSlug, chatId, {
-        id: assistantId,
-        role: 'assistant',
-        parts: [
-          ...(steps.assistantReasoning
-            ? [{ type: 'reasoning', text: steps.assistantReasoning }]
-            : []),
-          ...(steps.trailingText ? [{ type: 'text', text: steps.trailingText }] : []),
-        ],
-        createdAt: nowIso(),
-      })
+    if (!signal.aborted) {
+      await persistCollectedAssistant()
     }
   } finally {
     clearStagedImages({ chatId, turnId: assistantId })

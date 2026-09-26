@@ -16,6 +16,7 @@ export type TodoItem = {
 export type HarnessEvent =
   | { type: 'text-delta'; delta: string; messageId?: string; stepId?: string }
   | { type: 'reasoning-delta'; delta: string; messageId?: string; stepId?: string }
+  | { type: 'reasoning-duration'; stepId: string; seconds: number }
   | { type: 'tool-input-start'; toolCallId: string; name: string }
   | { type: 'tool-input-delta'; toolCallId: string; name: string; args: unknown }
   | { type: 'tool-start'; toolCallId: string; name: string; args: unknown }

@@ -66,6 +66,7 @@ vi.mock('vue-sonner', () => ({
 
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import consumeStream from '@/services/harness/orchestrator/consume-stream'
+import { persistLine } from '@/services/harness/orchestrator/persistence'
 
 const mockStream = (options: {
   finishUsage?: unknown
@@ -129,6 +130,9 @@ const makePrepared = (): PreparedHarnessStream & {
       collectedStepText: '',
       currentStepId: '',
       currentStepText: '',
+      sealedReasoningSeconds: 0,
+      noteReasoningDelta: vi.fn<() => void>(),
+      sealReasoningDuration: vi.fn<() => void>(),
     },
     workspace: {
       projectSlug: 'demo',
@@ -455,5 +459,104 @@ describe('consumeStream tool-input-delta', () => {
       name: 'write_file',
       args: { path: 'src/a.ts', tool: 'note' },
     })
+  })
+})
+
+describe('consumeStream reasoning duration persist', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    const prepareStep = vi.fn<(options: { messages: unknown[] }) => Promise<unknown>>()
+    prepareParentCompactStep.mockReturnValue(prepareStep)
+    mockStream({ finishUsage: { inputTokens: 1, outputTokens: 1 } })
+  })
+
+  it('notes a reasoning delta and seals on the first text delta of an open step', async () => {
+    streamText.mockImplementation(() => ({
+      fullStream: (async function* () {
+        yield { type: 'reasoning-delta', text: 'hmm' }
+        yield { type: 'text-delta', text: 'hello' }
+      })(),
+      text: Promise.resolve(''),
+      responseMessages: Promise.resolve([]),
+      usage: Promise.resolve(undefined),
+    }))
+    const prepared = makePrepared()
+    ;(prepared.steps as { stepOpen: boolean }).stepOpen = true
+
+    await consumeStream(prepared)
+
+    expect(prepared.steps.noteReasoningDelta).toHaveBeenCalledTimes(1)
+    expect(prepared.steps.sealReasoningDuration).toHaveBeenCalled()
+  })
+
+  it('puts sealed duration on the persisted reasoning part', async () => {
+    const prepared = makePrepared()
+    prepared.steps.assistantReasoning = 'think'
+    prepared.steps.trailingText = 'hello'
+    ;(prepared.steps as { sealedReasoningSeconds: number }).sealedReasoningSeconds = 5
+
+    await consumeStream(prepared)
+
+    expect(persistLine).toHaveBeenCalledWith(
+      'demo',
+      'chat-1',
+      expect.objectContaining({
+        id: 'turn-1',
+        role: 'assistant',
+        parts: [
+          { type: 'reasoning', text: 'think', duration: 5 },
+          { type: 'text', text: 'hello' },
+        ],
+      }),
+    )
+  })
+
+  it('omits duration when no reasoning was sealed', async () => {
+    const prepared = makePrepared()
+    prepared.steps.assistantReasoning = 'think'
+    prepared.steps.trailingText = 'hello'
+
+    await consumeStream(prepared)
+
+    expect(persistLine).toHaveBeenCalledWith(
+      'demo',
+      'chat-1',
+      expect.objectContaining({
+        parts: [
+          { type: 'reasoning', text: 'think' },
+          { type: 'text', text: 'hello' },
+        ],
+      }),
+    )
+  })
+
+  it('seals and persists duration on abort when a reasoning part is written', async () => {
+    const controller = new AbortController()
+    streamText.mockImplementation((config) => ({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        controller.abort()
+        await (config as { onAbort?: () => Promise<void> }).onAbort?.()
+      })(),
+      text: Promise.resolve(''),
+      responseMessages: Promise.resolve([]),
+      usage: Promise.resolve(undefined),
+    }))
+    const prepared = makePrepared()
+    ;(prepared as { signal: AbortSignal }).signal = controller.signal
+    prepared.steps.assistantReasoning = 'partial'
+    ;(prepared.steps as { sealedReasoningSeconds: number }).sealedReasoningSeconds = 2
+
+    await consumeStream(prepared)
+
+    expect(prepared.steps.sealReasoningDuration).toHaveBeenCalled()
+    expect(persistLine).toHaveBeenCalledWith(
+      'demo',
+      'chat-1',
+      expect.objectContaining({
+        aborted: true,
+        parts: [{ type: 'reasoning', text: 'partial', duration: 2 }],
+      }),
+    )
   })
 })

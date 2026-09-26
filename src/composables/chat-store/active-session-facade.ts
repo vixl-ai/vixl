@@ -68,6 +68,12 @@ const createActiveSessionFacade = () => {
     })
   }
 
+  const setLocalReasoningSeconds = (stepId: string, seconds: number): void => {
+    withActiveSession(undefined, (_session, api) => {
+      api.setLocalReasoningSeconds(stepId, seconds)
+    })
+  }
+
   const upsertLocalToolRun = (run: ToolRun): void => {
     withActiveSession(undefined, (_session, api) => {
       api.upsertLocalToolRun(run)
@@ -278,6 +284,7 @@ const createActiveSessionFacade = () => {
     finishAgentStep,
     appendLocalTextDelta,
     appendLocalReasoningDelta,
+    setLocalReasoningSeconds,
     upsertLocalToolRun,
     finishAgentTurn,
     flushPendingStreamDeltas,

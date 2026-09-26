@@ -42,6 +42,7 @@ export type SessionMutations = {
   finishAgentStep: () => void
   appendLocalTextDelta: (delta: string, messageId?: string, stepId?: string) => void
   appendLocalReasoningDelta: (delta: string, messageId?: string, stepId?: string) => void
+  setLocalReasoningSeconds: (stepId: string, seconds: number) => void
   upsertLocalToolRun: (run: ToolRun) => void
   finishAgentTurn: () => void
   flushPendingStreamDeltas: () => void

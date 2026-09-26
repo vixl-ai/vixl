@@ -6,9 +6,21 @@ import type { ToolRun } from '@/types/harness/tool-run'
 import toolRunToUiParts from '@/utils/tool-run-to-ui-parts'
 import type { ChatSession, MessagePart } from './types'
 
+const parsePositiveSeconds = (value: unknown): number | undefined => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return undefined
+  }
+  return value
+}
+
 export const parsePart = (part: Record<string, unknown>): MessagePart => {
   if (part.type === 'reasoning' && typeof part.text === 'string') {
-    return { type: 'reasoning', text: part.text }
+    const duration = parsePositiveSeconds(part.duration)
+    return {
+      type: 'reasoning',
+      text: part.text,
+      ...(duration !== undefined ? { duration } : {}),
+    } as MessagePart
   }
   if (
     part.type === 'file' &&
@@ -33,6 +45,25 @@ export const extractReasoning = (parts: MessagePart[]): string =>
     .filter((part) => part.type === 'reasoning')
     .map((part) => (part.type === 'reasoning' ? part.text : ''))
     .join('')
+
+export const extractReasoningDuration = (parts: MessagePart[]): number | undefined => {
+  let sum = 0
+  let found = false
+  for (const part of parts) {
+    if (part.type !== 'reasoning') {
+      continue
+    }
+    const duration = parsePositiveSeconds(
+      'duration' in part ? (part as { duration?: unknown }).duration : undefined,
+    )
+    if (duration === undefined) {
+      continue
+    }
+    sum += duration
+    found = true
+  }
+  return found ? sum : undefined
+}
 
 export const extractText = (parts: MessagePart[]): string =>
   parts

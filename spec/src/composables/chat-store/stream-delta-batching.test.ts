@@ -217,4 +217,18 @@ describe('stream delta batching', () => {
     const revived = store.forChat('proj', 'chat-drop')
     expect(revived.timeline.value).toEqual([])
   })
+
+  it('stores reasoningSeconds on the active step', async () => {
+    const { default: useChatStore, resetChatSessionsForTests } = await import(
+      '@/composables/use-chat-store'
+    )
+    resetChatSessionsForTests()
+    const store = useChatStore()
+    const session = store.forChat('proj', 'chat-duration')
+    session.startAgentTurn('turn-1')
+    session.startAgentStep('step-1')
+    session.setLocalReasoningSeconds('step-1', 4)
+
+    expect(turnOf(session.timeline, 'turn-1')?.steps[0]?.reasoningSeconds).toBe(4)
+  })
 })

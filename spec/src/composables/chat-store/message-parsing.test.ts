@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { convertToModelMessages } from 'ai'
 import {
   buildAssistantMessage,
+  extractReasoningDuration,
+  parsePart,
   rebuildMessagesFromTimeline,
   updateAssistantMessage,
 } from '@/composables/chat-store/message-parsing'
@@ -64,6 +66,59 @@ const multiStepTurn = (): AgentTurn => ({
       ],
     },
   ],
+})
+
+describe('parsePart reasoning duration', () => {
+  it('keeps a positive finite duration on a reasoning part', () => {
+    expect(parsePart({ type: 'reasoning', text: 'think', duration: 4 })).toEqual({
+      type: 'reasoning',
+      text: 'think',
+      duration: 4,
+    })
+  })
+
+  it('omits duration when it is missing or not a positive finite number', () => {
+    expect(parsePart({ type: 'reasoning', text: 'think' })).toEqual({
+      type: 'reasoning',
+      text: 'think',
+    })
+    expect(parsePart({ type: 'reasoning', text: 'think', duration: 0 })).toEqual({
+      type: 'reasoning',
+      text: 'think',
+    })
+    expect(parsePart({ type: 'reasoning', text: 'think', duration: -1 })).toEqual({
+      type: 'reasoning',
+      text: 'think',
+    })
+    expect(parsePart({ type: 'reasoning', text: 'think', duration: Infinity })).toEqual({
+      type: 'reasoning',
+      text: 'think',
+    })
+    expect(parsePart({ type: 'reasoning', text: 'think', duration: '4' })).toEqual({
+      type: 'reasoning',
+      text: 'think',
+    })
+  })
+
+  it('sums durations across reasoning parts and ignores parts without duration', () => {
+    expect(
+      extractReasoningDuration([
+        { type: 'reasoning', text: 'a', duration: 2 } as never,
+        { type: 'text', text: 'hi' },
+        { type: 'reasoning', text: 'b' },
+        { type: 'reasoning', text: 'c', duration: 3 } as never,
+      ]),
+    ).toBe(5)
+  })
+
+  it('returns undefined when no reasoning part has a duration', () => {
+    expect(
+      extractReasoningDuration([
+        { type: 'reasoning', text: 'old' },
+        { type: 'text', text: 'hi' },
+      ]),
+    ).toBeUndefined()
+  })
 })
 
 describe('updateAssistantMessage tool projection', () => {

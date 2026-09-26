@@ -109,6 +109,7 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
       <AiElementsReasoningReasoning
         v-if="step.reasoning.trim().length > 0"
         :is-streaming="isStepStreaming(index) && step.text.trim().length === 0 && step.tools.length === 0"
+        :duration="step.reasoningSeconds"
         :default-open="
           (isStepStreaming(index) && step.text.trim().length === 0 && step.tools.length === 0)
           || hasSpawnSubagent

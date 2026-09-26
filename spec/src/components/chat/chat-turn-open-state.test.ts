@@ -5,6 +5,7 @@ import ChatToolRun from '@/components/chat/ChatToolRun.vue'
 import ChatTurnFilesChanged from '@/components/chat/ChatTurnFilesChanged.vue'
 import { defineComponent } from 'vue'
 import Reasoning from '@/components/ai-elements/reasoning/Reasoning.vue'
+import ReasoningTrigger from '@/components/ai-elements/reasoning/ReasoningTrigger.vue'
 import ChainOfThought from '@/components/ai-elements/chain-of-thought/ChainOfThought.vue'
 import { useChainOfThought } from '@/components/ai-elements/chain-of-thought/context'
 import {
@@ -203,6 +204,123 @@ describe('Reasoning live streaming persist', () => {
     })
 
     expect(collapsibleOpen(wrapper)).toBe(true)
+  })
+})
+
+const reasoningDurationStubs = {
+  Collapsible: {
+    name: 'Collapsible',
+    props: ['open'],
+    template: '<div><slot /></div>',
+  },
+  CollapsibleTrigger: {
+    name: 'CollapsibleTrigger',
+    template: '<button type="button"><slot /></button>',
+  },
+  Shimmer: {
+    name: 'Shimmer',
+    template: '<span><slot /></span>',
+  },
+}
+
+const mountReasoningDuration = (props: {
+  isStreaming?: boolean
+  duration?: number
+}): VueWrapper => {
+  wrapper = mount(Reasoning, {
+    props,
+    slots: {
+      default: ReasoningTrigger,
+    },
+    global: {
+      stubs: reasoningDurationStubs,
+    },
+  })
+  return wrapper
+}
+
+describe('Reasoning duration', () => {
+  it('shows Thinking while streaming', () => {
+    const mounted = mountReasoningDuration({
+      isStreaming: true,
+      duration: 4,
+    })
+    expect(mounted.text()).toContain('Thinking...')
+    expect(mounted.text()).not.toContain('Thought for')
+  })
+
+  it('shows Thought for N seconds when a finished block has duration', () => {
+    const mounted = mountReasoningDuration({
+      isStreaming: false,
+      duration: 4,
+    })
+    expect(mounted.text()).toContain('Thought for 4 seconds')
+  })
+
+  it('uses the singular second label for duration 1', () => {
+    const mounted = mountReasoningDuration({
+      isStreaming: false,
+      duration: 1,
+    })
+    expect(mounted.text()).toContain('Thought for 1 second')
+    expect(mounted.text()).not.toContain('seconds')
+  })
+
+  it('falls back to a few seconds when duration is missing', () => {
+    const mounted = mountReasoningDuration({
+      isStreaming: false,
+    })
+    expect(mounted.text()).toContain('Thought for a few seconds')
+  })
+
+  it('keeps a stored duration after remount and does not overwrite it when streaming flips', async () => {
+    vi.useFakeTimers()
+    const mounted = mountReasoningDuration({
+      isStreaming: false,
+      duration: 4,
+    })
+    expect(mounted.text()).toContain('Thought for 4 seconds')
+
+    await mounted.setProps({ isStreaming: true })
+    await vi.advanceTimersByTimeAsync(5000)
+    await mounted.setProps({ isStreaming: false })
+    await flushPromises()
+
+    expect(mounted.text()).toContain('Thought for 4 seconds')
+    expect(mounted.emitted('update:duration')).toBeUndefined()
+  })
+
+  it('fills the live label from the mounted timer then replaces it when duration arrives', async () => {
+    vi.useFakeTimers()
+    const mounted = mountReasoningDuration({
+      isStreaming: true,
+    })
+    expect(mounted.text()).toContain('Thinking...')
+
+    await vi.advanceTimersByTimeAsync(2000)
+    await mounted.setProps({ isStreaming: false })
+    await flushPromises()
+    expect(mounted.text()).toContain('Thought for 2 seconds')
+
+    await mounted.setProps({ duration: 9 })
+    await flushPromises()
+    expect(mounted.text()).toContain('Thought for 9 seconds')
+  })
+
+  it('does not overwrite a duration that arrives while the live clock is running', async () => {
+    vi.useFakeTimers()
+    const mounted = mountReasoningDuration({
+      isStreaming: true,
+    })
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await mounted.setProps({ duration: 4 })
+    expect(mounted.text()).toContain('Thinking...')
+
+    await mounted.setProps({ isStreaming: false })
+    await flushPromises()
+    expect(mounted.text()).toContain('Thought for 4 seconds')
+    expect(mounted.emitted('update:duration')).toBeUndefined()
   })
 })
 

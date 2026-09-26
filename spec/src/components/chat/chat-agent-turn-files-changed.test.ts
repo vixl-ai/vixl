@@ -10,6 +10,7 @@ vi.hoisted(() => {
 
 import ChatAgentTurn from '@/components/chat/ChatAgentTurn.vue'
 import ChatTurnFilesChanged from '@/components/chat/ChatTurnFilesChanged.vue'
+import Reasoning from '@/components/ai-elements/reasoning/Reasoning.vue'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { AggregatedTurnFileChange } from '@/types/harness/file-checkpoint'
 import type { FileDiff, FileDiffOperation } from '@/types/harness/file-diff'
@@ -187,5 +188,45 @@ describe('ChatAgentTurn files changed', () => {
     const block = filesChanged(mounted)[0]
     expect(block).toBeDefined()
     expect(block?.props('restoreDiscardsLatestMessage')).toBe(true)
+  })
+})
+
+const reasoningTurn = (reasoningSeconds?: number): AgentTurn => ({
+  id: 't1',
+  text: '',
+  steps: [
+    {
+      id: 't1-step',
+      text: '',
+      reasoning: 'the plan',
+      ...(reasoningSeconds === undefined ? {} : { reasoningSeconds }),
+      tools: [],
+    },
+  ],
+})
+
+const reasoningBlock = (mounted: VueWrapper) => {
+  const byRef = mounted.findComponent(Reasoning)
+  if (byRef.exists()) {
+    return byRef
+  }
+  return mounted.findComponent({ name: 'AiElementsReasoningReasoning' })
+}
+
+describe('ChatAgentTurn reasoning duration', () => {
+  it('passes step.reasoningSeconds to the reasoning block', () => {
+    const mounted = mountTurn({
+      status: 'ready',
+      turn: reasoningTurn(4),
+    })
+    expect(reasoningBlock(mounted).props('duration')).toBe(4)
+  })
+
+  it('leaves duration undefined when the step has no reasoningSeconds', () => {
+    const mounted = mountTurn({
+      status: 'ready',
+      turn: reasoningTurn(),
+    })
+    expect(reasoningBlock(mounted).props('duration')).toBeUndefined()
   })
 })

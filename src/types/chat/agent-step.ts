@@ -4,5 +4,6 @@ export type AgentStep = {
   id: string
   text: string
   reasoning: string
+  reasoningSeconds?: number
   tools: ToolRun[]
 }

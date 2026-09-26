@@ -22,6 +22,7 @@ type TurnOps = {
   ensureActiveStep: () => string
   appendLocalTextDelta: (delta: string, messageId?: string, stepId?: string) => void
   appendLocalReasoningDelta: (delta: string, messageId?: string, stepId?: string) => void
+  setLocalReasoningSeconds: (stepId: string, seconds: number) => void
   upsertLocalToolRun: (run: ToolRun) => void
   finishAgentTurn: () => void
   flushPendingStreamDeltas: () => void
@@ -218,6 +219,15 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     return stepId
   }
 
+  const setLocalReasoningSeconds = (stepId: string, seconds: number): void => {
+    pending.flush()
+    const current = ensureActiveTurn()
+    if (!current) {
+      return
+    }
+    patchActiveTurn(patchStep(current, stepId, { reasoningSeconds: seconds }))
+  }
+
   const findTurnWithTool = (
     toolCallId: string,
   ): { turn: AgentTurn; step: AgentStep } | null => {
@@ -287,6 +297,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     appendLocalReasoningDelta: (delta, messageId, stepId) => {
       pending.enqueue('reasoning', delta, messageId, stepId)
     },
+    setLocalReasoningSeconds,
     upsertLocalToolRun,
     finishAgentTurn,
     flushPendingStreamDeltas: pending.flush,

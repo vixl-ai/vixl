@@ -80,8 +80,10 @@ watch(() => props.isStreaming, (streaming, _prev, onCleanup) => {
   }
 
   if (startTime.value !== null) {
-    const calculatedDuration = Math.ceil((Date.now() - startTime.value) / MS_IN_S)
-    updateDuration(calculatedDuration)
+    if (props.duration === undefined) {
+      const calculatedDuration = Math.ceil((Date.now() - startTime.value) / MS_IN_S)
+      updateDuration(calculatedDuration)
+    }
     startTime.value = null
   }
 

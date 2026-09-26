@@ -11,6 +11,7 @@ import {
   closeRunningTools,
   distributeLegacyStepText,
   extractReasoning,
+  extractReasoningDuration,
   extractText,
   getStepIndex,
   parsePart,
@@ -94,12 +95,21 @@ export const applyHydrateLine = (
   if (parsed.role === 'assistant') {
     const parts = parsed.parts.map(parsePart)
     const reasoning = extractReasoning(parts)
+    const reasoningSeconds = extractReasoningDuration(parts)
     const text = extractText(parts)
     if (!acc.pendingTurn) {
       acc.pendingTurn = {
         id: parsed.id,
         steps: reasoning
-          ? [{ id: parsed.id, text: '', reasoning, tools: [] }]
+          ? [
+              {
+                id: parsed.id,
+                text: '',
+                reasoning,
+                tools: [],
+                ...(reasoningSeconds !== undefined ? { reasoningSeconds } : {}),
+              },
+            ]
           : [],
         text,
         createdAt: acc.firstLineCreatedAt ?? parsed.createdAt,
@@ -110,10 +120,14 @@ export const applyHydrateLine = (
         // Aggregate assistant reasoning is not persisted per-step. Attach it
         // to the earliest step so it renders before tools (e.g. spawn_subagent).
         const stepId = nextTurn.steps[0]?.id ?? acc.currentStepId ?? parsed.id
+        const existing = nextTurn.steps.find((step: AgentStep) => step.id === stepId)
         nextTurn = patchStep(nextTurn, stepId, {
-          reasoning:
-            (nextTurn.steps.find((step: AgentStep) => step.id === stepId)
-              ?.reasoning ?? '') + reasoning,
+          reasoning: (existing?.reasoning ?? '') + reasoning,
+          ...(reasoningSeconds !== undefined
+            ? {
+                reasoningSeconds: (existing?.reasoningSeconds ?? 0) + reasoningSeconds,
+              }
+            : {}),
         })
       }
       const fromSteps: string = nextTurn.steps

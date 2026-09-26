@@ -125,6 +125,7 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
     finishAgentStep: agent.finishAgentStep,
     appendLocalTextDelta: agent.appendLocalTextDelta,
     appendLocalReasoningDelta: agent.appendLocalReasoningDelta,
+    setLocalReasoningSeconds: agent.setLocalReasoningSeconds,
     upsertLocalToolRun: agent.upsertLocalToolRun,
     finishAgentTurn: agent.finishAgentTurn,
     flushPendingStreamDeltas: agent.flushPendingStreamDeltas,
