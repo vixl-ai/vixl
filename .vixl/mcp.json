@@ -15,7 +15,7 @@
         "mcp"
       ],
       "command": "npx",
-      "enabled": true
+      "enabled": false
     }
   }
 }
