@@ -9,6 +9,7 @@
   <a href="https://vixl.app/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Docs" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License: MIT" /></a>
   <a href="https://vixl.app/"><img src="https://img.shields.io/badge/status-beta-blue.svg" alt="Status: Beta" /></a>
+  <a href="https://alternativeto.net/software/vixl/about/?utm_source=badge&utm_medium=referral"><img src="https://alternativeto.net/static/badges/badge-compact-color.svg" alt="vixl | AlternativeTo" width="171" height="55" /></a>
 </p>
 
 <p align="center">
