@@ -1,10 +1,10 @@
 ---
 layout: home
 title: Vixl
-description: Local-first alternative to Cursor, Antigravity, and VS Code agents. BYOK desktop app. No vixl subscription.
+description: Local-first alternative to Cursor agents, Antigravity agents, and VS Code agents. BYOK desktop app. No vixl subscription.
 hero:
   name: Vixl
-  text: Local-first alternative to Cursor, Antigravity, and VS Code agents
+  text: Local-first alternative to Cursor agents, Antigravity agents, and VS Code agents
   tagline: BYOK desktop app. No vixl subscription.
   actions:
     - theme: brand
