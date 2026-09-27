@@ -1,9 +1,11 @@
 ---
 title: Best practices
-description: Keep Vixl cost down by locking the parent to guiding sub-agents, paying for a plan once, and reusing the same model for cache.
+description: "How Vixl stays cheaper than a subscription agent: the parent guides, the plan is paid for once, and staying on the same model keeps the cache."
 ---
 
 # Best practices
+
+This page is how Vixl stays cheaper than a subscription agent: the parent guides, the plan is paid for once, and staying on the same model keeps the cache.
 
 ## Lock the parent to guiding
 

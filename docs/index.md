@@ -1,10 +1,11 @@
 ---
 layout: home
 title: Vixl
-description: Vixl is a local-first, BYOK desktop LLM UI and agent harness with MCP, sub-agents, and offline-capable local models.
+description: Local-first alternative to Cursor, Antigravity, and VS Code agents. BYOK desktop app. No vixl subscription.
 hero:
   name: Vixl
-  text: Local-first BYOK desktop LLM UI
+  text: Local-first alternative to Cursor, Antigravity, and VS Code agents
+  tagline: BYOK desktop app. No vixl subscription.
   actions:
     - theme: brand
       text: Get Started
@@ -13,16 +14,13 @@ hero:
       text: GitHub
       link: https://github.com/vixl-ai/vixl
 features:
-  - title: Four modes
-    details: Agent, Ask, Plan, and Orchestrator in an offline-capable desktop app.
-  - title: Orchestrate sub-agents
-    details: Split work across background sub-agents with BYOK models.
-  - title: Workbench
-    details: Monaco editor with a file tree and language servers.
-  - title: Terminals
-    details: Open a terminal in the project from the workbench.
-  - title: Review changes
-    details: Status and diffs in the workbench git view.
-  - title: MCP
-    details: Connect MCP servers over stdio, http, and sse.
+  - title: Cost
+    details: "No vixl subscription: you pay the host you configured, and orchestration and plan reuse keep that bill down."
+    link: /using/best-practices
+  - title: Local harness
+    details: Built to run Qwen on a Halo Strix machine. Progressive tool discovery keeps local prefills smaller.
+    link: /getting-started/philosophy
+  - title: Install
+    details: Install from GitHub Releases, then send a first chat.
+    link: /getting-started/
 ---
