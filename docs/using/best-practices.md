@@ -1,11 +1,11 @@
 ---
 title: Best practices
-description: Keep Vixl cost down by locking the parent to guiding sub-agents, paying for a plan once, and reusing the same model for cache.
+description: Keep Vixl cost down by locking the parent to guiding sub-agents, paying for a plan once, reusing the same model for cache, and switching providers when the same model is on sale.
 ---
 
 # Best practices
 
-Keep Vixl cost down by locking the parent to guiding sub-agents, paying for a plan once, and reusing the same model for cache.
+Keep Vixl cost down by locking the parent to guiding sub-agents, paying for a plan once, reusing the same model for cache, and switching providers when the same model is on sale.
 
 ## Lock the parent to guiding
 
@@ -25,6 +25,8 @@ Building in the same chat after switching models cache-misses the entire previou
 
 Orchestrating with the same model you planned with, as the parent, retains the cache. Sub-agents (often cheaper models) are guided with only the info needed to complete their tasks. The parent keeps the long context. The workers do not.
 
+On Claude, a cache read is 10% of the base input price: 90% off those tokens. A few models discount further. Vixl sends an ephemeral cache breakpoint on Anthropic, and on AI Gateway when the model is Claude. The multipliers are on [Anthropic prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
+
 Build stays in that chat (last build chat, else the source Plan chat) and maintains the cache. Same model and thread, still reading that `PLAN.md`.
 
 Checking Build in a fresh chat (new context) in the Build plan dialog treats the plan as a hyper-tuned prompt. The next agent ingests only the plan, not the chat history. Use it when the planning thread is noise, or when you want a clean Agent-mode run that should not see the research turns.
@@ -32,5 +34,9 @@ Checking Build in a fresh chat (new context) in the Build plan dialog treats the
 Stay on the planning model if you want the cache. Click Build to continue in that chat. Click Orchestrate to keep the parent on that model and spawn sub-agents. Enable Build in a fresh chat (new context) when the plan file should be the whole prompt.
 
 If you need a different parent model, expect a cache miss. Switching models in that chat, then clicking Build, pays that cost.
+
+## Switch hosts when the same model is on sale
+
+Add more than one [provider](/customize/providers). The same model is often sold by more than one host. When a host runs a sale, point the role or the chat picker at that provider. The saved ref is `providerId::modelId`, so the model id stays the same while the host changes. See [Models](/customize/models).
 
 [Use the workbench](/using/use-the-workbench)

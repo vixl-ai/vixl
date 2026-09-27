@@ -15,12 +15,12 @@ hero:
       link: https://github.com/vixl-ai/vixl
 features:
   - title: Cost
-    details: "No Vixl subscription: you pay the host you configured, and orchestration and plan reuse keep that bill down."
+    details: Save 90% vs full price on Claude cache reads.
     link: /using/best-practices
   - title: Local harness
-    details: Built to run Qwen on a Halo Strix machine. Progressive tool discovery keeps local prefills smaller.
+    details: Get cloud-like inference using local LLMs.
     link: /getting-started/philosophy
   - title: Install
-    details: Install from GitHub Releases, then send a first chat.
+    details: Download the latest release, then follow getting started.
     link: /getting-started/
 ---
