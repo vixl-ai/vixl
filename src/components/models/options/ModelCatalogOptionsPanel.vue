@@ -38,9 +38,7 @@ const emit = defineEmits<{
 
 const allowed = computed(() => props.option.allowed !== false)
 const fast = computed(() => props.option.fast === true)
-const reasoning = computed(
-  () => props.option.reasoning ?? 'provider-default',
-)
+const reasoning = computed(() => props.option.reasoning ?? 'provider-default')
 const contextValues = computed(() =>
   contextWindowSelectValues(props.meta.contextWindow, props.option.contextWindow),
 )
@@ -83,37 +81,23 @@ const handleMaxOutputTokens = (value: number | undefined): void => {
 </script>
 
 <template>
-  <div
-    class="space-y-3 p-1"
-    @click.stop
-    @pointerdown.stop
-  >
+  <div class="space-y-3 p-1" @click.stop @pointerdown.stop>
     <div class="flex items-center justify-between gap-3">
       <Label class="text-xs font-normal">Allowed in chat</Label>
       <Switch :model-value="allowed" @update:model-value="handleAllowed" />
     </div>
-    <div
-      v-if="supportsFast"
-      class="flex items-center justify-between gap-3"
-    >
+    <div v-if="supportsFast" class="flex items-center justify-between gap-3">
       <Label class="text-xs font-normal">Fast</Label>
       <Switch :model-value="fast" @update:model-value="handleFast" />
     </div>
-    <div
-      v-if="capability.supported"
-      class="space-y-1.5"
-    >
+    <div v-if="capability.supported" class="space-y-1.5">
       <Label class="text-xs font-normal">Reasoning</Label>
       <Select :model-value="reasoning" @update:model-value="handleReasoning">
         <SelectTrigger size="sm" class="w-full">
           <SelectValue placeholder="Default" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem
-            v-for="level in capability.levels"
-            :key="level"
-            :value="level"
-          >
+          <SelectItem v-for="level in capability.levels" :key="level" :value="level">
             {{ REASONING_LEVEL_LABELS[level] }}
           </SelectItem>
         </SelectContent>
@@ -135,15 +119,12 @@ const handleMaxOutputTokens = (value: number | undefined): void => {
       :values="outputValues"
       @change="handleMaxOutputTokens"
     />
+    <ModelCostRates :option="option" :meta="meta" />
     <p
       v-if="hintLines.length > 0"
       class="space-y-0.5 text-[11px] leading-snug text-muted-foreground"
     >
-      <span
-        v-for="line in hintLines"
-        :key="line"
-        class="block"
-      >
+      <span v-for="line in hintLines" :key="line" class="block">
         {{ line }}
       </span>
     </p>

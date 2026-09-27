@@ -465,6 +465,77 @@ const {
               </div>
             </div>
 
+            <div class="space-y-2">
+              <div class="min-w-0">
+                <p class="text-sm font-medium">Fast pricing</p>
+                <p class="text-xs text-muted-foreground">USD per 1M tokens when Fast is on</p>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="min-w-0 space-y-1.5">
+                  <Label :for="`model-fast-price-input-${index}`">Input $/1M</Label>
+                  <Input
+                    :id="`model-fast-price-input-${index}`"
+                    v-model="model.fastPricing.inputPerMillion"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    :class="fieldClass"
+                  />
+                </div>
+                <div class="min-w-0 space-y-1.5">
+                  <Label :for="`model-fast-price-output-${index}`">Output $/1M</Label>
+                  <Input
+                    :id="`model-fast-price-output-${index}`"
+                    v-model="model.fastPricing.outputPerMillion"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    :class="fieldClass"
+                  />
+                </div>
+                <div class="min-w-0 space-y-1.5">
+                  <Label :for="`model-fast-price-cache-read-${index}`">Cache read $/1M</Label>
+                  <Input
+                    :id="`model-fast-price-cache-read-${index}`"
+                    v-model="model.fastPricing.cacheReadPerMillion"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="0.01"
+                    :class="fieldClass"
+                  />
+                </div>
+                <div class="min-w-0 space-y-1.5">
+                  <Label :for="`model-fast-price-cache-write-${index}`">Cache write $/1M</Label>
+                  <Input
+                    :id="`model-fast-price-cache-write-${index}`"
+                    v-model="model.fastPricing.cacheWritePerMillion"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="0.01"
+                    :class="fieldClass"
+                  />
+                </div>
+                <div class="min-w-0 space-y-1.5">
+                  <Label :for="`model-fast-price-reasoning-${index}`">Reasoning $/1M</Label>
+                  <Input
+                    :id="`model-fast-price-reasoning-${index}`"
+                    v-model="model.fastPricing.reasoningPerMillion"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="0.01"
+                    :class="fieldClass"
+                  />
+                </div>
+              </div>
+            </div>
+
             <Collapsible v-model:open="model.advancedOpen" class="min-w-0">
               <CollapsibleTrigger
                 class="flex w-full items-center justify-between py-1 text-left text-sm font-medium hover:underline"

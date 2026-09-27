@@ -35,6 +35,7 @@ export const createEmptyModel = (): ModelDraft => ({
   headers: [],
   modelOptionsJson: '',
   pricing: createEmptyPricing(),
+  fastPricing: createEmptyPricing(),
   advancedOpen: false,
 })
 
@@ -48,16 +49,15 @@ const toDraftText = (value: string | number | null | undefined): string => {
   return String(value)
 }
 
-export const modelHasPricingConfigured = (draft: ModelDraft): boolean => {
-  const pricing = draft.pricing
-  return (
-    toDraftText(pricing.inputPerMillion).trim().length > 0 ||
-    toDraftText(pricing.outputPerMillion).trim().length > 0 ||
-    toDraftText(pricing.cacheReadPerMillion).trim().length > 0 ||
-    toDraftText(pricing.cacheWritePerMillion).trim().length > 0 ||
-    toDraftText(pricing.reasoningPerMillion).trim().length > 0
-  )
-}
+const pricingDraftHasValues = (pricing: PricingDraft): boolean =>
+  toDraftText(pricing.inputPerMillion).trim().length > 0 ||
+  toDraftText(pricing.outputPerMillion).trim().length > 0 ||
+  toDraftText(pricing.cacheReadPerMillion).trim().length > 0 ||
+  toDraftText(pricing.cacheWritePerMillion).trim().length > 0 ||
+  toDraftText(pricing.reasoningPerMillion).trim().length > 0
+
+export const modelHasPricingConfigured = (draft: ModelDraft): boolean =>
+  pricingDraftHasValues(draft.pricing) || pricingDraftHasValues(draft.fastPricing)
 
 export const showPricingWarning = (draft: ModelDraft): boolean =>
   !hasProviderCostPath && !modelHasPricingConfigured(draft)
@@ -165,6 +165,7 @@ export const modelToDraft = (model: VixlCustomProviderModel): ModelDraft => ({
   headers: recordToRows(model.headers),
   modelOptionsJson: model.modelOptions ? JSON.stringify(model.modelOptions, null, 2) : '',
   pricing: pricingToDraft(model.pricing),
+  fastPricing: pricingToDraft(model.fastPricing),
   advancedOpen: false,
 })
 
@@ -239,6 +240,10 @@ export const draftToModel = (draft: ModelDraft): VixlCustomProviderModel => {
   const pricing = draftToPricing(draft.pricing)
   if (pricing) {
     model.pricing = pricing
+  }
+  const fastPricing = draftToPricing(draft.fastPricing)
+  if (fastPricing) {
+    model.fastPricing = fastPricing
   }
   return model
 }

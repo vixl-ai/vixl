@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import formatTokenCount from '@/services/models/options/format-token-count'
-import formatCatalogPricing from '@/services/models/options/format-pricing'
 import formatCatalogMetaHint from '@/services/models/options/format-meta-hint'
 import parseCatalogTokenOverride from '@/services/models/options/parse-token-override'
 import formatModelSearchSuffix from '@/services/models/options/format-search-suffix'
@@ -30,7 +29,7 @@ describe('parseCatalogTokenOverride', () => {
 })
 
 describe('formatCatalogMetaHint', () => {
-  it('builds reported helper lines including compact pricing', () => {
+  it('builds context, output, and capability lines without pricing', () => {
     expect(
       formatCatalogMetaHint({
         contextWindow: 200_000,
@@ -39,18 +38,11 @@ describe('formatCatalogMetaHint', () => {
         toolCalling: true,
         pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
       }),
-    ).toEqual([
-      'Context 200k',
-      'Max output 8,192',
-      'Vision, Tools',
-      `${formatCatalogPricing({ inputPerMillion: 2.5, outputPerMillion: 10 })}`,
-    ])
+    ).toEqual(['Context 200k', 'Max output 8,192', 'Vision, Tools'])
   })
 
   it('omits unknown and false capability fields', () => {
-    expect(formatCatalogMetaHint({ vision: false, toolCalling: false })).toEqual(
-      [],
-    )
+    expect(formatCatalogMetaHint({ vision: false, toolCalling: false })).toEqual([])
   })
 
   it('skips token lines when the panel shows size selects', () => {
@@ -60,10 +52,19 @@ describe('formatCatalogMetaHint', () => {
           contextWindow: 1_000_000,
           maxOutputTokens: 32_768,
           vision: true,
+          pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
         },
         { omitContext: true, omitOutput: true },
       ),
     ).toEqual(['Vision'])
+  })
+
+  it('returns no lines when only pricing is present', () => {
+    expect(
+      formatCatalogMetaHint({
+        pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
+      }),
+    ).toEqual([])
   })
 })
 
