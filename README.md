@@ -64,11 +64,11 @@
 
 **Vixl is a local-first alternative to Cursor agents, Antigravity agents, and VS Code agents.**
 
-Save [90%](https://vixl.app/using/best-practices) vs full price on Claude cache reads.
+Save about [70%](https://vixl.app/using/best-practices) vs the same work in one full-price chat.
 
 Get [cloud-like inference](https://vixl.app/getting-started/philosophy) using local LLMs.
 
-Download the [latest release](https://github.com/vixl-ai/vixl/releases). Follow [getting started](https://vixl.app/getting-started/).
+Follow the [getting started page](https://vixl.app/getting-started/) or jump right in by downloading the [latest release](https://github.com/vixl-ai/vixl/releases).
 
 ## Roadmap
 
