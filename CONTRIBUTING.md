@@ -1,4 +1,4 @@
-# Contributing to vixl
+# Contributing to Vixl
 
 Thank you for your interest in contributing! This document explains how to get
 involved. By participating, you agree to abide by our

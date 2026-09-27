@@ -5,7 +5,7 @@ description: A Vixl project is a folder you register; home chats run with no pro
 
 # Projects and home chats
 
-A project is a folder you registered. vixl does not invent a project from the current working directory. The fleet lives in personal `.vixl` as `projects.json` (id, name, slug, `root_path`, `last_opened`) and `active-project.json` (`project_id`, or null).
+A project is a folder you registered. Vixl does not invent a project from the current working directory. The fleet lives in personal `.vixl` as `projects.json` (id, name, slug, `root_path`, `last_opened`) and `active-project.json` (`project_id`, or null).
 
 Slugs are lowercase alphanumeric plus hyphens, unique, and never `_home_` (reserved for home chats). Duplicate folder names get `-2`, `-3`, and so on. Duplicate canonical roots update `last_opened` instead of inserting a second row.
 

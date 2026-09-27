@@ -5,7 +5,7 @@ description: Vixl installs CodeGraph via npx and a catalog of language servers; 
 
 # Managed components
 
-vixl installs a small set of third-party binaries as opinions: the CodeGraph CLI via [npx](https://docs.npmjs.com/cli/v10/commands/npx), and language servers from the catalog. This page lists each installable component and its upstream source. PATH-only catalog rows are not downloaded: `deno`, `ruby`, `csharp`, `swift`, `elixir`, `haskell`, `ocaml`, `dart`, `gleam`, `nix`, `r`, `scala`. Project-local linters `eslint`, `oxlint`, and `biome` have no managed installer.
+Vixl installs a small set of third-party binaries as opinions: the CodeGraph CLI via [npx](https://docs.npmjs.com/cli/v10/commands/npx), and language servers from the catalog. This page lists each installable component and its upstream source. PATH-only catalog rows are not downloaded: `deno`, `ruby`, `csharp`, `swift`, `elixir`, `haskell`, `ocaml`, `dart`, `gleam`, `nix`, `r`, `scala`. Project-local linters `eslint`, `oxlint`, and `biome` have no managed installer.
 
 See [Language servers](/customize/language-servers) and [Code graphs](/concepts/code-graphs).
 
@@ -13,11 +13,11 @@ See [Language servers](/customize/language-servers) and [Code graphs](/concepts/
 
 Package: [`@colbymchenry/codegraph`](https://www.npmjs.com/package/@colbymchenry/codegraph).
 
-vixl runs `npx -y @colbymchenry/codegraph` for `init`, `index --force`, and `serve --mcp --path {root}`. Indexes live under personal `.vixl/graphs/`, never in the repo.
+Vixl runs `npx -y @colbymchenry/codegraph` for `init`, `index --force`, and `serve --mcp --path {root}`. Indexes live under personal `.vixl/graphs/`, never in the repo.
 
-vixl sets `CODEGRAPH_TELEMETRY=0` so the package's own telemetry is off. It also sets `CODEGRAPH_NO_UPDATE_CHECK=1`. This is the only telemetry-related string in the app. See [Privacy](/resources/privacy).
+Vixl sets `CODEGRAPH_TELEMETRY=0` so the package's own telemetry is off. It also sets `CODEGRAPH_NO_UPDATE_CHECK=1`. This is the only telemetry-related string in the app. See [Privacy](/resources/privacy).
 
-## Language servers vixl installs
+## Language servers Vixl installs
 
 Install kinds: npm package, GitHub release (repo / tag / asset), HTTP archive, or `go install`.
 

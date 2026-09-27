@@ -19,7 +19,7 @@ Send now (stops running work) aborts the parent, stops subagents for the chat, k
 
 Remove drops the item.
 
-After a turn finishes normally, vixl sends the next queued item. Stop generating sets a flag so the queue is not drained automatically. You send the rest yourself, or you use Send now (stops running work).
+After a turn finishes normally, Vixl sends the next queued item. Stop generating sets a flag so the queue is not drained automatically. You send the rest yourself, or you use Send now (stops running work).
 
 If an `ask_user` question is pending, a non-empty send from the chat input is the answer, not a new turn and not a queued message.
 

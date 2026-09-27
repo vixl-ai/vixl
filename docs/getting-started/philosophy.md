@@ -23,7 +23,7 @@ User prompt -> something (hidden) -> result.
 
 Second to that Vixl does not call the LLM "you" or humanize its tasks in any system prompt.
 
-Vixl does not attatch as a co-author.
+Vixl does not attach as a co-author.
 
 ## Plans get persisted
 
@@ -31,7 +31,7 @@ Vixl does not attatch as a co-author.
 
 Some of us use ticket software like Linear, or Jira, where plans are just artifacts in the cloud.
 
-Some people also, or often just need a better documented todo list thats persisted.
+Some people also, or often just need a better documented todo list that's persisted.
 
 I always thought it was weird that we decided plans were markdown documentation that described the desired state of something, but everyone just decided to toss it after.
 
@@ -43,7 +43,7 @@ It should just feel like writing a shopping list.
 
 ## Feature complete
 
-Once the [roadmap](/resources/roadmap) is met, I don't really want to keep adding unless theres a very worthwhile RFC.
+Once the [roadmap](/resources/roadmap) is met, I don't really want to keep adding unless there's a very worthwhile RFC.
 
 When you have people working 40hrs a week on a project, overtime it just becomes bloatware.
 
@@ -79,7 +79,7 @@ A LLM is a tool, not a person, and not a co-author.
 
 I don't know what it is about LLM code, since it's just trained on codebases, maybe people really do this.
 
-However I've noticed an increase in voided calls, no-op catches, and comments saying "dont throw."
+However I've noticed an increase in voided calls, no-op catches, and comments saying "don't throw."
 
 Whatever happened to fail loudly?
 

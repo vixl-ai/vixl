@@ -5,7 +5,7 @@ description: Vixl does not host models; you bring a BYOK provider and pick perso
 
 # Models and roles
 
-vixl does not host models. You bring a provider, then pick models per role. Providers and models are personal settings. Project `settings.json` cannot keep `providers.*`, `models.*`, or `lsp.*` keys. If those keys exist on disk they are stripped.
+Vixl does not host models. You bring a provider, then pick models per role. Providers and models are personal settings. Project `settings.json` cannot keep `providers.*`, `models.*`, or `lsp.*` keys. If those keys exist on disk they are stripped.
 
 ## Providers first
 

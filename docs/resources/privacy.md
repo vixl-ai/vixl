@@ -5,7 +5,7 @@ description: Vixl is local-first with no analytics and no home server; you confi
 
 # Privacy
 
-vixl is local-first. There is no analytics in the app and no round trip to a vixl home server. The only telemetry-related string in the codebase is `CODEGRAPH_TELEMETRY=0`, which disables the [`@colbymchenry/codegraph`](https://www.npmjs.com/package/@colbymchenry/codegraph) package's own telemetry.
+Vixl is local-first. There is no analytics in the app and no round trip to a Vixl home server. The only telemetry-related string in the codebase is `CODEGRAPH_TELEMETRY=0`, which disables the [`@colbymchenry/codegraph`](https://www.npmjs.com/package/@colbymchenry/codegraph) package's own telemetry.
 
 ## Network
 
@@ -23,9 +23,9 @@ API keys and MCP secrets are stored in the OS keychain (service `vixl`). They ar
 
 ## Delete means delete
 
-Deleting a chat removes it from the client: the SQLite `chats` row (messages and related rows cascade) and the directory `.vixl/chats/<projectSlug>/<chatId>/`. There is no archive, no vixl memory, and no user profiling.
+Deleting a chat removes it from the client: the SQLite `chats` row (messages and related rows cascade) and the directory `.vixl/chats/<projectSlug>/<chatId>/`. There is no archive, no Vixl memory, and no user profiling.
 
-If you used a cloud provider, that provider's data policies are the provider's business. Delete covers vixl only.
+If you used a cloud provider, that provider's data policies are the provider's business. Delete covers Vixl only.
 
 Removing a project from the sidebar drops the fleet registry row. It does not delete `<repo>/.vixl`, chats, or graph indexes. Graph stores can be deleted from Settings > Graphs.
 
