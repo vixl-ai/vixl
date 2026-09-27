@@ -107,9 +107,11 @@ fn portable_sibling_is_last_fallback() {
 fn common_bin_dirs_include_container_runtime_paths() {
     let dirs = common_bin_dirs();
     assert!(dirs.contains(&PathBuf::from("/opt/podman/bin")));
-    if let Some(home) = home_dir() {
-        assert!(dirs.contains(&home.join(".docker/bin")));
-    }
+    // Snapshot the dirs once. Other tests swap HOME, so a later home_dir() read can disagree.
+    assert!(
+        dirs.iter().any(|dir| dir.ends_with(".docker/bin")),
+        "common bin dirs missing .docker/bin: {dirs:?}"
+    );
     #[cfg(windows)]
     {
         assert!(dirs.contains(&PathBuf::from(
