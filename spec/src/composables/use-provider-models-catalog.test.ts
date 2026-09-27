@@ -28,7 +28,7 @@ const updateSetting = vi.hoisted(
 )
 
 const loadModelsDevCatalog = vi.hoisted(
-  () => vi.fn(async (): Promise<unknown> => undefined),
+  () => vi.fn<() => Promise<unknown>>(async () => undefined),
 )
 
 vi.mock('@/services/providers/list-all-provider-models', () => ({
