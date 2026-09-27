@@ -24,6 +24,7 @@ type PrepareParentCompactStepInput = {
   turnId: string
   messages: UIMessage[]
   onEvent: (event: HarnessEvent) => void
+  fast?: boolean
 } & Pick<GenerateCheckpointInput, 'model' | 'tools' | 'providerOptions'>
 
 export default (input: PrepareParentCompactStepInput) =>
@@ -101,6 +102,7 @@ export default (input: PrepareParentCompactStepInput) =>
             providerMetadata: compacted.providerMetadata,
             responseId: compacted.responseId,
             settings,
+            fast: input.fast,
             onEvent: input.onEvent,
           })
         } catch (error) {

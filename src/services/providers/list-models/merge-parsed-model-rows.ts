@@ -41,6 +41,7 @@ export default (left: ParsedModelRow, right: ParsedModelRow): ParsedModelRow => 
   const contextWindow = right.contextWindow ?? left.contextWindow
   const maxOutputTokens = right.maxOutputTokens ?? left.maxOutputTokens
   const pricing = right.pricing ?? left.pricing
+  const fastPricing = right.fastPricing ?? left.fastPricing
 
   return {
     id: left.id,
@@ -50,6 +51,7 @@ export default (left: ParsedModelRow, right: ParsedModelRow): ParsedModelRow => 
     ...(contextWindow !== undefined ? { contextWindow } : {}),
     ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
     ...(pricing ? { pricing } : {}),
+    ...(fastPricing ? { fastPricing } : {}),
     ...(vision ? { vision } : {}),
     ...(toolCalling ? { toolCalling } : {}),
   }

@@ -3,7 +3,6 @@ import { Button } from '@/components/shadcn/ui/button'
 import ModelsSearchModelSelectorList from '@/components/ai-elements/model-selector/ModelSelectorList.vue'
 import ModelsSearchModelSelectorGroup from '@/components/ai-elements/model-selector/ModelSelectorGroup.vue'
 import ModelsSearchModelSelectorItem from '@/components/ai-elements/model-selector/ModelSelectorItem.vue'
-import ModelsSearchModelSelectorEmpty from '@/components/ai-elements/model-selector/ModelSelectorEmpty.vue'
 import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
 import type { ModelRef } from '@/types/models/model-ref'
@@ -47,32 +46,28 @@ const handleOptionsOpen = (serialized: string, open: boolean): void => {
   emit('update:optionsOpenFor', serialized, open)
 }
 
-const handleOptionChange = (
-  model: ModelRef,
-  patch: ModelCatalogOption,
-): void => {
+const handleOptionChange = (model: ModelRef, patch: ModelCatalogOption): void => {
   emit('optionChange', model, patch)
 }
 </script>
 
 <template>
   <ModelsSearchModelSelectorList>
-    <template v-if="loading">
-      <ModelsSearchModelSelectorEmpty>Loading models...</ModelsSearchModelSelectorEmpty>
-    </template>
-    <template v-else-if="!hasProviders">
-      <ModelsSearchModelSelectorEmpty>
-        <div class="space-y-2 text-center">
-          <p>No providers configured.</p>
-          <Button variant="outline" size="sm" @click="handleOpenProviders">
-            Add a provider
-          </Button>
-        </div>
-      </ModelsSearchModelSelectorEmpty>
-    </template>
-    <template v-else-if="groups.length === 0 && disabledEntries.length === 0">
-      <ModelsSearchModelSelectorEmpty>No models match your search.</ModelsSearchModelSelectorEmpty>
-    </template>
+    <div v-if="loading" role="status" aria-live="polite" class="py-6 text-center text-sm">
+      Loading models...
+    </div>
+    <div v-else-if="!hasProviders" class="space-y-2 py-6 text-center text-sm">
+      <p role="status" aria-live="polite">No providers configured.</p>
+      <Button variant="outline" size="sm" @click="handleOpenProviders"> Add a provider </Button>
+    </div>
+    <div
+      v-else-if="groups.length === 0 && disabledEntries.length === 0"
+      role="status"
+      aria-live="polite"
+      class="py-6 text-center text-sm"
+    >
+      No models match your search.
+    </div>
     <template v-else>
       <ModelsSearchModelSelectorGroup
         v-for="group in groups"
@@ -83,12 +78,10 @@ const handleOptionChange = (
           v-for="model in group.models"
           :key="serializedFor(model)"
           :value="`${serializedFor(model)} ${model.modelId} ${model.label} ${model.providerName} ${group.name}`"
-          class="group/item"
+          class="group/item flex-nowrap"
           @select="handleSelect(model.providerId, model.modelId)"
         >
-          <span class="sr-only">
-            {{ model.modelId }} {{ group.name }}
-          </span>
+          <span class="sr-only"> {{ model.modelId }} {{ group.name }} </span>
           <ModelSearchResultRow
             :model="model"
             :query="searchQuery"
@@ -104,17 +97,12 @@ const handleOptionChange = (
           />
         </ModelsSearchModelSelectorItem>
       </ModelsSearchModelSelectorGroup>
-      <div
-        v-if="disabledEntries.length > 0"
-        class="pt-2"
-      >
-        <p class="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-          Disabled
-        </p>
+      <div v-if="disabledEntries.length > 0" class="pt-2">
+        <p class="px-2 py-1.5 text-xs font-medium text-muted-foreground">Disabled</p>
         <div
           v-for="model in disabledEntries"
           :key="`disabled-${serializedFor(model)}`"
-          class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm opacity-60"
+          class="flex flex-nowrap items-center gap-2 rounded-sm px-2 py-1.5 text-sm opacity-60"
         >
           <ModelSearchResultRow
             :model="model"

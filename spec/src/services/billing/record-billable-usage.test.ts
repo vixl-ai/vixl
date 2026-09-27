@@ -238,4 +238,159 @@ describe('recordBillableUsage', () => {
     expect(record.pricingSource).toBe('provider_reported')
     expect(record.rates).toBeUndefined()
   })
+
+  it('uses custom fastPricing when fast is on', () => {
+    const record = recordBillableUsage({
+      chatId: 'chat-1',
+      turnId: 'turn-1',
+      source: 'main',
+      providerId: 'openrouter',
+      modelId: 'test-model',
+      usage: usageWithTokens(),
+      settings: {
+        version: 1,
+        'providers.custom.openrouter': {
+          type: 'openai-compatible',
+          name: 'OpenRouter',
+          baseURL: 'https://openrouter.ai/api/v1',
+          models: [
+            {
+              id: 'test-model',
+              pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+              fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+            },
+          ],
+        },
+      } as VixlSettings,
+      fast: true,
+    })
+
+    expect(record.pricingSource).toBe('user_configured')
+    expect(record.costUSD).toBe(5)
+    expect(record.rates).toEqual({
+      inputPerMillion: 3,
+      outputPerMillion: 4,
+    })
+  })
+
+  it('uses catalogMeta fastPricing when fast is on', () => {
+    const record = recordBillableUsage({
+      chatId: 'chat-1',
+      turnId: 'turn-1',
+      source: 'main',
+      providerId: 'openai',
+      modelId: 'gpt-4o',
+      usage: usageWithTokens(),
+      settings: {
+        version: 1,
+        'models.catalogMeta': {
+          'openai::gpt-4o': {
+            pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
+            fastPricing: { inputPerMillion: 10, outputPerMillion: 50 },
+          },
+        },
+      } as VixlSettings,
+      fast: true,
+    })
+
+    expect(record.pricingSource).toBe('catalog_estimate')
+    expect(record.costUSD).toBe(35)
+    expect(record.rates).toEqual({
+      inputPerMillion: 10,
+      outputPerMillion: 50,
+    })
+  })
+
+  it('uses base pricing when fast is off even if fastPricing exists', () => {
+    const record = recordBillableUsage({
+      chatId: 'chat-1',
+      turnId: 'turn-1',
+      source: 'main',
+      providerId: 'openrouter',
+      modelId: 'test-model',
+      usage: usageWithTokens(),
+      settings: {
+        version: 1,
+        'providers.custom.openrouter': {
+          type: 'openai-compatible',
+          name: 'OpenRouter',
+          baseURL: 'https://openrouter.ai/api/v1',
+          models: [
+            {
+              id: 'test-model',
+              pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+              fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+            },
+          ],
+        },
+      } as VixlSettings,
+      fast: false,
+    })
+
+    expect(record.pricingSource).toBe('user_configured')
+    expect(record.costUSD).toBe(2)
+    expect(record.rates).toEqual({
+      inputPerMillion: 1,
+      outputPerMillion: 2,
+    })
+  })
+
+  it('falls back to base pricing when fast is on without fastPricing', () => {
+    const record = recordBillableUsage({
+      chatId: 'chat-1',
+      turnId: 'turn-1',
+      source: 'main',
+      providerId: 'openai',
+      modelId: 'gpt-4o',
+      usage: usageWithTokens(),
+      settings: {
+        version: 1,
+        'models.catalogMeta': {
+          'openai::gpt-4o': {
+            pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
+          },
+        },
+      } as VixlSettings,
+      fast: true,
+    })
+
+    expect(record.pricingSource).toBe('catalog_estimate')
+    expect(record.costUSD).toBe(7.5)
+    expect(record.rates).toEqual({
+      inputPerMillion: 2.5,
+      outputPerMillion: 10,
+    })
+  })
+
+  it('keeps provider_reported cost when fast is on', () => {
+    const record = recordBillableUsage({
+      chatId: 'chat-1',
+      turnId: 'turn-1',
+      source: 'main',
+      providerId: 'openrouter',
+      modelId: 'test-model',
+      usage: usageWithTokens({ cost: 0.42 }),
+      settings: {
+        version: 1,
+        'providers.custom.openrouter': {
+          type: 'openai-compatible',
+          name: 'OpenRouter',
+          baseURL: 'https://openrouter.ai/api/v1',
+          models: [
+            {
+              id: 'test-model',
+              pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+              fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+            },
+          ],
+        },
+      } as VixlSettings,
+      fast: true,
+    })
+
+    expect(record.costUSD).toBe(0.42)
+    expect(record.pricingSource).toBe('provider_reported')
+    expect(record.rates).toBeUndefined()
+  })
 })
+

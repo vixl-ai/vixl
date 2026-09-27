@@ -19,6 +19,8 @@ export type ModelRef = {
   maxOutputTokens?: number
   /** USD per 1M tokens, converted from provider per-token rates when known. */
   pricing?: ModelPricingRates
+  /** USD per 1M tokens for the fast sibling, when the provider lists a priced -fast row. */
+  fastPricing?: ModelPricingRates
   /** True when the provider reports image/vision input. */
   vision?: boolean
   /** True when the provider reports tool calling. */

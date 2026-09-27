@@ -90,12 +90,19 @@ export const collapseModelVariants = (models: ModelRef[]): ModelRef[] => {
     }
 
     const fastModelId = preferredFastSiblingId(parsed.baseModelId, ids)
+    const chosenFastId = fastModelId ?? model.fastModelId
+    const fastSibling =
+      chosenFastId && chosenFastId !== model.modelId
+        ? byId.get(chosenFastId)
+        : undefined
+    const fastPricing = fastSibling?.pricing
     collapsed.push({
       ...model,
       modelId: parsed.baseModelId,
       name: model.name ?? parsed.displayKey,
       supportsFast: Boolean(fastModelId) || model.supportsFast === true,
       fastModelId: fastModelId ?? model.fastModelId,
+      ...(fastPricing ? { fastPricing } : {}),
     })
     consumed.add(model.modelId)
     if (fastModelId) {

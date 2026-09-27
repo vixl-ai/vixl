@@ -4,8 +4,9 @@ import type {
   VixlCustomProviderModel,
   VixlSettings,
 } from '@/types/vixl/vixl-settings'
-import { getCustomProvider } from '@/services/providers/registry'
+import mergeFastOverBaseRates from '@/services/billing/merge-fast-over-base-rates'
 import { getModelCatalogMeta } from '@/services/models/model-catalog-meta'
+import { getCustomProvider } from '@/services/providers/registry'
 
 type ResolvedModelPricing = {
   rates: ModelPricingRates
@@ -29,14 +30,27 @@ const ratesFromPricing = (pricing: ModelPricingRates): ModelPricingRates => {
   return rates
 }
 
+const pickRates = (
+  fastRates: ModelPricingRates | undefined,
+  baseRates: ModelPricingRates | undefined,
+  fast: boolean | undefined,
+): ModelPricingRates | undefined => {
+  if (fast === true && fastRates) {
+    return mergeFastOverBaseRates(fastRates, baseRates)
+  }
+  return baseRates
+}
+
 /**
  * Resolve model pricing: user-configured custom rates, then catalogMeta estimate.
+ * When the call is in fast mode, fastPricing wins over base pricing in each source.
  */
 export default (input: {
   providerId: string
   modelId: string
   settings: VixlSettings
   customModel?: VixlCustomProviderModel
+  fast?: boolean
 }): ResolvedModelPricing | null => {
   const model =
     input.customModel ??
@@ -44,23 +58,29 @@ export default (input: {
       (entry) => entry.id === input.modelId,
     )
 
-  if (model?.pricing) {
+  const customRates = pickRates(model?.fastPricing, model?.pricing, input.fast)
+  if (customRates) {
     return {
-      rates: ratesFromPricing(model.pricing),
+      rates: ratesFromPricing(customRates),
       source: 'user_configured',
     }
   }
 
-  const catalogPricing = getModelCatalogMeta(input.settings, {
+  const catalogMeta = getModelCatalogMeta(input.settings, {
     providerId: input.providerId,
     modelId: input.modelId,
-  }).pricing
-  if (!catalogPricing) {
+  })
+  const catalogRates = pickRates(
+    catalogMeta.fastPricing,
+    catalogMeta.pricing,
+    input.fast,
+  )
+  if (!catalogRates) {
     return null
   }
 
   return {
-    rates: ratesFromPricing(catalogPricing),
+    rates: ratesFromPricing(catalogRates),
     source: 'catalog_estimate',
   }
 }

@@ -214,4 +214,41 @@ describe('mergeParsedModelRows reported fields', () => {
       toolCalling: true,
     })
   })
+
+  it('keeps right-side fastPricing the same way as pricing', () => {
+    const merged = mergeParsedModelRows(
+      {
+        id: 'same',
+        pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+        fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+      },
+      {
+        id: 'same',
+        pricing: { inputPerMillion: 5, outputPerMillion: 6 },
+        fastPricing: { inputPerMillion: 7, outputPerMillion: 8 },
+      },
+    )
+
+    expect(merged.pricing).toEqual({ inputPerMillion: 5, outputPerMillion: 6 })
+    expect(merged.fastPricing).toEqual({
+      inputPerMillion: 7,
+      outputPerMillion: 8,
+    })
+  })
+
+  it('keeps left fastPricing when the right row omits it', () => {
+    const merged = mergeParsedModelRows(
+      {
+        id: 'same',
+        fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+      },
+      { id: 'same', contextWindow: 8000 },
+    )
+
+    expect(merged.fastPricing).toEqual({
+      inputPerMillion: 3,
+      outputPerMillion: 4,
+    })
+    expect(merged.contextWindow).toBe(8000)
+  })
 })
