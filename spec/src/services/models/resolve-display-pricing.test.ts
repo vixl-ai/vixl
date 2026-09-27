@@ -131,6 +131,86 @@ describe('resolveDisplayPricing', () => {
     ).toBe(true)
   })
 
+  it('inherits cache and reasoning from base when fastPricing is input/output only', () => {
+    expect(
+      resolveDisplayPricing({
+        meta: {
+          pricing: {
+            inputPerMillion: 3,
+            outputPerMillion: 15,
+            cacheReadPerMillion: 0.3,
+            cacheWritePerMillion: 3.75,
+            reasoningPerMillion: 15,
+          },
+          fastPricing: { inputPerMillion: 4.5, outputPerMillion: 22.5 },
+        },
+        option: { fast: true },
+      }),
+    ).toEqual({
+      rates: {
+        inputPerMillion: 4.5,
+        outputPerMillion: 22.5,
+        cacheReadPerMillion: 0.3,
+        cacheWritePerMillion: 3.75,
+        reasoningPerMillion: 15,
+      },
+      fastEstimated: false,
+      showReasoningRate: true,
+    })
+  })
+
+  it('lets fast cache rates override base cache rates', () => {
+    expect(
+      resolveDisplayPricing({
+        meta: {
+          pricing: {
+            inputPerMillion: 3,
+            outputPerMillion: 15,
+            cacheReadPerMillion: 0.3,
+            cacheWritePerMillion: 3.75,
+          },
+          fastPricing: {
+            inputPerMillion: 4.5,
+            outputPerMillion: 22.5,
+            cacheReadPerMillion: 0.6,
+            cacheWritePerMillion: 7.5,
+          },
+        },
+        option: { fast: true },
+      }),
+    ).toEqual({
+      rates: {
+        inputPerMillion: 4.5,
+        outputPerMillion: 22.5,
+        cacheReadPerMillion: 0.6,
+        cacheWritePerMillion: 7.5,
+      },
+      fastEstimated: false,
+      showReasoningRate: false,
+    })
+  })
+
+  it('inherits reasoning from base when fastPricing omits it', () => {
+    expect(
+      resolveDisplayPricing({
+        meta: {
+          pricing: { ...base, cacheReadPerMillion: 0.3 },
+          fastPricing: { inputPerMillion: 4.5, outputPerMillion: 22.5 },
+        },
+        option: { fast: true },
+      }),
+    ).toEqual({
+      rates: {
+        inputPerMillion: 4.5,
+        outputPerMillion: 22.5,
+        cacheReadPerMillion: 0.3,
+        reasoningPerMillion: 15,
+      },
+      fastEstimated: false,
+      showReasoningRate: true,
+    })
+  })
+
   it('hides the reasoning rate when rates have no reasoningPerMillion', () => {
     expect(
       resolveDisplayPricing({

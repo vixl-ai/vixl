@@ -1,6 +1,7 @@
 import type { ModelPricingRates } from '@/types/billing/model-pricing-rates'
 import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
+import mergeFastOverBaseRates from '@/services/billing/merge-fast-over-base-rates'
 
 export type ResolvedDisplayPricing = {
   rates: ModelPricingRates | null
@@ -28,7 +29,7 @@ const resolveDisplayPricing = ({
   let fastEstimated = false
 
   if (option?.fast === true && fast !== undefined) {
-    rates = fast
+    rates = mergeFastOverBaseRates(fast, base) ?? base ?? null
   } else if (option?.fast === true) {
     rates = base ?? null
     fastEstimated = true

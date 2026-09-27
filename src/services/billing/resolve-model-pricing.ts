@@ -4,8 +4,9 @@ import type {
   VixlCustomProviderModel,
   VixlSettings,
 } from '@/types/vixl/vixl-settings'
-import { getCustomProvider } from '@/services/providers/registry'
+import mergeFastOverBaseRates from '@/services/billing/merge-fast-over-base-rates'
 import { getModelCatalogMeta } from '@/services/models/model-catalog-meta'
+import { getCustomProvider } from '@/services/providers/registry'
 
 type ResolvedModelPricing = {
   rates: ModelPricingRates
@@ -35,7 +36,7 @@ const pickRates = (
   fast: boolean | undefined,
 ): ModelPricingRates | undefined => {
   if (fast === true && fastRates) {
-    return fastRates
+    return mergeFastOverBaseRates(fastRates, baseRates)
   }
   return baseRates
 }
