@@ -5,8 +5,6 @@ description: Compare Vixl to VS Code Copilot, Cursor, and Antigravity on BYOK, l
 
 # Comparison
 
-The README cost line points here: there is no Vixl subscription, and you pay the host you configured. Orchestration and plan reuse keep that bill down; see [best practices](/using/best-practices).
-
 Vixl was built to make a local machine feel smoother. Pain that motivated it: [OpenCode](https://opencode.ai/) would not show reasoning for Qwen even though it appeared in traces. [VS Code](https://code.visualstudio.com/) agents required an account even for local models, with plans stored in chats. With a router you specify every model yourself; the first-party model lists do not apply. [Cursor](https://cursor.com/) and [Google Antigravity](https://antigravity.google/) are cloud-only.
 
 Sources for the table: [GitHub Copilot plans](https://docs.github.com/en/copilot/get-started/plans), [VS Code language models](https://code.visualstudio.com/docs/copilot/language-models), [VS Code BYOK](https://code.visualstudio.com/blogs/2026/06/18/byok-vscode), [VS Code license](https://code.visualstudio.com/license), [VS Code MCP](https://code.visualstudio.com/docs/agent-customization/mcp-servers), [Cursor pricing](https://cursor.com/pricing), [Cursor models](https://cursor.com/docs/models-and-pricing), [Cursor API keys](https://cursor.com/docs/settings/api-keys), [Cursor MCP](https://cursor.com/docs/mcp), [Cursor terms](https://cursor.com/terms-of-service), [Antigravity pricing](https://antigravity.google/pricing), [Antigravity models](https://antigravity.google/docs/models/), [Antigravity plans](https://www.antigravity.google/docs/plans/), [Antigravity MCP](https://antigravity.google/docs/mcp/).
