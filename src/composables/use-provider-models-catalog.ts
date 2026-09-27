@@ -56,7 +56,10 @@ export default (options: UseProviderModelsCatalogOptions) => {
     }
 
     const currentMeta = getModelCatalogMetaMap(personal)
-    if (JSON.stringify(currentMeta) === JSON.stringify(nextMeta)) {
+    if (
+      generation !== loadGeneration ||
+      JSON.stringify(currentMeta) === JSON.stringify(nextMeta)
+    ) {
       return
     }
     try {
