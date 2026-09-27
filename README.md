@@ -64,15 +64,15 @@
 
 **vixl is a local-first alternative to Cursor agents, Antigravity agents, and VS Code agents.**
 
-There is no vixl subscription. You pay the host you configured. Orchestration and plan reuse keep that bill down. See [best practices](https://vixl.app/using/best-practices) and the [comparison](https://vixl.app/resources/comparison).
+[There is no vixl subscription. You pay the host you configured.](https://vixl.app/resources/comparison) [Orchestration and plan reuse keep that bill down.](https://vixl.app/using/best-practices)
 
-Local models can still feel like a cloud harness. vixl was built to run Qwen on a Halo Strix machine. [Philosophy](https://vixl.app/getting-started/philosophy) is why. [Progressive tool discovery](https://vixl.app/concepts/context) loads tool and skill detail on demand so local prefills stay smaller.
+[Local models can still feel like a cloud harness. vixl was built to run Qwen on a Halo Strix machine.](https://vixl.app/getting-started/philosophy) [Progressive tool discovery loads tool and skill detail on demand so local prefills stay smaller.](https://vixl.app/concepts/context)
 
-Ready to start: [get started](https://vixl.app/getting-started/) or install the latest build from [GitHub Releases](https://github.com/vixl-ai/vixl/releases).
+[Install vixl, add a provider, and send a first chat.](https://vixl.app/getting-started/) [Grab the latest build.](https://github.com/vixl-ai/vixl/releases)
 
 ## Roadmap
 
-[Roadmap](https://vixl.app/resources/roadmap)
+[The roadmap lists what is still planned.](https://vixl.app/resources/roadmap)
 
 ## Contributing
 
