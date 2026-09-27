@@ -34,6 +34,7 @@ export type VixlCustomProviderModel = {
   headers?: Record<string, string>
   modelOptions?: Record<string, unknown>
   pricing?: ModelPricingRates
+  fastPricing?: ModelPricingRates
 }
 
 export type VixlCustomProvider = {

@@ -20,8 +20,16 @@ const updateSetting = vi.hoisted(
   () => vi.fn<() => Promise<void>>(async () => undefined),
 )
 
+const loadModelsDevCatalog = vi.hoisted(
+  () => vi.fn(async () => undefined),
+)
+
 vi.mock('@/services/providers/list-all-provider-models', () => ({
   default: listAllProviderModels,
+}))
+
+vi.mock('@/services/models/models-dev/catalog', () => ({
+  default: loadModelsDevCatalog,
 }))
 
 vi.mock('@/composables/use-vixl-config', async () => {
@@ -47,6 +55,8 @@ describe('use-provider-models-catalog', () => {
   beforeEach(() => {
     listAllProviderModels.mockReset()
     listAllProviderModels.mockResolvedValue(openaiListed())
+    loadModelsDevCatalog.mockReset()
+    loadModelsDevCatalog.mockResolvedValue(undefined)
     updateSetting.mockReset()
     updateSetting.mockResolvedValue(undefined)
     vi.mocked(toast.error).mockClear()
