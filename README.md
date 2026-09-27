@@ -64,7 +64,7 @@
 
 **vixl is a local-first alternative to Cursor agents, Antigravity agents, and VS Code agents.**
 
-[There is no vixl subscription. You pay the host you configured.](https://vixl.app/resources/comparison) [Orchestration and plan reuse keep that bill down.](https://vixl.app/using/best-practices)
+[Orchestration and plan reuse keep that bill down.](https://vixl.app/using/best-practices)
 
 [Local models can still feel like a cloud harness. vixl was built to run Qwen on a Halo Strix machine.](https://vixl.app/getting-started/philosophy) [Progressive tool discovery loads tool and skill detail on demand so local prefills stay smaller.](https://vixl.app/concepts/context)
 
