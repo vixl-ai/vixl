@@ -26,6 +26,7 @@ type RecordBillableUsageInput = {
   subagentId?: string
   settings: VixlSettings
   customModel?: VixlCustomProviderModel
+  fast?: boolean
   at?: string
 }
 
@@ -76,6 +77,7 @@ export default (input: RecordBillableUsageInput): BillableUsageRecord => {
       modelId: input.modelId,
       settings: input.settings,
       customModel: input.customModel,
+      fast: input.fast,
     })
     if (resolved) {
       rates = resolved.rates

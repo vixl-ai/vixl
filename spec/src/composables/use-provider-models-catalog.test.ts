@@ -17,11 +17,26 @@ const listAllProviderModels = vi.hoisted(
 )
 
 const updateSetting = vi.hoisted(
-  () => vi.fn<() => Promise<void>>(async () => undefined),
+  () =>
+    vi.fn<
+      (
+        scope: 'personal',
+        key: 'models.catalogMeta',
+        value: unknown,
+      ) => Promise<void>
+    >(async () => undefined),
+)
+
+const loadModelsDevCatalog = vi.hoisted(
+  () => vi.fn<() => Promise<unknown>>(async () => undefined),
 )
 
 vi.mock('@/services/providers/list-all-provider-models', () => ({
   default: listAllProviderModels,
+}))
+
+vi.mock('@/services/models/models-dev/catalog', () => ({
+  default: loadModelsDevCatalog,
 }))
 
 vi.mock('@/composables/use-vixl-config', async () => {
@@ -47,6 +62,8 @@ describe('use-provider-models-catalog', () => {
   beforeEach(() => {
     listAllProviderModels.mockReset()
     listAllProviderModels.mockResolvedValue(openaiListed())
+    loadModelsDevCatalog.mockReset()
+    loadModelsDevCatalog.mockResolvedValue(undefined)
     updateSetting.mockReset()
     updateSetting.mockResolvedValue(undefined)
     vi.mocked(toast.error).mockClear()
@@ -108,6 +125,129 @@ describe('use-provider-models-catalog', () => {
 
     await vi.waitFor(() => {
       expect(listAllProviderModels).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it('does not persist catalogMeta from a superseded generation', async () => {
+    const { default: useProviderModelsCatalog } = await import(
+      '@/composables/use-provider-models-catalog'
+    )
+    let releaseFirstCatalog: (value: unknown) => void = () => undefined
+    const firstCatalog = new Promise<unknown>((resolve) => {
+      releaseFirstCatalog = resolve
+    })
+    loadModelsDevCatalog
+      .mockImplementationOnce(async () => firstCatalog)
+      .mockResolvedValue(undefined)
+    listAllProviderModels
+      .mockResolvedValueOnce(openaiListed())
+      .mockResolvedValueOnce([
+        {
+          providerId: 'anthropic',
+          providerName: 'Anthropic',
+          models: [
+            {
+              providerId: 'anthropic',
+              modelId: 'claude-sonnet-4-5',
+              contextWindow: 200000,
+            },
+          ],
+        },
+      ])
+
+    const settings = ref<VixlSettings>({
+      version: 1,
+      'providers.openai.apiKeyRef': 'openai',
+    })
+    useProviderModelsCatalog({ settings })
+
+    await vi.waitFor(() => {
+      expect(loadModelsDevCatalog).toHaveBeenCalledTimes(1)
+    })
+
+    settings.value = {
+      version: 1,
+      'providers.openai.apiKeyRef': 'openai',
+      'providers.anthropic.apiKeyRef': 'anthropic',
+    }
+
+    await vi.waitFor(() => {
+      expect(listAllProviderModels).toHaveBeenCalledTimes(2)
+      expect(updateSetting).toHaveBeenCalledWith(
+        'personal',
+        'models.catalogMeta',
+        { 'anthropic::claude-sonnet-4-5': { contextWindow: 200000 } },
+      )
+    })
+
+    const writes = updateSetting.mock.calls.length
+    releaseFirstCatalog({
+      openai: {
+        models: {
+          'gpt-4o': {
+            cost: { input: 1, output: 2 },
+            modalities: { input: ['text', 'image'] },
+          },
+        },
+      },
+    })
+    await nextTick()
+    await Promise.resolve()
+
+    expect(updateSetting).toHaveBeenCalledTimes(writes)
+    expect(
+      updateSetting.mock.calls.some(([, key, value]) => {
+        return (
+          key === 'models.catalogMeta' &&
+          Boolean(
+            value &&
+              typeof value === 'object' &&
+              'openai::gpt-4o' in (value as Record<string, unknown>),
+          )
+        )
+      }),
+    ).toBe(false)
+  })
+
+  it('persists collapsed fast sibling pricing as catalogMeta.fastPricing', async () => {
+    listAllProviderModels.mockResolvedValue([
+      {
+        providerId: 'openrouter',
+        providerName: 'OpenRouter',
+        models: [
+          {
+            providerId: 'openrouter',
+            modelId: 'moonshotai/kimi-k3',
+            pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+          },
+          {
+            providerId: 'openrouter',
+            modelId: 'moonshotai/kimi-k3-fast',
+            pricing: { inputPerMillion: 3, outputPerMillion: 4 },
+          },
+        ],
+      },
+    ])
+    const { default: useProviderModelsCatalog } = await import(
+      '@/composables/use-provider-models-catalog'
+    )
+    const settings = ref<VixlSettings>({
+      version: 1,
+      'providers.openrouter.apiKeyRef': 'openrouter',
+    })
+    useProviderModelsCatalog({ settings })
+
+    await vi.waitFor(() => {
+      expect(updateSetting).toHaveBeenCalledWith(
+        'personal',
+        'models.catalogMeta',
+        {
+          'openrouter::moonshotai/kimi-k3': {
+            pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+            fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+          },
+        },
+      )
     })
   })
 

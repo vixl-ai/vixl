@@ -197,6 +197,7 @@ const runSubagentGenerate = async (args: {
     onBillEvent: (event) => {
       ctx.onHarnessEvent?.(event)
     },
+    fast: callModel.fast,
   })
 
   const prepareStep = async (options: {
@@ -285,13 +286,14 @@ const runSubagentGenerate = async (args: {
     chatId: ctx.chatId,
     turnId: parentTurnId,
     source: 'subagent',
-    providerId: callModel.createRef.providerId,
-    modelId: callModel.createRef.modelId,
+    providerId: callModel.optionRef.providerId,
+    modelId: callModel.optionRef.modelId,
     usage: result.usage,
     providerMetadata: result.providerMetadata,
     responseId: result.response?.id,
     subagentId,
     settings: ctx.settings,
+    fast: callModel.fast,
     // Emit on the parent harness channel (not nested) so chat-meta / turn-usage
     // reach the session without a subagent-event wrapper.
     onEvent: (event) => {

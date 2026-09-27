@@ -5,9 +5,12 @@ import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ProviderModelGroup } from '@/types/models/provider-model-group'
 import listAllProviderModels from '@/services/providers/list-all-provider-models'
 import collapseProviderModelGroups from '@/services/models/collapse-provider-model-groups'
+import mergeCatalogMetaFromCustomProviders from '@/services/models/merge-catalog-meta-from-custom'
 import mergeCatalogMetaFromGroups from '@/services/models/merge-catalog-meta-from-groups'
 import mergeExtraModels from '@/services/models/merge-extra-models'
 import { getModelCatalogMetaMap } from '@/services/models/model-catalog-meta'
+import loadModelsDevCatalog from '@/services/models/models-dev/catalog'
+import mergeModelsDevCatalogMeta from '@/services/models/models-dev/meta'
 import { filterProviderModelGroups } from '@/services/models/search'
 import serializeModelRef from '@/utils/serialize-model-ref'
 import formatModelRefLabel from '@/utils/format-model-ref-label'
@@ -31,8 +34,28 @@ export default (options: UseProviderModelsCatalogOptions) => {
     listed: ProviderModelGroup[],
     generation: number,
   ): Promise<void> => {
+    const catalog = await loadModelsDevCatalog()
+    if (generation !== loadGeneration) {
+      return
+    }
+
     const personal = config.personalSettings.value
-    const nextMeta = mergeCatalogMetaFromGroups(personal, listed)
+    const collapsed = collapseProviderModelGroups(listed)
+    let nextMeta = mergeCatalogMetaFromGroups(personal, collapsed)
+    nextMeta = mergeCatalogMetaFromCustomProviders(options.settings.value, nextMeta)
+    if (catalog) {
+      nextMeta = mergeModelsDevCatalogMeta(
+        nextMeta,
+        catalog,
+        collapsed.flatMap((group) =>
+          group.models.map((model) => ({
+            providerId: model.providerId,
+            modelId: model.modelId,
+          })),
+        ),
+      )
+    }
+
     const currentMeta = getModelCatalogMetaMap(personal)
     if (
       generation !== loadGeneration ||

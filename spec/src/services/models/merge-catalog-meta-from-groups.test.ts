@@ -99,6 +99,86 @@ describe('mergeCatalogMetaFromGroups', () => {
     })
   })
 
+  it('persists provider-reported fastPricing onto catalogMeta', () => {
+    const groups: ProviderModelGroup[] = [
+      {
+        providerId: 'openrouter',
+        providerName: 'OpenRouter',
+        models: [
+          {
+            providerId: 'openrouter',
+            modelId: 'moonshotai/kimi-k3',
+            pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+            fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+            supportsFast: true,
+            fastModelId: 'moonshotai/kimi-k3-fast',
+          },
+        ],
+      },
+    ]
+
+    const next = mergeCatalogMetaFromGroups(settings(), groups)
+
+    expect(next['openrouter::moonshotai/kimi-k3']).toEqual({
+      pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+      fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+    })
+  })
+
+  it('leaves catalogMeta.fastPricing alone when the provider omits it', () => {
+    const current = settings({
+      'models.catalogMeta': {
+        'openrouter::moonshotai/kimi-k3': {
+          pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+          fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+        },
+      },
+    })
+    const groups: ProviderModelGroup[] = [
+      {
+        providerId: 'openrouter',
+        providerName: 'OpenRouter',
+        models: [
+          {
+            providerId: 'openrouter',
+            modelId: 'moonshotai/kimi-k3',
+            pricing: { inputPerMillion: 1.5, outputPerMillion: 2.5 },
+          },
+        ],
+      },
+    ]
+
+    const next = mergeCatalogMetaFromGroups(current, groups)
+
+    expect(next['openrouter::moonshotai/kimi-k3']).toEqual({
+      pricing: { inputPerMillion: 1.5, outputPerMillion: 2.5 },
+      fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+    })
+  })
+
+  it('does not write fastPricing when the base row has none', () => {
+    const groups: ProviderModelGroup[] = [
+      {
+        providerId: 'openrouter',
+        providerName: 'OpenRouter',
+        models: [
+          {
+            providerId: 'openrouter',
+            modelId: 'moonshotai/kimi-k3',
+            pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+          },
+        ],
+      },
+    ]
+
+    const next = mergeCatalogMetaFromGroups(settings(), groups)
+
+    expect(next['openrouter::moonshotai/kimi-k3']).toEqual({
+      pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+    })
+    expect(next['openrouter::moonshotai/kimi-k3']?.fastPricing).toBeUndefined()
+  })
+
   it('updates only refs seen in this refresh', () => {
     const current = settings({
       'models.catalogMeta': {

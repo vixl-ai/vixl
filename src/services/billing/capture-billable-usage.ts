@@ -65,6 +65,7 @@ export default async (input: {
   subagentId?: string
   settings: VixlSettings
   customModel?: VixlCustomProviderModel
+  fast?: boolean
   onEvent: (event: HarnessEvent) => void
 }): Promise<BillableUsageRecord> => {
   const generationId = gatewayGenerationId(input.providerMetadata)
@@ -82,6 +83,7 @@ export default async (input: {
     subagentId: input.subagentId,
     settings: input.settings,
     customModel: input.customModel,
+    fast: input.fast,
   })
 
   input.onEvent({ type: 'billable-usage', record })

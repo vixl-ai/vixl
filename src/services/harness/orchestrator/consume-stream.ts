@@ -58,12 +58,13 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
       chatId,
       turnId: assistantId,
       source: 'main',
-      providerId: callModel.createRef.providerId,
-      modelId: callModel.createRef.modelId,
+      providerId: callModel.optionRef.providerId,
+      modelId: callModel.optionRef.modelId,
       usage,
       providerMetadata: extras?.providerMetadata,
       responseId: extras?.responseId,
       settings,
+      fast: callModel.fast,
       onEvent,
     })
   }
@@ -116,6 +117,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
         turnId: assistantId,
         messages,
         onEvent,
+        fast: callModel.fast,
       }),
     }),
     abortSignal: signal,

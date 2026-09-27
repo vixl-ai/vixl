@@ -24,6 +24,7 @@ const catalog = {
     },
   },
   vercel: {
+    npm: '@ai-sdk/gateway',
     models: {
       'openai/gpt-5.6-sol': {
         modalities: { input: ['text', 'image', 'pdf'] },
@@ -65,7 +66,7 @@ describe('resolveModelsDevVision', () => {
     ).toBe(false)
   })
 
-  it('looks up gateway full ids under the vercel catalog key', async () => {
+  it('looks up gateway full ids via package match on the vercel catalog key', async () => {
     expect(
       await resolveModelsDevVision({
         providerId: 'gateway',
@@ -76,6 +77,15 @@ describe('resolveModelsDevVision', () => {
       await resolveModelsDevVision({
         providerId: 'gateway',
         modelId: 'gpt-5.6-sol',
+      }),
+    ).toBeUndefined()
+  })
+
+  it('does not attach vercel catalog rows to the v0 vercel provider', async () => {
+    expect(
+      await resolveModelsDevVision({
+        providerId: 'vercel',
+        modelId: 'openai/gpt-5.6-sol',
       }),
     ).toBeUndefined()
   })

@@ -5,6 +5,7 @@ export const modelCatalogMetaSchema = z.object({
   contextWindow: z.number().int().positive().optional(),
   maxOutputTokens: z.number().int().positive().optional(),
   pricing: modelPricingRatesSchema.optional(),
+  fastPricing: modelPricingRatesSchema.optional(),
   vision: z.boolean().optional(),
   toolCalling: z.boolean().optional(),
 })

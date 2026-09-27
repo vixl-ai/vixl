@@ -37,6 +37,7 @@ export type ModelDraft = {
   headers: KeyValueRow[]
   modelOptionsJson: string
   pricing: PricingDraft
+  fastPricing: PricingDraft
   advancedOpen: boolean
 }
 

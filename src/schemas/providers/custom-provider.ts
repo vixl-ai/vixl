@@ -22,6 +22,7 @@ export const customProviderModelSchema = z.object({
   headers: z.record(z.string(), z.string()).optional(),
   modelOptions: z.record(z.string(), z.unknown()).optional(),
   pricing: modelPricingRatesSchema.optional(),
+  fastPricing: modelPricingRatesSchema.optional(),
 })
 
 export const customProviderSchema = z.object({
