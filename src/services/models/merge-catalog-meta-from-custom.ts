@@ -14,28 +14,14 @@ import {
 
 const CUSTOM_PREFIX = 'providers.custom.'
 
-const customCatalogMeta = (model: VixlCustomProviderModel): ModelCatalogMeta => {
-  const patch: ModelCatalogMeta = {}
-  if (model.contextWindow !== undefined) {
-    patch.contextWindow = model.contextWindow
-  }
-  if (model.maxOutputTokens !== undefined) {
-    patch.maxOutputTokens = model.maxOutputTokens
-  }
-  if (model.pricing !== undefined) {
-    patch.pricing = model.pricing
-  }
-  if (model.fastPricing !== undefined) {
-    patch.fastPricing = model.fastPricing
-  }
-  if (model.vision !== undefined) {
-    patch.vision = model.vision
-  }
-  if (model.toolCalling !== undefined) {
-    patch.toolCalling = model.toolCalling
-  }
-  return patch
-}
+const customCatalogMeta = (model: VixlCustomProviderModel): ModelCatalogMeta => ({
+  contextWindow: model.contextWindow,
+  maxOutputTokens: model.maxOutputTokens,
+  pricing: model.pricing,
+  fastPricing: model.fastPricing,
+  vision: model.vision,
+  toolCalling: model.toolCalling,
+})
 
 const mergeCatalogMetaFromCustomProviders = (
   settings: VixlSettings,
@@ -63,9 +49,6 @@ const mergeCatalogMetaFromCustomProviders = (
         continue
       }
       const patch = customCatalogMeta(model)
-      if (Object.keys(patch).length === 0) {
-        continue
-      }
       working = {
         ...working,
         'models.catalogMeta': mergeModelCatalogMeta(

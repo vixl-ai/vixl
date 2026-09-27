@@ -86,4 +86,64 @@ describe('mergeCatalogMetaFromCustomProviders', () => {
       toolCalling: true,
     })
   })
+
+  it('clears omitted custom fastPricing, pricing, and vision from catalogMeta', () => {
+    const next = mergeCatalogMetaFromCustomProviders(
+      settings({
+        'providers.custom.local': {
+          type: 'openai-compatible',
+          name: 'Local',
+          baseURL: 'http://127.0.0.1:8080/v1',
+          models: [{ id: 'opus', toolCalling: true }],
+        },
+      }),
+      {
+        'local::opus': {
+          contextWindow: 64000,
+          pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+          fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+          vision: true,
+          toolCalling: false,
+        },
+      },
+    )
+
+    expect(next['local::opus']).toEqual({ toolCalling: true })
+  })
+
+  it('preserves catalog fields the custom model still defines', () => {
+    const next = mergeCatalogMetaFromCustomProviders(
+      settings({
+        'providers.custom.local': {
+          type: 'openai-compatible',
+          name: 'Local',
+          baseURL: 'http://127.0.0.1:8080/v1',
+          models: [
+            {
+              id: 'opus',
+              pricing: { inputPerMillion: 9, outputPerMillion: 8 },
+              vision: false,
+              contextWindow: 32000,
+            },
+          ],
+        },
+      }),
+      {
+        'local::opus': {
+          contextWindow: 64000,
+          pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+          fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+          vision: true,
+          toolCalling: true,
+        },
+      },
+    )
+
+    expect(next['local::opus']).toEqual({
+      contextWindow: 32000,
+      pricing: { inputPerMillion: 9, outputPerMillion: 8 },
+      vision: false,
+    })
+  })
 })
+

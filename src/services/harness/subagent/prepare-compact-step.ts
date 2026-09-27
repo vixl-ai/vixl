@@ -23,6 +23,7 @@ type PrepareCompactStepInput = {
   subagentId: string
   emitNestedEvent: (event: HarnessEvent) => void
   onBillEvent: (event: HarnessEvent) => void
+  fast?: boolean
 } & Pick<GenerateCheckpointInput, 'model' | 'tools' | 'providerOptions'>
 
 export default (input: PrepareCompactStepInput) =>
@@ -77,6 +78,7 @@ export default (input: PrepareCompactStepInput) =>
             responseId: compacted.responseId,
             subagentId: input.subagentId,
             settings,
+            fast: input.fast,
             onEvent: input.onBillEvent,
           })
         } catch (error) {
