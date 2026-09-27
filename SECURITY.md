@@ -25,6 +25,6 @@ You can expect an initial response within a reasonable timeframe. We will work w
 
 ## Scope
 
-This policy covers the **vixl** application (Vue frontend, Tauri shell, agent harness, and first-party tools). Issues in downstream dependencies (Tauri, AI SDK providers, MCP servers, OS keychain, and similar) should be reported to those projects when they are the root cause.
+This policy covers the **Vixl** application (Vue frontend, Tauri shell, agent harness, and first-party tools). Issues in downstream dependencies (Tauri, AI SDK providers, MCP servers, OS keychain, and similar) should be reported to those projects when they are the root cause.
 
 Vixl can run shell commands and edit files under user policy. Treat local agent permissions as best-effort. Reports about sandbox escape, secret leakage, or unintended tool execution are in scope.

@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="./docs/media/readme/logo.png" alt="vixl" width="160" />
+  <img src="./docs/media/readme/logo.png" alt="Vixl" width="160" />
 </p>
 
-<h1 align="center">vixl</h1>
+<h1 align="center">Vixl</h1>
 
 <p align="center">
-  <a href="https://alternativeto.net/software/vixl/about/?utm_source=badge&utm_medium=referral"><img src="https://alternativeto.net/static/badges/badge-compact-color.svg" alt="vixl | AlternativeTo" width="171" height="55" /></a>
+  <a href="https://alternativeto.net/software/vixl/about/?utm_source=badge&utm_medium=referral"><img src="https://alternativeto.net/static/badges/badge-compact-color.svg" alt="Vixl | AlternativeTo" width="171" height="55" /></a>
 </p>
 
 <p align="center">
@@ -57,18 +57,18 @@
 ---
 
 <p align="center">
-  <img src="./docs/media/readme/screenshot.png" alt="vixl desktop app" />
+  <img src="./docs/media/readme/screenshot.png" alt="Vixl desktop app" />
 </p>
 
 ---
 
-**vixl is a local-first alternative to Cursor agents, Antigravity agents, and VS Code agents.**
+**Vixl is a local-first alternative to Cursor agents, Antigravity agents, and VS Code agents.**
 
 [Orchestration and plan reuse keep that bill down.](https://vixl.app/using/best-practices)
 
-[Local models can still feel like a cloud harness. vixl was built to run Qwen on a Halo Strix machine.](https://vixl.app/getting-started/philosophy) [Progressive tool discovery loads tool and skill detail on demand so local prefills stay smaller.](https://vixl.app/concepts/context)
+[Local models can still feel like a cloud harness. Vixl was built to run Qwen on a Halo Strix machine.](https://vixl.app/getting-started/philosophy) [Progressive tool discovery loads tool and skill detail on demand so local prefills stay smaller.](https://vixl.app/concepts/context)
 
-[Install vixl, add a provider, and send a first chat.](https://vixl.app/getting-started/) [Grab the latest build.](https://github.com/vixl-ai/vixl/releases)
+[Install Vixl, add a provider, and send a first chat.](https://vixl.app/getting-started/) [Grab the latest build.](https://github.com/vixl-ai/vixl/releases)
 
 ## Roadmap
 

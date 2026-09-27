@@ -36,19 +36,19 @@ Fork copies the messages and file checkpoints into a new chat. The title becomes
 1. Right-click the chat.
 2. Choose Fork.
 
-vixl opens the fork.
+Vixl opens the fork.
 
 ## Delete a chat
 
 Delete means delete. There is no archive, no memory, and no user profiling. Removing a chat drops the [SQLite](https://www.sqlite.org) row (messages and usage cascade with it) and removes the chat directory under the personal [`.vixl`](/concepts/the-vixl-directory) tree: `{app data}/.vixl/chats/<projectSlug>/<chatId>/` (macOS: `~/Library/Application Support/app.vixl/.vixl/chats/`). File checkpoints live in that directory, so they go with it. The open harness, plan session, and agent shells for that chat are torn down first.
 
-If a [cloud provider](/customize/providers) was used, that provider's data policies are the provider's business. Delete covers vixl only. See [Privacy](/resources/privacy).
+If a [cloud provider](/customize/providers) was used, that provider's data policies are the provider's business. Delete covers Vixl only. See [Privacy](/resources/privacy).
 
 1. Right-click the chat.
 2. Choose Delete.
 3. Click Delete.
 
-The dialog is titled Delete chat?. It warns that the title and its message history are permanently deleted. Cancel aborts. If that chat was open, vixl routes Home.
+The dialog is titled Delete chat?. It warns that the title and its message history are permanently deleted. Cancel aborts. If that chat was open, Vixl routes Home.
 
 The project Chats table can Rename and Delete the same way. It does not Fork or Pin.
 

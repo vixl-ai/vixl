@@ -7,7 +7,7 @@ description: Custom Vixl agents are markdown under .vixl/agents/; YAML frontmatt
 
 Custom agents are markdown files at `{scope}/.vixl/agents/{slug}.md`. Personal files sit under the app-data `.vixl`. Project files sit under `<repo>/.vixl/agents/`. Create them from Settings or the project Agents tab. Run them with `/` in the chat input. They spawn as sub-agents.
 
-vixl parses YAML between the first pair of `---` lines as frontmatter. The rest is the agent body, which becomes the sub-agent system prompt.
+Vixl parses YAML between the first pair of `---` lines as frontmatter. The rest is the agent body, which becomes the sub-agent system prompt.
 
 ```markdown
 ---

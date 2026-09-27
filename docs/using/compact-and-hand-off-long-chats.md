@@ -13,7 +13,7 @@ Compact summarizes history into a checkpoint stored on chat meta as `activeConte
 
 The compact prompt asks for Goal, Decisions, Files+symbols, Errors+fixes, Skills loaded, Plan+todos, Next. Budget: 8000 tokens of active window, 2048 max output tokens.
 
-The thread shows Compacting, then Compacted. If the model rewrite errors, vixl still writes a deterministic fallback checkpoint and the compact succeeds. Empty history is a no-op. Other failures abort. Compaction needs a project root.
+The thread shows Compacting, then Compacted. If the model rewrite errors, Vixl still writes a deterministic fallback checkpoint and the compact succeeds. Empty history is a no-op. Other failures abort. Compaction needs a project root.
 
 1. Open Estimated context window.
 2. Click Compact.
@@ -22,7 +22,7 @@ The thread shows Compacting, then Compacted. If the model rewrite errors, vixl s
 
 Handoff runs Compact first, then writes a temp markdown file under the OS temp dir (`vixl/handoffs/handoff-<timestamp>.md`). The file starts with `# Handoff: {datetime}`, then `**Source chat:**`, then `## Summary`. It then creates a new chat titled `Handoff from <title>` in the same mode and model, and parks a first message: Continuing from handoff: plus the summary.
 
-The original chat keeps its Compacted marker. vixl opens the new chat.
+The original chat keeps its Compacted marker. Vixl opens the new chat.
 
 1. Open Estimated context window.
 2. Click Handoff.

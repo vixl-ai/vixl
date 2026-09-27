@@ -13,7 +13,7 @@ Per row: enable/disable (Play / Ban), Install when missing, Retry on error, Unin
 
 Project-local servers that require trust ([ESLint](https://eslint.org), [Oxlint](https://oxc.rs), [Biome](https://biomejs.dev)) need `workspace.trust` for the active project. Vue / Nuxt hybrid installs [typescript-language-server](https://www.npmjs.com/package/typescript-language-server) `5.3.0` plus [typescript](https://www.npmjs.com/package/typescript) `5.8.2` as `typescript-classic`, which appears in Settings > LSP as TypeScript (Vue / Nuxt Hybrid), an install-only row with no disable toggle.
 
-Every installable server below is what vixl actually fetches. Toolchain rows are listed after that: they are in the catalog but vixl does not download them. Duplicate listing with sources: [Managed components](/reference/managed-components).
+Every installable server below is what Vixl actually fetches. Toolchain rows are listed after that: they are in the catalog but Vixl does not download them. Duplicate listing with sources: [Managed components](/reference/managed-components).
 
 ## Installable servers
 
