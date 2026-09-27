@@ -51,6 +51,77 @@ describe('collapseModelVariants', () => {
       ]),
     ).toBe('moonshotai/kimi-k3-fast')
   })
+
+  it('preserves priced -fast sibling rates as fastPricing on the base row', () => {
+    const collapsed = collapseModelVariants([
+      {
+        providerId: 'openrouter',
+        modelId: 'moonshotai/kimi-k3',
+        pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+      },
+      {
+        providerId: 'openrouter',
+        modelId: 'moonshotai/kimi-k3-fast',
+        pricing: { inputPerMillion: 3, outputPerMillion: 4 },
+      },
+    ])
+
+    expect(collapsed).toHaveLength(1)
+    expect(collapsed[0]?.modelId).toBe('moonshotai/kimi-k3')
+    expect(collapsed[0]?.pricing).toEqual({
+      inputPerMillion: 1,
+      outputPerMillion: 2,
+    })
+    expect(collapsed[0]?.fastPricing).toEqual({
+      inputPerMillion: 3,
+      outputPerMillion: 4,
+    })
+    expect(collapsed[0]?.fastModelId).toBe('moonshotai/kimi-k3-fast')
+  })
+
+  it('uses the chosen fastModelId sibling when multiple fast rows have pricing', () => {
+    const collapsed = collapseModelVariants([
+      {
+        providerId: 'gateway',
+        modelId: 'moonshotai/kimi-k3',
+        pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+      },
+      {
+        providerId: 'gateway',
+        modelId: 'moonshotai/kimi-k3-highspeed',
+        pricing: { inputPerMillion: 9, outputPerMillion: 10 },
+      },
+      {
+        providerId: 'gateway',
+        modelId: 'moonshotai/kimi-k3-fast',
+        pricing: { inputPerMillion: 3, outputPerMillion: 4 },
+      },
+    ])
+
+    expect(collapsed[0]?.fastModelId).toBe('moonshotai/kimi-k3-fast')
+    expect(collapsed[0]?.fastPricing).toEqual({
+      inputPerMillion: 3,
+      outputPerMillion: 4,
+    })
+  })
+
+  it('does not set fastPricing when the fast sibling has no pricing', () => {
+    const collapsed = collapseModelVariants([
+      {
+        providerId: 'openrouter',
+        modelId: 'moonshotai/kimi-k3',
+        pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+      },
+      {
+        providerId: 'openrouter',
+        modelId: 'moonshotai/kimi-k3-fast',
+      },
+    ])
+
+    expect(collapsed[0]?.supportsFast).toBe(true)
+    expect(collapsed[0]?.fastModelId).toBe('moonshotai/kimi-k3-fast')
+    expect(collapsed[0]?.fastPricing).toBeUndefined()
+  })
 })
 
 describe('resolveModelRefForCall', () => {

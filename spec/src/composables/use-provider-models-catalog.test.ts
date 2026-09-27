@@ -209,6 +209,48 @@ describe('use-provider-models-catalog', () => {
     ).toBe(false)
   })
 
+  it('persists collapsed fast sibling pricing as catalogMeta.fastPricing', async () => {
+    listAllProviderModels.mockResolvedValue([
+      {
+        providerId: 'openrouter',
+        providerName: 'OpenRouter',
+        models: [
+          {
+            providerId: 'openrouter',
+            modelId: 'moonshotai/kimi-k3',
+            pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+          },
+          {
+            providerId: 'openrouter',
+            modelId: 'moonshotai/kimi-k3-fast',
+            pricing: { inputPerMillion: 3, outputPerMillion: 4 },
+          },
+        ],
+      },
+    ])
+    const { default: useProviderModelsCatalog } = await import(
+      '@/composables/use-provider-models-catalog'
+    )
+    const settings = ref<VixlSettings>({
+      version: 1,
+      'providers.openrouter.apiKeyRef': 'openrouter',
+    })
+    useProviderModelsCatalog({ settings })
+
+    await vi.waitFor(() => {
+      expect(updateSetting).toHaveBeenCalledWith(
+        'personal',
+        'models.catalogMeta',
+        {
+          'openrouter::moonshotai/kimi-k3': {
+            pricing: { inputPerMillion: 1, outputPerMillion: 2 },
+            fastPricing: { inputPerMillion: 3, outputPerMillion: 4 },
+          },
+        },
+      )
+    })
+  })
+
   it('toasts and clears groups when listing models fails', async () => {
     listAllProviderModels.mockRejectedValue(new Error('catalog down'))
     const { default: useProviderModelsCatalog } = await import(

@@ -9,6 +9,7 @@ export type ParsedModelRow = {
   contextWindow?: number
   maxOutputTokens?: number
   pricing?: ModelPricingRates
+  fastPricing?: ModelPricingRates
   vision?: boolean
   toolCalling?: boolean
 }

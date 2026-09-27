@@ -113,6 +113,7 @@ const toModelRefs = (
         ? { maxOutputTokens: row.maxOutputTokens }
         : {}),
       ...(row.pricing ? { pricing: row.pricing } : {}),
+      ...(row.fastPricing ? { fastPricing: row.fastPricing } : {}),
       ...(row.vision ? { vision: true } : {}),
       ...(row.toolCalling ? { toolCalling: true } : {}),
     }

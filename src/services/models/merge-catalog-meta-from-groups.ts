@@ -21,6 +21,9 @@ const reportedCatalogMeta = (model: ModelRef): ModelCatalogMeta => {
   if (model.pricing !== undefined) {
     patch.pricing = model.pricing
   }
+  if (model.fastPricing !== undefined) {
+    patch.fastPricing = model.fastPricing
+  }
   if (model.vision !== undefined) {
     patch.vision = model.vision
   }

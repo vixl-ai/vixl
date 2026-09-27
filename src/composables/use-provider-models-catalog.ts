@@ -40,13 +40,14 @@ export default (options: UseProviderModelsCatalogOptions) => {
     }
 
     const personal = config.personalSettings.value
-    let nextMeta = mergeCatalogMetaFromGroups(personal, listed)
+    const collapsed = collapseProviderModelGroups(listed)
+    let nextMeta = mergeCatalogMetaFromGroups(personal, collapsed)
     nextMeta = mergeCatalogMetaFromCustomProviders(options.settings.value, nextMeta)
     if (catalog) {
       nextMeta = mergeModelsDevCatalogMeta(
         nextMeta,
         catalog,
-        listed.flatMap((group) =>
+        collapsed.flatMap((group) =>
           group.models.map((model) => ({
             providerId: model.providerId,
             modelId: model.modelId,
