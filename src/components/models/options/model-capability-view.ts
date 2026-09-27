@@ -2,29 +2,29 @@ import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
 import type { ReasoningCapability } from '@/services/models/resolve-reasoning-capability'
 
-export type ModelSearchCapabilityKey = 'vision' | 'tools' | 'reasoning' | 'fast'
+export type ModelCapabilityKey = 'vision' | 'tools' | 'reasoning' | 'fast'
 
-export type ModelSearchCapabilityItem = {
-  key: ModelSearchCapabilityKey
+export type ModelCapabilityItem = {
+  key: ModelCapabilityKey
   tooltip: string
   muted: boolean
   label?: string
 }
 
-export type ModelSearchResultViewInput = {
+export type BuildModelCapabilitiesInput = {
   meta?: ModelCatalogMeta
   option?: ModelCatalogOption
   capability?: ReasoningCapability
   supportsFast?: boolean
 }
 
-export const buildModelSearchCapabilities = ({
+export const buildModelCapabilities = ({
   meta,
   option,
   capability,
   supportsFast,
-}: ModelSearchResultViewInput): ModelSearchCapabilityItem[] => {
-  const items: ModelSearchCapabilityItem[] = []
+}: BuildModelCapabilitiesInput): ModelCapabilityItem[] => {
+  const items: ModelCapabilityItem[] = []
 
   if (meta?.vision === true) {
     items.push({

@@ -14,7 +14,7 @@ import {
   buildModelCost,
   MODEL_COST_ESTIMATED_TOOLTIP,
   type ModelCostLineKey,
-} from '@/components/models/model-cost-view'
+} from '@/components/models/options/model-cost-view'
 
 const ICONS = {
   input: ArrowUp,
@@ -28,12 +28,10 @@ const props = withDefaults(
   defineProps<{
     option: ModelCatalogOption
     meta?: ModelCatalogMeta
-    compact?: boolean
     class?: HTMLAttributes['class']
   }>(),
   {
     meta: () => ({}),
-    compact: false,
   },
 )
 
@@ -50,9 +48,7 @@ const view = computed(() =>
     <div
       :class="
         cn(
-          props.compact
-            ? 'inline-flex shrink-0 flex-nowrap items-center gap-1.5 text-xs text-muted-foreground'
-            : 'flex flex-wrap items-center gap-1.5 text-[11px] leading-snug text-muted-foreground',
+          'flex flex-wrap items-center gap-1.5 text-[11px] leading-snug text-muted-foreground',
           props.class,
         )
       "

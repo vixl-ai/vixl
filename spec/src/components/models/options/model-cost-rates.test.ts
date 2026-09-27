@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import ModelCostRates from '@/components/models/ModelCostRates.vue'
+import ModelCostRates from '@/components/models/options/ModelCostRates.vue'
 import type { ModelPricingRates } from '@/types/billing/model-pricing-rates'
 import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
@@ -29,10 +29,9 @@ afterEach(() => {
 const mountRates = (
   option: ModelCatalogOption,
   meta: ModelCatalogMeta,
-  compact = false,
 ): VueWrapper => {
   wrapper = mount(ModelCostRates, {
-    props: { option, meta, compact },
+    props: { option, meta },
   })
   return wrapper
 }
@@ -77,14 +76,6 @@ describe('ModelCostRates', () => {
     expect(mounted.text()).toContain('$4.50')
     expect(mounted.text()).toContain('$22.50')
     expect(mounted.find('[aria-label="Estimated"]').exists()).toBe(false)
-  })
-
-  it('uses compact row classes when compact is set', () => {
-    const mounted = mountRates({}, { pricing: base }, true)
-    const root = mounted.get('div')
-    expect(root.classes()).toContain('flex-nowrap')
-    expect(root.classes()).toContain('text-xs')
-    expect(root.classes()).not.toContain('flex-wrap')
   })
 
   it('renders nothing when pricing is missing', () => {

@@ -3,13 +3,22 @@ import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import { isReasoningLevel } from '@/types/models/reasoning-level'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { getCustomProvider } from '@/services/providers/registry'
+import pickCapabilityDefaultLevel from '@/services/models/pick-capability-default-level'
 import resolveBuiltinReasoningCapability from '@/services/models/resolve-builtin-model-capabilities'
 
 export type ReasoningCapability = {
   supported: boolean
   levels: ReasoningLevel[]
   mandatory: boolean
+  defaultLevel: ReasoningLevel
 }
+
+const unsupported = (): ReasoningCapability => ({
+  supported: false,
+  levels: [],
+  mandatory: false,
+  defaultLevel: 'medium',
+})
 
 const uniqueLevels = (levels: ReasoningLevel[]): ReasoningLevel[] => {
   const seen = new Set<ReasoningLevel>()
@@ -45,7 +54,14 @@ const fromLiveMetadata = (ref: ModelRef): ReasoningCapability | null => {
   if (mandatory) {
     levels = levels.filter((level) => level !== 'none')
   }
-  return { supported: true, levels, mandatory }
+  const builtin = resolveBuiltinReasoningCapability(ref)
+  const preferred = builtin.supported ? builtin.defaultLevel : undefined
+  return {
+    supported: true,
+    levels,
+    mandatory,
+    defaultLevel: pickCapabilityDefaultLevel(levels, preferred),
+  }
 }
 
 export const resolveReasoningCapability = (
@@ -53,7 +69,7 @@ export const resolveReasoningCapability = (
   ref: ModelRef | null | undefined,
 ): ReasoningCapability => {
   if (!ref) {
-    return { supported: false, levels: [], mandatory: false }
+    return unsupported()
   }
 
   const customProvider = getCustomProvider(settings, ref.providerId)
@@ -61,13 +77,19 @@ export const resolveReasoningCapability = (
     const model = customProvider.models?.find((entry) => entry.id === ref.modelId)
     if (!model?.supportsReasoningEffort?.length) {
       // thinking alone means local thinking tokens, not portable effort levels
-      return { supported: false, levels: [], mandatory: false }
+      return unsupported()
     }
     const levels = levelsFromCustomList(model.supportsReasoningEffort)
     if (levels.length === 0) {
-      return { supported: false, levels: [], mandatory: false }
+      return unsupported()
     }
-    return { supported: true, levels, mandatory: false }
+    const preferred = isReasoningLevel(model.reasoningEffort) ? model.reasoningEffort : undefined
+    return {
+      supported: true,
+      levels,
+      mandatory: false,
+      defaultLevel: pickCapabilityDefaultLevel(levels, preferred),
+    }
   }
 
   const live = fromLiveMetadata(ref)

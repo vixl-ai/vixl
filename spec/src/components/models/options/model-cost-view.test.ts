@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildModelCost } from '@/components/models/model-cost-view'
+import { buildModelCost } from '@/components/models/options/model-cost-view'
 import type { ModelPricingRates } from '@/types/billing/model-pricing-rates'
 
 const pricing: ModelPricingRates = {

@@ -47,7 +47,7 @@ const handleChange = (patch: ModelCatalogOption): void => {
     <span class="truncate">
       <QueryMatchText :text="model.label" :query="query" />
     </span>
-    <span class="ml-1.5 text-xs font-normal text-muted-foreground @max-[18rem]/modelpicker:hidden">
+    <span class="ml-1.5 text-xs font-normal text-muted-foreground">
       <QueryMatchText
         :text="model.providerName"
         :query="query"
@@ -56,13 +56,6 @@ const handleChange = (patch: ModelCatalogOption): void => {
     </span>
     <span v-if="showDisabledBadge" class="ml-1 text-xs text-muted-foreground"> (disabled) </span>
   </ModelsSearchModelSelectorName>
-  <ModelSearchResultCapabilities
-    :meta="meta"
-    :option="option"
-    :capability="capability"
-    :supports-fast="supportsFast"
-  />
-  <ModelCostRates compact class="@max-[24rem]/modelpicker:hidden" :meta="meta" :option="option" />
   <Popover :open="optionsOpen" @update:open="handleOptionsOpen">
     <PopoverTrigger as-child>
       <Button

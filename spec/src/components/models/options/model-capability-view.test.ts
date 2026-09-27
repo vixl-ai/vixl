@@ -1,23 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { buildModelSearchCapabilities } from '@/components/models/search/model-search-result-view'
+import { buildModelCapabilities } from '@/components/models/options/model-capability-view'
 import type { ReasoningCapability } from '@/services/models/resolve-reasoning-capability'
 
 const reasoningSupported: ReasoningCapability = {
   supported: true,
   levels: ['provider-default', 'low', 'high', 'xhigh'],
   mandatory: false,
+  defaultLevel: 'high',
 }
 
 const reasoningUnsupported: ReasoningCapability = {
   supported: false,
   levels: [],
   mandatory: false,
+  defaultLevel: 'medium',
 }
 
-describe('buildModelSearchCapabilities', () => {
+describe('buildModelCapabilities', () => {
   it('returns no icons when meta and capability are empty', () => {
     expect(
-      buildModelSearchCapabilities({
+      buildModelCapabilities({
         meta: {},
         option: {},
         capability: reasoningUnsupported,
@@ -28,7 +30,7 @@ describe('buildModelSearchCapabilities', () => {
 
   it('includes vision and tools when meta flags are true', () => {
     expect(
-      buildModelSearchCapabilities({
+      buildModelCapabilities({
         meta: { vision: true, toolCalling: true },
         option: {},
         capability: reasoningUnsupported,
@@ -42,7 +44,7 @@ describe('buildModelSearchCapabilities', () => {
 
   it('shows a muted reasoning icon for provider-default', () => {
     expect(
-      buildModelSearchCapabilities({
+      buildModelCapabilities({
         meta: {},
         option: { reasoning: 'provider-default' },
         capability: reasoningSupported,
@@ -53,7 +55,7 @@ describe('buildModelSearchCapabilities', () => {
 
   it('labels an explicit reasoning level with the short id', () => {
     expect(
-      buildModelSearchCapabilities({
+      buildModelCapabilities({
         meta: {},
         option: { reasoning: 'xhigh' },
         capability: reasoningSupported,
@@ -71,7 +73,7 @@ describe('buildModelSearchCapabilities', () => {
 
   it('omits reasoning when the capability is unsupported', () => {
     expect(
-      buildModelSearchCapabilities({
+      buildModelCapabilities({
         meta: {},
         option: { reasoning: 'high' },
         capability: reasoningUnsupported,
@@ -82,7 +84,7 @@ describe('buildModelSearchCapabilities', () => {
 
   it('highlights fast when option.fast is on', () => {
     expect(
-      buildModelSearchCapabilities({
+      buildModelCapabilities({
         meta: {},
         option: { fast: true },
         capability: reasoningUnsupported,
@@ -93,7 +95,7 @@ describe('buildModelSearchCapabilities', () => {
 
   it('mutes fast when it is available but off', () => {
     expect(
-      buildModelSearchCapabilities({
+      buildModelCapabilities({
         meta: {},
         option: {},
         capability: reasoningUnsupported,

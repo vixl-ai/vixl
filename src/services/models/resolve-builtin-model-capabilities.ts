@@ -1,16 +1,19 @@
 import type { ModelRef } from '@/types/models/model-ref'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
+import pickCapabilityDefaultLevel from '@/services/models/pick-capability-default-level'
 
 type BuiltinReasoningCapability = {
   supported: boolean
   levels: ReasoningLevel[]
   mandatory: boolean
+  defaultLevel: ReasoningLevel
 }
 
 const unsupported = (): BuiltinReasoningCapability => ({
   supported: false,
   levels: [],
   mandatory: false,
+  defaultLevel: 'medium',
 })
 
 const uniqueLevels = (levels: ReasoningLevel[]): ReasoningLevel[] => {
@@ -28,15 +31,16 @@ const uniqueLevels = (levels: ReasoningLevel[]): ReasoningLevel[] => {
 
 const capability = (
   levels: ReasoningLevel[],
+  defaultLevel: ReasoningLevel,
   mandatory = false,
 ): BuiltinReasoningCapability => {
-  const withDefault: ReasoningLevel[] = mandatory
-    ? levels
-    : ['provider-default', ...levels]
+  const withDefault: ReasoningLevel[] = mandatory ? levels : ['provider-default', ...levels]
+  const unique = uniqueLevels(withDefault)
   return {
     supported: true,
-    levels: uniqueLevels(withDefault),
+    levels: unique,
     mandatory,
+    defaultLevel: pickCapabilityDefaultLevel(unique, defaultLevel),
   }
 }
 
@@ -64,15 +68,15 @@ const resolveOpenaiReasoning = (modelId: string): BuiltinReasoningCapability => 
     id.startsWith('gpt-5.2-codex') ||
     id.startsWith('gpt-5.3-codex')
   ) {
-    return capability(['medium', 'high', 'xhigh'])
+    return capability(['medium', 'high', 'xhigh'], 'medium')
   }
 
   if (id === 'gpt-5-pro' || id.startsWith('gpt-5-pro-')) {
-    return capability(['high'], true)
+    return capability(['high'], 'high', true)
   }
 
   if (id.startsWith('gpt-5.6')) {
-    return capability(['none', 'low', 'medium', 'high', 'xhigh', 'max'])
+    return capability(['none', 'low', 'medium', 'high', 'xhigh', 'max'], 'none')
   }
 
   if (
@@ -81,32 +85,28 @@ const resolveOpenaiReasoning = (modelId: string): BuiltinReasoningCapability => 
     id.startsWith('gpt-5.4') ||
     id.startsWith('gpt-5.5')
   ) {
-    return capability(['none', 'low', 'medium', 'high', 'xhigh'])
+    return capability(['none', 'low', 'medium', 'high', 'xhigh'], 'none')
   }
 
   if (id === 'gpt-5.1' || id.startsWith('gpt-5.1-')) {
-    return capability(['none', 'low', 'medium', 'high'])
+    return capability(['none', 'low', 'medium', 'high'], 'none')
   }
 
-  if (
-    id === 'gpt-5' ||
-    id.startsWith('gpt-5-mini') ||
-    id.startsWith('gpt-5-nano')
-  ) {
-    return capability(['minimal', 'low', 'medium', 'high'])
+  if (id === 'gpt-5' || id.startsWith('gpt-5-mini') || id.startsWith('gpt-5-nano')) {
+    return capability(['minimal', 'low', 'medium', 'high'], 'medium')
   }
 
   // o3 / o3-pro (and dated aliases). Other o3-* variants are not enumerated.
   if (id === 'o3' || id.startsWith('o3-pro')) {
-    return capability(['low', 'medium', 'high', 'xhigh'])
+    return capability(['low', 'medium', 'high', 'xhigh'], 'medium')
   }
 
   if (id.startsWith('o4-mini')) {
-    return capability(['low', 'medium', 'high', 'xhigh'])
+    return capability(['low', 'medium', 'high', 'xhigh'], 'medium')
   }
 
   if (id.startsWith('o1-mini') || id.startsWith('o1-preview')) {
-    return capability(['minimal', 'low', 'medium', 'high'])
+    return capability(['minimal', 'low', 'medium', 'high'], 'medium')
   }
 
   return unsupported()
@@ -128,22 +128,19 @@ const resolveAnthropicReasoning = (modelId: string): BuiltinReasoningCapability 
     id.startsWith('claude-mythos-5') ||
     id.startsWith('claude-mythos-preview')
   ) {
-    return capability(['low', 'medium', 'high', 'xhigh', 'max'])
+    return capability(['low', 'medium', 'high', 'xhigh', 'max'], 'high')
   }
 
   if (id.startsWith('claude-opus-4-7') || id.startsWith('claude-opus-4-8')) {
-    return capability(['low', 'medium', 'high', 'xhigh', 'max'])
+    return capability(['low', 'medium', 'high', 'xhigh', 'max'], 'high')
   }
 
-  if (
-    id.startsWith('claude-opus-4-6') ||
-    id.startsWith('claude-sonnet-4-6')
-  ) {
-    return capability(['low', 'medium', 'high', 'xhigh'])
+  if (id.startsWith('claude-opus-4-6') || id.startsWith('claude-sonnet-4-6')) {
+    return capability(['low', 'medium', 'high', 'xhigh'], 'high')
   }
 
   if (id.startsWith('claude-opus-4-5')) {
-    return capability(['low', 'medium', 'high', 'xhigh'])
+    return capability(['low', 'medium', 'high', 'xhigh'], 'high')
   }
 
   return unsupported()
@@ -159,15 +156,15 @@ const resolveGoogleReasoning = (modelId: string): BuiltinReasoningCapability => 
   const id = normalizeModelId(modelId)
 
   if (id.startsWith('gemini-3.1-flash-lite-image')) {
-    return capability(['minimal', 'high'])
+    return capability(['minimal', 'high'], 'high')
   }
 
   if (id.startsWith('gemini-3.1-pro-preview')) {
-    return capability(['low', 'medium', 'high'])
+    return capability(['low', 'medium', 'high'], 'high')
   }
 
   if (id.startsWith('gemini-3')) {
-    return capability(['minimal', 'low', 'medium', 'high'])
+    return capability(['minimal', 'low', 'medium', 'high'], 'high')
   }
 
   if (
@@ -175,16 +172,13 @@ const resolveGoogleReasoning = (modelId: string): BuiltinReasoningCapability => 
     id.startsWith('gemini-2.5-flash') ||
     id.startsWith('gemini-2.5-pro')
   ) {
-    return capability(['low', 'medium', 'high'])
+    return capability(['low', 'medium', 'high'], 'medium')
   }
 
   return unsupported()
 }
 
-const resolveFamily = (
-  family: string,
-  modelId: string,
-): BuiltinReasoningCapability => {
+const resolveFamily = (family: string, modelId: string): BuiltinReasoningCapability => {
   switch (family) {
     case 'openai':
       return resolveOpenaiReasoning(modelId)
@@ -201,9 +195,7 @@ const resolveFamily = (
  * Sparse id-pattern reasoning capability for native catalogs and
  * gateway/openrouter fallbacks when live effort metadata is absent.
  */
-export const resolveBuiltinReasoningCapability = (
-  ref: ModelRef,
-): BuiltinReasoningCapability => {
+export const resolveBuiltinReasoningCapability = (ref: ModelRef): BuiltinReasoningCapability => {
   const providerId = ref.providerId.trim().toLowerCase()
   const rawModelId = ref.modelId.trim()
 

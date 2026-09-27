@@ -33,6 +33,7 @@ describe('resolveReasoningCapability', () => {
       'high',
       'xhigh',
     ])
+    expect(capability.defaultLevel).toBe('high')
   })
 
   it('hides effort for anthropic models outside effort families', () => {
@@ -54,6 +55,8 @@ describe('resolveReasoningCapability', () => {
     expect(capability.supported).toBe(true)
     expect(capability.mandatory).toBe(true)
     expect(capability.levels).toEqual(['provider-default', 'low', 'high'])
+    // gpt-5 family default is medium, which is not in the live subset
+    expect(capability.defaultLevel).toBe('low')
   })
 
   it('prepends provider-default for live OpenRouter effort subsets', () => {
@@ -69,6 +72,16 @@ describe('resolveReasoningCapability', () => {
       'medium',
       'high',
     ])
+    expect(capability.defaultLevel).toBe('medium')
+  })
+
+  it('uses the builtin family default when it is in the live subset', () => {
+    const capability = resolveReasoningCapability(baseSettings, {
+      providerId: 'openrouter',
+      modelId: 'openai/gpt-5.2',
+      supportsReasoningEffort: ['none', 'low', 'medium', 'high'],
+    })
+    expect(capability.defaultLevel).toBe('none')
   })
 
   it('excludes none from levels when reasoning is mandatory', () => {
@@ -82,6 +95,7 @@ describe('resolveReasoningCapability', () => {
     expect(capability.mandatory).toBe(true)
     expect(capability.levels).toEqual(['provider-default', 'low', 'high'])
     expect(capability.levels).not.toContain('none')
+    expect(capability.defaultLevel).toBe('low')
   })
 
   it('returns unsupported for non-reasoning OpenRouter models without live metadata', () => {
@@ -107,6 +121,7 @@ describe('resolveReasoningCapability', () => {
       'high',
       'xhigh',
     ])
+    expect(capability.defaultLevel).toBe('none')
   })
 
   it('hides effort for custom models without supportsReasoningEffort', () => {
@@ -163,6 +178,28 @@ describe('resolveReasoningCapability', () => {
     })
     expect(capability.supported).toBe(true)
     expect(capability.levels).toEqual(['provider-default', 'low', 'high'])
+    expect(capability.defaultLevel).toBe('low')
+  })
+
+  it('uses a custom model reasoningEffort when it is a listed level', () => {
+    const settings = {
+      ...baseSettings,
+      'providers.custom.local': {
+        type: 'openai-compatible',
+        name: 'Local',
+        baseURL: 'http://127.0.0.1:11434/v1',
+        models: [{
+          id: 'qwen',
+          supportsReasoningEffort: ['low', 'high'],
+          reasoningEffort: 'high',
+        }],
+      },
+    } as VixlSettings
+    const capability = resolveReasoningCapability(settings, {
+      providerId: 'local',
+      modelId: 'qwen',
+    })
+    expect(capability.defaultLevel).toBe('high')
   })
 })
 

@@ -12,16 +12,16 @@ import type { ModelCatalogMeta } from '@/types/models/model-catalog-meta'
 import type { ModelCatalogOption } from '@/types/models/model-catalog-option'
 import type { ReasoningCapability } from '@/services/models/resolve-reasoning-capability'
 import {
-  buildModelSearchCapabilities,
-  type ModelSearchCapabilityKey,
-} from '@/components/models/search/model-search-result-view'
+  buildModelCapabilities,
+  type ModelCapabilityKey,
+} from '@/components/models/options/model-capability-view'
 
 const ICONS = {
   vision: Eye,
   tools: Wrench,
   reasoning: Brain,
   fast: Zap,
-} as const satisfies Record<ModelSearchCapabilityKey, typeof Eye>
+} as const satisfies Record<ModelCapabilityKey, typeof Eye>
 
 const props = withDefaults(
   defineProps<{
@@ -37,7 +37,7 @@ const props = withDefaults(
 )
 
 const items = computed(() =>
-  buildModelSearchCapabilities({
+  buildModelCapabilities({
     meta: props.meta,
     option: props.option,
     capability: props.capability,

@@ -29,7 +29,7 @@ describe('parseCatalogTokenOverride', () => {
 })
 
 describe('formatCatalogMetaHint', () => {
-  it('builds context, output, and capability lines without pricing', () => {
+  it('builds context and output lines without capability text', () => {
     expect(
       formatCatalogMetaHint({
         contextWindow: 200_000,
@@ -38,10 +38,10 @@ describe('formatCatalogMetaHint', () => {
         toolCalling: true,
         pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
       }),
-    ).toEqual(['Context 200k', 'Max output 8,192', 'Vision, Tools'])
+    ).toEqual(['Context 200k', 'Max output 8,192'])
   })
 
-  it('omits unknown and false capability fields', () => {
+  it('omits unknown and false token fields', () => {
     expect(formatCatalogMetaHint({ vision: false, toolCalling: false })).toEqual([])
   })
 
@@ -56,7 +56,7 @@ describe('formatCatalogMetaHint', () => {
         },
         { omitContext: true, omitOutput: true },
       ),
-    ).toEqual(['Vision'])
+    ).toEqual([])
   })
 
   it('returns no lines when only pricing is present', () => {

@@ -52,15 +52,13 @@ const handleOptionChange = (model: ModelRef, patch: ModelCatalogOption): void =>
 </script>
 
 <template>
-  <ModelsSearchModelSelectorList class="@container/modelpicker">
+  <ModelsSearchModelSelectorList>
     <div v-if="loading" role="status" aria-live="polite" class="py-6 text-center text-sm">
       Loading models...
     </div>
     <div v-else-if="!hasProviders" class="space-y-2 py-6 text-center text-sm">
       <p role="status" aria-live="polite">No providers configured.</p>
-      <Button variant="outline" size="sm" @click="handleOpenProviders">
-        Add a provider
-      </Button>
+      <Button variant="outline" size="sm" @click="handleOpenProviders"> Add a provider </Button>
     </div>
     <div
       v-else-if="groups.length === 0 && disabledEntries.length === 0"
@@ -83,9 +81,7 @@ const handleOptionChange = (model: ModelRef, patch: ModelCatalogOption): void =>
           class="group/item flex-nowrap"
           @select="handleSelect(model.providerId, model.modelId)"
         >
-          <span class="sr-only">
-            {{ model.modelId }} {{ group.name }}
-          </span>
+          <span class="sr-only"> {{ model.modelId }} {{ group.name }} </span>
           <ModelSearchResultRow
             :model="model"
             :query="searchQuery"

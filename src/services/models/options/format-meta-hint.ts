@@ -18,17 +18,6 @@ const formatCatalogMetaHint = (
     lines.push(`Max output ${formatTokenCount(meta.maxOutputTokens)}`)
   }
 
-  const caps: string[] = []
-  if (meta.vision === true) {
-    caps.push('Vision')
-  }
-  if (meta.toolCalling === true) {
-    caps.push('Tools')
-  }
-  if (caps.length > 0) {
-    lines.push(caps.join(', '))
-  }
-
   return lines
 }
 
