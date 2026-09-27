@@ -5,6 +5,10 @@
 <h1 align="center">vixl</h1>
 
 <p align="center">
+  <a href="https://alternativeto.net/software/vixl/about/?utm_source=badge&utm_medium=referral"><img src="https://alternativeto.net/static/badges/badge-compact-color.svg" alt="vixl | AlternativeTo" width="171" height="55" /></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/vixl-ai/vixl/actions/workflows/ci.yml"><img src="https://github.com/vixl-ai/vixl/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://vixl.app/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue" alt="Docs" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="License: MIT" /></a>
