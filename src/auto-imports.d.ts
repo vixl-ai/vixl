@@ -300,6 +300,7 @@ declare global {
   const useSorted: typeof import('@vueuse/core').useSorted
   const useSpeechRecognition: typeof import('@vueuse/core').useSpeechRecognition
   const useSpeechSynthesis: typeof import('@vueuse/core').useSpeechSynthesis
+  const useStartHomeChat: typeof import('./composables/use-start-home-chat').default
   const useStartPlanBuild: typeof import('./composables/use-start-plan-build').default
   const useStartVixlFilesChat: typeof import('./composables/use-start-vixl-files-chat').default
   const useStepper: typeof import('@vueuse/core').useStepper
@@ -699,6 +700,7 @@ declare module 'vue' {
     readonly useSorted: UnwrapRef<typeof import('@vueuse/core')['useSorted']>
     readonly useSpeechRecognition: UnwrapRef<typeof import('@vueuse/core')['useSpeechRecognition']>
     readonly useSpeechSynthesis: UnwrapRef<typeof import('@vueuse/core')['useSpeechSynthesis']>
+    readonly useStartHomeChat: UnwrapRef<typeof import('./composables/use-start-home-chat')['default']>
     readonly useStartPlanBuild: UnwrapRef<typeof import('./composables/use-start-plan-build')['default']>
     readonly useStartVixlFilesChat: UnwrapRef<typeof import('./composables/use-start-vixl-files-chat')['default']>
     readonly useStepper: UnwrapRef<typeof import('@vueuse/core')['useStepper']>

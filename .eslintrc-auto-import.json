@@ -328,6 +328,7 @@
     "useSorted": true,
     "useSpeechRecognition": true,
     "useSpeechSynthesis": true,
+    "useStartHomeChat": true,
     "useStartPlanBuild": true,
     "useStartVixlFilesChat": true,
     "useStepper": true,

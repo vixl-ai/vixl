@@ -5,7 +5,7 @@ description: Manage Vixl chats in the sidebar by renaming, pinning, forking, del
 
 # Manage chats
 
-Chats live in the left sidebar, grouped under each [project](/concepts/projects-and-home-chats). Home chats sit at the top level. Click a row to open it.
+Chats live in the left sidebar, grouped under each [project](/concepts/projects-and-home-chats). Home chats sit under a **Home** folder. Click a row to open it.
 
 Right-click a sidebar chat for Rename, Fork, Pin or Unpin, and Delete. Right-click the thread for Copy ID, Export Transcript, Rename, and Pin or Unpin. Fork and Delete are sidebar-only.
 

@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useChatStore from '@/composables/use-chat-store'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
+import type { FleetSidebarChat } from '@/types/fleet/fleet-sidebar-chat'
 import type { ChatMeta } from '@/types/chat/chat-meta'
 import { isTauri, listPinnedChats } from '@/services/vixl/vixl-tauri'
 import type { FleetPinnedChat } from '@/types/fleet/fleet-pinned-chat'
@@ -16,14 +17,8 @@ export type FleetSidebarActivityItem =
       updatedAt: string
     }
   | {
-      kind: 'standalone'
-      chat: {
-        id: string
-        title: string
-        status?: ChatMeta['status']
-        attention?: ChatMeta['attention']
-        projectSlug: string
-      }
+      kind: 'home'
+      chats: FleetSidebarChat[]
       updatedAt: string
     }
 
@@ -95,17 +90,16 @@ export default () => {
       })
     }
 
-    for (const chat of standaloneChats.value) {
+    if (standaloneChats.value.length > 0) {
       items.push({
-        kind: 'standalone',
-        chat: {
+        kind: 'home',
+        chats: standaloneChats.value.map((chat) => ({
           id: chat.id,
           title: chat.title,
           status: chat.status,
           attention: chat.attention ?? null,
-          projectSlug: HOME_CHAT_SLUG,
-        },
-        updatedAt: chat.updatedAt,
+        })),
+        updatedAt: maxUpdatedAt(standaloneChats.value),
       })
     }
 

@@ -25,7 +25,7 @@ Home chats use slug `_home_` and your user home directory as the workspace. They
 
 Project chats use that folder as `projectRoot`. They merge personal and project config (project wins for most keys). They inject project `AGENTS.md` and project `.vixl/rules`, not the personal copies. See [The .vixl directory](/concepts/the-vixl-directory) for the merge.
 
-The sidebar lists projects (collapsible) then home chats. **New Agent** goes to `/` and does not pick a project for you. The home picker does.
+The sidebar lists collapsible project rows mixed with a **Home** folder for home chats. Rows sort by recent activity; Home uses its newest chat. Home is hidden when it has no chats, or when search or the running-only filter leaves none. Search text matching **home** shows all home chats. Home opens when you are viewing a home chat, and follows Collapse All / Expand All. Its plus button starts a new home chat (same as sidebar **New Chat**). Home has no project context menu. **New Agent** goes to `/` and does not pick a project for you. The home picker does.
 
 ## Project page tabs
 
