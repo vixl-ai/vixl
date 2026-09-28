@@ -46,3 +46,11 @@ export type ResumeOrchestratorInput = Omit<
   completedResults: Array<{ toolCallId: string; result: SubagentResult }>
   skipUserPersist: true
 }
+
+export type ContinueOrchestratorInput = Omit<
+  OrchestratorInput,
+  'userText' | 'skipUserPersist' | 'appendedUserMessageId'
+> & {
+  assistantId: string
+  userMessageId: string
+}

@@ -35,6 +35,7 @@ const {
   chatPromptInputRef,
   pendingQuestion,
   compacting,
+  continuableTurnId,
   timeline,
   todos,
   runningShells,
@@ -63,6 +64,7 @@ const {
   handleSkipMcpAuth,
   handleOpenMcpSettings,
   handleRetry,
+  handleContinue,
   handlePermissionLevelChange,
 } = useAgentThreadView()
 
@@ -140,6 +142,7 @@ const pills = computed(() => {
           :project-mcp="mcpProjectConfig"
           :read-only="isSubagentView"
           :compacting="compacting"
+          :continuable-turn-id="continuableTurnId"
           @resolve-approval="handleResolveApproval"
           @submit-answer="handleSubmitAnswer"
           @authenticate-mcp="handleAuthenticateMcp"
@@ -147,6 +150,7 @@ const pills = computed(() => {
           @open-mcp-settings="handleOpenMcpSettings"
           @secrets-saved-mcp="(toolCallId) => handleSecretsSavedMcp(toolCallId)"
           @retry="handleRetry"
+          @continue="handleContinue"
           @restore-files="handleRestoreFiles"
           @stop-subagent="handleStopSubagent"
         />

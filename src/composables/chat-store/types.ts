@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai'
 import type { ComputedRef, Ref } from 'vue'
+import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { AgentTurnError } from '@/types/chat/agent-turn-error'
 import type { ChatMeta } from '@/types/chat/chat-meta'
 import type { ChatTimelineItem, SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
@@ -38,6 +39,7 @@ export type SessionMutations = {
   reloadMeta: (projectSlug: string, chatId: string) => Promise<void>
   appendLocalMessage: (message: UIMessage) => void
   startAgentTurn: (turnId: string) => void
+  resumeAgentTurn: (turnId: string) => void
   startAgentStep: (stepId: string) => void
   finishAgentStep: () => void
   appendLocalTextDelta: (delta: string, messageId?: string, stepId?: string) => void
@@ -90,6 +92,7 @@ export type SessionMutations = {
     messageId: string,
   ) => Promise<void>
   getLastUserMessage: () => UIMessage | null
+  getContinuableTurn: () => AgentTurn | null
   appendLocalCompaction: (summary: string, focus: string | null) => void
   patchMetaActiveContext: (activeContext: {
     checkpointLineId: string

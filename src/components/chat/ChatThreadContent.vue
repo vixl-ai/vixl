@@ -44,6 +44,7 @@ const props = defineProps<{
   projectMcp?: McpConfig
   readOnly?: boolean
   compacting?: boolean
+  continuableTurnId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -53,6 +54,7 @@ const emit = defineEmits<{
   openMcpSettings: [serverId: string]
   secretsSavedMcp: [toolCallId: string, serverId: string]
   retry: []
+  continue: []
   restoreFiles: [turnId: string]
   stopSubagent: [subagentId: string]
 }>()
@@ -644,7 +646,9 @@ watch(
             :chat-file-changes="row.index === lastVisibleAgentTurnIndex ? chatFileChanges : null"
             :restore-changes="row.index === lastVisibleAgentTurnIndex ? lastTurnRestoreChanges : undefined"
             :restore-discards-latest-message="row.index === lastVisibleAgentTurnIndex ? hasUserMessageAfterLastTurn : undefined"
+            :can-continue="row.item.turn.id === continuableTurnId"
             @retry="emit('retry')"
+            @continue="emit('continue')"
             @restore-files="emit('restoreFiles', row.item.turn.id)"
             @stop-subagent="emit('stopSubagent', $event)"
           />

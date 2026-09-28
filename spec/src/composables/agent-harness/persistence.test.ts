@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import type { FileUIPart, UIMessage } from 'ai'
+import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { AgentHarnessState } from '@/composables/agent-harness/types'
 
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
@@ -22,7 +23,11 @@ vi.mock('@/services/harness/restore-file-checkpoints', () => ({
 }))
 
 import createPersistence from '@/composables/agent-harness/persistence'
-import { collectMutationsAfterUserMessage } from '@/services/harness/restore-file-checkpoints'
+import useContextUsage from '@/composables/use-context-usage'
+import restoreFileCheckpoints, {
+  collectMutationsAfterUserMessage,
+  resolveBaselinesForAgentTurn,
+} from '@/services/harness/restore-file-checkpoints'
 
 const imageFile: FileUIPart = {
   type: 'file',
@@ -31,7 +36,10 @@ const imageFile: FileUIPart = {
   filename: 'shot.png',
 }
 
-const buildState = (lastUser: UIMessage | null): AgentHarnessState =>
+const buildState = (
+  lastUser: UIMessage | null,
+  continuableTurn: AgentTurn | null = null,
+): AgentHarnessState =>
   ({
     options: {
       projectSlug: 'proj',
@@ -42,6 +50,7 @@ const buildState = (lastUser: UIMessage | null): AgentHarnessState =>
     },
     session: {
       getLastUserMessage: () => lastUser,
+      getContinuableTurn: () => continuableTurn,
       truncateAfterLastUserMessage: vi
         .fn<(...args: unknown[]) => Promise<void>>()
         .mockResolvedValue(undefined),
@@ -59,11 +68,36 @@ const buildState = (lastUser: UIMessage | null): AgentHarnessState =>
     workbench: {
       reloadWorkspaceFiles: vi.fn<(paths: string[]) => void>(),
     },
+    disposed: ref(false),
+    contextUsage: useContextUsage(),
     chatStore: {
       editingMessageId: ref(lastUser?.id ?? null),
       cancelEditMessage: vi.fn<() => void>(),
+      isSessionActive: () => true,
     },
   }) as unknown as AgentHarnessState
+
+const seedEstimateWithStaleProviderFill = (estimated = 5_000) => {
+  const contextUsage = useContextUsage()
+  contextUsage.setBudget({
+    modelId: 'test-model',
+    limit: 262_000,
+    promptUsed: estimated,
+    reservedOutput: 33_000,
+    safetyBuffer: 2_000,
+    free: 262_000 - 33_000 - 2_000 - estimated,
+    used: estimated,
+    buckets: [{ id: 'messages', label: 'Conversation', tokens: estimated }],
+  })
+  contextUsage.setLastStepUsage({
+    promptTokens: 51_000,
+    inputTokens: 51_000,
+    outputTokens: 1_200,
+    cacheReadTokens: 47_000,
+    cacheWriteTokens: 0,
+  })
+  return contextUsage
+}
 
 describe('retryLastTurn', () => {
   beforeEach(() => {
@@ -154,6 +188,127 @@ describe('retryLastTurn', () => {
     const persistence = createPersistence(state, { send })
 
     await persistence.retryLastTurn({
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+    })
+
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('clears provider fill after truncate so promptUsed falls back to the estimate', async () => {
+    const lastUser: UIMessage = {
+      id: 'user-text',
+      role: 'user',
+      parts: [{ type: 'text', text: 'retry me' }],
+    }
+    const contextUsage = seedEstimateWithStaleProviderFill()
+    expect(contextUsage.promptUsed.value).toBe(51_000)
+
+    const persistence = createPersistence(buildState(lastUser), {
+      send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await persistence.retryLastTurn({
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+    })
+
+    expect(contextUsage.lastStepUsage.value).toBeNull()
+    expect(contextUsage.promptUsed.value).toBe(5_000)
+  })
+
+  it('does not clear provider fill when retry does not truncate', async () => {
+    const lastUser: UIMessage = {
+      id: 'user-text',
+      role: 'user',
+      parts: [{ type: 'text', text: 'retry me' }],
+    }
+    const contextUsage = seedEstimateWithStaleProviderFill()
+    const state = buildState(lastUser)
+    state.status.value = 'streaming'
+    const persistence = createPersistence(state, {
+      send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await persistence.retryLastTurn({
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+    })
+
+    expect(state.session.truncateAfterLastUserMessage).not.toHaveBeenCalled()
+    expect(contextUsage.lastStepUsage.value?.inputTokens).toBe(51_000)
+    expect(contextUsage.promptUsed.value).toBe(51_000)
+  })
+})
+
+describe('continueLastTurn', () => {
+  const lastUser: UIMessage = {
+    id: 'user-text',
+    role: 'user',
+    parts: [{ type: 'text', text: 'hello' }],
+  }
+  const continuableTurn: AgentTurn = {
+    id: 'turn-err',
+    steps: [],
+    text: 'partial answer',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    error: { kind: 'error', message: 'provider down' },
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('calls send with continueTurnId and does not truncate or clear provider fill', async () => {
+    const contextUsage = seedEstimateWithStaleProviderFill()
+    expect(contextUsage.promptUsed.value).toBe(51_000)
+    const send = vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined)
+    const state = buildState(lastUser, continuableTurn)
+    const persistence = createPersistence(state, { send })
+
+    await persistence.continueLastTurn({
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      reasoning: 'high',
+    })
+
+    expect(send).toHaveBeenCalledWith({
+      text: '',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      reasoning: 'high',
+      continueTurnId: 'turn-err',
+      appendedUserMessageId: 'user-text',
+      skipUserMessage: true,
+      skipUserPersist: true,
+      internal: true,
+    })
+    expect(state.session.truncateAfterLastUserMessage).not.toHaveBeenCalled()
+    expect(state.session.truncateAfterUserMessage).not.toHaveBeenCalled()
+    expect(state.session.truncateBeforeMessage).not.toHaveBeenCalled()
+    expect(contextUsage.lastStepUsage.value?.inputTokens).toBe(51_000)
+    expect(contextUsage.promptUsed.value).toBe(51_000)
+  })
+
+  it('does not send when getContinuableTurn returns null', async () => {
+    const send = vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined)
+    const persistence = createPersistence(buildState(lastUser), { send })
+
+    await persistence.continueLastTurn({
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+    })
+
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('does not send while the parent turn is in flight', async () => {
+    const send = vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined)
+    const state = buildState(lastUser, continuableTurn)
+    state.status.value = 'streaming'
+    const persistence = createPersistence(state, { send })
+
+    await persistence.continueLastTurn({
       mode: 'agent',
       model: 'openai::gpt-4o',
     })
@@ -331,6 +486,71 @@ describe('submitEditMessage', () => {
     expect(state.session.truncateAfterUserMessage).not.toHaveBeenCalled()
     expect(state.chatStore.cancelEditMessage).not.toHaveBeenCalled()
     expect(toastError).toHaveBeenCalledWith('Message cannot be empty')
+  })
+
+  it('clears provider fill after truncate so promptUsed falls back to the estimate', async () => {
+    const lastUser: UIMessage = {
+      id: 'user-text',
+      role: 'user',
+      parts: [{ type: 'text', text: 'old text' }],
+    }
+    const contextUsage = seedEstimateWithStaleProviderFill()
+    expect(contextUsage.promptUsed.value).toBe(51_000)
+    const state = buildState(lastUser)
+    const persistence = createPersistence(state, {
+      send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await persistence.submitEditMessage({
+      newContent: 'new text',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+    })
+
+    expect(state.session.truncateBeforeMessage).toHaveBeenCalled()
+    expect(contextUsage.lastStepUsage.value).toBeNull()
+    expect(contextUsage.promptUsed.value).toBe(5_000)
+  })
+})
+
+describe('restoreAgentTurnFiles', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('clears provider fill after truncate so promptUsed falls back to the estimate', async () => {
+    const lastUser: UIMessage = {
+      id: 'user-text',
+      role: 'user',
+      parts: [{ type: 'text', text: 'restore after this' }],
+    }
+    const contextUsage = seedEstimateWithStaleProviderFill()
+    expect(contextUsage.promptUsed.value).toBe(51_000)
+    vi.mocked(resolveBaselinesForAgentTurn).mockReturnValue({
+      precedingUserMessageId: 'user-text',
+      targets: [{ path: 'a.ts', userMessageId: 'user-text' }],
+    })
+    vi.mocked(restoreFileCheckpoints).mockResolvedValue({
+      errors: [],
+      restored: [],
+      deleted: [],
+      skipped: [],
+    })
+    const state = buildState(lastUser)
+    const persistence = createPersistence(state, {
+      send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    const ok = await persistence.restoreAgentTurnFiles('turn-1')
+
+    expect(ok).toBe(true)
+    expect(state.session.truncateAfterUserMessage).toHaveBeenCalledWith(
+      'proj',
+      'chat-1',
+      'user-text',
+    )
+    expect(contextUsage.lastStepUsage.value).toBeNull()
+    expect(contextUsage.promptUsed.value).toBe(5_000)
   })
 })
 
