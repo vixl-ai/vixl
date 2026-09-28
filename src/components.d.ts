@@ -206,6 +206,7 @@ declare module 'vue' {
     Github: typeof import('./components/ai-elements/open-in-chat/providers/icons/Github.vue')['default']
     GraphsSection: typeof import('./components/settings/sections/GraphsSection.vue')['default']
     HomeEmptyChatInput: typeof import('./components/chat/HomeEmptyChatInput.vue')['default']
+    HomeFolderRow: typeof import('./components/navigation/aside/left/HomeFolderRow.vue')['default']
     Image: typeof import('./components/ai-elements/image/Image.vue')['default']
     InlineCitation: typeof import('./components/ai-elements/inline-citation/InlineCitation.vue')['default']
     InlineCitationCard: typeof import('./components/ai-elements/inline-citation/InlineCitationCard.vue')['default']

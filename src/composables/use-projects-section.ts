@@ -2,6 +2,7 @@ import { computed, nextTick, ref, type ComponentPublicInstance } from 'vue'
 import useFleetSidebar, {
   type FleetSidebarActivityItem,
 } from '@/composables/use-fleet-sidebar'
+import type { FleetSidebarChat } from '@/types/fleet/fleet-sidebar-chat'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
 
 const searchOpen = ref(false)
@@ -20,20 +21,21 @@ const focusSearchInput = (): void => {
   }
 }
 
-const filterProject = (
-  project: FleetSidebarProject,
+const filterChats = (
+  chats: FleetSidebarChat[],
+  name: string,
   query: string,
   runningOnlyValue: boolean,
-): FleetSidebarProject | null => {
-  let chats = project.chats
+): FleetSidebarChat[] | null => {
+  let next = chats
 
   if (runningOnlyValue) {
-    chats = chats.filter((chat) => chat.status === 'running')
+    next = next.filter((chat) => chat.status === 'running')
   }
 
   if (query) {
-    const nameMatches = project.displayName.toLowerCase().includes(query)
-    const matchingChats = chats.filter((chat) =>
+    const nameMatches = name.toLowerCase().includes(query)
+    const matchingChats = next.filter((chat) =>
       chat.title.toLowerCase().includes(query),
     )
 
@@ -41,7 +43,25 @@ const filterProject = (
       return null
     }
 
-    chats = nameMatches ? chats : matchingChats
+    next = nameMatches ? next : matchingChats
+  }
+
+  return next
+}
+
+const filterProject = (
+  project: FleetSidebarProject,
+  query: string,
+  runningOnlyValue: boolean,
+): FleetSidebarProject | null => {
+  const chats = filterChats(
+    project.chats,
+    project.displayName,
+    query,
+    runningOnlyValue,
+  )
+  if (chats === null) {
+    return null
   }
 
   return {
@@ -74,13 +94,10 @@ export default () => {
         continue
       }
 
-      if (runningOnly.value && item.chat.status !== 'running') {
-        continue
+      const chats = filterChats(item.chats, 'home', query, runningOnly.value)
+      if (chats && chats.length > 0) {
+        next.push({ ...item, chats })
       }
-      if (query && !item.chat.title.toLowerCase().includes(query)) {
-        continue
-      }
-      next.push(item)
     }
 
     return next
