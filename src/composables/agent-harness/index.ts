@@ -144,6 +144,7 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     steerSubagent: steer.steerSubagent,
     submitEditMessage: persistence.submitEditMessage,
     retryLastTurn: persistence.retryLastTurn,
+    continueLastTurn: persistence.continueLastTurn,
     restoreAgentTurnFiles: persistence.restoreAgentTurnFiles,
     getFileMutationsAfterMessage: persistence.getFileMutationsAfterMessage,
     getLastTurnFileMutations: persistence.getLastTurnFileMutations,

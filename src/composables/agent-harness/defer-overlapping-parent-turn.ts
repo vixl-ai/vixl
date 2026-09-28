@@ -1,9 +1,11 @@
+import { toast } from 'vue-sonner'
 import type { ChatStatus } from 'ai'
 import type { Ref } from 'vue'
 
 type DeferOverlappingParentTurnArgs = {
   resumeInFlight: boolean
   compacting: boolean
+  continueTurnId?: string
   enqueue: () => void
   abortController: Ref<AbortController | null>
   controller: AbortController
@@ -16,7 +18,13 @@ export default (args: DeferOverlappingParentTurnArgs): boolean => {
     return false
   }
 
-  args.enqueue()
+  if (args.continueTurnId) {
+    toast.error('Chat is busy', {
+      description: 'Wait for compaction or background resume to finish.',
+    })
+  } else {
+    args.enqueue()
+  }
   if (!args.resumeInFlight) {
     args.status.value = 'ready'
   }

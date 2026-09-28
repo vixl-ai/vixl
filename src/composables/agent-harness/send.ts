@@ -5,7 +5,6 @@ import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { PermissionCapabilityKey } from '@/types/harness/permission'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
-import runOrchestrator from '@/services/harness/orchestrator'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
 import parseModelRef from '@/utils/parse-model-ref'
 import { listAgentIndex } from '@/services/agents/registry'
@@ -20,6 +19,7 @@ import appendSendUserMessage from './append-send-user-message'
 import applyParentTurnStart from './apply-parent-turn-start'
 import deferOverlappingParentTurn from './defer-overlapping-parent-turn'
 import enqueueComposerSend from './enqueue-composer-send'
+import runParentOrchestrator from './run-parent-orchestrator'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
 export type SendArgs = {
@@ -32,9 +32,11 @@ export type SendArgs = {
   skipUserMessage?: boolean
   skipUserPersist?: boolean
   appendedUserMessageId?: string
+  continueTurnId?: string
   // Internal sends (drain, retry, edit, forceSendQueued) bypass the outbound
   // composer busy enqueue. They still defer when compaction or a background
   // resume is in flight: drain/retry/edit re-enqueue, force-send waits first.
+  // Continue toasts instead of enqueueing.
   internal?: boolean
 }
 
@@ -151,7 +153,11 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         return
       }
 
-      if (args.text.trim().length === 0 && !files.some((file) => Boolean(file.url))) {
+      if (
+        !args.continueTurnId &&
+        args.text.trim().length === 0 &&
+        !files.some((file) => Boolean(file.url))
+      ) {
         toast.error('Nothing to send', {
           description: 'Attachments could not be restored.',
         })
@@ -192,6 +198,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         deferOverlappingParentTurn({
           resumeInFlight: resumingBackgroundBatch.value,
           compacting: compacting.value,
+          continueTurnId: args.continueTurnId,
           enqueue: () =>
             enqueueComposerSend(messageQueue, {
               ...args,
@@ -218,8 +225,12 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         effectiveSettings: chatSettings,
       })
 
-      const turnId = crypto.randomUUID()
-      session.startAgentTurn(turnId)
+      const turnId = args.continueTurnId ?? crypto.randomUUID()
+      if (args.continueTurnId) {
+        session.resumeAgentTurn(args.continueTurnId)
+      } else {
+        session.startAgentTurn(turnId)
+      }
       turnStarted = true
       suppressQueueDrainAfterStop.value = false
       if (
@@ -230,7 +241,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         flushPendingBackgroundResume(options.chatId)
       }
 
-      await runOrchestrator({
+      await runParentOrchestrator({
         workspace: options,
         projectSlug: options.projectSlug,
         chatId: options.chatId,
@@ -255,6 +266,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         reasoning: args.reasoning,
         sessionAllows: state.sessionAllows,
         sessionDenies: state.sessionDenies,
+        continueTurnId: args.continueTurnId,
       })
       status.value = 'ready'
       session.finishAgentTurn()

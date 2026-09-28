@@ -89,7 +89,9 @@ vi.mock('@/composables/agent-thread-view', () => ({
     handleSkipMcpAuth: vi.fn<(id: string) => void>(),
     handleOpenMcpSettings: vi.fn<() => Promise<void>>(),
     handleRetry: vi.fn<(...args: unknown[]) => Promise<void>>(),
+    handleContinue: vi.fn<(...args: unknown[]) => Promise<void>>(),
     handlePermissionLevelChange: vi.fn<(...args: unknown[]) => Promise<void>>(),
+    continuableTurnId: computed(() => null),
   }),
 }))
 

@@ -1,4 +1,5 @@
 import type { UIMessage } from 'ai'
+import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { AgentTurnError } from '@/types/chat/agent-turn-error'
 import type { ChatMeta } from '@/types/chat/chat-meta'
 import type { SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
@@ -33,6 +34,12 @@ const createActiveSessionFacade = () => {
   const startAgentTurn = (turnId: string): void => {
     withActiveSession(undefined, (_session, api) => {
       api.startAgentTurn(turnId)
+    })
+  }
+
+  const resumeAgentTurn = (turnId: string): void => {
+    withActiveSession(undefined, (_session, api) => {
+      api.resumeAgentTurn(turnId)
     })
   }
 
@@ -259,6 +266,9 @@ const createActiveSessionFacade = () => {
   const getLastUserMessage = (): UIMessage | null =>
     withActiveSession(null, (_session, api) => api.getLastUserMessage())
 
+  const getContinuableTurn = (): AgentTurn | null =>
+    withActiveSession(null, (_session, api) => api.getContinuableTurn())
+
   const appendLocalCompaction = (summary: string, focus: string | null): void => {
     withActiveSession(undefined, (_session, api) => {
       api.appendLocalCompaction(summary, focus)
@@ -280,6 +290,7 @@ const createActiveSessionFacade = () => {
     reloadMeta,
     appendLocalMessage,
     startAgentTurn,
+    resumeAgentTurn,
     startAgentStep,
     finishAgentStep,
     appendLocalTextDelta,
@@ -309,6 +320,7 @@ const createActiveSessionFacade = () => {
     truncateAfterLastUserMessage,
     truncateAfterUserMessage,
     getLastUserMessage,
+    getContinuableTurn,
     appendLocalCompaction,
     patchMetaActiveContext,
   }

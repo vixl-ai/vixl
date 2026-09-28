@@ -18,6 +18,7 @@ defineProps<{
   projectMcp?: McpConfig
   readOnly?: boolean
   compacting?: boolean
+  continuableTurnId?: string | null
 }>()
 
 defineEmits<{
@@ -27,6 +28,7 @@ defineEmits<{
   openMcpSettings: [serverId: string]
   secretsSavedMcp: [toolCallId: string, serverId: string]
   retry: []
+  continue: []
   restoreFiles: [turnId: string]
   stopSubagent: [subagentId: string]
 }>()
@@ -47,12 +49,14 @@ defineEmits<{
       :project-mcp="projectMcp"
       :read-only="readOnly"
       :compacting="compacting"
+      :continuable-turn-id="continuableTurnId"
       @submit-answer="(toolCallId, answer) => $emit('submitAnswer', toolCallId, answer)"
       @authenticate-mcp="(toolCallId) => $emit('authenticateMcp', toolCallId)"
       @skip-mcp-auth="(toolCallId) => $emit('skipMcpAuth', toolCallId)"
       @open-mcp-settings="(serverId) => $emit('openMcpSettings', serverId)"
       @secrets-saved-mcp="(toolCallId, serverId) => $emit('secretsSavedMcp', toolCallId, serverId)"
       @retry="$emit('retry')"
+      @continue="$emit('continue')"
       @restore-files="$emit('restoreFiles', $event)"
       @stop-subagent="$emit('stopSubagent', $event)"
     />

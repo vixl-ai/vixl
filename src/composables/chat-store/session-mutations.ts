@@ -121,6 +121,24 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
       }
       session.timeline.value = [...session.timeline.value, { type: 'agent-turn', turn }]
     },
+    resumeAgentTurn: (turnId: string): void => {
+      const exists = session.timeline.value.some(
+        (entry) => entry.type === 'agent-turn' && entry.turn.id === turnId,
+      )
+      if (!exists) {
+        return
+      }
+      agent.flushPendingStreamDeltas()
+      session.turnIdRemap.clear()
+      session.activeTurnId.value = turnId
+      session.activeStepId.value = null
+      session.pendingStepText.value = ''
+      const current = agent.getActiveTurn()
+      if (current?.error) {
+        const { error: _error, ...rest } = current
+        agent.patchActiveTurn(rest)
+      }
+    },
     startAgentStep: agent.startAgentStep,
     finishAgentStep: agent.finishAgentStep,
     appendLocalTextDelta: agent.appendLocalTextDelta,
@@ -208,6 +226,30 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
         if (item?.type === 'user') {
           return item.message
         }
+      }
+      return null
+    },
+    getContinuableTurn: (): AgentTurn | null => {
+      const items = session.timeline.value
+      for (let index = items.length - 1; index >= 0; index -= 1) {
+        const item = items[index]
+        if (item?.type === 'user' || item?.type === 'compaction') {
+          return null
+        }
+        if (item?.type !== 'agent-turn') {
+          continue
+        }
+        const { turn } = item
+        if (!turn.error || turn.error.kind === 'aborted') {
+          return null
+        }
+        const hasContent =
+          turn.text.length > 0 ||
+          turn.steps.some(
+            (step) =>
+              step.text.length > 0 || step.reasoning.length > 0 || step.tools.length > 0,
+          )
+        return hasContent ? turn : null
       }
       return null
     },

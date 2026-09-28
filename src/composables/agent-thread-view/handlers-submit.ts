@@ -7,6 +7,7 @@ import type { PermissionLevel } from '@/types/harness/permission'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import chatRouteFor from '@/utils/chat-route-for'
+import { createContinueHandler } from './handlers-continue'
 import type { AgentThreadViewState } from './types'
 
 export const createSubmitHandlers = (state: AgentThreadViewState) => {
@@ -246,6 +247,8 @@ export const createSubmitHandlers = (state: AgentThreadViewState) => {
     })
   }
 
+  const handleContinue = createContinueHandler(state)
+
   const handlePermissionLevelChange = async (
     level: PermissionLevel,
   ): Promise<void> => {
@@ -293,6 +296,7 @@ export const createSubmitHandlers = (state: AgentThreadViewState) => {
     handleStopSubagent,
     handleOpenSubagent,
     handleRetry,
+    handleContinue,
     handlePermissionLevelChange,
     handleCompact,
     handleHandoff,

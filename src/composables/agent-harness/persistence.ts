@@ -9,6 +9,7 @@ import restoreFileCheckpoints, {
   resolveBaselinesForAgentTurn,
   resolveBaselinesForRevert,
 } from '@/services/harness/restore-file-checkpoints'
+import canWriteVisibleContext from './can-write-visible-context'
 import type { AgentHarnessState } from './types'
 
 type PersistenceDeps = {
@@ -22,12 +23,19 @@ type PersistenceDeps = {
     skipUserMessage?: boolean
     skipUserPersist?: boolean
     appendedUserMessageId?: string
+    continueTurnId?: string
     internal?: boolean
   }) => Promise<void>
 }
 
 export default (state: AgentHarnessState, deps: PersistenceDeps) => {
-  const { options, session, status, workbench } = state
+  const { options, session, status, workbench, contextUsage } = state
+
+  const clearProviderFill = (): void => {
+    if (canWriteVisibleContext(state)) {
+      contextUsage.clearLastStepUsage()
+    }
+  }
 
   const applyFileRestore = async (
     targets: Array<{ path: string; userMessageId: string }>,
@@ -125,6 +133,7 @@ export default (state: AgentHarnessState, deps: PersistenceDeps) => {
           messageId,
         )
       }
+      clearProviderFill()
       state.chatStore.cancelEditMessage()
       await deps.send({
         text,
@@ -181,6 +190,7 @@ export default (state: AgentHarnessState, deps: PersistenceDeps) => {
         options.projectSlug,
         options.chatId,
       )
+      clearProviderFill()
       await deps.send({
         text,
         mode: args.mode,
@@ -194,6 +204,40 @@ export default (state: AgentHarnessState, deps: PersistenceDeps) => {
       })
     } catch (err) {
       toast.error('Failed to retry', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+    }
+  }
+
+  const continueLastTurn = async (args: {
+    mode: VixlChatMode
+    model: string
+    reasoning?: ReasoningLevel
+  }): Promise<void> => {
+    if (status.value === 'streaming' || status.value === 'submitted') {
+      return
+    }
+
+    const turn = session.getContinuableTurn()
+    const lastUser = session.getLastUserMessage()
+    if (!turn || !lastUser) {
+      return
+    }
+
+    try {
+      await deps.send({
+        text: '',
+        mode: args.mode,
+        model: args.model,
+        reasoning: args.reasoning,
+        continueTurnId: turn.id,
+        appendedUserMessageId: lastUser.id,
+        skipUserMessage: true,
+        skipUserPersist: true,
+        internal: true,
+      })
+    } catch (err) {
+      toast.error('Failed to continue', {
         description: err instanceof Error ? err.message : 'Unknown error',
       })
     }
@@ -217,6 +261,7 @@ export default (state: AgentHarnessState, deps: PersistenceDeps) => {
         options.chatId,
         resolved.precedingUserMessageId,
       )
+      clearProviderFill()
       return true
     } catch (err) {
       toast.error('Files reverted but chat truncate failed', {
@@ -240,6 +285,7 @@ export default (state: AgentHarnessState, deps: PersistenceDeps) => {
   return {
     submitEditMessage,
     retryLastTurn,
+    continueLastTurn,
     restoreAgentTurnFiles,
     getFileMutationsAfterMessage,
     getLastTurnFileMutations,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ChatStatus } from 'ai'
-import { RotateCcwIcon } from '@lucide/vue'
+import { PlayIcon, RotateCcwIcon } from '@lucide/vue'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { AggregatedTurnFileChange } from '@/types/harness/file-checkpoint'
@@ -40,10 +40,12 @@ const props = defineProps<{
   chatFileChanges?: AggregatedTurnFileChange[] | null
   restoreChanges?: AggregatedTurnFileChange[]
   restoreDiscardsLatestMessage?: boolean
+  canContinue?: boolean
 }>()
 
 const emit = defineEmits<{
   retry: []
+  continue: []
   restoreFiles: []
   stopSubagent: [subagentId: string]
 }>()
@@ -223,16 +225,28 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
       <AlertTitle>{{ errorTitle }}</AlertTitle>
       <AlertDescription class="flex flex-col gap-3">
         <span>{{ turn.error.message }}</span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          class="w-fit gap-1.5"
-          @click="emit('retry')"
-        >
-          <RotateCcwIcon class="size-3.5" />
-          Retry
-        </Button>
+        <div class="flex gap-2">
+          <Button
+            v-if="canContinue"
+            type="button"
+            size="sm"
+            class="w-fit gap-1.5"
+            @click="emit('continue')"
+          >
+            <PlayIcon class="size-3.5" />
+            Continue
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            class="w-fit gap-1.5"
+            @click="emit('retry')"
+          >
+            <RotateCcwIcon class="size-3.5" />
+            Retry
+          </Button>
+        </div>
       </AlertDescription>
     </Alert>
   </div>

@@ -134,6 +134,12 @@ export default () => {
   const pendingQuestion = computed(
     () => paintedSession.value?.pendingQuestion.value ?? null,
   )
+  const continuableTurnId = computed(() => {
+    if (isSubagentView.value) {
+      return null
+    }
+    return paintedSession.value?.getContinuableTurn()?.id ?? null
+  })
   const timeline = computed(() => {
     if (!isSubagentView.value) {
       return paintedSession.value?.timeline.value ?? []
@@ -226,6 +232,7 @@ export default () => {
     filePolicyChanges,
     filePolicyTitle,
     filePolicyEmphasizeRevert,
+    continuableTurnId,
     ...handlers,
   }
 }

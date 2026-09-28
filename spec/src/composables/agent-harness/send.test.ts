@@ -11,6 +11,9 @@ const updateChatMeta = vi.hoisted(() =>
 const runOrchestrator = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
 )
+const continueOrchestrator = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+)
 const listConfiguredProviders = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => string[]>(() => ['openai']),
 )
@@ -30,6 +33,7 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
 
 vi.mock('@/services/harness/orchestrator', () => ({
   default: (...args: unknown[]) => runOrchestrator(...args),
+  continueOrchestrator: (...args: unknown[]) => continueOrchestrator(...args),
 }))
 
 vi.mock('@/services/providers/list-configured-providers', () => ({
@@ -111,6 +115,7 @@ type SendTestState = AgentHarnessState & {
 const buildState = (): SendTestState => {
   const patchMeta = vi.fn<(patch: unknown) => void>()
   const startAgentTurn = vi.fn<(turnId: string) => void>()
+  const resumeAgentTurn = vi.fn<(turnId: string) => void>()
   const finishAgentTurn = vi.fn<() => void>()
   const setAgentTurnError = vi.fn<(error: unknown) => void>()
   const refreshSlug = vi
@@ -131,6 +136,7 @@ const buildState = (): SendTestState => {
       patchMeta,
       appendLocalMessage: vi.fn<(...args: unknown[]) => void>(),
       startAgentTurn,
+      resumeAgentTurn,
       finishAgentTurn,
       setAgentTurnError,
       messages: ref([]),
@@ -187,6 +193,7 @@ describe('agent-harness send persist model/mode', () => {
     vi.clearAllMocks()
     updateChatMeta.mockResolvedValue(undefined)
     runOrchestrator.mockResolvedValue(undefined)
+    continueOrchestrator.mockResolvedValue(undefined)
     listConfiguredProviders.mockReturnValue(['openai'])
     listAgentIndex.mockResolvedValue([])
     listSlashSkillIndex.mockResolvedValue([])
@@ -1818,3 +1825,137 @@ describe('agent-harness send persist model/mode', () => {
     expect(runOrchestrator).not.toHaveBeenCalled()
   })
 })
+
+describe('agent-harness send continue', () => {
+  const continueArgs = {
+    text: '',
+    mode: 'agent' as const,
+    model: 'openai::gpt-4o',
+    continueTurnId: 'turn-err',
+    appendedUserMessageId: 'user-1',
+    skipUserMessage: true,
+    skipUserPersist: true,
+    internal: true,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    updateChatMeta.mockResolvedValue(undefined)
+    runOrchestrator.mockResolvedValue(undefined)
+    continueOrchestrator.mockResolvedValue(undefined)
+    listConfiguredProviders.mockReturnValue(['openai'])
+    listAgentIndex.mockResolvedValue([])
+    listSlashSkillIndex.mockResolvedValue([])
+    resolveAgentDefinition.mockResolvedValue(null)
+    loadEffectiveSettings.mockResolvedValue({ version: 1 })
+    hasPendingBackgroundResume.mockReturnValue(false)
+    hasRunningSubagentsForChat.mockReturnValue(false)
+  })
+
+  it('resumes the existing turn and calls continueOrchestrator', async () => {
+    const state = buildState()
+    const { send } = createSend(state, buildAttention(), {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send(continueArgs)
+
+    expect(state.session.resumeAgentTurn).toHaveBeenCalledWith('turn-err')
+    expect(state.session.startAgentTurn).not.toHaveBeenCalled()
+    expect(state.session.appendLocalMessage).not.toHaveBeenCalled()
+    expect(continueOrchestrator).toHaveBeenCalledTimes(1)
+    expect(continueOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assistantId: 'turn-err',
+        userMessageId: 'user-1',
+      }),
+    )
+    expect(continueOrchestrator.mock.calls[0]?.[0]).not.toHaveProperty('userText')
+    expect(runOrchestrator).not.toHaveBeenCalled()
+    expect(state.status.value).toBe('ready')
+  })
+
+  it('sets the turn error when continueOrchestrator rejects', async () => {
+    continueOrchestrator.mockRejectedValueOnce(new Error('provider down'))
+    const state = buildState()
+    const attention = buildAttention()
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send(continueArgs)
+
+    expect(state.session.resumeAgentTurn).toHaveBeenCalledWith('turn-err')
+    expect(state.session.setAgentTurnError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'error',
+        message: 'provider down',
+      }),
+    )
+    expect(state.session.finishAgentTurn).toHaveBeenCalledTimes(1)
+    expect(attention.applyTurnEndAttention).toHaveBeenCalledWith('error')
+    expect(state.status.value).toBe('error')
+    expect(runOrchestrator).not.toHaveBeenCalled()
+  })
+
+  it('sets the turn error when continue has no user message id', async () => {
+    const state = buildState()
+    const attention = buildAttention()
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: '',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      continueTurnId: 'turn-err',
+      skipUserMessage: true,
+      skipUserPersist: true,
+      internal: true,
+    })
+
+    expect(state.session.resumeAgentTurn).toHaveBeenCalledWith('turn-err')
+    expect(continueOrchestrator).not.toHaveBeenCalled()
+    expect(runOrchestrator).not.toHaveBeenCalled()
+    expect(state.session.setAgentTurnError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'error',
+        message: 'Cannot continue turn without a user message id',
+      }),
+    )
+    expect(state.status.value).toBe('error')
+  })
+
+  it('toasts and does not enqueue when compacting', async () => {
+    const state = buildState()
+    state.compacting.value = true
+    const { send } = createSend(state, createHelpers(state), {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send(continueArgs)
+
+    expect(toastError).toHaveBeenCalledWith(
+      'Chat is busy',
+      expect.objectContaining({
+        description: 'Wait for compaction or background resume to finish.',
+      }),
+    )
+    expect(state.messageQueue.enqueue).not.toHaveBeenCalled()
+    expect(state.session.resumeAgentTurn).not.toHaveBeenCalled()
+    expect(state.session.startAgentTurn).not.toHaveBeenCalled()
+    expect(continueOrchestrator).not.toHaveBeenCalled()
+    expect(runOrchestrator).not.toHaveBeenCalled()
+    expect(state.status.value).toBe('ready')
+  })
+})
+
