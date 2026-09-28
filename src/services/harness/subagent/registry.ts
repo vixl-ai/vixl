@@ -1,4 +1,5 @@
 import type { ModelMessage } from 'ai'
+import { ref } from 'vue'
 import type { SubagentRecord, SubagentResult, SubagentStatus } from '@/types/harness/subagent-record'
 import { clearSteers, resetInboxForTests } from '@/services/harness/subagent/inbox'
 
@@ -11,6 +12,12 @@ const completionWaiters = new Map<string, CompletionWaiter[]>()
 const turnResponseMessages = new Map<string, ModelMessage[]>()
 const pendingBackgroundResume = new Set<string>()
 const deliveredBackgroundResults = new Map<string, Set<string>>()
+
+export const subagentRegistryRevision = ref(0)
+
+const bumpRevision = (): void => {
+  subagentRegistryRevision.value++
+}
 
 const setSubagentStatus = (
   record: SubagentRecord,
@@ -68,6 +75,7 @@ export const register = (
   if (options?.pendingResume !== false) {
     pendingBackgroundResume.add(chatId)
   }
+  bumpRevision()
   return record
 }
 
@@ -80,6 +88,7 @@ export const resolve = (subagentId: string, result: SubagentResult): void => {
   setSubagentStatus(record, 'completed', result)
   controllers.delete(subagentId)
   resolveCompletionWaiters(subagentId, result)
+  bumpRevision()
 }
 
 export const fail = (subagentId: string, summary: string): void => {
@@ -96,6 +105,7 @@ export const fail = (subagentId: string, summary: string): void => {
   setSubagentStatus(record, 'failed', result)
   controllers.delete(subagentId)
   resolveCompletionWaiters(subagentId, result)
+  bumpRevision()
 }
 
 export const waitFor = (chatId: string, subagentId: string): Promise<SubagentResult> => {
@@ -141,7 +151,10 @@ export const hasPendingBackgroundResume = (chatId: string): boolean =>
   pendingBackgroundResume.has(chatId)
 
 export const clearPendingBackgroundResume = (chatId: string): void => {
-  pendingBackgroundResume.delete(chatId)
+  if (!pendingBackgroundResume.delete(chatId)) {
+    return
+  }
+  bumpRevision()
 }
 
 export const listDeliverableBackgroundResults = (
@@ -218,6 +231,7 @@ export const reopen = (
   record.status = 'running'
   record.result = undefined
   controllers.set(subagentId, controller)
+  bumpRevision()
   return record
 }
 
@@ -239,11 +253,15 @@ export const abortOne = (subagentId: string): void => {
   }
   setSubagentStatus(record, 'aborted', result)
   resolveCompletionWaiters(subagentId, result)
+  bumpRevision()
 }
 
 export const abort = (chatId: string): void => {
   const ids = chatSubagents.get(chatId)
   if (!ids) {
+    if (pendingBackgroundResume.delete(chatId)) {
+      bumpRevision()
+    }
     return
   }
 
@@ -271,6 +289,7 @@ export const abort = (chatId: string): void => {
   turnResponseMessages.delete(chatId)
   pendingBackgroundResume.delete(chatId)
   deliveredBackgroundResults.delete(chatId)
+  bumpRevision()
 }
 
 export const resetSubagentRegistryForTests = (): void => {
@@ -282,4 +301,5 @@ export const resetSubagentRegistryForTests = (): void => {
   pendingBackgroundResume.clear()
   deliveredBackgroundResults.clear()
   resetInboxForTests()
+  bumpRevision()
 }

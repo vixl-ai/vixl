@@ -9,6 +9,7 @@ import {
   hasPendingBackgroundResume,
   hasRunningSubagentsForChat,
   listDeliverableBackgroundResults,
+  subagentRegistryRevision,
 } from '@/services/harness/subagent/registry'
 import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import parseModelRef from '@/utils/parse-model-ref'
@@ -264,6 +265,7 @@ export default (
         resumingBackgroundBatch.value,
         abortController.value,
         suppressQueueDrainAfterStop.value,
+        subagentRegistryRevision.value,
       ].join(':')
     },
     () => {
