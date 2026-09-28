@@ -41,6 +41,7 @@
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@lucide/vue": "^1.24.0",
+    "@markmend/core": "1.0.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@mozilla/readability": "^0.6.0",
     "@rive-app/webgl2": "^2.38.5",

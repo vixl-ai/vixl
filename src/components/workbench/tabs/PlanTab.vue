@@ -352,6 +352,7 @@ watch(
           <Markdown
             v-if="segment.type === 'markdown' && segment.content.trim()"
             :content="segment.content"
+            mode="static"
             :enable-animate="false"
           />
           <PlanMermaid v-else-if="segment.type === 'mermaid'" :code="segment.content" />

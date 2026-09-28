@@ -78,3 +78,45 @@ describe('MessageResponse mermaid', () => {
     expect(wrapper.getComponent(PlanMermaid).props('code')).toContain('flowchart TD')
   })
 })
+
+const angiLeadContent = 'Next: fire the `angi_lead` trigger.'
+
+describe('MessageResponse emphasis', () => {
+  let wrapper: VueWrapper | undefined
+
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = undefined
+  })
+
+  it('does not append a trailing underscore while streaming angi_lead', async () => {
+    wrapper = mount(MessageResponse, {
+      props: {
+        content: angiLeadContent,
+        streaming: true,
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('angi_lead')
+    expect(wrapper.text()).toContain('trigger.')
+    expect(wrapper.text()).not.toMatch(/_\s*$/)
+  })
+
+  it('does not keep a trailing underscore after streaming ends', async () => {
+    wrapper = mount(MessageResponse, {
+      props: {
+        content: angiLeadContent,
+        streaming: true,
+      },
+    })
+    await flushPromises()
+
+    await wrapper.setProps({ streaming: false })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('angi_lead')
+    expect(wrapper.text()).toContain('trigger.')
+    expect(wrapper.text()).not.toMatch(/_\s*$/)
+  })
+})
