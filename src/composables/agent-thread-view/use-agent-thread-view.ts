@@ -17,6 +17,7 @@ import {
   agentShellRevision,
   listShellsForChat,
 } from '@/services/harness/shell/registry'
+import { subagentRegistryRevision } from '@/services/harness/subagent/registry'
 import buildSubagentTimeline from '@/utils/build-subagent-timeline'
 import { createHandlers } from './handlers'
 import { bindAgentThreadLifecycle } from './lifecycle'
@@ -112,12 +113,11 @@ export default () => {
   const queuedMessages = computed<QueuedChatMessage[]>(
     () => unref(harness.value?.queuedMessages) ?? [],
   )
-  const isWaitingOnBackground = computed(() => {
-    // The subagent registry is module-level state, not reactive. Depend on the
-    // harness subagents ref so this recomputes when subagent status changes.
-    const subagents = unref(harness.value?.subagents) ?? []
-    return subagents.length >= 0 && (harness.value?.isWaitingOnBackground() ?? false)
-  })
+  const isWaitingOnBackground = computed(
+    () =>
+      subagentRegistryRevision.value >= 0 &&
+      (harness.value?.isWaitingOnBackground() ?? false),
+  )
   const runningSubagents = computed(() => {
     const subagents = unref(harness.value?.subagents) ?? []
     return subagents.filter((subagent) => subagent.status === 'running')

@@ -3,6 +3,7 @@ import { computed, nextTick, ref, shallowRef } from 'vue'
 import type { AgentHarnessState, AttentionHelpers } from '@/composables/agent-harness/types'
 import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
+const useRealRegistryQueries = vi.hoisted(() => ({ current: false }))
 const clearPendingBackgroundResume = vi.hoisted(() =>
   vi.fn<(chatId: string) => void>(),
 )
@@ -34,15 +35,29 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
   }),
 )
 
-vi.mock('@/services/harness/subagent/registry', () => ({
-  clearPendingBackgroundResume: (chatId: string) =>
-    clearPendingBackgroundResume(chatId),
-  clearTurnResponseMessages: (chatId: string) =>
-    clearTurnResponseMessages(chatId),
-  hasPendingBackgroundResume: () => true,
-  hasRunningSubagentsForChat: () => false,
-  listDeliverableBackgroundResults: () => listDeliverableBackgroundResults(),
-}))
+vi.mock('@/services/harness/subagent/registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/harness/subagent/registry')>()
+  return {
+    ...actual,
+    clearPendingBackgroundResume: (chatId: string) => {
+      clearPendingBackgroundResume(chatId)
+      actual.clearPendingBackgroundResume(chatId)
+    },
+    clearTurnResponseMessages: (chatId: string) => {
+      clearTurnResponseMessages(chatId)
+      actual.clearTurnResponseMessages(chatId)
+    },
+    hasPendingBackgroundResume: (chatId: string) =>
+      useRealRegistryQueries.current
+        ? actual.hasPendingBackgroundResume(chatId)
+        : true,
+    hasRunningSubagentsForChat: (chatId: string) =>
+      useRealRegistryQueries.current
+        ? actual.hasRunningSubagentsForChat(chatId)
+        : false,
+    listDeliverableBackgroundResults: () => listDeliverableBackgroundResults(),
+  }
+})
 
 vi.mock('@/utils/should-flush-background-subagent-resume', () => ({
   default: (...args: unknown[]) => shouldFlushBackgroundSubagentResume(...args),
@@ -64,7 +79,14 @@ vi.mock('vue-sonner', () => ({
   },
 }))
 
+import createHelpers from '@/composables/agent-harness/helpers'
 import createTurnLoop from '@/composables/agent-harness/turn-loop'
+import {
+  clearPendingBackgroundResume as clearPendingViaRegistry,
+  register as registerSubagent,
+  resetSubagentRegistryForTests,
+  resolve as resolveSubagent,
+} from '@/services/harness/subagent/registry'
 
 const buildState = (): AgentHarnessState =>
   ({
@@ -139,6 +161,11 @@ const buildAttention = (
     refreshSidebar: vi.fn<() => void>(),
     applyTurnEndAttention: vi.fn<() => void>(),
   }) as unknown as AttentionHelpers
+
+beforeEach(() => {
+  useRealRegistryQueries.current = false
+  resetSubagentRegistryForTests()
+})
 
 describe('maybeFlushBackgroundSubagentResume', () => {
   beforeEach(() => {
@@ -619,6 +646,47 @@ describe('idle queue drain', () => {
     expect(shouldFlushBackgroundSubagentResume).toHaveBeenCalled()
     expect(state.messageQueue.take).not.toHaveBeenCalled()
     expect(sendFn).not.toHaveBeenCalled()
+  })
+
+  it('drains a queued message when pending resume clears with no running subagents', async () => {
+    useRealRegistryQueries.current = true
+    registerSubagent('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    resolveSubagent('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'done',
+    })
+
+    const state = buildState()
+    state.status.value = 'ready'
+    state.subagents.value = [
+      {
+        subagentId: 'sub-1',
+        name: 'explorer',
+        blocking: false,
+        status: 'done',
+        events: [],
+      },
+    ]
+    vi.mocked(state.messageQueue.take)
+      .mockReturnValueOnce(queuedItem)
+      .mockReturnValue(undefined)
+    createTurnLoop(state, createHelpers(state), loopDeps())
+    await nextTick()
+    expect(sendFn).not.toHaveBeenCalled()
+
+    const subagentsBefore = state.subagents.value
+    clearPendingViaRegistry('chat-1')
+    expect(state.subagents.value).toBe(subagentsBefore)
+    await nextTick()
+
+    expect(state.messageQueue.take).toHaveBeenCalled()
+    expect(sendFn).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'queued', internal: true }),
+    )
   })
 })
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { computed } from 'vue'
 
 describe('subagent-registry', () => {
   beforeEach(async () => {
@@ -404,5 +405,214 @@ describe('subagent-registry', () => {
 
     abort('chat-1')
     expect(drainSteers('sub-2')).toEqual([])
+  })
+
+  it('bumps the registry revision on running and pending-resume transitions', async () => {
+    const {
+      abort,
+      abortOne,
+      clearPendingBackgroundResume,
+      fail,
+      register,
+      reopen,
+      resetSubagentRegistryForTests,
+      resolve,
+      subagentRegistryRevision,
+    } = await import('@/services/harness/subagent/registry')
+
+    let last = subagentRegistryRevision.value
+    const expectBump = (): void => {
+      expect(subagentRegistryRevision.value).toBe(last + 1)
+      last = subagentRegistryRevision.value
+    }
+
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'one',
+    })
+    expectBump()
+
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'one',
+      summary: 'done',
+    })
+    expectBump()
+
+    expect(reopen('sub-1', new AbortController())?.status).toBe('running')
+    expectBump()
+
+    abortOne('sub-1')
+    expectBump()
+
+    register('chat-1', 'sub-2', new AbortController(), {
+      toolCallId: 'tc-2',
+      agentName: 'two',
+    })
+    expectBump()
+
+    fail('sub-2', 'boom')
+    expectBump()
+
+    register('chat-1', 'sub-3', new AbortController(), {
+      toolCallId: 'tc-3',
+      agentName: 'three',
+    })
+    expectBump()
+
+    abort('chat-1')
+    expectBump()
+
+    register('chat-1', 'sub-4', new AbortController(), {
+      toolCallId: 'tc-4',
+      agentName: 'four',
+    })
+    expectBump()
+
+    clearPendingBackgroundResume('chat-1')
+    expectBump()
+
+    resetSubagentRegistryForTests()
+    expectBump()
+  })
+
+  it('does not bump the registry revision on no-op transitions', async () => {
+    const {
+      abort,
+      abortOne,
+      clearPendingBackgroundResume,
+      fail,
+      register,
+      reopen,
+      resolve,
+      subagentRegistryRevision,
+    } = await import('@/services/harness/subagent/registry')
+
+    const start = subagentRegistryRevision.value
+
+    resolve('missing', {
+      subagentId: 'missing',
+      name: 'none',
+      summary: 'noop',
+    })
+    fail('missing', 'noop')
+    expect(reopen('missing', new AbortController())).toBeNull()
+    abortOne('missing')
+    abort('chat-missing')
+    clearPendingBackgroundResume('chat-missing')
+    expect(subagentRegistryRevision.value).toBe(start)
+
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'one',
+    })
+    const afterRegister = subagentRegistryRevision.value
+
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'one',
+      summary: 'done',
+    })
+    const afterResolve = subagentRegistryRevision.value
+    expect(afterResolve).toBe(afterRegister + 1)
+
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'one',
+      summary: 'again',
+    })
+    fail('sub-1', 'already done')
+    abortOne('sub-1')
+    expect(subagentRegistryRevision.value).toBe(afterResolve)
+
+    expect(reopen('sub-1', new AbortController())?.status).toBe('running')
+    const afterReopen = subagentRegistryRevision.value
+    expect(afterReopen).toBe(afterResolve + 1)
+    expect(reopen('sub-1', new AbortController())).toBeNull()
+    expect(subagentRegistryRevision.value).toBe(afterReopen)
+
+    abortOne('sub-1')
+    const afterAbortOne = subagentRegistryRevision.value
+    abortOne('sub-1')
+    expect(subagentRegistryRevision.value).toBe(afterAbortOne)
+
+    abort('chat-1')
+    const afterAbort = subagentRegistryRevision.value
+    abort('chat-1')
+    clearPendingBackgroundResume('chat-1')
+    expect(subagentRegistryRevision.value).toBe(afterAbort)
+  })
+
+  it('lets pending-resume consumers refresh from the registry revision', async () => {
+    const {
+      abort,
+      clearPendingBackgroundResume,
+      hasPendingBackgroundResume,
+      register,
+      subagentRegistryRevision,
+    } = await import('@/services/harness/subagent/registry')
+
+    const waiting = computed(
+      () =>
+        subagentRegistryRevision.value >= 0 &&
+        hasPendingBackgroundResume('chat-1'),
+    )
+
+    expect(waiting.value).toBe(false)
+
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    expect(waiting.value).toBe(true)
+
+    clearPendingBackgroundResume('chat-1')
+    expect(waiting.value).toBe(false)
+
+    register('chat-1', 'sub-2', new AbortController(), {
+      toolCallId: 'tc-2',
+      agentName: 'other',
+    })
+    expect(waiting.value).toBe(true)
+
+    abort('chat-1')
+    expect(waiting.value).toBe(false)
+  })
+
+  it('clears leftover pending resume on abort when the chat has no subagent ids', async () => {
+    const {
+      abort,
+      hasPendingBackgroundResume,
+      register,
+      reopen,
+      resolve,
+      subagentRegistryRevision,
+    } = await import('@/services/harness/subagent/registry')
+
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'done',
+    })
+    abort('chat-1')
+    expect(reopen('sub-1', new AbortController())?.status).toBe('running')
+    expect(hasPendingBackgroundResume('chat-1')).toBe(true)
+
+    const waiting = computed(
+      () =>
+        subagentRegistryRevision.value >= 0 &&
+        hasPendingBackgroundResume('chat-1'),
+    )
+    expect(waiting.value).toBe(true)
+
+    const beforeAbort = subagentRegistryRevision.value
+    abort('chat-1')
+    expect(subagentRegistryRevision.value).toBe(beforeAbort + 1)
+    expect(hasPendingBackgroundResume('chat-1')).toBe(false)
+    expect(waiting.value).toBe(false)
   })
 })
