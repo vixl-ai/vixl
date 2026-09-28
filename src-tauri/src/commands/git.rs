@@ -321,25 +321,50 @@ pub async fn git_status(project_root: String) -> Result<GitStatusResult, String>
     Ok(GitStatusResult { branch, entries })
 }
 
+fn git_diff_args<'a>(
+    path: Option<&'a str>,
+    staged: bool,
+    base: Option<&'a str>,
+) -> Result<Vec<&'a str>, String> {
+    let mut args = vec!["diff"];
+    if staged {
+        args.push("--cached");
+    }
+    if let Some(base) = base {
+        let trimmed = base.trim();
+        // A leading dash would let a base inject git options.
+        if trimmed.is_empty()
+            || trimmed.starts_with('-')
+            || trimmed.contains('\0')
+            || trimmed.contains(char::is_whitespace)
+        {
+            return Err("Invalid diff base".to_string());
+        }
+        if staged && trimmed.contains("..") {
+            return Err("staged cannot be combined with a range base".to_string());
+        }
+        args.push("--end-of-options");
+        args.push(trimmed);
+    }
+    if let Some(file_path) = path.filter(|value| !value.trim().is_empty()) {
+        args.push("--");
+        args.push(file_path.trim());
+    }
+    Ok(args)
+}
+
 #[tauri::command]
 pub async fn git_diff(
     project_root: String,
     path: Option<String>,
     staged: Option<bool>,
+    base: Option<String>,
 ) -> Result<GitDiffResult, String> {
     if !is_git_repo(&project_root) {
         return Err("Not a git repository".to_string());
     }
 
-    let mut args = vec!["diff"];
-    if staged.unwrap_or(false) {
-        args.push("--cached");
-    }
-    if let Some(file_path) = path.as_deref().filter(|value| !value.trim().is_empty()) {
-        args.push("--");
-        args.push(file_path.trim());
-    }
-
+    let args = git_diff_args(path.as_deref(), staged.unwrap_or(false), base.as_deref())?;
     let diff = run_git_async(&project_root, &args).await?;
     Ok(GitDiffResult { diff })
 }
@@ -428,4 +453,87 @@ pub async fn git_log(project_root: String, limit: Option<u32>) -> Result<GitLogR
         .collect();
 
     Ok(GitLogResult { commits })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diff_args_default() {
+        let args = git_diff_args(None, false, None).expect("default args");
+        assert_eq!(args, vec!["diff"]);
+    }
+
+    #[test]
+    fn diff_args_staged() {
+        let args = git_diff_args(None, true, None).expect("staged args");
+        assert_eq!(args, vec!["diff", "--cached"]);
+    }
+
+    #[test]
+    fn diff_args_base_head() {
+        let args = git_diff_args(None, false, Some("HEAD")).expect("HEAD base");
+        assert_eq!(args, vec!["diff", "--end-of-options", "HEAD"]);
+    }
+
+    #[test]
+    fn diff_args_range_base() {
+        let args = git_diff_args(None, false, Some("main...HEAD")).expect("range base");
+        assert_eq!(args, vec!["diff", "--end-of-options", "main...HEAD"]);
+    }
+
+    #[test]
+    fn diff_args_staged_base_and_path() {
+        let args = git_diff_args(Some("src/lib.rs"), true, Some("HEAD")).expect("combined args");
+        assert_eq!(
+            args,
+            vec![
+                "diff",
+                "--cached",
+                "--end-of-options",
+                "HEAD",
+                "--",
+                "src/lib.rs"
+            ]
+        );
+    }
+
+    #[test]
+    fn diff_args_rejects_leading_dash_base() {
+        let err = git_diff_args(None, false, Some("--output=/tmp/x")).expect_err("leading dash");
+        assert!(err.contains("Invalid diff base"), "got: {err}");
+    }
+
+    #[test]
+    fn diff_args_rejects_whitespace_base() {
+        let err = git_diff_args(None, false, Some("main HEAD")).expect_err("whitespace");
+        assert!(err.contains("Invalid diff base"), "got: {err}");
+    }
+
+    #[test]
+    fn diff_args_rejects_nul_base() {
+        let err = git_diff_args(None, false, Some("HEAD\0")).expect_err("nul");
+        assert!(err.contains("Invalid diff base"), "got: {err}");
+    }
+
+    #[test]
+    fn diff_args_rejects_blank_base() {
+        let err = git_diff_args(None, false, Some("  ")).expect_err("blank");
+        assert!(err.contains("Invalid diff base"), "got: {err}");
+        let err = git_diff_args(None, false, Some("")).expect_err("empty");
+        assert!(err.contains("Invalid diff base"), "got: {err}");
+    }
+
+    #[test]
+    fn diff_args_rejects_staged_range_base() {
+        let err = git_diff_args(None, true, Some("HEAD~1...HEAD")).expect_err("staged range");
+        assert_eq!(err, "staged cannot be combined with a range base");
+    }
+
+    #[test]
+    fn diff_args_staged_single_ref_base() {
+        let args = git_diff_args(None, true, Some("HEAD~1")).expect("staged single ref");
+        assert_eq!(args, vec!["diff", "--cached", "--end-of-options", "HEAD~1"]);
+    }
 }

@@ -33,4 +33,6 @@ If you edit a user message (or retry) after later file mutations, a policy dialo
 
 Vixl has git tools (`git_status`, `git_diff`, `git_log`, `git_branch`, and in Agent mode `git_checkout`, `git_branch_create`, `git_commit`). Built-in prompts never tell the agent to commit, create a branch, or follow a git flow. Agent mode's skill says: Do not commit unless the user asks. `git_commit` runs `git commit -m` with the message you (or the agent, if you asked) supplied. It does not add a Co-authored-by trailer for Vixl or the model. If the model is a tool it was not a co-author, and the harness is not either.
 
+`git_diff` accepts optional `path`, `staged` (index vs HEAD when `base` is omitted), and `base` (a ref or range such as `HEAD` for all uncommitted changes, or `main...HEAD` for the whole branch). With no arguments it shows unstaged changes only, and diffs never include untracked files.
+
 [Use the workbench](/using/use-the-workbench)

@@ -15,6 +15,7 @@ export const gitDiff = (args: {
   projectRoot: string
   path?: string
   staged?: boolean
+  base?: string
 }): Promise<{ diff: string }> => call('git_diff', args)
 
 export const gitShowFile = (args: {

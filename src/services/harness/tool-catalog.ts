@@ -14,7 +14,7 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   codebase_impact: 'Analyze CodeGraph blast radius for a symbol change',
   codebase_status: 'Check CodeGraph index health and sync status',
   git_status: 'Show git working tree status',
-  git_diff: 'Show git diff',
+  git_diff: 'Show git diff against the index, HEAD, or a ref',
   git_log: 'Show git commit history',
   git_branch: 'Show current git branch',
   git_checkout: 'Checkout a git branch or ref',
