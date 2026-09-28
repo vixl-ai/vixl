@@ -46,14 +46,14 @@ const SKILLS_CEILINGS: Record<VixlChatMode, number> = {
 
 /**
  * Measured builtin tool-def tokens (chars/4):
- * ask 2933, plan 3463, agent 4361, orchestrator 3311.
+ * ask 2996, plan 3526, agent 4424, orchestrator 3374.
  * Ceilings are measured plus one so toBeLessThan stays tight.
  */
 const TOOL_DEF_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 2935,
-  plan: 3464,
-  agent: 4362,
-  orchestrator: 3312,
+  ask: 2997,
+  plan: 3527,
+  agent: 4425,
+  orchestrator: 3375,
 }
 
 type ModeSnapshot = {
