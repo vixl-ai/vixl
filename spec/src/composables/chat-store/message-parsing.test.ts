@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { convertToModelMessages } from 'ai'
 import {
   buildAssistantMessage,
+  closeRunningTools,
+  createStep,
   extractReasoningDuration,
   parsePart,
   rebuildMessagesFromTimeline,
   updateAssistantMessage,
+  upsertToolInStep,
 } from '@/composables/chat-store/message-parsing'
 import { createSession } from '@/composables/chat-store/helpers'
+import createSessionAgentOps from '@/composables/chat-store/session-agent-ops'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 
 const toolTurn = (text = ''): AgentTurn => ({
@@ -312,5 +316,145 @@ describe('convertToModelMessages with chronological assistant parts', () => {
       { role: 'assistant', type: 'text', text: 'Here is what I found.' },
       { role: 'tool', type: 'tool-result', toolCallId: 'tc-2' },
     ])
+  })
+})
+
+describe('closeRunningTools truncated input', () => {
+  it('marks an unstarted running tool as a cut off error', () => {
+    const closed = closeRunningTools({
+      ...createStep('step-1'),
+      tools: [
+        {
+          toolCallId: 'tc-plan',
+          name: 'create_plan',
+          status: 'running' as const,
+        },
+      ],
+    })
+    expect(closed.tools[0]).toMatchObject({
+      toolCallId: 'tc-plan',
+      status: 'error',
+      result: { error: 'Tool call was cut off before it finished' },
+    })
+  })
+
+  it('keeps a started running tool as done with stopped', () => {
+    const closed = closeRunningTools({
+      ...createStep('step-1'),
+      tools: [
+        {
+          toolCallId: 'tc-1',
+          name: 'read_file',
+          status: 'running' as const,
+          args: { path: 'a.ts' },
+          started: true,
+        },
+      ],
+    })
+    expect(closed.tools[0]).toMatchObject({
+      toolCallId: 'tc-1',
+      status: 'done',
+      result: { stopped: true },
+      started: true,
+    })
+  })
+})
+
+describe('upsertToolInStep args merge', () => {
+  it('does not let an empty object clobber existing args', () => {
+    const step = {
+      ...createStep('step-1'),
+      tools: [
+        {
+          toolCallId: 'tc-1',
+          name: 'read_file',
+          status: 'running' as const,
+          args: { path: 'a.ts' },
+          started: true,
+        },
+      ],
+    }
+    const next = upsertToolInStep(step, {
+      toolCallId: 'tc-1',
+      name: 'read_file',
+      status: 'running',
+      args: {},
+    })
+    expect(next.tools[0]?.args).toEqual({ path: 'a.ts' })
+    expect(next.tools[0]?.started).toBe(true)
+  })
+
+  it('keeps existing args when incoming args are nullish', () => {
+    const step = {
+      ...createStep('step-1'),
+      tools: [
+        {
+          toolCallId: 'tc-1',
+          name: 'read_file',
+          status: 'done' as const,
+          args: { path: 'a.ts' },
+        },
+      ],
+    }
+    const next = upsertToolInStep(step, {
+      toolCallId: 'tc-1',
+      name: 'read_file',
+      status: 'done',
+      result: { content: 'ok' },
+    })
+    expect(next.tools[0]?.args).toEqual({ path: 'a.ts' })
+    expect(next.tools[0]?.result).toEqual({ content: 'ok' })
+  })
+})
+
+describe('finishAgentTurn truncated tool close', () => {
+  it('closes an unstarted local tool as cut off', () => {
+    const session = createSession('proj', 'chat-cut')
+    const ops = createSessionAgentOps(session)
+    session.activeTurnId.value = 'turn-1'
+    ops.startAgentStep('step-1')
+    ops.upsertLocalToolRun({
+      toolCallId: 'tc-plan',
+      name: 'create_plan',
+      status: 'running',
+    })
+    ops.finishAgentTurn()
+    const item = session.timeline.value[0]
+    expect(item?.type).toBe('agent-turn')
+    if (item?.type !== 'agent-turn') {
+      return
+    }
+    expect(item.turn.steps[0]?.tools[0]).toMatchObject({
+      toolCallId: 'tc-plan',
+      name: 'create_plan',
+      status: 'error',
+      result: { error: 'Tool call was cut off before it finished' },
+    })
+  })
+
+  it('closes a started local tool as done with stopped', () => {
+    const session = createSession('proj', 'chat-started')
+    const ops = createSessionAgentOps(session)
+    session.activeTurnId.value = 'turn-1'
+    ops.startAgentStep('step-1')
+    ops.upsertLocalToolRun({
+      toolCallId: 'tc-1',
+      name: 'read_file',
+      status: 'running',
+      args: { path: 'a.ts' },
+      started: true,
+    })
+    ops.finishAgentTurn()
+    const item = session.timeline.value[0]
+    expect(item?.type).toBe('agent-turn')
+    if (item?.type !== 'agent-turn') {
+      return
+    }
+    expect(item.turn.steps[0]?.tools[0]).toMatchObject({
+      toolCallId: 'tc-1',
+      status: 'done',
+      result: { stopped: true },
+      started: true,
+    })
   })
 })

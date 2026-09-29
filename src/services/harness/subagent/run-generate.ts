@@ -34,6 +34,7 @@ import {
   throwIfAborted,
 } from '@/services/harness/subagent/generate-support'
 import { generateTextWithTransientRetry } from '@/services/harness/subagent/retry-transient'
+import describeOutputLimitTruncation from '@/services/harness/orchestrator/describe-output-limit-truncation'
 import repairToolCall from '@/services/harness/orchestrator/repair-tool-call'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
@@ -261,7 +262,17 @@ const runSubagentGenerate = async (args: {
     historyAfterGenerate(subagentId, inputMessages, result),
   )
 
-  return result.text
+  if (result.finishReason !== 'length') {
+    return result.text
+  }
+
+  const notice = `[${describeOutputLimitTruncation({
+    maxOutputTokens: callOptions.maxOutputTokens,
+  })}]`
+  if (!result.text.trim()) {
+    return notice
+  }
+  return `${result.text}\n\n${notice}`
 }
 
 export default runSubagentGenerate

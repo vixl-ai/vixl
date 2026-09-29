@@ -26,6 +26,7 @@ vi.mock('@/services/context/system-prompt-parts/assemble', () => ({
 }))
 
 import countContextBudget from '@/services/context/count-context-budget'
+import { DEFAULT_MAX_OUTPUT_TOKENS } from '@/services/models/resolve-model-call-options'
 import { mcpListStatuses, readMcpConfig } from '@/services/vixl/vixl-tauri'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { SystemPromptParts } from '@/services/context/system-prompt-parts'
@@ -122,10 +123,59 @@ describe('countContextBudget', () => {
       messages: [message('1', '2026-01-01T00:00:00.000Z', 'hi')],
     })
     expect(budget.limit).toBe(256_000)
-    expect(budget.reservedOutput).toBe(8_192)
+    expect(budget.reservedOutput).toBe(DEFAULT_MAX_OUTPUT_TOKENS)
     expect(budget.limit - budget.reservedOutput - budget.safetyBuffer).toBe(
-      256_000 - 8_192 - 2_000,
+      256_000 - DEFAULT_MAX_OUTPUT_TOKENS - 2_000,
     )
+  })
+
+  it('reserves half a 32k window so usable prompt stays positive', async () => {
+    const budget = await countContextBudget({
+      modelId: 'gpt-4o',
+      providerId: 'openai',
+      settings: {
+        version: 1,
+        'models.catalogOptions': {
+          'openai::gpt-4o': { contextWindow: 32_768 },
+        },
+        'models.catalogMeta': {
+          'openai::gpt-4o': { contextWindow: 32_768 },
+        },
+      } as VixlSettings,
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [message('1', '2026-01-01T00:00:00.000Z', 'hi')],
+    })
+    expect(budget.limit).toBe(32_768)
+    expect(budget.reservedOutput).toBe(16_384)
+    expect(budget.limit - budget.reservedOutput - budget.safetyBuffer).toBeGreaterThan(
+      0,
+    )
+  })
+
+  it('reserves half a 40k window', async () => {
+    const budget = await countContextBudget({
+      modelId: 'gpt-4o',
+      providerId: 'openai',
+      settings: {
+        version: 1,
+        'models.catalogOptions': {
+          'openai::gpt-4o': { contextWindow: 40_000 },
+        },
+        'models.catalogMeta': {
+          'openai::gpt-4o': { contextWindow: 40_000 },
+        },
+      } as VixlSettings,
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [message('1', '2026-01-01T00:00:00.000Z', 'hi')],
+    })
+    expect(budget.limit).toBe(40_000)
+    expect(budget.reservedOutput).toBe(20_000)
   })
 
   it('counts tool results from timeline in the conversation bucket', async () => {

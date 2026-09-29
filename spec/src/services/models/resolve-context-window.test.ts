@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_MAX_OUTPUT_TOKENS,
+  DEFAULT_SIDE_TASK_MAX_OUTPUT_TOKENS,
   FALLBACK_CONTEXT_WINDOW,
   resolveContextWindow,
+  resolveMaxInputTokens,
   resolveModelCallOptions,
+  resolveSideTaskCallOptions,
 } from '@/services/models/resolve-model-call-options'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
@@ -173,10 +176,115 @@ describe('resolveModelCallOptions maxOutputTokens precedence', () => {
     ).toBe(4_096)
   })
 
-  it('falls back to default 8192', () => {
+  it('falls back to the 32768 main-agent default', () => {
     expect(
       resolveModelCallOptions({ version: 1 }, ref).maxOutputTokens,
     ).toBe(DEFAULT_MAX_OUTPUT_TOKENS)
+    expect(DEFAULT_MAX_OUTPUT_TOKENS).toBe(32_768)
+  })
+
+  it('keeps the 32768 default on a 64k window', () => {
+    const settings = {
+      version: 1,
+      'models.catalogOptions': {
+        'openai::gpt-4o': { contextWindow: 65_536 },
+      },
+      'models.catalogMeta': {
+        'openai::gpt-4o': { contextWindow: 65_536 },
+      },
+    } as VixlSettings
+    expect(resolveModelCallOptions(settings, ref).maxOutputTokens).toBe(
+      DEFAULT_MAX_OUTPUT_TOKENS,
+    )
+  })
+
+  it('clamps the main-agent default to half a 40k window', () => {
+    const settings = {
+      version: 1,
+      'models.catalogOptions': {
+        'openai::gpt-4o': { contextWindow: 40_000 },
+      },
+      'models.catalogMeta': {
+        'openai::gpt-4o': { contextWindow: 40_000 },
+      },
+    } as VixlSettings
+    expect(resolveModelCallOptions(settings, ref).maxOutputTokens).toBe(20_000)
+  })
+
+  it('clamps the main-agent default to half a 32k window', () => {
+    const settings = {
+      version: 1,
+      'models.catalogOptions': {
+        'openai::gpt-4o': { contextWindow: 32_768 },
+      },
+      'models.catalogMeta': {
+        'openai::gpt-4o': { contextWindow: 32_768 },
+      },
+    } as VixlSettings
+    expect(resolveModelCallOptions(settings, ref).maxOutputTokens).toBe(16_384)
+  })
+
+  it('does not half-clamp an explicit catalog max output', () => {
+    const settings = {
+      version: 1,
+      'models.catalogOptions': {
+        'openai::gpt-4o': { contextWindow: 32_000, maxOutputTokens: 28_000 },
+      },
+      'models.catalogMeta': {
+        'openai::gpt-4o': { contextWindow: 32_000, maxOutputTokens: 32_000 },
+      },
+    } as VixlSettings
+    expect(resolveModelCallOptions(settings, ref).maxOutputTokens).toBe(28_000)
+  })
+})
+
+describe('resolveMaxInputTokens custom window minus output', () => {
+  it('subtracts the main-agent default when custom max output is unset', () => {
+    expect(
+      resolveMaxInputTokens(customKat({ contextWindow: 128_000 }), {
+        providerId: 'kat',
+        modelId: 'kat-coder',
+      }),
+    ).toBe(128_000 - DEFAULT_MAX_OUTPUT_TOKENS)
+  })
+
+  it('subtracts the half-window fallback on a 40k custom window', () => {
+    expect(
+      resolveMaxInputTokens(customKat({ contextWindow: 40_000 }), {
+        providerId: 'kat',
+        modelId: 'kat-coder',
+      }),
+    ).toBe(20_000)
+  })
+
+  it('subtracts the half-window fallback on a 32k custom window', () => {
+    expect(
+      resolveMaxInputTokens(customKat({ contextWindow: 32_768 }), {
+        providerId: 'kat',
+        modelId: 'kat-coder',
+      }),
+    ).toBe(16_384)
+  })
+
+  it('returns the full window when explicit output leaves no input', () => {
+    expect(
+      resolveMaxInputTokens(
+        customKat({ contextWindow: 32_000, maxOutputTokens: 32_000 }),
+        {
+          providerId: 'kat',
+          modelId: 'kat-coder',
+        },
+      ),
+    ).toBe(32_000)
+  })
+})
+
+describe('resolveSideTaskCallOptions max output', () => {
+  it('keeps the 256 side-task budget', () => {
+    expect(
+      resolveSideTaskCallOptions({ version: 1 }, ref).maxOutputTokens,
+    ).toBe(DEFAULT_SIDE_TASK_MAX_OUTPUT_TOKENS)
+    expect(DEFAULT_SIDE_TASK_MAX_OUTPUT_TOKENS).toBe(256)
   })
 })
 

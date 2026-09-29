@@ -6,6 +6,12 @@ import formatUnknownError from '@/utils/format-unknown-error'
 const RESULT_CHAR_CAP = 8000
 const INCOMPLETE_TOOL_MESSAGE = 'Tool did not complete'
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const projectToolInput = (args: unknown): Record<string, unknown> =>
+  isPlainObject(args) ? args : {}
+
 const serializeProjectedResult = (result: unknown): string => {
   if (typeof result === 'string') {
     return result
@@ -48,7 +54,7 @@ const projectToolRun = (run: ToolRun): UIMessage['parts'][number] => {
       toolName: run.name,
       toolCallId: run.toolCallId,
       state: 'output-available',
-      input: run.args,
+      input: projectToolInput(run.args),
       output: capProjectedResult(run.result),
     }
   }
@@ -57,7 +63,7 @@ const projectToolRun = (run: ToolRun): UIMessage['parts'][number] => {
     toolName: run.name,
     toolCallId: run.toolCallId,
     state: 'output-error',
-    input: run.args,
+    input: projectToolInput(run.args),
     errorText: errorTextForRun(run),
   }
 }

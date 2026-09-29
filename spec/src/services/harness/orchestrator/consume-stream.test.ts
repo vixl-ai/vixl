@@ -594,3 +594,158 @@ describe('consumeStream reasoning duration persist', () => {
     })
   })
 })
+
+const mockPartsStream = (parts: unknown[], text = ''): void => {
+  streamText.mockImplementation(() => ({
+    fullStream: (async function* () {
+      for (const part of parts) {
+        yield part
+      }
+    })(),
+    text: Promise.resolve(text),
+    responseMessages: Promise.resolve([]),
+    usage: Promise.resolve(undefined),
+  }))
+}
+
+describe('consumeStream output-limit truncation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    const prepareStep = vi.fn<(options: { messages: unknown[] }) => Promise<unknown>>()
+    prepareParentCompactStep.mockReturnValue(prepareStep)
+  })
+
+  it('throws with the tool name and limit when a tool input is still streaming', async () => {
+    mockPartsStream([
+      { type: 'start-step' },
+      { type: 'tool-input-start', id: 'call-1', toolName: 'create_plan' },
+      { type: 'tool-input-delta', id: 'call-1', delta: '{"title":"' },
+      { type: 'finish-step', finishReason: 'length', usage: { outputTokens: 4096 } },
+    ])
+    const prepared = makePrepared()
+    prepared.callOptions.maxOutputTokens = 4096
+
+    await expect(consumeStream(prepared)).rejects.toThrow(
+      'The model hit its output limit (4096 tokens) before finishing. create_plan was cut off and did not run. Raise max output in model options or ask for a shorter response.',
+    )
+  })
+
+  it('throws with the limit when only text was truncated', async () => {
+    mockPartsStream([
+      { type: 'start-step' },
+      { type: 'text-delta', text: 'partial' },
+      { type: 'finish-step', finishReason: 'length', usage: { outputTokens: 2048 } },
+    ])
+    const prepared = makePrepared()
+    prepared.callOptions.maxOutputTokens = 2048
+    ;(prepared.steps as { stepOpen: boolean }).stepOpen = true
+
+    await expect(consumeStream(prepared)).rejects.toThrow(
+      'The model hit its output limit (2048 tokens) before finishing. Raise max output in model options or ask for a shorter response.',
+    )
+  })
+
+  it('does not throw when a step finishes with stop', async () => {
+    mockPartsStream([
+      { type: 'start-step' },
+      { type: 'text-delta', text: 'done' },
+      { type: 'finish-step', finishReason: 'stop', usage: { outputTokens: 12 } },
+    ])
+    const prepared = makePrepared()
+    prepared.callOptions.maxOutputTokens = 4096
+    ;(prepared.steps as { stepOpen: boolean }).stepOpen = true
+
+    await expect(consumeStream(prepared)).resolves.toBeUndefined()
+  })
+
+  it('does not report truncation when the user aborts', async () => {
+    const controller = new AbortController()
+    streamText.mockImplementation((config) => ({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        yield {
+          type: 'finish-step',
+          finishReason: 'length',
+          usage: { outputTokens: 4096 },
+        }
+        controller.abort()
+        await (config as { onAbort?: () => Promise<void> }).onAbort?.()
+      })(),
+      text: Promise.resolve(''),
+      responseMessages: Promise.resolve([]),
+      usage: Promise.resolve(undefined),
+    }))
+    const prepared = makePrepared()
+    prepared.callOptions.maxOutputTokens = 4096
+    ;(prepared as { signal: AbortSignal }).signal = controller.signal
+
+    await expect(consumeStream(prepared)).resolves.toBeUndefined()
+  })
+
+  it('persists result.text when truncation has no collected step text', async () => {
+    mockPartsStream(
+      [
+        { type: 'start-step' },
+        { type: 'finish-step', finishReason: 'length', usage: { outputTokens: 4096 } },
+      ],
+      'paid partial',
+    )
+    const prepared = makePrepared()
+    prepared.callOptions.maxOutputTokens = 4096
+
+    await expect(consumeStream(prepared)).rejects.toThrow(
+      'The model hit its output limit (4096 tokens) before finishing.',
+    )
+    expect(persistLine).toHaveBeenCalledWith(
+      'demo',
+      'chat-1',
+      expect.objectContaining({
+        id: 'turn-1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'paid partial' }],
+      }),
+    )
+  })
+
+  it('still persists streamed assistant text and reasoning before throwing', async () => {
+    mockPartsStream([
+      { type: 'start-step' },
+      { type: 'finish-step', finishReason: 'length', usage: { outputTokens: 4096 } },
+    ])
+    const prepared = makePrepared()
+    prepared.callOptions.maxOutputTokens = 4096
+    prepared.steps.assistantReasoning = 'think'
+    prepared.steps.trailingText = 'partial answer'
+    ;(prepared.steps as { sealedReasoningSeconds: number }).sealedReasoningSeconds = 3
+
+    await expect(consumeStream(prepared)).rejects.toThrow(
+      'The model hit its output limit (4096 tokens) before finishing.',
+    )
+    expect(persistLine).toHaveBeenCalledWith(
+      'demo',
+      'chat-1',
+      expect.objectContaining({
+        id: 'turn-1',
+        role: 'assistant',
+        parts: [
+          { type: 'reasoning', text: 'think', duration: 3 },
+          { type: 'text', text: 'partial answer' },
+        ],
+      }),
+    )
+  })
+
+  it('lets a stream error take precedence over truncation', async () => {
+    mockPartsStream([
+      { type: 'start-step' },
+      { type: 'error', error: new Error('provider exploded') },
+      { type: 'finish-step', finishReason: 'length', usage: { outputTokens: 4096 } },
+    ])
+    const prepared = makePrepared()
+    prepared.callOptions.maxOutputTokens = 4096
+    prepared.steps.trailingText = 'partial'
+
+    await expect(consumeStream(prepared)).rejects.toThrow('provider exploded')
+    expect(persistLine).not.toHaveBeenCalled()
+  })
+})

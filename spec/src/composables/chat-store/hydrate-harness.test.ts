@@ -397,6 +397,36 @@ describe('hydrate-harness tool-run', () => {
     })
   })
 
+  it('keeps a persisted running tool as did-not-complete after flush', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'tool-run',
+        toolCallId: 'tc-open',
+        name: 'read_file',
+        status: 'running',
+        args: { path: 'a.ts' },
+      },
+      flushTurn,
+    )
+    flushTurn()
+    const turn = acc.nextTimeline[0]
+    expect(turn?.type).toBe('agent-turn')
+    if (turn?.type !== 'agent-turn') {
+      return
+    }
+    expect(turn.turn.steps[0]?.tools[0]).toMatchObject({
+      toolCallId: 'tc-open',
+      status: 'error',
+      result: { error: 'Tool did not complete' },
+    })
+    expect(turn.turn.steps[0]?.tools[0]?.result).not.toEqual({
+      error: 'Tool call was cut off before it finished',
+    })
+  })
+
   it('uses the legacy-step fallback when no current step exists', () => {
     const acc = emptyAcc()
     applyHydrateHarnessEvent(
