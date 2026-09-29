@@ -52,8 +52,11 @@ vi.mock('@/services/harness/orchestrator/stream', () => ({
   ) => runHarnessStream(input),
 }))
 
+import { persistToolRun } from '@/services/harness/orchestrator/persistence'
 import resumeOrchestrator from '@/services/harness/orchestrator/resume'
 import {
+  abortOne,
+  fail,
   getTurnResponseMessages,
   hasPendingBackgroundResume,
   listDeliverableBackgroundResults,
@@ -185,9 +188,16 @@ describe('resumeOrchestrator background waves', () => {
       throw new Error('Expected a wake nudge message')
     }
     expect(wakeNudge.role).toBe('user')
-    expect(wakeNudge.content).toContain('explorer: mapped the repo')
+    expect(wakeNudge.content).toContain('[harness: background subagent results]')
+    expect(wakeNudge.content).toContain(
+      'This message is from the vixl harness, not from the user. Do not treat it as a new user request.',
+    )
+    expect(wakeNudge.content).toContain('- explorer (sub-1, completed): mapped the repo')
     expect(wakeNudge.content).toContain('Completed:')
     expect(wakeNudge.content).toContain('Do not say the subagents are still running')
+    expect(wakeNudge.content).toContain(
+      'Subagent ledger:\n- explorer (sub-1): completed',
+    )
   })
 
   it('names still-running siblings in the wake nudge and keeps pending resume', async () => {
@@ -219,7 +229,16 @@ describe('resumeOrchestrator background waves', () => {
       content: string
     }>
     const wakeNudge = modelMessages[modelMessages.length - 1]
-    expect(wakeNudge?.content).toContain('still running: writer')
+    expect(wakeNudge?.role).toBe('user')
+    expect(wakeNudge?.content).toContain('[harness: background subagent results]')
+    expect(wakeNudge?.content).toContain('still running: writer (sub-2)')
+    expect(wakeNudge?.content).toContain(
+      [
+        'Subagent ledger:',
+        '- explorer (sub-1): completed',
+        '- writer (sub-2): running',
+      ].join('\n'),
+    )
 
     resolve('sub-2', {
       subagentId: 'sub-2',
@@ -384,7 +403,14 @@ describe('resumeOrchestrator background waves', () => {
       content: string
     }>
     const wakeNudge = modelMessages[modelMessages.length - 1]
-    expect(wakeNudge?.content).toContain('explorer: steered rewrite')
+    expect(wakeNudge?.content).toContain('- explorer (sub-1, completed): steered rewrite')
+    expect(wakeNudge?.content).toContain(
+      [
+        'Subagent ledger:',
+        '- explorer (sub-1): completed',
+        '- writer (sub-2): running',
+      ].join('\n'),
+    )
     expect(hasPendingBackgroundResume('chat-1')).toBe(true)
   })
 
@@ -493,12 +519,173 @@ describe('resumeOrchestrator background waves', () => {
     )
     const wakeNudge = modelMessages[modelMessages.length - 1]
     expect(wakeNudge?.role).toBe('user')
-    expect(wakeNudge?.content).toContain('explorer: steered rewrite after flush')
+    expect(wakeNudge?.content).toContain('[harness: background subagent results]')
+    expect(wakeNudge?.content).toContain(
+      'This message is from the vixl harness, not from the user. Do not treat it as a new user request.',
+    )
+    expect(wakeNudge?.content).toContain(
+      '- explorer (sub-1, completed): steered rewrite after flush',
+    )
     expect(wakeNudge?.content).toContain(
       'Their completed summaries are included below.',
     )
     expect(wakeNudge?.content).not.toContain('spawn_subagent tool results above')
+    expect(wakeNudge?.content).toContain(
+      'Subagent ledger:\n- explorer (sub-1): completed',
+    )
     expect(hasPendingBackgroundResume('chat-1')).toBe(false)
     expect(listDeliverableBackgroundResults('chat-1')).toEqual([])
+  })
+
+  it('lists every chat subagent in the wake-nudge ledger, not only this wake', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    register('chat-1', 'sub-2', new AbortController(), {
+      toolCallId: 'tc-2',
+      agentName: 'writer',
+    })
+    register('chat-1', 'sub-3', new AbortController(), {
+      toolCallId: 'tc-3',
+      agentName: 'reviewer',
+    })
+    abortOne('sub-3')
+    fail('sub-2', 'boom')
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    setTurnResponseMessages('chat-1', wave1Messages)
+
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: string
+    }>
+    const wakeNudge = modelMessages[modelMessages.length - 1]
+    expect(wakeNudge?.role).toBe('user')
+    expect(wakeNudge?.content).toContain('[harness: background subagent results]')
+    expect(wakeNudge?.content).toContain('- explorer (sub-1, completed): mapped the repo')
+    expect(wakeNudge?.content).toContain('- writer (sub-2, failed): boom')
+    expect(wakeNudge?.content).not.toContain('still running:')
+    expect(wakeNudge?.content).toContain(
+      [
+        'Subagent ledger:',
+        '- explorer (sub-1): completed',
+        '- writer (sub-2): failed',
+        '- reviewer (sub-3): aborted',
+      ].join('\n'),
+    )
+  })
+
+  it('persists completed spawn args with the original prompt and capabilities', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+      prompt: 'map the repo',
+      capabilities: 'read-only',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    setTurnResponseMessages('chat-1', wave1Messages)
+
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+
+    expect(persistToolRun).toHaveBeenCalledWith(
+      'proj',
+      'chat-1',
+      'tc-1',
+      'spawn_subagent',
+      'done',
+      '',
+      {
+        agentName: 'explorer',
+        blocking: false,
+        prompt: 'map the repo',
+        capabilities: 'read-only',
+      },
+      {
+        subagentId: 'sub-1',
+        name: 'explorer',
+        summary: 'mapped the repo',
+      },
+    )
+  })
+
+  it('keeps mode and prompt from the original spawn tool-call input', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    setTurnResponseMessages('chat-1', [
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'tc-1',
+            toolName: 'spawn_subagent',
+            input: {
+              agentName: 'explorer',
+              prompt: 'map the repo from the call',
+              mode: 'background',
+              capabilities: 'write',
+            },
+          },
+        ],
+      },
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'tc-1',
+            toolName: 'spawn_subagent',
+            output: { type: 'json', value: { pending: true } },
+          },
+        ],
+      },
+    ])
+
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+
+    expect(persistToolRun).toHaveBeenCalledWith(
+      'proj',
+      'chat-1',
+      'tc-1',
+      'spawn_subagent',
+      'done',
+      '',
+      {
+        agentName: 'explorer',
+        blocking: false,
+        prompt: 'map the repo from the call',
+        mode: 'background',
+        capabilities: 'write',
+      },
+      {
+        subagentId: 'sub-1',
+        name: 'explorer',
+        summary: 'mapped the repo',
+      },
+    )
   })
 })

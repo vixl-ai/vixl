@@ -10,7 +10,44 @@ import {
   getPlanExecutionSession,
   resolveUpdatePlanTodoPath,
 } from '@/services/harness/plan-execution-session'
+import { listSubagentsForChat } from '@/services/harness/subagent/registry'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+
+type RunningSubagentHint = {
+  subagentId: string
+  name: string
+}
+
+const listRunningSubagentHints = (chatId: string): RunningSubagentHint[] =>
+  listSubagentsForChat(chatId)
+    .filter((record) => record.status === 'running')
+    .map((record) => ({
+      subagentId: record.subagentId,
+      name: record.agentName,
+    }))
+
+const withRunningSubagentContext = <T extends Record<string, unknown>>(
+  chatId: string,
+  inputTodos: Array<{ status: string }>,
+  result: T,
+): T | (T & { runningSubagents: RunningSubagentHint[]; note?: string }) => {
+  const runningSubagents = listRunningSubagentHints(chatId)
+  if (runningSubagents.length === 0) {
+    return result
+  }
+  const completing = inputTodos.some((todo) => todo.status === 'completed')
+  if (!completing) {
+    return { ...result, runningSubagents }
+  }
+  const runningList = runningSubagents
+    .map((item) => `${item.name} (${item.subagentId})`)
+    .join(', ')
+  return {
+    ...result,
+    runningSubagents,
+    note: `Background subagents are still running: ${runningList}. Only mark a todo completed after its subagent result arrives.`,
+  }
+}
 
 const updatePlanTodo = (ctx: HarnessToolContext) =>
   tool({
@@ -41,7 +78,9 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
         session.activePlanPath,
       )
       if (!resolvedPlanPath) {
-        return { todos: z.array(planTodoItemSchema).parse(todos) }
+        return withRunningSubagentContext(ctx.chatId, todos, {
+          todos: z.array(planTodoItemSchema).parse(todos),
+        })
       }
       const existing = await fsReadFile({
         projectRoot: ctx.projectRoot,
@@ -75,7 +114,10 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
         )
         workbench.refreshPlanTabs()
       }
-      return { planPath: resolvedPlanPath, todos: merged }
+      return withRunningSubagentContext(ctx.chatId, todos, {
+        planPath: resolvedPlanPath,
+        todos: merged,
+      })
     },
   })
 

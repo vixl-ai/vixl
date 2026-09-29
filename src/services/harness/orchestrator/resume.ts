@@ -6,6 +6,7 @@ import filterMessagesForActiveContext from '@/services/context/filter-messages-f
 import {
   clearPendingBackgroundResume,
   clearTurnResponseMessages,
+  getSubagent,
   getTurnResponseMessages,
   listSubagentsForChat,
   markBackgroundResultsDelivered,
@@ -18,6 +19,56 @@ import { patchSubagentToolResults } from './helpers'
 import { persistToolRun } from './persistence'
 import resolveLiveWorkspace from './resolve-workspace'
 import runHarnessStream from './stream'
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+const readSpawnToolInput = (
+  messages: ModelMessage[],
+  toolCallId: string,
+): Record<string, unknown> | null => {
+  for (const message of messages) {
+    if (message.role !== 'assistant' || !Array.isArray(message.content)) {
+      continue
+    }
+    for (const part of message.content) {
+      if (part.type !== 'tool-call' || part.toolCallId !== toolCallId) {
+        continue
+      }
+      if (isPlainRecord(part.input)) {
+        return part.input
+      }
+    }
+  }
+  return null
+}
+
+const persistedSpawnArgs = (
+  toolCallId: string,
+  result: { name: string; subagentId: string },
+  turnMessages: ModelMessage[] | null,
+): Record<string, unknown> => {
+  const fromTurn = turnMessages
+    ? readSpawnToolInput(turnMessages, toolCallId)
+    : null
+  const record = getSubagent(result.subagentId)
+  const prompt =
+    (typeof fromTurn?.prompt === 'string' && fromTurn.prompt) || record?.prompt
+  const mode = fromTurn?.mode
+  const capabilities =
+    (typeof fromTurn?.capabilities === 'string' && fromTurn.capabilities) ||
+    record?.capabilities
+  return {
+    agentName:
+      (typeof fromTurn?.agentName === 'string' && fromTurn.agentName) ||
+      record?.agentName ||
+      result.name,
+    blocking: false,
+    ...(prompt ? { prompt } : {}),
+    ...(mode !== undefined ? { mode } : {}),
+    ...(capabilities ? { capabilities } : {}),
+  }
+}
 
 export default async (input: ResumeOrchestratorInput): Promise<void> => {
   const workspace = resolveLiveWorkspace(input)
@@ -50,7 +101,7 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
       'spawn_subagent',
       'done',
       '',
-      { agentName: item.result.name, blocking: false },
+      persistedSpawnArgs(item.toolCallId, item.result, turnMessages),
       item.result,
     )
   }
@@ -62,9 +113,13 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
     chatId,
     completedResults.map((item) => item.toolCallId),
   )
-  const runningNames = listSubagentsForChat(chatId)
+  const chatSubagents = listSubagentsForChat(chatId)
+  const runningAgents = chatSubagents
     .filter((record) => record.status === 'running')
-    .map((record) => record.agentName.trim() || record.subagentId)
+    .map((record) => ({
+      name: record.agentName.trim() || record.subagentId,
+      subagentId: record.subagentId,
+    }))
   const activeContextMeta = await readChatMeta(workspace.projectSlug, chatId).catch(() => null)
   const activeContext = activeContextMeta?.activeContext
   const { messages: contextMessages, checkpointText } = filterMessagesForActiveContext(
@@ -89,16 +144,27 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
   const baseMessages: ModelMessage[] = checkpointText
     ? [{ role: 'user', content: checkpointText }, ...recentModelMessages]
     : recentModelMessages
+  // AI SDK v7 rejects system-role messages in `messages` unless allowSystemInMessages is set; keep a user turn so generateText/streamText can resume across providers.
   const wakeNudge: ModelMessage = {
     role: 'user',
-    content: buildWakeNudge(completedResults, runningNames, {
-      summariesInline: !turnMessages,
-    }),
+    content: buildWakeNudge(
+      completedResults.map((item) => ({
+        ...item,
+        status:
+          chatSubagents.find((record) => record.subagentId === item.result.subagentId)
+            ?.status ?? 'completed',
+      })),
+      runningAgents,
+      chatSubagents,
+      {
+        summariesInline: !turnMessages,
+      },
+    ),
   }
   const modelMessages = [...baseMessages, ...patchedTurnMessages, wakeNudge]
 
   clearTurnResponseMessages(chatId)
-  if (runningNames.length === 0) {
+  if (runningAgents.length === 0) {
     clearPendingBackgroundResume(chatId)
   }
 

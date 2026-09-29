@@ -5,7 +5,7 @@ use tokio::process::Command;
 use crate::commands::mcp::merged_shell_path;
 
 #[cfg(target_os = "macos")]
-use super::super::sandbox::generate_seatbelt_profile;
+use super::super::sandbox::generate_seatbelt_profile_with;
 
 fn apply_merged_shell_path(cmd: &mut Command) {
     if let Some(merged) = merged_shell_path() {
@@ -104,7 +104,12 @@ fn build_tracked_command(project_root: &str, command: &str) -> Command {
 /// The sandboxed child still gets its own process group (via setpgid) so that
 /// `killpg` continues to work for the full process tree.
 #[cfg(target_os = "macos")]
-fn build_sandboxed_command(project_root: &str, command: &str, allow_network: bool) -> Command {
+fn build_sandboxed_command(
+    project_root: &str,
+    command: &str,
+    allow_network: bool,
+    project_writable: bool,
+) -> Command {
     use std::env;
 
     let home = env::var("HOME").unwrap_or_default();
@@ -113,7 +118,8 @@ fn build_sandboxed_command(project_root: &str, command: &str, allow_network: boo
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or(tmpdir_raw);
     let project_root_clean = project_root.trim_end_matches('/').to_string();
-    let profile = generate_seatbelt_profile(allow_network, &home, &project_root_clean);
+    let profile =
+        generate_seatbelt_profile_with(allow_network, project_writable, &home, &project_root_clean);
 
     let mut cmd = Command::new("/usr/bin/sandbox-exec");
     cmd.arg("-D")
@@ -144,7 +150,8 @@ fn build_sandboxed_command(project_root: &str, command: &str, allow_network: boo
 }
 
 /// On Linux: wrap the command with `bwrap` (bubblewrap) for namespace-based sandboxing.
-/// Bind-mounts project_root RW, common system paths RO, and a fresh tmpfs for /tmp.
+/// Bind-mounts project_root RW (or RO when `project_writable` is false), common
+/// system paths RO, and a fresh tmpfs for /tmp.
 /// Network isolation is applied when `allow_network` is false.
 #[cfg(target_os = "linux")]
 fn find_bwrap() -> Option<String> {
@@ -176,6 +183,7 @@ fn build_bubblewrap_command(
     project_root: &str,
     command: &str,
     allow_network: bool,
+    project_writable: bool,
 ) -> Command {
     let mut cmd = Command::new(bwrap);
 
@@ -200,8 +208,12 @@ fn build_bubblewrap_command(
     // tmpfs for /tmp
     cmd.arg("--tmpfs").arg("/tmp");
 
-    // Project root: read-write bind mount
-    cmd.arg("--bind").arg(project_root).arg(project_root);
+    // Project root: RW unless the caller requested a read-only project jail
+    if project_writable {
+        cmd.arg("--bind").arg(project_root).arg(project_root);
+    } else {
+        cmd.arg("--ro-bind").arg(project_root).arg(project_root);
+    }
 
     // HOME: read-write so tool caches work, but only if it differs from project root
     if let Ok(home) = std::env::var("HOME") {
@@ -255,13 +267,16 @@ pub(crate) fn spawn_child(
     command: &str,
     sandboxed: Option<bool>,
     allow_network: Option<bool>,
+    project_writable: Option<bool>,
 ) -> Result<tokio::process::Child, String> {
     let want_sandbox = sandboxed.unwrap_or(true);
+    let allow_network = allow_network.unwrap_or(false);
+    let project_writable = project_writable.unwrap_or(true);
 
     #[cfg(target_os = "macos")]
     {
         if want_sandbox {
-            return build_sandboxed_command(project_root, command, allow_network.unwrap_or(false))
+            return build_sandboxed_command(project_root, command, allow_network, project_writable)
                 .spawn()
                 .map_err(|e| format!("SANDBOX_FAILED: {e}"));
         }
@@ -276,7 +291,8 @@ pub(crate) fn spawn_child(
                         &bwrap,
                         project_root,
                         command,
-                        allow_network.unwrap_or(false),
+                        allow_network,
+                        project_writable,
                     )
                     .spawn()
                     .map_err(|e| format!("SANDBOX_FAILED: {e}"));
@@ -298,7 +314,7 @@ pub(crate) fn spawn_child(
         }
     }
 
-    let _ = allow_network;
+    let _ = (allow_network, project_writable);
 
     build_tracked_command(project_root, command)
         .spawn()

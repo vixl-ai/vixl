@@ -11,10 +11,15 @@ import {
   resolveMcpAuthForServer,
   patchPendingMcpAuthForServer,
 } from '@/services/mcp/mcp-auth-gate'
+import {
+  register,
+  resetSubagentRegistryForTests,
+} from '@/services/harness/subagent/registry'
 
 describe('mcp-auth-gate', () => {
   beforeEach(() => {
     resetMcpAuthGateForTests()
+    resetSubagentRegistryForTests()
   })
 
   it('requests and resolves authenticated', async () => {
@@ -230,5 +235,56 @@ describe('mcp-auth-gate', () => {
 
     resolveMcpAuth('tool-personal', { action: 'cancelled' })
     await expect(personal).resolves.toEqual({ action: 'cancelled' })
+  })
+
+  it('keepBackground skips auth owned by a running background subagent', async () => {
+    register('chat-1', 'bg-1', new AbortController(), {
+      toolCallId: 'tc-bg',
+      agentName: 'background',
+    })
+    register(
+      'chat-1',
+      'block-1',
+      new AbortController(),
+      { toolCallId: 'tc-block', agentName: 'blocking' },
+      { pendingResume: false },
+    )
+
+    const parent = requestMcpAuth({
+      chatId: 'chat-1',
+      toolCallId: 'tool-parent',
+      serverId: 'parent',
+      scopeKey: 'personal',
+      kind: 'oauth',
+      title: 'Parent',
+    })
+    const background = requestMcpAuth({
+      chatId: 'chat-1',
+      toolCallId: 'tool-bg',
+      serverId: 'bg',
+      scopeKey: 'personal',
+      kind: 'oauth',
+      title: 'Background',
+      subagentId: 'bg-1',
+    })
+    const blocking = requestMcpAuth({
+      chatId: 'chat-1',
+      toolCallId: 'tool-block',
+      serverId: 'block',
+      scopeKey: 'personal',
+      kind: 'oauth',
+      title: 'Blocking',
+      subagentId: 'block-1',
+    })
+
+    rejectPendingMcpAuthForChat('chat-1', { keepBackground: true })
+
+    await expect(parent).resolves.toEqual({ action: 'cancelled' })
+    await expect(blocking).resolves.toEqual({ action: 'cancelled' })
+    expect(getPendingMcpAuth('tool-bg')).toBeDefined()
+    expect(listPendingMcpAuthForChat('chat-1')).toHaveLength(1)
+
+    resolveMcpAuth('tool-bg', { action: 'authenticated' })
+    await expect(background).resolves.toEqual({ action: 'authenticated' })
   })
 })

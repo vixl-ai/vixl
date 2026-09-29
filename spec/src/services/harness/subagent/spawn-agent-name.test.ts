@@ -3,10 +3,7 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const resolveAgentDefinition = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<null>>(),
-)
-const listAgentIndex = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<Array<{ name: string }>>>(),
+  vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 )
 const getPlanExecutionSession = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => { subagentModel: string | null }>(),
@@ -30,7 +27,6 @@ const linkAbortSignal = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 
 vi.mock('@/services/agents/resolve-agent-definition', () => ({
   default: (...args: unknown[]) => resolveAgentDefinition(...args),
-  listAgentIndex: (...args: unknown[]) => listAgentIndex(...args),
 }))
 
 vi.mock('@/services/harness/plan-execution-session', () => ({
@@ -97,25 +93,53 @@ const execute = (agentName: string): Promise<unknown> => {
   )
 }
 
-describe('spawn_subagent agentName validation', () => {
+const spawnedName = (): unknown =>
+  (registerSubagent.mock.calls[0]?.[3] as { agentName?: string } | undefined)
+    ?.agentName
+
+describe('spawn_subagent agentName', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resolveAgentDefinition.mockResolvedValue(null)
-    listAgentIndex.mockResolvedValue([{ name: 'explorer' }, { name: 'reviewer' }])
     getPlanExecutionSession.mockReturnValue({ subagentModel: null })
     resolveSpawnModel.mockResolvedValue('anthropic::claude-sonnet-4')
     runSubagentGenerate.mockResolvedValue('ok summary')
   })
 
-  it('returns a tool error listing catalog names for unresolved names', async () => {
-    await expect(execute('shell')).rejects.toThrow(
-      /Unknown agentName "shell".*Valid catalog names: explorer, reviewer/,
+  it.each(['explore', 'shell', 'run-ci', 'review_bugbot', 'Fix 3 Angi review findings'])(
+    'spawns non-catalog name %s as a generic helper with the name unchanged',
+    async (agentName) => {
+      await expect(execute(agentName)).resolves.toMatchObject({
+        name: agentName,
+        summary: 'ok summary',
+      })
+      expect(spawnedName()).toBe(agentName)
+      expect(runSubagentGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({ agentName }),
+      )
+    },
+  )
+
+  it('spawns when the catalog lookup fails', async () => {
+    resolveAgentDefinition.mockRejectedValue(new Error('catalog unreadable'))
+    await expect(execute('Reading auth')).resolves.toMatchObject({
+      name: 'Reading auth',
+    })
+    expect(resolveSpawnModel).toHaveBeenCalledWith(
+      expect.objectContaining({ frontmatterModel: undefined }),
     )
-    expect(registerSubagent).not.toHaveBeenCalled()
-    expect(runSubagentGenerate).not.toHaveBeenCalled()
   })
 
-  it('emits agentName on subagent-start for a verb phrase helper', async () => {
+  it('uses the catalog definition model for a catalog agentName', async () => {
+    resolveAgentDefinition.mockResolvedValue({
+      id: 'explorer',
+      name: 'explorer',
+      description: 'Explore the repo',
+      body: '',
+      model: 'local::qwen',
+      path: '/tmp/project/.vixl/agents/explorer.md',
+      scope: 'project',
+    })
     const events: Array<{ type: string; name?: string }> = []
     const ctx = baseCtx()
     ctx.onHarnessEvent = (event) => {
@@ -128,48 +152,20 @@ describe('spawn_subagent agentName validation', () => {
     ) => Promise<unknown>
     await runner(
       {
-        agentName: 'Reading auth',
+        agentName: 'explorer',
         prompt: 'Find auth helpers.',
         mode: 'blocking',
       },
       { toolCallId: 'call-1' },
     )
-    const start = events.find((event) => event.type === 'subagent-start')
-    expect(start).toMatchObject({
-      name: 'Reading auth',
-    })
-    expect(start && 'description' in start).toBe(false)
-  })
-
-  it('keeps kebab-case agentName when spawning a generic helper', async () => {
-    const events: Array<{ type: string; name?: string }> = []
-    const ctx = baseCtx()
-    ctx.onHarnessEvent = (event) => {
-      events.push(event as { type: string; name?: string })
-    }
-    const built = spawnSubagent(ctx)
-    const runner = built.execute as (
-      value: Record<string, unknown>,
-      options: { toolCallId: string },
-    ) => Promise<unknown>
-    await runner(
-      {
-        agentName: 'run-ci',
-        prompt: 'Run CI.',
-        mode: 'blocking',
-      },
-      { toolCallId: 'call-1' },
+    expect(resolveAgentDefinition).toHaveBeenCalledWith('/tmp/project', 'explorer')
+    expect(resolveSpawnModel).toHaveBeenCalledWith(
+      expect.objectContaining({ frontmatterModel: 'local::qwen' }),
     )
     expect(events.find((event) => event.type === 'subagent-start')).toMatchObject({
-      name: 'run-ci',
+      name: 'explorer',
     })
-    expect(registerSubagent).toHaveBeenCalledWith(
-      'chat-1',
-      expect.any(String),
-      expect.any(AbortController),
-      expect.objectContaining({ agentName: 'run-ci' }),
-      expect.any(Object),
-    )
+    expect(spawnedName()).toBe('explorer')
   })
 
   it('describes background spawn, visible status, and no-poll on the tool', () => {
@@ -179,12 +175,13 @@ describe('spawn_subagent agentName validation', () => {
     expect(built.description).toContain('Background returns immediately')
   })
 
-  it('describes accepted agentName forms on the input schema', () => {
+  it('guides agentName naming without describing rejections', () => {
     const built = spawnSubagent(baseCtx())
     const schema = built.inputSchema as unknown as {
       shape: { agentName: { description?: string } }
     }
-    expect(schema.shape.agentName.description).toContain('2-6 word verb phrase')
-    expect(schema.shape.agentName.description).toContain('Bare single words')
+    expect(schema.shape.agentName.description).toContain('Catalog name')
+    expect(schema.shape.agentName.description).toContain('verb phrase')
+    expect(schema.shape.agentName.description).not.toMatch(/reject/i)
   })
 })

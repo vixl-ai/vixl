@@ -85,7 +85,7 @@ pub fn is_sensitive_relative_path(path: &str) -> bool {
         if segment.is_empty() || segment == "." {
             continue;
         }
-        if segment == ".env" || segment.starts_with(".env.") {
+        if is_sensitive_env_segment(segment) {
             return true;
         }
         if matches!(
@@ -133,6 +133,13 @@ pub fn is_sensitive_relative_path(path: &str) -> bool {
     }
 
     false
+}
+
+fn is_sensitive_env_segment(segment: &str) -> bool {
+    if matches!(segment, ".env.example" | ".env.sample" | ".env.template") {
+        return false;
+    }
+    segment == ".env" || segment.starts_with(".env.")
 }
 
 pub(crate) fn reject_sensitive_path(user_path: &str) -> Result<(), String> {

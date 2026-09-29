@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
-import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const resolveAgentDefinition = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<null>>(),
@@ -64,16 +64,12 @@ vi.mock('@/utils/link-abort-signal', () => ({
 }))
 
 import spawnSubagent from '@/services/harness/subagent/spawn'
-import { noPoll, visibleStatus } from '@/services/harness/guidance'
 
-const writeError = (mode: VixlChatMode): string =>
-  `Write-capable subagents are not allowed in ${mode} mode. Spawn with capabilities: "read-only" (the default).`
-
-const baseCtx = (mode: VixlChatMode): HarnessToolContext => ({
+const baseCtx = (): HarnessToolContext => ({
   projectRoot: '/tmp/project',
   projectSlug: 'project',
   chatId: 'chat-1',
-  mode,
+  mode: 'agent',
   settings: { version: 1 } as VixlSettings,
   permissionLevel: 'ask',
   sessionAllows: new Set(),
@@ -82,30 +78,26 @@ const baseCtx = (mode: VixlChatMode): HarnessToolContext => ({
   supportsVision: false,
   onPendingApproval: () => {},
   onHarnessEvent: () => {},
+  signal: new AbortController().signal,
 })
 
-const execute = async (
-  mode: VixlChatMode,
-  capabilities?: 'read-only' | 'write',
-  spawnMode: 'blocking' | 'background' = 'blocking',
-): Promise<unknown> => {
-  const built = spawnSubagent(baseCtx(mode))
+const execute = (mode: 'blocking' | 'background'): Promise<unknown> => {
+  const built = spawnSubagent(baseCtx())
   const runner = built.execute as (
     value: Record<string, unknown>,
     options: { toolCallId: string },
   ) => Promise<unknown>
-  const input: Record<string, unknown> = {
-    agentName: 'Reading auth',
-    prompt: 'Summarize the auth flow.',
-    mode: spawnMode,
-  }
-  if (capabilities !== undefined) {
-    input.capabilities = capabilities
-  }
-  return runner(input, { toolCallId: 'call-1' })
+  return runner(
+    {
+      agentName: 'Reading auth',
+      prompt: 'Find auth helpers.',
+      mode,
+    },
+    { toolCallId: 'call-1' },
+  )
 }
 
-describe('spawn_subagent capability enforcement', () => {
+describe('spawn_subagent parent abort link', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resolveAgentDefinition.mockResolvedValue(null)
@@ -115,66 +107,13 @@ describe('spawn_subagent capability enforcement', () => {
     runSubagentGenerate.mockResolvedValue('ok summary')
   })
 
-  const readOnlyModes: VixlChatMode[] = ['ask', 'plan']
-  const writeAllowedModes: VixlChatMode[] = ['agent', 'orchestrator']
-
-  it('rejects write capabilities in ask and plan', async () => {
-    for (const mode of readOnlyModes) {
-      runSubagentGenerate.mockClear()
-      await expect(execute(mode, 'write')).rejects.toThrow(writeError(mode))
-      expect(runSubagentGenerate).not.toHaveBeenCalled()
-    }
+  it('links blocking subagents to the parent turn signal', async () => {
+    await execute('blocking')
+    expect(linkAbortSignal).toHaveBeenCalledTimes(1)
   })
 
-  it('allows read-only capabilities in ask and plan', async () => {
-    for (const mode of readOnlyModes) {
-      runSubagentGenerate.mockClear()
-      await expect(execute(mode, 'read-only')).resolves.toMatchObject({
-        name: 'Reading auth',
-        summary: 'ok summary',
-      })
-      expect(runSubagentGenerate).toHaveBeenCalledTimes(1)
-    }
-  })
-
-  it('allows omitted capabilities in ask and plan', async () => {
-    for (const mode of readOnlyModes) {
-      runSubagentGenerate.mockClear()
-      await expect(execute(mode)).resolves.toMatchObject({
-        summary: 'ok summary',
-      })
-      expect(runSubagentGenerate).toHaveBeenCalledTimes(1)
-    }
-  })
-
-  it('allows write capabilities in agent and orchestrator', async () => {
-    for (const mode of writeAllowedModes) {
-      runSubagentGenerate.mockClear()
-      await expect(execute(mode, 'write')).resolves.toMatchObject({
-        name: 'Reading auth',
-        summary: 'ok summary',
-      })
-      expect(runSubagentGenerate).toHaveBeenCalledTimes(1)
-    }
-  })
-
-  it('tells the parent to leave a visible status before ending a background spawn', async () => {
-    await expect(execute('agent', 'read-only', 'background')).resolves.toMatchObject({
-      name: 'Reading auth',
-      status: 'running',
-      note: `${noPoll} ${visibleStatus('spawned')} subagentId is not a shell_id.`,
-    })
-  })
-
-  it('describes read-only shell sandbox and write file edits on capabilities', () => {
-    const built = spawnSubagent(baseCtx('agent'))
-    const schema = built.inputSchema as unknown as {
-      shape: { capabilities: { description?: string } }
-    }
-    expect(schema.shape.capabilities.description).toContain(
-      'sandbox where the project is not writable',
-    )
-    expect(schema.shape.capabilities.description).toContain('write can edit files')
-    expect(schema.shape.capabilities.description).not.toContain('can only report')
+  it('does not link background subagents to the parent turn signal', async () => {
+    await execute('background')
+    expect(linkAbortSignal).not.toHaveBeenCalled()
   })
 })

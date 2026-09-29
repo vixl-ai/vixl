@@ -15,7 +15,7 @@ import {
 } from '@/services/harness/subagent/helpers'
 import resolveSpawnModel from '@/services/harness/subagent/resolve-spawn-model'
 import runSubagentGenerate from '@/services/harness/subagent/run-generate'
-import validateSpawnAgentName from '@/services/harness/subagent/validate-spawn-agent-name'
+import resolveAgentDefinition from '@/services/agents/resolve-agent-definition'
 import { READ_ONLY_SPAWN_MODES } from '@/services/harness/subagent/constants'
 import linkAbortSignal from '@/utils/link-abort-signal'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
@@ -27,7 +27,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
       agentName: z
         .string()
         .describe(
-          'Catalog name, or a 2-6 word verb phrase for a generic helper (spaces, hyphens, or underscores). Bare single words are rejected unless a catalog defines them.',
+          'Catalog name to use a custom agent; otherwise a short verb phrase describing the task (e.g. "Review auth changes"), shown as the subagent label.',
         ),
       prompt: z.string().describe('Task instructions for the subagent'),
       mode: z
@@ -42,7 +42,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         .enum(['read-only', 'write'])
         .default('read-only')
         .describe(
-          "write required for edit/write/delete/move or shell/git mutations; read-only (default) can only report",
+          'read-only (default) can run tests, lint, git log/diff, and gh in a sandbox where the project is not writable; write can edit files',
         ),
     }),
     execute: async (
@@ -52,6 +52,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
       | { subagentId: string; name: string; summary: string }
       | {
           subagentId: string
+          name: string
           status: 'running'
           note: string
         }
@@ -77,10 +78,10 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         ctx.projectSlug,
         ctx.chatId,
       ).subagentModel
-      const agentDefinition = await validateSpawnAgentName(
+      const agentDefinition = await resolveAgentDefinition(
         ctx.projectRoot,
         agentName,
-      )
+      ).catch(() => null)
       const model = await resolveSpawnModel({
         callModel,
         lockedModel: lockedSubagentModel,
@@ -89,7 +90,10 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
       })
       const blocking = mode === 'blocking'
       const controller = new AbortController()
-      linkAbortSignal(ctx.signal, controller)
+      // Background must outlive parent-turn abort; explicit stop/abortOne still halt them.
+      if (blocking) {
+        linkAbortSignal(ctx.signal, controller)
+      }
 
       registerSubagent(
         ctx.chatId,
@@ -170,6 +174,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
 
         return {
           subagentId,
+          name: agentName,
           status: 'running',
           note: `${noPoll} ${visibleStatus('spawned')} subagentId is not a shell_id.`,
         }

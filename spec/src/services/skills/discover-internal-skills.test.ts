@@ -52,6 +52,9 @@ describe('discover-internal-skills', () => {
     const loaded = loadInternalSkill('orchestrator')
     expect(loaded).not.toBeNull()
     expect(loaded?.content).toContain('Orchestrator mode')
+    expect(loaded?.content).toContain(
+      'The parent may use the shell for validation only (CI, tests, lint, typecheck, `gh pr view` / `gh api` for review comments, `git log`, `git diff`, `git status`). The parent never edits source files and never runs mutating commands such as `git stash`, `git reset`, `git commit`, `git push`, `git checkout`, `rm`, or redirects into project files; all implementation goes to subagents.',
+    )
   })
 
   it('omits mode-gated skills from the slash-command set', () => {

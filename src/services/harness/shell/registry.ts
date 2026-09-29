@@ -1,5 +1,6 @@
 import { listen } from '@tauri-apps/api/event'
 import { ref } from 'vue'
+import { isRunningBackgroundSubagent } from '@/services/harness/subagent/registry'
 import { shellKillTracked, shellSpawnTracked } from '@/services/vixl/vixl-tauri'
 import type { AgentShellRecord, AgentShellStatus } from '@/types/harness/agent-shell'
 import type { HarnessEvent } from '@/types/harness/harness-event'
@@ -133,6 +134,8 @@ export const createAgentShell = async (args: {
   command: string
   sandboxed?: boolean
   allowNetwork?: boolean
+  projectWritable?: boolean
+  subagentId?: string
 }): Promise<AgentShellRecord> => {
   const shellId = crypto.randomUUID()
   const record: AgentShellRecord = {
@@ -146,6 +149,7 @@ export const createAgentShell = async (args: {
     exitCode: null,
     exitSignal: null,
     startedAt: new Date().toISOString(),
+    subagentId: args.subagentId,
   }
 
   shells.set(shellId, record)
@@ -157,6 +161,7 @@ export const createAgentShell = async (args: {
     command: args.command,
     sandboxed: args.sandboxed,
     allowNetwork: args.allowNetwork,
+    ...(args.projectWritable === false ? { projectWritable: false } : {}),
   })
   bumpRevision()
 
@@ -266,13 +271,27 @@ export const killAgentShell = async (shellId: string): Promise<AgentShellRecord>
   return shell
 }
 
-export const killShellsForChat = async (chatId: string): Promise<void> => {
+export const killShellsForChat = async (
+  chatId: string,
+  options?: { keepBackground?: boolean },
+): Promise<void> => {
   const shellIds = chatShells.get(chatId)
   if (!shellIds) {
     return
   }
 
-  const toKill = [...shellIds]
+  const toKill: string[] = []
+  for (const shellId of shellIds) {
+    const owner = shells.get(shellId)?.subagentId
+    if (
+      options?.keepBackground &&
+      owner &&
+      isRunningBackgroundSubagent(owner)
+    ) {
+      continue
+    }
+    toKill.push(shellId)
+  }
   for (const shellId of toKill) {
     try {
       await killAgentShell(shellId)
@@ -280,9 +299,12 @@ export const killShellsForChat = async (chatId: string): Promise<void> => {
       shells.delete(shellId)
       cleanupShellListeners(shellId)
     }
+    shellIds.delete(shellId)
   }
 
-  chatShells.delete(chatId)
+  if (!options?.keepBackground || shellIds.size === 0) {
+    chatShells.delete(chatId)
+  }
 }
 
 export const resetAgentShellRegistryForTests = (): void => {

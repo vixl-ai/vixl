@@ -117,6 +117,7 @@ describe('resumeSubagent', () => {
 
     expect(getSubagent('sub-1')?.status).toBe('running')
     expect(emitSubagentResult).not.toHaveBeenCalled()
+    expect(linkAbortSignal).not.toHaveBeenCalled()
     expect(runSubagentGenerate).toHaveBeenCalledWith(
       expect.objectContaining({
         subagentId: 'sub-1',

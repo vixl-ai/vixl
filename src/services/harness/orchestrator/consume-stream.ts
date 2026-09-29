@@ -8,7 +8,7 @@ import enrichToolError from '@/services/harness/enrich-tool-error'
 import { clearStagedImages } from '@/services/harness/image-stage'
 import { killShellsForChat } from '@/services/harness/shell/registry'
 import {
-  abort as abortSubagentsForChat,
+  abortBlocking,
   getTurnResponseMessages,
   hasPendingBackgroundResume,
   setTurnResponseMessages,
@@ -122,12 +122,12 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     }),
     abortSignal: signal,
     onAbort: async () => {
-      rejectPendingForChat(chatId)
+      rejectPendingForChat(chatId, { keepBackground: true })
       rejectPendingQuestionsForChat(chatId)
-      rejectPendingMcpAuthForChat(chatId)
+      rejectPendingMcpAuthForChat(chatId, { keepBackground: true })
       clearStagedImages({ chatId, turnId: assistantId })
-      await killShellsForChat(chatId)
-      abortSubagentsForChat(chatId)
+      await killShellsForChat(chatId, { keepBackground: true })
+      abortBlocking(chatId)
       steps.sealReasoningDuration()
       await persistCollectedAssistant(true)
       onEvent({

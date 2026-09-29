@@ -31,6 +31,7 @@ export const runTerminalCommand = async (
     description?: string
     sandboxed?: boolean
     allowNetwork?: boolean
+    projectWritable?: boolean
   },
 ): Promise<Record<string, unknown>> => {
   if (ctx.signal?.aborted) {
@@ -49,6 +50,8 @@ export const runTerminalCommand = async (
       command: args.command,
       sandboxed: args.sandboxed,
       allowNetwork: args.allowNetwork,
+      ...(args.projectWritable === false ? { projectWritable: false } : {}),
+      ...(ctx.subagentId ? { subagentId: ctx.subagentId } : {}),
     })
 
     if (args.is_background) {

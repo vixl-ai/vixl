@@ -129,6 +129,91 @@ describe('subagent-registry', () => {
     expect(hasPendingBackgroundResume('chat-1')).toBe(false)
   })
 
+  it('aborts only blocking subagents and keeps background running', async () => {
+    const {
+      abortBlocking,
+      hasPendingBackgroundResume,
+      listDeliverableBackgroundResults,
+      listSubagentsForChat,
+      register,
+    } = await import('@/services/harness/subagent/registry')
+
+    const blocking = new AbortController()
+    const background = new AbortController()
+    register(
+      'chat-1',
+      'block-1',
+      blocking,
+      { toolCallId: 'tc-block', agentName: 'blocking' },
+      { pendingResume: false },
+    )
+    register('chat-1', 'bg-1', background, {
+      toolCallId: 'tc-bg',
+      agentName: 'background',
+    })
+
+    const aborted = abortBlocking('chat-1')
+
+    expect(aborted).toEqual(['block-1'])
+    expect(blocking.signal.aborted).toBe(true)
+    expect(background.signal.aborted).toBe(false)
+    expect(hasPendingBackgroundResume('chat-1')).toBe(true)
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual([])
+
+    const records = listSubagentsForChat('chat-1')
+    expect(records.find((record) => record.subagentId === 'block-1')?.status).toBe(
+      'aborted',
+    )
+    expect(records.find((record) => record.subagentId === 'bg-1')?.status).toBe(
+      'running',
+    )
+  })
+
+  it('identifies running background subagents from pendingResume at register', async () => {
+    const { isRunningBackgroundSubagent, register, resolve } = await import(
+      '@/services/harness/subagent/registry'
+    )
+
+    register('chat-1', 'bg-1', new AbortController(), {
+      toolCallId: 'tc-bg',
+      agentName: 'background',
+    })
+    register(
+      'chat-1',
+      'block-1',
+      new AbortController(),
+      { toolCallId: 'tc-block', agentName: 'blocking' },
+      { pendingResume: false },
+    )
+
+    expect(isRunningBackgroundSubagent('bg-1')).toBe(true)
+    expect(isRunningBackgroundSubagent('block-1')).toBe(false)
+    expect(isRunningBackgroundSubagent('missing')).toBe(false)
+
+    resolve('bg-1', {
+      subagentId: 'bg-1',
+      name: 'background',
+      summary: 'done',
+    })
+    expect(isRunningBackgroundSubagent('bg-1')).toBe(false)
+  })
+
+  it('does not bump the registry revision when abortBlocking is a no-op', async () => {
+    const { abortBlocking, register, subagentRegistryRevision } = await import(
+      '@/services/harness/subagent/registry'
+    )
+
+    register('chat-1', 'bg-1', new AbortController(), {
+      toolCallId: 'tc-bg',
+      agentName: 'background',
+    })
+    const afterRegister = subagentRegistryRevision.value
+
+    expect(abortBlocking('chat-1')).toEqual([])
+    expect(abortBlocking('chat-missing')).toEqual([])
+    expect(subagentRegistryRevision.value).toBe(afterRegister)
+  })
+
   it('lists only completed and failed results as deliverable', async () => {
     const {
       register,
@@ -409,16 +494,17 @@ describe('subagent-registry', () => {
 
   it('bumps the registry revision on running and pending-resume transitions', async () => {
     const {
-      abort,
-      abortOne,
-      clearPendingBackgroundResume,
-      fail,
-      register,
-      reopen,
-      resetSubagentRegistryForTests,
-      resolve,
-      subagentRegistryRevision,
-    } = await import('@/services/harness/subagent/registry')
+    abort,
+    abortBlocking,
+    abortOne,
+    clearPendingBackgroundResume,
+    fail,
+    register,
+    reopen,
+    resetSubagentRegistryForTests,
+    resolve,
+    subagentRegistryRevision,
+  } = await import('@/services/harness/subagent/registry')
 
     let last = subagentRegistryRevision.value
     const expectBump = (): void => {
@@ -467,6 +553,18 @@ describe('subagent-registry', () => {
       toolCallId: 'tc-4',
       agentName: 'four',
     })
+    expectBump()
+
+    register(
+      'chat-1',
+      'block-1',
+      new AbortController(),
+      { toolCallId: 'tc-block', agentName: 'blocking' },
+      { pendingResume: false },
+    )
+    expectBump()
+
+    expect(abortBlocking('chat-1')).toEqual(['block-1'])
     expectBump()
 
     clearPendingBackgroundResume('chat-1')

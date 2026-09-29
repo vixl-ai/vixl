@@ -5,6 +5,12 @@ import {
   dropPlanExecutionSession,
   setActivePlanPath,
 } from '@/services/harness/plan-execution-session'
+import {
+  register,
+  resetSubagentRegistryForTests,
+  resolve,
+} from '@/services/harness/subagent/registry'
+import parseTodoUpdate from '@/services/harness/parse-todo-update'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
@@ -71,9 +77,17 @@ const existingPlan = createPlan({
   ],
 })
 
+const registerRunning = (subagentId: string, agentName: string, ownerChatId = chatId): void => {
+  register(ownerChatId, subagentId, new AbortController(), {
+    toolCallId: `tc-${subagentId}`,
+    agentName,
+  })
+}
+
 describe('update_plan_todo', () => {
   beforeEach(() => {
     dropPlanExecutionSession(projectSlug, chatId)
+    resetSubagentRegistryForTests()
     openPlan.mockClear()
     ensureHomeRoot.mockClear()
     resolveProjectIdByRoot.mockClear()
@@ -144,5 +158,101 @@ describe('update_plan_todo', () => {
     expect(result).toEqual({ todos })
     expect(fsReadFile).not.toHaveBeenCalled()
     expect(fsWriteFile).not.toHaveBeenCalled()
+  })
+
+  it('lists running subagents after a successful plan update', async () => {
+    registerRunning('sub-1', 'explorer')
+    registerRunning('sub-2', 'implementer')
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const tool = updatePlanTodo(planCtx())
+
+    const result = (await runTool(tool.execute, {
+      planPath: existingPlan.path,
+      todos: [{ id: 'update', content: 'Still going', status: 'in_progress' }],
+    })) as {
+      planPath: string
+      todos: Array<{ id: string }>
+      runningSubagents?: Array<{ subagentId: string; name: string }>
+      note?: string
+    }
+
+    expect(result.planPath).toBe(existingPlan.path)
+    expect(result.runningSubagents).toEqual([
+      { subagentId: 'sub-1', name: 'explorer' },
+      { subagentId: 'sub-2', name: 'implementer' },
+    ])
+    expect(result.note).toBeUndefined()
+  })
+
+  it('warns when marking a todo completed while subagents are still running', async () => {
+    registerRunning('sub-1', 'explorer')
+    registerRunning('sub-2', 'implementer')
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const tool = updatePlanTodo(planCtx())
+
+    const result = (await runTool(tool.execute, {
+      planPath: existingPlan.path,
+      todos: [{ id: 'update', content: 'New text', status: 'completed' }],
+    })) as {
+      planPath: string
+      todos: Array<{ id: string; status: string }>
+      runningSubagents?: Array<{ subagentId: string; name: string }>
+      note?: string
+    }
+
+    expect(result.runningSubagents).toEqual([
+      { subagentId: 'sub-1', name: 'explorer' },
+      { subagentId: 'sub-2', name: 'implementer' },
+    ])
+    expect(result.note).toBe(
+      'Background subagents are still running: explorer (sub-1), implementer (sub-2). Only mark a todo completed after its subagent result arrives.',
+    )
+    expect(parseTodoUpdate('update_plan_todo', result)).toEqual(result.todos)
+  })
+
+  it('lists running subagents on in-chat todo updates without a plan', async () => {
+    registerRunning('sub-1', 'explorer')
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const tool = updatePlanTodo(planCtx())
+    const todos = [{ id: 'chat-only', content: 'Track in chat Tasks', status: 'completed' as const }]
+
+    const result = (await runTool(tool.execute, { todos })) as {
+      todos: typeof todos
+      runningSubagents?: Array<{ subagentId: string; name: string }>
+      note?: string
+    }
+
+    expect(result.todos).toEqual(todos)
+    expect(result.runningSubagents).toEqual([{ subagentId: 'sub-1', name: 'explorer' }])
+    expect(result.note).toBe(
+      'Background subagents are still running: explorer (sub-1). Only mark a todo completed after its subagent result arrives.',
+    )
+    expect(fsWriteFile).not.toHaveBeenCalled()
+  })
+
+  it('omits finished subagents and ignores running agents from other chats', async () => {
+    registerRunning('sub-done', 'writer')
+    resolve('sub-done', { subagentId: 'sub-done', name: 'writer', summary: 'done' })
+    registerRunning('sub-other', 'researcher', 'chat-other')
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const tool = updatePlanTodo(planCtx())
+
+    const result = (await runTool(tool.execute, {
+      planPath: existingPlan.path,
+      todos: [{ id: 'update', content: 'New text', status: 'completed' }],
+    })) as {
+      planPath: string
+      todos: Array<{ id: string }>
+      runningSubagents?: Array<{ subagentId: string; name: string }>
+      note?: string
+    }
+
+    expect(result).toEqual({
+      planPath: existingPlan.path,
+      todos: [
+        { id: 'keep', content: 'Keep me', status: 'in_progress' },
+        { id: 'update', content: 'New text', status: 'completed' },
+      ],
+    })
   })
 })

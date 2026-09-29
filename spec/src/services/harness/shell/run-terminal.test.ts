@@ -1039,4 +1039,133 @@ describe('build-tools run_terminal', () => {
       }),
     )
   })
+
+  it('records the nested subagent owner on created shells', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      subagentId: 'bg-1',
+    })
+    await runTool(tools.run_terminal.execute, { command: 'echo hello' })
+
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chatId: 'chat-1',
+        command: 'echo hello',
+        subagentId: 'bg-1',
+      }),
+    )
+  })
+
+  it('never retries unsandboxed for a read-only nested ctx', async () => {
+    createAgentShell.mockRejectedValueOnce(new Error('SANDBOX_FAILED: seatbelt'))
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      subagentId: 'ro-1',
+      subagentCapabilities: 'read-only',
+    })
+
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'gh pr view 1' }),
+    ).rejects.toThrow(/SANDBOX_FAILED/)
+
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'gh pr view 1',
+        sandboxed: true,
+        projectWritable: false,
+      }),
+    )
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'shell.network',
+        capability: 'shell.network',
+        unsandboxed: false,
+      }),
+    )
+  })
+
+  it('does not honor session unsandboxed allowances for a read-only nested ctx', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      subagentId: 'ro-1',
+      subagentCapabilities: 'read-only',
+      sessionAllows: new Set(['shell.unsandboxed']),
+    })
+
+    await runTool(tools.run_terminal.execute, { command: 'gh pr view 1' })
+
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'gh pr view 1',
+        sandboxed: true,
+        projectWritable: false,
+      }),
+    )
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unsandboxed: false,
+      }),
+    )
+  })
+
+  it('refuses read-only nested shell when the sandbox is disabled', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      subagentId: 'ro-1',
+      subagentCapabilities: 'read-only',
+      settings: { version: 1, 'agent.sandbox.enabled': false } as VixlSettings,
+      sandboxEnabled: false,
+    })
+
+    const result = await runTool(tools.run_terminal.execute, {
+      command: 'gh pr view 1',
+    })
+
+    expect(createAgentShell).not.toHaveBeenCalled()
+    expect(gateToolPermission).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      rejected: true,
+      error:
+        'Read-only subagents cannot run an unsandboxed shell. Enable the OS sandbox, or spawn a write-capable subagent.',
+    })
+  })
+
+  it('refuses read-only nested shell when the OS sandbox is unavailable', async () => {
+    createAgentShell.mockRejectedValueOnce(
+      new Error(
+        'SANDBOX_UNAVAILABLE: no OS sandbox on this platform; approve unsandboxed shell to continue',
+      ),
+    )
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      subagentId: 'ro-1',
+      subagentCapabilities: 'read-only',
+    })
+
+    const result = await runTool(tools.run_terminal.execute, {
+      command: 'gh pr view 1',
+    })
+
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sandboxed: true,
+        projectWritable: false,
+      }),
+    )
+    expect(result).toMatchObject({
+      rejected: true,
+      error:
+        'Read-only subagents require an OS sandbox. This platform has no sandbox, so run_terminal is unavailable.',
+    })
+  })
 })

@@ -12,6 +12,7 @@ const completionWaiters = new Map<string, CompletionWaiter[]>()
 const turnResponseMessages = new Map<string, ModelMessage[]>()
 const pendingBackgroundResume = new Set<string>()
 const deliveredBackgroundResults = new Map<string, Set<string>>()
+const blockingSubagents = new Set<string>()
 
 export const subagentRegistryRevision = ref(0)
 
@@ -72,8 +73,11 @@ export const register = (
   subagents.set(subagentId, record)
   controllers.set(subagentId, controller)
   trackSubagentForChat(chatId, subagentId)
+  // pendingResume: false at register marks a blocking subagent.
   if (options?.pendingResume !== false) {
     pendingBackgroundResume.add(chatId)
+  } else {
+    blockingSubagents.add(subagentId)
   }
   bumpRevision()
   return record
@@ -87,6 +91,7 @@ export const resolve = (subagentId: string, result: SubagentResult): void => {
 
   setSubagentStatus(record, 'completed', result)
   controllers.delete(subagentId)
+  blockingSubagents.delete(subagentId)
   resolveCompletionWaiters(subagentId, result)
   bumpRevision()
 }
@@ -104,6 +109,7 @@ export const fail = (subagentId: string, summary: string): void => {
   }
   setSubagentStatus(record, 'failed', result)
   controllers.delete(subagentId)
+  blockingSubagents.delete(subagentId)
   resolveCompletionWaiters(subagentId, result)
   bumpRevision()
 }
@@ -143,6 +149,10 @@ export const listSubagentsForChat = (chatId: string): SubagentRecord[] => {
 
 export const hasRunningSubagentsForChat = (chatId: string): boolean =>
   listSubagentsForChat(chatId).some((record) => record.status === 'running')
+
+export const isRunningBackgroundSubagent = (subagentId: string): boolean =>
+  subagents.get(subagentId)?.status === 'running' &&
+  !blockingSubagents.has(subagentId)
 
 export const getRunningSubagentForChat = (chatId: string): SubagentRecord | null =>
   listSubagentsForChat(chatId).find((record) => record.status === 'running') ?? null
@@ -235,25 +245,48 @@ export const reopen = (
   return record
 }
 
-export const abortOne = (subagentId: string): void => {
+const abortRunning = (subagentId: string, summary: string): boolean => {
   clearSteers(subagentId)
   const record = subagents.get(subagentId)
   if (!record || record.status !== 'running') {
-    return
+    blockingSubagents.delete(subagentId)
+    return false
   }
 
-  const controller = controllers.get(subagentId)
-  controller?.abort()
+  controllers.get(subagentId)?.abort()
   controllers.delete(subagentId)
-
+  blockingSubagents.delete(subagentId)
   const result: SubagentResult = {
     subagentId,
     name: record.agentName,
-    summary: 'Stopped',
+    summary,
   }
   setSubagentStatus(record, 'aborted', result)
   resolveCompletionWaiters(subagentId, result)
-  bumpRevision()
+  return true
+}
+
+export const abortOne = (subagentId: string): void => {
+  if (abortRunning(subagentId, 'Stopped')) {
+    bumpRevision()
+  }
+}
+
+export const abortBlocking = (chatId: string): string[] => {
+  const ids = chatSubagents.get(chatId)
+  if (!ids) {
+    return []
+  }
+
+  const abortedIds = [...ids].filter(
+    (subagentId) =>
+      blockingSubagents.has(subagentId) &&
+      abortRunning(subagentId, 'Subagent aborted'),
+  )
+  if (abortedIds.length > 0) {
+    bumpRevision()
+  }
+  return abortedIds
 }
 
 export const abort = (chatId: string): void => {
@@ -266,23 +299,7 @@ export const abort = (chatId: string): void => {
   }
 
   for (const subagentId of ids) {
-    clearSteers(subagentId)
-    const record = subagents.get(subagentId)
-    if (!record || record.status !== 'running') {
-      continue
-    }
-
-    const controller = controllers.get(subagentId)
-    controller?.abort()
-    controllers.delete(subagentId)
-
-    const result: SubagentResult = {
-      subagentId,
-      name: record.agentName,
-      summary: 'Subagent aborted',
-    }
-    setSubagentStatus(record, 'aborted', result)
-    resolveCompletionWaiters(subagentId, result)
+    abortRunning(subagentId, 'Subagent aborted')
   }
 
   chatSubagents.delete(chatId)
@@ -300,6 +317,7 @@ export const resetSubagentRegistryForTests = (): void => {
   turnResponseMessages.clear()
   pendingBackgroundResume.clear()
   deliveredBackgroundResults.clear()
+  blockingSubagents.clear()
   resetInboxForTests()
   bumpRevision()
 }

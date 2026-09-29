@@ -2,8 +2,67 @@ import type { UIMessage } from 'ai'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { ChatTimelineItem, SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { TodoItem } from '@/types/harness/harness-event'
+import type { ToolRun } from '@/types/harness/tool-run'
 import buildSubagentTimeline from '@/utils/build-subagent-timeline'
 import formatTranscriptToolRun from '@/utils/format-transcript-tool-run'
+
+type HistoryPart =
+  | { kind: 'text'; text: string }
+  | { kind: 'tool'; toolCallId: string }
+
+type HistoryCursor = {
+  parts: HistoryPart[]
+  index: number
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+const partText = (part: Record<string, unknown>): string => {
+  if (typeof part.text === 'string') {
+    return part.text.trim()
+  }
+  if (typeof part.reasoning === 'string') {
+    return part.reasoning.trim()
+  }
+  return ''
+}
+
+const flattenAssistantHistory = (messages: unknown[]): HistoryPart[] => {
+  const parts: HistoryPart[] = []
+  for (const message of messages) {
+    if (!isRecord(message) || message.role !== 'assistant') {
+      continue
+    }
+    const content = message.content
+    if (typeof content === 'string') {
+      const text = content.trim()
+      if (text) {
+        parts.push({ kind: 'text', text })
+      }
+      continue
+    }
+    if (!Array.isArray(content)) {
+      continue
+    }
+    for (const raw of content) {
+      if (!isRecord(raw)) {
+        continue
+      }
+      if (raw.type === 'reasoning' || raw.type === 'text') {
+        const text = partText(raw)
+        if (text) {
+          parts.push({ kind: 'text', text })
+        }
+        continue
+      }
+      if (raw.type === 'tool-call' && typeof raw.toolCallId === 'string') {
+        parts.push({ kind: 'tool', toolCallId: raw.toolCallId })
+      }
+    }
+  }
+  return parts
+}
 
 const serializeMessageText = (message: UIMessage): string =>
   message.parts
@@ -24,6 +83,8 @@ const serializeUser = (message: UIMessage): string => {
 const serializeAgentTurn = (turn: AgentTurn): string => {
   const parts: string[] = []
   for (const step of turn.steps) {
+    // AgentStep stores reasoning, text, and tools as separate buckets.
+    // Intra-step part order is not persisted.
     const reasoning = step.reasoning.trim()
     if (reasoning.length > 0) {
       parts.push(reasoning)
@@ -50,14 +111,65 @@ const serializeTodos = (todos: TodoItem[]): string => {
   return `TODO:\n${lines.join('\n') || '(empty)'}`
 }
 
+const emitHistoryThroughTools = (
+  lines: string[],
+  cursor: HistoryCursor,
+  tools: ToolRun[],
+  toolsById: Map<string, ToolRun>,
+): void => {
+  const remaining = new Set(tools.map((tool) => tool.toolCallId))
+  const emitted = new Set<string>()
+  while (cursor.index < cursor.parts.length && remaining.size > 0) {
+    const part = cursor.parts[cursor.index]!
+    if (part.kind === 'tool') {
+      if (!remaining.has(part.toolCallId)) {
+        break
+      }
+      const run = toolsById.get(part.toolCallId)
+      if (run) {
+        lines.push(formatTranscriptToolRun(run))
+      }
+      remaining.delete(part.toolCallId)
+      emitted.add(part.toolCallId)
+      cursor.index += 1
+      continue
+    }
+    lines.push(part.text)
+    cursor.index += 1
+  }
+  for (const tool of tools) {
+    if (!emitted.has(tool.toolCallId)) {
+      lines.push(formatTranscriptToolRun(tool))
+    }
+  }
+}
+
 const appendSubagentEventLines = (
   lines: string[],
   item: SubagentTimelineItem,
 ): void => {
   const promptId = `${item.subagentId}-prompt`
+  const toolsById = new Map(item.tools.map((tool) => [tool.toolCallId, tool]))
+  const cursor: HistoryCursor = {
+    parts: flattenAssistantHistory(item.messages ?? []),
+    index: 0,
+  }
+  const useHistory = cursor.parts.length > 0
   for (const timelineItem of buildSubagentTimeline(item)) {
     if (timelineItem.type === 'agent-turn') {
       for (const step of timelineItem.turn.steps) {
+        if (useHistory) {
+          emitHistoryThroughTools(lines, cursor, step.tools, toolsById)
+          continue
+        }
+        const reasoning = step.reasoning.trim()
+        if (reasoning.length > 0) {
+          lines.push(reasoning)
+        }
+        const text = step.text.trim()
+        if (text.length > 0) {
+          lines.push(text)
+        }
         lines.push(...step.tools.map(formatTranscriptToolRun))
       }
       continue
@@ -76,6 +188,18 @@ const appendSubagentEventLines = (
     const message = serializeMessageText(timelineItem.message)
     if (message.length > 0) {
       lines.push(`steer: ${message}`)
+    }
+  }
+  while (cursor.index < cursor.parts.length) {
+    const part = cursor.parts[cursor.index]!
+    cursor.index += 1
+    if (part.kind === 'text') {
+      lines.push(part.text)
+      continue
+    }
+    const run = toolsById.get(part.toolCallId)
+    if (run) {
+      lines.push(formatTranscriptToolRun(run))
     }
   }
 }

@@ -23,6 +23,14 @@ export default (error: unknown): string => {
         return nested
       }
     }
+    try {
+      const serialized = JSON.stringify(error)
+      if (serialized && serialized !== '{}') {
+        return serialized
+      }
+    } catch {
+      return 'Unknown error'
+    }
   }
   return 'Unknown error'
 }

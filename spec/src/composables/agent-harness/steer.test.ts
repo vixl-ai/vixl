@@ -102,13 +102,16 @@ describe('agent-harness steerSubagent', () => {
       }),
       'sub-1',
       'keep going',
+      'explorer',
     )
     expect(state.subagents.value[0]?.status).toBe('running')
     expect(state.session.rollbackLocalSubagentSteer).not.toHaveBeenCalled()
   })
 
-  it('rolls back pending steer and running status when deliverSteer returns an error', async () => {
-    deliverSteer.mockResolvedValue({ error: 'Subagent sub-1 is aborted and cannot be steered.' })
+  it('rolls back pending steer and running status when deliverSteer rejects', async () => {
+    deliverSteer.mockRejectedValue(
+      new Error('Subagent sub-1 is aborted and cannot be steered.'),
+    )
     const state = buildState()
     const { steerSubagent } = createSteer(state, {
       handleEvent: vi.fn<(event: unknown) => void>(),
@@ -178,7 +181,7 @@ describe('agent-harness steerSubagent', () => {
   })
 
   it('removes an inserted subagent entry when steer delivery fails', async () => {
-    deliverSteer.mockResolvedValue({ error: 'Unknown subagentId: sub-1' })
+    deliverSteer.mockRejectedValue(new Error('Unknown subagentId: sub-1'))
     const state = buildState()
     state.subagents.value = []
     const { steerSubagent } = createSteer(state, {
