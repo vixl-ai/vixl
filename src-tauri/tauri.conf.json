@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "vixl",
-  "version": "0.10.20",
+  "version": "0.10.21",
   "identifier": "app.vixl",
   "build": {
     "frontendDist": "../dist",
