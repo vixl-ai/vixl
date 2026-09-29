@@ -11,7 +11,6 @@ import {
   setMessages,
 } from '@/services/harness/subagent/registry'
 import runSubagentGenerate from '@/services/harness/subagent/run-generate'
-import linkAbortSignal from '@/utils/link-abort-signal'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const resumeSubagent = async (
@@ -34,7 +33,7 @@ const resumeSubagent = async (
   }
 
   const controller = new AbortController()
-  linkAbortSignal(ctx.signal, controller)
+  // Resumed work stays background; do not link to the parent turn signal.
   const reopened = reopen(subagentId, controller)
   if (!reopened) {
     throw new Error(`Subagent cannot be resumed: ${subagentId}`)

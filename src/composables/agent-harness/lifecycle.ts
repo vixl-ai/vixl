@@ -1,11 +1,12 @@
 import { toast } from 'vue-sonner'
 import {
   abort as abortSubagentsForChat,
+  abortBlocking,
   abortOne,
-  clearPendingBackgroundResume,
   listSubagentsForChat,
 } from '@/services/harness/subagent/registry'
 import {
+  getPendingApproval,
   rejectPendingForChat,
   rejectPendingForSubagent,
 } from '@/services/harness/permission/approval-gate'
@@ -63,14 +64,23 @@ export default (
     deps.maybeFlushBackgroundSubagentResume()
   }
 
-  const stop = async (): Promise<void> => {
+  const stop = async (flags?: { keepBackground?: boolean }): Promise<void> => {
+    const keepBackground = flags?.keepBackground === true
     suppressQueueDrainAfterStop.value = true
     abortController.value?.abort()
-    rejectPendingMcpAuthForChat(options.chatId)
-    pendingMcpAuth.value = []
-    rejectPendingForChat(options.chatId)
-    pendingApprovals.value = []
-    deps.stopMcpAuthPolling()
+    const keepOpts = keepBackground ? { keepBackground: true } : undefined
+    rejectPendingMcpAuthForChat(options.chatId, keepOpts)
+    rejectPendingForChat(options.chatId, keepOpts)
+    if (keepBackground) {
+      pendingApprovals.value = pendingApprovals.value.filter((entry) =>
+        Boolean(getPendingApproval(entry.toolCallId)),
+      )
+      deps.syncPendingMcpAuth()
+    } else {
+      pendingMcpAuth.value = []
+      pendingApprovals.value = []
+      deps.stopMcpAuthPolling()
+    }
     attention.maybeClearAttentionWhenGatesEmpty()
     const runningIds = new Set([
       ...listSubagentsForChat(options.chatId)
@@ -80,14 +90,19 @@ export default (
         .filter((item) => item.status === 'running')
         .map((item) => item.subagentId),
     ])
-    abortSubagentsForChat(options.chatId)
-    for (const subagentId of runningIds) {
+    const stoppedIds = keepBackground
+      ? new Set(abortBlocking(options.chatId))
+      : runningIds
+    if (!keepBackground) {
+      abortSubagentsForChat(options.chatId)
+    }
+    for (const subagentId of stoppedIds) {
       session.clearLocalQueuedSubagentSteers(subagentId)
       session.completeLocalSubagent(subagentId, 'Stopped', 'stopped')
     }
-    if (runningIds.size > 0) {
+    if (stoppedIds.size > 0) {
       subagents.value = subagents.value.map((item) =>
-        runningIds.has(item.subagentId)
+        stoppedIds.has(item.subagentId)
           ? { ...item, status: 'stopped', summary: 'Stopped' }
           : item,
       )
@@ -107,7 +122,7 @@ export default (
       })
     }
     try {
-      await killShellsForChat(options.chatId)
+      await killShellsForChat(options.chatId, keepOpts)
     } catch (stopError) {
       toast.error('Failed to stop terminals', {
         description: stopError instanceof Error ? stopError.message : 'Unknown error',
@@ -121,8 +136,7 @@ export default (
       return
     }
     messageQueue.remove(id)
-    await stop()
-    clearPendingBackgroundResume(options.chatId)
+    await stop({ keepBackground: true })
     await waitUntilParentUnblocked(state)
     if (state.disposed.value) {
       return

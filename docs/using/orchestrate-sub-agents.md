@@ -1,23 +1,23 @@
 ---
 title: Orchestrate sub-agents
-description: Orchestrator mode locks the Vixl parent to guiding sub-agents; it does not write files, run shell, or mutate git itself.
+description: Orchestrator mode locks the Vixl parent to guiding sub-agents; it can run validation commands but does not write files or mutate git itself.
 ---
 
 # Orchestrate sub-agents
 
-[Orchestrator mode](/concepts/chat-modes) is the lock: the parent guides sub-agents. It does not write files, edit, patch, delete, move files, run shell, or run [git](https://git-scm.com) mutations itself.
+[Orchestrator mode](/concepts/chat-modes) is the lock: the parent guides sub-agents. It does not write files, edit, patch, delete, or move files, or run [git](https://git-scm.com) mutations itself. It can run validation shell commands (CI, tests, `gh` PR comments).
 
-The mode allowlist is reads, codebase tools, git status/diff/log/branch, lsp, diagnostics, `load_skill`, `ask_user`, `web_fetch`, [MCP](https://modelcontextprotocol.io) getters/calls, `create_plan`, `update_plan`, `update_plan_todo`, `update_todos`, `spawn_subagent`, `steer_subagent`, `resolve_models`, and `move_workspace`. The built-in skill says: Never mutate files or run shell from the parent. Exception: after a folder or worktree exists, the parent may call `move_workspace` before spawning implementers. The skill also says network via user MCP only; `web_fetch` is still on the allowlist.
+The mode allowlist is reads, codebase tools, git status/diff/log/branch, lsp, diagnostics, `load_skill`, `ask_user`, `web_fetch`, the shell suite (`run_terminal`, `terminal_output`, `stop_terminal`), [MCP](https://modelcontextprotocol.io) getters/calls, `create_plan`, `update_plan`, `update_plan_todo`, `update_todos`, `spawn_subagent`, `steer_subagent`, `resolve_models`, and `move_workspace`. The built-in skill says the parent never edits source files; shell is for validation only. Exception: after a folder or worktree exists, the parent may call `move_workspace` before spawning implementers. Network goes through `web_fetch`, user MCP, or validation shell commands such as `gh`.
 
 Approvals still apply. See [Permissions and approvals](/concepts/permissions-and-approvals).
 
 ## Spawn
 
-The parent calls `spawn_subagent`. `agentName` is a catalog custom-agent name, or a 2 to 6 word verb phrase for a generic helper. `prompt` is the task. `mode` is `blocking` (default) or `background`. Optional `model` is an exact `provider::modelId` from `resolve_models` (ignored when a plan locked a subagent model). `capabilities` is `read-only` (default) or `write`.
+The parent calls `spawn_subagent`. `agentName` is a catalog custom-agent name, or any other label (ideally a short verb phrase) for a generic helper. `prompt` is the task. `mode` is `blocking` (default) or `background`. Optional `model` is an exact `provider::modelId` from `resolve_models` (ignored when a plan locked a subagent model). `capabilities` is `read-only` (default) or `write`.
 
 Ask and Plan cannot spawn write-capable helpers. Nested agents cannot spawn further sub-agents. They also do not get `steer_subagent`, `create_plan`, `update_plan`, `update_plan_todo`, `update_todos`, `ask_user`, `move_workspace`, or `resolve_models`.
 
-Read-only nested tools: reads, codebase, git status/diff/log/branch, lsp, diagnostics, `load_skill`, `web_fetch`, MCP. Write adds write/edit/patch/delete/move, the terminal suite, and git commit/checkout/branch_create.
+Read-only nested tools: reads, codebase, git status/diff/log/branch, lsp, diagnostics, `load_skill`, `web_fetch`, MCP, and the terminal suite in a sandbox where the project is not writable. Write adds write/edit/patch/delete/move and git commit/checkout/branch_create.
 
 Model pick order when there is no plan lock: the spawn `model` argument, else the agent file's `model`, else Settings `models.subagent`. Fuzzy names are rejected. Call `resolve_models` first. A plan Orchestrate lock ignores the spawn `model` and the agent-file model. See [Models and roles](/concepts/models-and-roles).
 

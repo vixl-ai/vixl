@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::io::AsyncReadExt;
+use tokio::task::JoinHandle;
 
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
@@ -62,6 +64,30 @@ fn kill_process_group(child: &mut tokio::process::Child) {
     }
 }
 
+const OUTPUT_PUMP_JOIN_TIMEOUT: Duration = Duration::from_secs(3);
+
+async fn join_output_pumps_with_timeout(
+    stdout: JoinHandle<()>,
+    stderr: JoinHandle<()>,
+    timeout: Duration,
+) {
+    let stdout_abort = stdout.abort_handle();
+    let stderr_abort = stderr.abort_handle();
+    if tokio::time::timeout(timeout, async {
+        let _ = tokio::join!(stdout, stderr);
+    })
+    .await
+    .is_err()
+    {
+        stdout_abort.abort();
+        stderr_abort.abort();
+    }
+}
+
+async fn join_output_pumps(stdout: JoinHandle<()>, stderr: JoinHandle<()>) {
+    join_output_pumps_with_timeout(stdout, stderr, OUTPUT_PUMP_JOIN_TIMEOUT).await
+}
+
 async fn pump_shell_stream(
     app: AppHandle,
     shell_id: String,
@@ -114,8 +140,15 @@ pub async fn shell_spawn_tracked(
     command: String,
     sandboxed: Option<bool>,
     allow_network: Option<bool>,
+    project_writable: Option<bool>,
 ) -> Result<(), String> {
-    let mut child = spawn_child(&project_root, &command, sandboxed, allow_network)?;
+    let mut child = spawn_child(
+        &project_root,
+        &command,
+        sandboxed,
+        allow_network,
+        project_writable,
+    )?;
 
     let stdout = child
         .stdout
@@ -139,13 +172,13 @@ pub async fn shell_spawn_tracked(
 
     let app_stdout = app.clone();
     let shell_stdout = shell_id.clone();
-    tokio::spawn(async move {
+    let stdout_task = tokio::spawn(async move {
         pump_shell_stream(app_stdout, shell_stdout, "stdout", stdout).await;
     });
 
     let app_stderr = app.clone();
     let shell_stderr = shell_id.clone();
-    tokio::spawn(async move {
+    let stderr_task = tokio::spawn(async move {
         pump_shell_stream(app_stderr, shell_stderr, "stderr", stderr).await;
     });
 
@@ -178,6 +211,10 @@ pub async fn shell_spawn_tracked(
           }
         };
 
+        // Drain remaining stdout/stderr before exit so the frontend does not
+        // drop the tail when it unregisters listeners on the exit event.
+        join_output_pumps(stdout_task, stderr_task).await;
+
         let _ = exit_tx.send(Some(exit.clone()));
         TRACKED_SHELLS.lock().unwrap().remove(&shell_wait);
 
@@ -208,4 +245,38 @@ pub async fn shell_kill_tracked(shell_id: String) -> Result<ShellExitResult, Str
     let _ = tracked.kill_tx.send(()).await;
 
     Ok(recv_tracked_exit(tracked.exit_rx).await)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    #[tokio::test]
+    async fn join_output_pumps_waits_for_both_tasks() {
+        let finished = Arc::new(AtomicBool::new(false));
+        let flag = finished.clone();
+        let stdout = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            flag.store(true, Ordering::SeqCst);
+        });
+        let stderr = tokio::spawn(async {});
+
+        join_output_pumps_with_timeout(stdout, stderr, Duration::from_secs(1)).await;
+
+        assert!(finished.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn join_output_pumps_times_out_hung_pipe() {
+        let stdout = tokio::spawn(std::future::pending::<()>());
+        let stderr = tokio::spawn(async {});
+        let started = Instant::now();
+
+        join_output_pumps_with_timeout(stdout, stderr, Duration::from_millis(50)).await;
+
+        assert!(started.elapsed() < Duration::from_millis(500));
+    }
 }

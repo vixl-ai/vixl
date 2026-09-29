@@ -9,7 +9,20 @@
 ///
 /// Ancestor directories of `home` and `project_root` are emitted as literal
 /// file-read allows so Node/npm `realpath`/`lstat` walks do not hit EPERM.
+///
+/// `project_writable` defaults to true via [`generate_seatbelt_profile`]. When
+/// false, PROJECT_ROOT stays readable and TMPDIR/caches stay writable, but the
+/// profile omits the project write allow (and the .env template write allow).
 pub fn generate_seatbelt_profile(allow_network: bool, home: &str, project_root: &str) -> String {
+    generate_seatbelt_profile_with(allow_network, true, home, project_root)
+}
+
+pub fn generate_seatbelt_profile_with(
+    allow_network: bool,
+    project_writable: bool,
+    home: &str,
+    project_root: &str,
+) -> String {
     let network_rule = if allow_network {
         "(allow network*)\n"
     } else {
@@ -17,9 +30,36 @@ pub fn generate_seatbelt_profile(allow_network: bool, home: &str, project_root: 
     };
 
     let ancestor_rules = format_ancestor_read_rules(home, project_root);
+    let project_write_rules = if project_writable {
+        r#"
+; Project root: full read/write access
+(allow file-read*  (subpath (param "PROJECT_ROOT")))
+(allow file-write* (subpath (param "PROJECT_ROOT")))
+
+; Deny writes to .git/hooks to prevent hook injection attacks
+(deny file-write* (subpath (string-append (param "PROJECT_ROOT") "/.git/hooks")))
+
+; Deny writes to .env and .env.* so the shell cannot bypass file-tool sensitive-path checks.
+; require-all keeps the regex scoped to PROJECT_ROOT without interpolating it into the pattern.
+; Later rules win: re-allow the same env templates that file tools permit.
+(deny file-write*
+  (require-all
+    (subpath (param "PROJECT_ROOT"))
+    (regex #"/\.env(\.[^/]*)?$")))
+(allow file-write*
+  (require-all
+    (subpath (param "PROJECT_ROOT"))
+    (regex #"/\.env\.(example|sample|template)$")))
+"#
+    } else {
+        r#"
+; Project root: read-only (TMPDIR and tool caches stay writable)
+(allow file-read*  (subpath (param "PROJECT_ROOT")))
+"#
+    };
 
     format!(
-        r#"(version 1)
+        r##"(version 1)
 (deny default)
 
 ; Process and signal operations required for shell execution
@@ -85,19 +125,12 @@ pub fn generate_seatbelt_profile(allow_network: bool, home: &str, project_root: 
 (deny file-write* (subpath (string-append (param "HOME") "/.aws")))
 (deny file-read*  (subpath (string-append (param "HOME") "/.gnupg")))
 (deny file-write* (subpath (string-append (param "HOME") "/.gnupg")))
-
-; Project root: full read/write access
-(allow file-read*  (subpath (param "PROJECT_ROOT")))
-(allow file-write* (subpath (param "PROJECT_ROOT")))
-
-; Deny writes to .git/hooks to prevent hook injection attacks
-(deny file-write* (subpath (string-append (param "PROJECT_ROOT") "/.git/hooks")))
-
+{project_write_rules}
 ; TMPDIR (macOS uses /private/var/folders/…/T by default)
 (allow file-read*  (subpath (param "TMPDIR")))
 (allow file-write* (subpath (param "TMPDIR")))
 
-{network_rule}"#
+{network_rule}"##
     )
 }
 

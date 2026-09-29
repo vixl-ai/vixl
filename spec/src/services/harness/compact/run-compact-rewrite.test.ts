@@ -301,6 +301,33 @@ describe('runCompactRewrite', () => {
     )
   })
 
+  it('applies transformSummary to the returned summary and rewritten messages', async () => {
+    generateCheckpoint.mockResolvedValue({
+      summary: 'Short recap',
+      usage: { inputTokens: 2, outputTokens: 1 },
+      providerMetadata: undefined,
+      responseId: 'r1',
+      modelRef,
+    })
+    const messages: ModelMessage[] = [
+      { role: 'user', content: 'Find the auth bug.' },
+      { role: 'assistant', content: hugeContent },
+    ]
+
+    const result = await runCompactRewrite({
+      checkpointInput: checkpointInput(messages),
+      system,
+      messages,
+      highWater,
+      transformSummary: (summary) => `${summary}\n\nSubagent ledger:\n- explorer (sub-1): completed`,
+    })
+
+    expect(result.summary).toContain('Subagent ledger:')
+    expect(result.summary).toContain('Short recap')
+    expect(JSON.stringify(result.messages)).toContain('Subagent ledger:')
+    expect(JSON.stringify(result.messages)).toContain('Short recap')
+  })
+
   it('rethrows aborted checkpoint generation', async () => {
     const controller = new AbortController()
     generateCheckpoint.mockImplementation(async () => {

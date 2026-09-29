@@ -35,11 +35,11 @@ Build starts (or resumes) an Agent-mode chat against the plan. Orchestrate start
 
 ## Orchestrator
 
-Orchestrator coordinates through sub-agents. The parent must not mutate files or run shell. After a folder or worktree exists, the parent may `move_workspace` before spawning implementers. Implementers wait until the chat is on that workspace.
+Orchestrator coordinates through sub-agents. The parent never edits files. It can run validation shell commands (CI, tests, `gh` PR comments). After a folder or worktree exists, the parent may `move_workspace` before spawning implementers. Implementers wait until the chat is on that workspace.
 
-The parent can read and search, inspect git, use LSP, load skills, ask you questions, call MCP, `create_plan` / `update_plan` / `update_plan_todo` / `update_todos`, spawn and steer sub-agents, and resolve models. It has no `write_file`, `edit_file`, `apply_patch`, `delete_file`, `move_file`, no shell suite, and no git mutations.
+The parent can read and search, inspect git, use LSP, load skills, ask you questions, call MCP, `create_plan` / `update_plan` / `update_plan_todo` / `update_todos`, spawn and steer sub-agents, and resolve models. It has the shell suite (`run_terminal`, `terminal_output`, `stop_terminal`) for validation. It has no `write_file`, `edit_file`, `apply_patch`, `delete_file`, `move_file`, and no git mutations.
 
-The orchestrator skill says to use your MCP servers for network, not built-in fetch. The allowlist still includes `web_fetch`. Background spawns are preferred. The parent leaves a one-line status and ends the turn. The harness resumes when a sub-agent finishes. `terminal_output` is not how that wait works. Nested agents cannot spawn further sub-agents.
+Network goes through `web_fetch`, user MCP, or validation shell commands such as `gh`. Background spawns are preferred. The parent leaves a one-line status and ends the turn. The harness resumes when a sub-agent finishes. `terminal_output` is not how that wait works. Nested agents cannot spawn further sub-agents.
 
 See [Orchestrate sub-agents](/using/orchestrate-sub-agents) and [Best practices](/using/best-practices).
 

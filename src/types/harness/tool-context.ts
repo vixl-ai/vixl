@@ -32,6 +32,8 @@ type HarnessToolContext = {
   /** Set when tools run inside a spawn_subagent nested agent. */
   subagentId?: string
   subagentLabel?: string
+  /** Present on nested spawn_subagent tool contexts. */
+  subagentCapabilities?: 'read-only' | 'write'
 }
 
 export type { HarnessToolContext }

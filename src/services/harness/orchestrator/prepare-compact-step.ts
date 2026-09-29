@@ -13,6 +13,8 @@ import {
   resolveCompactWindow,
   runCompactRewrite,
 } from '@/services/harness/compact'
+import { listSubagentsForChat } from '@/services/harness/subagent/registry'
+import appendSubagentCheckpointSummary from './append-subagent-checkpoint-summary'
 
 type PrepareParentCompactStepInput = {
   settings: VixlSettings
@@ -45,6 +47,7 @@ export default (input: PrepareParentCompactStepInput) =>
 
     input.onEvent({ type: 'compaction-started' })
     try {
+      const records = listSubagentsForChat(input.chatId)
       const compactedRewrite = await runCompactRewrite({
         checkpointInput: {
           model: input.model,
@@ -60,19 +63,23 @@ export default (input: PrepareParentCompactStepInput) =>
         messages: options.messages,
         highWater,
         hardWindow: resolveCompactWindow(settings, modelRef),
+        transformSummary: (summary) =>
+          appendSubagentCheckpointSummary(summary, records),
       })
+
+      const summary = compactedRewrite.summary
 
       const checkpoint = await persistCompactionCheckpoint({
         projectSlug: input.workspace.projectSlug,
         chatId: input.chatId,
-        summary: compactedRewrite.summary,
+        summary,
         focus: 'parent',
         messages: input.messages,
       })
 
       input.onEvent({
         type: 'compaction',
-        summary: compactedRewrite.summary,
+        summary,
         focus: 'parent',
       })
       input.onEvent({

@@ -18,16 +18,36 @@ vi.mock('@/services/billing/capture-billable-usage', () => ({
   default: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }))
 
+const rejectPendingForChat = vi.hoisted(() =>
+  vi.fn<(chatId: string, options?: { keepBackground?: boolean }) => void>(),
+)
+const rejectPendingQuestionsForChat = vi.hoisted(() =>
+  vi.fn<(chatId: string) => void>(),
+)
+const rejectPendingMcpAuthForChat = vi.hoisted(() =>
+  vi.fn<(chatId: string, options?: { keepBackground?: boolean }) => void>(),
+)
+const killShellsForChat = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<void>>(),
+)
+
 vi.mock('@/services/harness/permission/approval-gate', () => ({
-  rejectPendingForChat: vi.fn<() => void>(),
+  rejectPendingForChat: (
+    chatId: string,
+    options?: { keepBackground?: boolean },
+  ) => rejectPendingForChat(chatId, options),
 }))
 
 vi.mock('@/services/harness/permission/question-gate', () => ({
-  rejectPendingQuestionsForChat: vi.fn<() => void>(),
+  rejectPendingQuestionsForChat: (chatId: string) =>
+    rejectPendingQuestionsForChat(chatId),
 }))
 
 vi.mock('@/services/mcp/mcp-auth-gate', () => ({
-  rejectPendingMcpAuthForChat: vi.fn<() => void>(),
+  rejectPendingMcpAuthForChat: (
+    chatId: string,
+    options?: { keepBackground?: boolean },
+  ) => rejectPendingMcpAuthForChat(chatId, options),
 }))
 
 vi.mock('@/services/harness/enrich-tool-error', () => ({
@@ -35,11 +55,14 @@ vi.mock('@/services/harness/enrich-tool-error', () => ({
 }))
 
 vi.mock('@/services/harness/shell/registry', () => ({
-  killShellsForChat: vi.fn<(...args: unknown[]) => Promise<void>>(),
+  killShellsForChat: (...args: unknown[]) => killShellsForChat(...args),
 }))
+
+const abortBlocking = vi.hoisted(() => vi.fn<(chatId: string) => string[]>())
 
 vi.mock('@/services/harness/subagent/registry', () => ({
   abort: vi.fn<() => void>(),
+  abortBlocking: (chatId: string) => abortBlocking(chatId),
   hasPendingBackgroundResume: () => false,
   setTurnResponseMessages: vi.fn<() => void>(),
 }))
@@ -558,5 +581,16 @@ describe('consumeStream reasoning duration persist', () => {
         parts: [{ type: 'reasoning', text: 'partial', duration: 2 }],
       }),
     )
+    expect(abortBlocking).toHaveBeenCalledWith('chat-1')
+    expect(rejectPendingForChat).toHaveBeenCalledWith('chat-1', {
+      keepBackground: true,
+    })
+    expect(rejectPendingQuestionsForChat).toHaveBeenCalledWith('chat-1')
+    expect(rejectPendingMcpAuthForChat).toHaveBeenCalledWith('chat-1', {
+      keepBackground: true,
+    })
+    expect(killShellsForChat).toHaveBeenCalledWith('chat-1', {
+      keepBackground: true,
+    })
   })
 })

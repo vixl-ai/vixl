@@ -42,7 +42,7 @@ The catalog also appears as `Available subagents:` in the system prompt.
 
 ## What spawn does
 
-`agentName` must match a catalog agent, or be a 2-6 word verb phrase for a generic helper. Bare unknown single words fail. Reserved non-agent slugs `shell` and `generalpurpose` are rejected.
+When `agentName` matches a catalog agent, that definition is used. Any other name spawns a generic helper labeled with that name, so prefer a short verb phrase that describes the task.
 
 The file body is the sub-agent system prompt (`Follow the agent definition below.`). Optional **model** from frontmatter is used unless the spawn call or a plan lock overrides it. Optional **tools** intersect the read-only or write allowlist. Absent `tools` keeps the full capability set for that spawn.
 

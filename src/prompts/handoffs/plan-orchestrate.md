@@ -13,11 +13,11 @@ The harness has locked the model to the users selected choice.
 
 If an early todo creates a worktree or needs a workspace move, sequence that create, then parent `move_workspace`, then implementers;
 
-After spawning, leave a one-line visible status covering what was spawned, what is still running, and what happens next. Do not poll with `terminal_output`.
+After spawning, leave a one-line visible status covering what was spawned, what is still running, and what happens next. `terminal_output` is only for the parent's own shell_id values and never for checking on subagents.
 
 End the turn; the harness resumes as each background subagent finishes. 
 
-Review outputs, update plan todo status with `update_plan_todo`, and continue.
+Review outputs, update plan todo status with `update_plan_todo`, and continue. Validate results yourself (run CI/tests, read PR comments) instead of spawning a subagent just to run a command.
 
 If scope changes, the parent may revise the plan body with `update_plan`;
 

@@ -133,6 +133,72 @@ describe('agent-shell-registry', () => {
     expect(getAgentShell(second.shellId)?.status).toBe('completed')
   })
 
+  it('records the owning subagent on a shell', async () => {
+    const { createAgentShell, getAgentShell } = await import(
+      '@/services/harness/shell/registry'
+    )
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'sleep 10',
+      subagentId: 'bg-1',
+    })
+
+    expect(getAgentShell(shell.shellId)?.subagentId).toBe('bg-1')
+  })
+
+  it('keepBackground kill leaves running background subagent shells', async () => {
+    const { register, resetSubagentRegistryForTests } = await import(
+      '@/services/harness/subagent/registry'
+    )
+    resetSubagentRegistryForTests()
+    register('chat-1', 'bg-1', new AbortController(), {
+      toolCallId: 'tc-bg',
+      agentName: 'background',
+    })
+    register(
+      'chat-1',
+      'block-1',
+      new AbortController(),
+      { toolCallId: 'tc-block', agentName: 'blocking' },
+      { pendingResume: false },
+    )
+
+    const { createAgentShell, killShellsForChat, getAgentShell, listShellsForChat } =
+      await import('@/services/harness/shell/registry')
+
+    const parent = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'sleep 1',
+    })
+    const background = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'sleep 2',
+      subagentId: 'bg-1',
+    })
+    const blocking = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'sleep 3',
+      subagentId: 'block-1',
+    })
+
+    await killShellsForChat('chat-1', { keepBackground: true })
+
+    expect(shellKillTracked).toHaveBeenCalledWith(parent.shellId)
+    expect(shellKillTracked).toHaveBeenCalledWith(blocking.shellId)
+    expect(shellKillTracked).not.toHaveBeenCalledWith(background.shellId)
+    expect(getAgentShell(parent.shellId)?.status).toBe('completed')
+    expect(getAgentShell(blocking.shellId)?.status).toBe('completed')
+    expect(getAgentShell(background.shellId)?.status).toBe('running')
+    expect(listShellsForChat('chat-1').map((shell) => shell.shellId)).toEqual([
+      background.shellId,
+    ])
+  })
+
   it('recovers when kill races with an already-reaped shell', async () => {
     let exitHandler: ExitListener | undefined
     listen.mockImplementation(async (event, handler) => {

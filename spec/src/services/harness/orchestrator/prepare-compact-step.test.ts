@@ -3,11 +3,13 @@ import type { LanguageModel, ModelMessage, ToolSet } from 'ai'
 import type { ModelRef } from '@/types/models/model-ref'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessEvent } from '@/types/harness/harness-event'
+import type { SubagentRecord } from '@/types/harness/subagent-record'
 import {
   compactBudgets,
   estimatePromptTokens,
   resolveCompactHighWater,
 } from '@/services/harness/compact'
+import appendSubagentCheckpointSummary from '@/services/harness/orchestrator/append-subagent-checkpoint-summary'
 
 const generateCheckpoint = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>(),
@@ -17,6 +19,9 @@ const persistCompactionCheckpoint = vi.hoisted(() =>
 )
 const captureBillableUsage = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<void>>(),
+)
+const listSubagentsForChat = vi.hoisted(() =>
+  vi.fn<(chatId: string) => SubagentRecord[]>(),
 )
 
 vi.mock('@/services/harness/compact/generate-checkpoint', () => ({
@@ -29,6 +34,10 @@ vi.mock('@/services/harness/compact/persist-checkpoint', () => ({
 
 vi.mock('@/services/billing/capture-billable-usage', () => ({
   default: (...args: unknown[]) => captureBillableUsage(...args),
+}))
+
+vi.mock('@/services/harness/subagent/registry', () => ({
+  listSubagentsForChat: (chatId: string) => listSubagentsForChat(chatId),
 }))
 
 import prepareParentCompactStep from '@/services/harness/orchestrator/prepare-compact-step'
@@ -86,6 +95,16 @@ const baseInput = (overrides?: { settings?: VixlSettings; signal?: AbortSignal }
   }
 }
 
+const subagentRecord = (
+  overrides: Pick<SubagentRecord, 'agentName' | 'subagentId' | 'status'> &
+    Partial<SubagentRecord>,
+): SubagentRecord => ({
+  chatId: 'chat-1',
+  toolCallId: `call-${overrides.subagentId}`,
+  startedAt: '2026-01-01T00:00:00.000Z',
+  ...overrides,
+})
+
 const expectPersistedUnderWindow = (
   system: string,
   messages: ModelMessage[],
@@ -102,12 +121,17 @@ describe('prepareParentCompactStep', () => {
     persistCompactionCheckpoint.mockReset()
     captureBillableUsage.mockReset()
     generateCheckpoint.mockResolvedValue(compactedResult)
-    persistCompactionCheckpoint.mockResolvedValue({
-      summary: compactedResult.summary,
-      includeFromCreatedAt: '2026-01-01T00:00:00.000Z',
-      checkpointLineId: 'cp-parent',
+    persistCompactionCheckpoint.mockImplementation(async (input: unknown) => {
+      const payload = input as { summary: string }
+      return {
+        summary: payload.summary,
+        includeFromCreatedAt: '2026-01-01T00:00:00.000Z',
+        checkpointLineId: 'cp-parent',
+      }
     })
     captureBillableUsage.mockResolvedValue(undefined)
+    listSubagentsForChat.mockReset()
+    listSubagentsForChat.mockReturnValue([])
   })
 
   it('returns undefined under high-water and does not persist', async () => {
@@ -422,5 +446,92 @@ describe('prepareParentCompactStep', () => {
     expect(persistCompactionCheckpoint).not.toHaveBeenCalled()
     expect(onEvent).toHaveBeenCalledWith({ type: 'compaction-started' })
     expect(onEvent).toHaveBeenCalledWith({ type: 'compaction-ended' })
+  })
+
+  it('appends ledger and completed summaries when the chat has subagents', async () => {
+    const records = [
+      subagentRecord({
+        agentName: 'explorer',
+        subagentId: 'sub-1',
+        status: 'completed',
+        result: {
+          subagentId: 'sub-1',
+          name: 'explorer',
+          summary: 'Mapped the auth module.',
+        },
+      }),
+      subagentRecord({
+        agentName: 'writer',
+        subagentId: 'sub-2',
+        status: 'running',
+      }),
+    ]
+    listSubagentsForChat.mockReturnValue(records)
+    const { onEvent, input } = baseInput()
+    const prepareStep = prepareParentCompactStep(input)
+    const expectedSummary = appendSubagentCheckpointSummary(
+      compactedResult.summary,
+      records,
+    )
+
+    const result = await prepareStep({
+      messages: [
+        { role: 'user', content: 'Find the auth bug.' },
+        { role: 'assistant', content: hugeContent },
+      ],
+    })
+
+    expect(listSubagentsForChat).toHaveBeenCalledWith('chat-1')
+    expect(persistCompactionCheckpoint).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: expectedSummary,
+      }),
+    )
+    expect(onEvent).toHaveBeenCalledWith({
+      type: 'compaction',
+      summary: expectedSummary,
+      focus: 'parent',
+    })
+    expect(expectedSummary).toContain('Subagent ledger:')
+    expect(expectedSummary).toContain('Completed subagent results:')
+    expect(expectedSummary).toContain(
+      '- explorer (sub-1): Mapped the auth module.',
+    )
+    expect(expectedSummary).toContain(compactedResult.summary)
+    const checkpointText = (result?.messages ?? [])
+      .flatMap((message) =>
+        typeof message.content === 'string' ? [message.content] : [],
+      )
+      .join('\n')
+    expect(checkpointText).toContain(expectedSummary)
+    expect(checkpointText).toContain('Subagent ledger:')
+    expect(checkpointText).toContain('- explorer (sub-1): completed')
+    expect(checkpointText).toContain('Completed subagent results:')
+    expect(checkpointText).toContain(
+      '- explorer (sub-1): Mapped the auth module.',
+    )
+  })
+
+  it('leaves the checkpoint summary unchanged when the chat has no subagents', async () => {
+    const { onEvent, input } = baseInput()
+    const prepareStep = prepareParentCompactStep(input)
+
+    await prepareStep({
+      messages: [
+        { role: 'user', content: 'Find the auth bug.' },
+        { role: 'assistant', content: hugeContent },
+      ],
+    })
+
+    expect(persistCompactionCheckpoint).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: compactedResult.summary,
+      }),
+    )
+    expect(onEvent).toHaveBeenCalledWith({
+      type: 'compaction',
+      summary: compactedResult.summary,
+      focus: 'parent',
+    })
   })
 })

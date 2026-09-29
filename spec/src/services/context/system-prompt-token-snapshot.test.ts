@@ -19,21 +19,21 @@ const MODES: VixlChatMode[] = ['ask', 'plan', 'agent', 'orchestrator']
  * Empty-project (standalone, no rules, no MCP) ceilings after slim prompts
  * and builtin tool descriptions.
  * Measured totals (system join + builtin tool defs, chars/4):
- * ask 3290, plan 3873, agent 4700, orchestrator 3748.
+ * ask 3386, plan 3969, agent 4846, orchestrator 4311.
  * Headroom is about 3 percent so waste cannot return unnoticed.
  */
 const TOTAL_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 3329,
-  plan: 3989,
-  agent: 4841,
-  orchestrator: 3860,
+  ask: 3488,
+  plan: 4089,
+  agent: 4992,
+  orchestrator: 4441,
 }
 
 const BASE_CEILINGS: Record<VixlChatMode, number> = {
   ask: 290,
   plan: 337,
   agent: 270,
-  orchestrator: 365,
+  orchestrator: 418,
 }
 
 /** Available skills catalog with ungated command skills; measured 59. */
@@ -46,14 +46,15 @@ const SKILLS_CEILINGS: Record<VixlChatMode, number> = {
 
 /**
  * Measured builtin tool-def tokens (chars/4):
- * ask 2996, plan 3526, agent 4424, orchestrator 3374.
- * Ceilings are measured plus one so toBeLessThan stays tight.
+ * ask 3067, plan 3597, agent 4543, orchestrator 3828.
+ * Agent stays measured plus one. Ask, plan, and orchestrator are measured
+ * plus about 3 percent after the spawn capabilities describe change.
  */
 const TOOL_DEF_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 2997,
-  plan: 3527,
-  agent: 4425,
-  orchestrator: 3375,
+  ask: 3160,
+  plan: 3705,
+  agent: 4544,
+  orchestrator: 3943,
 }
 
 type ModeSnapshot = {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { StagedImage } from '@/types/harness/staged-image'
@@ -8,7 +8,8 @@ const generateText = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{
     text: string
     usage?: unknown
-    response?: { messages?: unknown[] }
+    finishReason?: string
+    response?: { id?: string; messages?: unknown[] }
     responseMessages?: unknown[]
   }>>(),
 )
@@ -38,6 +39,8 @@ const buildHarnessTools = vi.hoisted(() =>
       edit_file: { execute: stubExecute },
       apply_patch: { execute: stubExecute },
       run_terminal: { execute: stubExecute },
+      terminal_output: { execute: stubExecute },
+      stop_terminal: { execute: stubExecute },
       git_commit: { execute: stubExecute },
     }),
   ),
@@ -90,11 +93,23 @@ import {
   register,
   resetSubagentRegistryForTests,
 } from '@/services/harness/subagent/registry'
+import repairToolCall from '@/services/harness/orchestrator/repair-tool-call'
+
+type ToolExecutionEndEvent = {
+  toolCall: { toolCallId: string; toolName: string; input: unknown }
+  toolOutput:
+    | { type: 'tool-result'; output: unknown }
+    | { type: 'tool-error'; error: unknown }
+}
 
 type GenerateConfig = {
   tools?: Record<string, { execute?: (...args: never[]) => Promise<unknown> }>
   prepareStep?: unknown
   system?: string
+  repairToolCall?: unknown
+  messages?: unknown[]
+  prompt?: string
+  onToolExecutionEnd?: (event: ToolExecutionEndEvent) => void
 }
 
 const TOKEN_CAP = 8000
@@ -187,11 +202,15 @@ describe('runSubagentGenerate capabilities', () => {
     const toolNames = Object.keys(config.tools ?? {})
     expect(toolNames).toContain('read_file')
     expect(toolNames).toContain('grep')
+    expect(toolNames).toContain('run_terminal')
+    expect(toolNames).toContain('terminal_output')
+    expect(toolNames).toContain('stop_terminal')
     expect(toolNames).not.toContain('edit_file')
     expect(toolNames).not.toContain('apply_patch')
-    expect(toolNames).not.toContain('run_terminal')
     expect(toolNames).not.toContain('git_commit')
     expect(config.system).toContain('read-only sub-agent')
+    expect(config.system).toContain('run_terminal runs in a sandbox')
+    expect(config.system).not.toContain('read-only tools only')
   })
 
   it('includes write tools and omits the read-only system prompt', async () => {
@@ -208,6 +227,32 @@ describe('runSubagentGenerate capabilities', () => {
       ]),
     )
     expect(config.system).not.toContain('read-only')
+  })
+
+  it('puts read-only on nestedCtx when capabilities is read-only', async () => {
+    await runWithCapabilities('read-only')
+    const nestedCtx = buildHarnessTools.mock.calls[0]?.[0] as HarnessToolContext
+    expect(nestedCtx.subagentCapabilities).toBe('read-only')
+  })
+
+  it('puts write on nestedCtx when capabilities is write', async () => {
+    await runWithCapabilities('write')
+    const nestedCtx = buildHarnessTools.mock.calls[0]?.[0] as HarnessToolContext
+    expect(nestedCtx.subagentCapabilities).toBe('write')
+  })
+
+  it('defaults nestedCtx subagentCapabilities to read-only when omitted', async () => {
+    await runSubagentGenerate({
+      ctx: baseCtx(),
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+    } as Parameters<typeof runSubagentGenerate>[0])
+    const nestedCtx = buildHarnessTools.mock.calls[0]?.[0] as HarnessToolContext
+    expect(nestedCtx.subagentCapabilities).toBe('read-only')
   })
 })
 
@@ -508,3 +553,412 @@ describe('runSubagentGenerate steer prepareStep', () => {
     ])
   })
 })
+
+describe('runSubagentGenerate summary validation', () => {
+  const run = (capabilities: 'read-only' | 'write' = 'write') =>
+    runSubagentGenerate({
+      ctx: baseCtx(),
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities,
+    })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetSubagentRegistryForTests()
+    createModel.mockResolvedValue({ id: 'stub-model' })
+    captureBillableUsage.mockResolvedValue(undefined)
+    resolveAgentDefinition.mockResolvedValue(null)
+    compactStep.mockResolvedValue(undefined)
+    generateText.mockResolvedValue({
+      text: 'summary',
+      usage: {},
+      finishReason: 'stop',
+    })
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'call-1',
+      agentName: 'explore',
+      model: 'local::qwen',
+    })
+  })
+
+  it('passes the parent repairToolCall into the main generateText call', async () => {
+    await run()
+    const config = generateText.mock.calls[0]?.[0] as GenerateConfig
+    expect(config.repairToolCall).toBe(repairToolCall)
+  })
+})
+
+describe('runSubagentGenerate per-step snapshot', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetSubagentRegistryForTests()
+    createModel.mockResolvedValue({ id: 'stub-model' })
+    captureBillableUsage.mockResolvedValue(undefined)
+    resolveAgentDefinition.mockResolvedValue(null)
+    compactStep.mockResolvedValue(undefined)
+    generateText.mockResolvedValue({
+      text: 'summary',
+      usage: {},
+      response: { messages: [{ role: 'assistant', content: 'summary' }] },
+    })
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'call-1',
+      agentName: 'explore',
+      model: 'local::qwen',
+    })
+  })
+
+  it('writes options.messages into the registry without emitting history every step', async () => {
+    const events: unknown[] = []
+    const snapshot = [
+      { role: 'user' as const, content: 'task' },
+      { role: 'assistant' as const, content: 'mid-run' },
+    ]
+    let historyDuringStep = 0
+    generateText.mockImplementation(async (config) => {
+      const prepareStep = (config as GenerateConfig).prepareStep as (options: {
+        messages: { role: string; content: string }[]
+      }) => Promise<{ messages?: unknown[] } | undefined>
+      await prepareStep({ messages: snapshot })
+      historyDuringStep = events.filter((event) => {
+        if (!event || typeof event !== 'object' || !('type' in event)) {
+          return false
+        }
+        const nested = (event as { type?: unknown; event?: { type?: unknown } }).event
+        return (
+          (event as { type?: unknown }).type === 'subagent-event' &&
+          nested?.type === 'subagent-history'
+        )
+      }).length
+      expect(getSubagent('sub-1')?.messages).toEqual(snapshot)
+      return {
+        text: 'summary',
+        usage: {},
+        response: { messages: [{ role: 'assistant', content: 'summary' }] },
+      }
+    })
+
+    await runSubagentGenerate({
+      ctx: {
+        ...baseCtx(),
+        onHarnessEvent: (event) => {
+          events.push(event)
+        },
+      },
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+
+    expect(historyDuringStep).toBe(0)
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'subagent-event',
+          event: expect.objectContaining({ type: 'subagent-history' }),
+        }),
+      ]),
+    )
+  })
+})
+
+describe('runSubagentGenerate transient retry', () => {
+  const run = () =>
+    runSubagentGenerate({
+      ctx: baseCtx(),
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'write',
+    })
+
+  const transientError = () =>
+    new Error('Failed after 3 attempts GatewayResponseError error sending request')
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    resetSubagentRegistryForTests()
+    createModel.mockResolvedValue({ id: 'stub-model' })
+    captureBillableUsage.mockResolvedValue(undefined)
+    resolveAgentDefinition.mockResolvedValue(null)
+    compactStep.mockResolvedValue(undefined)
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'call-1',
+      agentName: 'explore',
+      model: 'local::qwen',
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('retries from the prepareStep snapshot after a transient error', async () => {
+    const snapshot = [
+      { role: 'user' as const, content: 'task' },
+      { role: 'assistant' as const, content: 'wrote src/a.ts' },
+    ]
+    generateText.mockImplementationOnce(async (config) => {
+      const prepareStep = (config as GenerateConfig).prepareStep as (options: {
+        messages: { role: string; content: string }[]
+      }) => Promise<{ messages?: unknown[] } | undefined>
+      await prepareStep({ messages: snapshot })
+      throw transientError()
+    })
+    generateText.mockResolvedValueOnce({
+      text: 'recovered',
+      usage: { inputTokens: 4 },
+      response: { messages: [{ role: 'assistant', content: 'recovered' }] },
+    })
+
+    const pending = run()
+    await vi.advanceTimersByTimeAsync(2_000)
+    await expect(pending).resolves.toBe('recovered')
+
+    expect(generateText).toHaveBeenCalledTimes(2)
+    const second = generateText.mock.calls[1]?.[0] as GenerateConfig
+    expect(second.messages).toEqual(snapshot)
+    expect(second.prompt).toBeUndefined()
+    expect(captureBillableUsage).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails immediately on a non-transient error', async () => {
+    generateText.mockRejectedValueOnce(new Error('Invalid tool arguments'))
+    await expect(run()).rejects.toThrow('Invalid tool arguments')
+    expect(generateText).toHaveBeenCalledTimes(1)
+    expect(captureBillableUsage).not.toHaveBeenCalled()
+  })
+
+  it('does not retry abort errors', async () => {
+    const abortError = new Error('The operation was aborted.')
+    abortError.name = 'AbortError'
+    generateText.mockRejectedValueOnce(abortError)
+    await expect(run()).rejects.toThrow('The operation was aborted.')
+    expect(generateText).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts during backoff without a second generateText call', async () => {
+    const controller = new AbortController()
+    generateText.mockRejectedValueOnce(transientError())
+
+    const pending = runSubagentGenerate({
+      ctx: baseCtx(),
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: controller.signal,
+      model: 'local::qwen',
+      capabilities: 'write',
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    controller.abort()
+    await expect(pending).rejects.toThrow('Subagent aborted')
+    expect(generateText).toHaveBeenCalledTimes(1)
+  })
+})
+
+type PrepareStepFn = (options: {
+  messages: { role: string; content: string }[]
+}) => Promise<{ messages?: { role: string; content: string }[] } | undefined>
+
+const step1Messages = [
+  { role: 'assistant' as const, content: 'call grep' },
+  { role: 'tool' as const, content: 'matches' },
+]
+const step2Messages = [
+  { role: 'assistant' as const, content: 'call read' },
+  { role: 'tool' as const, content: 'file body' },
+]
+const step3Messages = [{ role: 'assistant' as const, content: 'summary' }]
+
+const inputFromConfig = (
+  config: GenerateConfig,
+): { role: string; content: string }[] => {
+  if (Array.isArray(config.messages) && config.messages.length > 0) {
+    return config.messages as { role: string; content: string }[]
+  }
+  return [{ role: 'user', content: String(config.prompt) }]
+}
+
+const applyPrepareStep = async (
+  prepareStep: PrepareStepFn,
+  messages: { role: string; content: string }[],
+): Promise<{ role: string; content: string }[]> => {
+  const prepared = await prepareStep({ messages })
+  return prepared?.messages ?? messages
+}
+
+const threeStepSdkResult = async (
+  config: GenerateConfig,
+  betweenSteps?: { afterStep1?: () => void },
+) => {
+  const prepareStep = config.prepareStep as PrepareStepFn
+  let messages = await applyPrepareStep(prepareStep, inputFromConfig(config))
+  messages = [...messages, ...step1Messages]
+  betweenSteps?.afterStep1?.()
+  messages = await applyPrepareStep(prepareStep, messages)
+  messages = [...messages, ...step2Messages]
+  await applyPrepareStep(prepareStep, messages)
+  return {
+    text: 'summary',
+    usage: {},
+    responseMessages: [...step1Messages, ...step2Messages, ...step3Messages],
+    response: { messages: step3Messages },
+    steps: [
+      { response: { messages: step1Messages } },
+      { response: { messages: step2Messages } },
+      { response: { messages: step3Messages } },
+    ],
+  }
+}
+
+const countByContent = (messages: unknown[] | undefined, content: string): number =>
+  (messages ?? []).filter((message) => {
+    if (message === null || typeof message !== 'object') {
+      return false
+    }
+    return 'content' in message && message.content === content
+  }).length
+
+describe('runSubagentGenerate multi-step history', () => {
+  const run = () =>
+    runSubagentGenerate({
+      ctx: baseCtx(),
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetSubagentRegistryForTests()
+    createModel.mockResolvedValue({ id: 'stub-model' })
+    captureBillableUsage.mockResolvedValue(undefined)
+    resolveAgentDefinition.mockResolvedValue(null)
+    compactStep.mockResolvedValue(undefined)
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'call-1',
+      agentName: 'explore',
+      model: 'local::qwen',
+    })
+  })
+
+  it('persists a 3-step run without duplicating assistant or tool messages', async () => {
+    generateText.mockImplementation(async (config) =>
+      threeStepSdkResult(config as GenerateConfig),
+    )
+
+    await run()
+
+    const stored = getSubagent('sub-1')?.messages
+    expect(stored?.[0]).toEqual(
+      expect.objectContaining({
+        role: 'user',
+        content: expect.stringContaining('find the auth bug'),
+      }),
+    )
+    expect(countByContent(stored, 'call grep')).toBe(1)
+    expect(countByContent(stored, 'matches')).toBe(1)
+    expect(countByContent(stored, 'call read')).toBe(1)
+    expect(countByContent(stored, 'file body')).toBe(1)
+    expect(countByContent(stored, 'summary')).toBe(1)
+    expect(stored?.slice(-5)).toEqual([
+      ...step1Messages,
+      ...step2Messages,
+      ...step3Messages,
+    ])
+  })
+
+  it('does not duplicate steps after one transient retry', async () => {
+    vi.useFakeTimers()
+    generateText.mockImplementationOnce(async (config) => {
+      const prepareStep = (config as GenerateConfig).prepareStep as PrepareStepFn
+      await prepareStep({ messages: inputFromConfig(config as GenerateConfig) })
+      throw new Error(
+        'Failed after 3 attempts GatewayResponseError error sending request',
+      )
+    })
+    generateText.mockImplementationOnce(async (config) =>
+      threeStepSdkResult(config as GenerateConfig),
+    )
+
+    const pending = run()
+    try {
+      await vi.advanceTimersByTimeAsync(2_000)
+      await pending
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const stored = getSubagent('sub-1')?.messages
+    expect(generateText).toHaveBeenCalledTimes(2)
+    const second = generateText.mock.calls[1]?.[0] as GenerateConfig
+    expect(second.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'user',
+          content: expect.stringContaining('find the auth bug'),
+        }),
+      ]),
+    )
+    expect(countByContent(stored, 'call grep')).toBe(1)
+    expect(countByContent(stored, 'matches')).toBe(1)
+    expect(countByContent(stored, 'call read')).toBe(1)
+    expect(countByContent(stored, 'file body')).toBe(1)
+    expect(countByContent(stored, 'summary')).toBe(1)
+  })
+
+  it('keeps a mid-run steer once and does not duplicate prior steps', async () => {
+    generateText.mockImplementation(async (config) =>
+      threeStepSdkResult(config as GenerateConfig, {
+        afterStep1: () => {
+          pushSteer('sub-1', 'also check tests')
+        },
+      }),
+    )
+
+    await run()
+
+    const stored = getSubagent('sub-1')?.messages
+    expect(countByContent(stored, 'also check tests')).toBe(1)
+    expect(countByContent(stored, 'call grep')).toBe(1)
+    expect(countByContent(stored, 'matches')).toBe(1)
+    expect(countByContent(stored, 'call read')).toBe(1)
+    expect(countByContent(stored, 'file body')).toBe(1)
+    expect(countByContent(stored, 'summary')).toBe(1)
+    const steerIndex = stored?.findIndex(
+      (message) =>
+        typeof message === 'object' &&
+        message &&
+        'content' in message &&
+        message.content === 'also check tests',
+    )
+    const grepIndex = stored?.findIndex(
+      (message) =>
+        typeof message === 'object' &&
+        message &&
+        'content' in message &&
+        message.content === 'call grep',
+    )
+    expect(steerIndex).toBeGreaterThan(grepIndex ?? -1)
+  })
+})
+

@@ -130,13 +130,15 @@ export default (state: AgentHarnessState, deps: SteerDeps) => {
     }
 
     try {
-      const result = await deliverSteer(ctx, subagentId, message)
-      if ('error' in result) {
-        rollbackSteer()
-        toast.error('Failed to steer subagent', {
-          description: result.error,
-        })
-      }
+      await deliverSteer(
+        ctx,
+        subagentId,
+        message,
+        getSubagent(subagentId)?.agentName ??
+          existing?.name ??
+          timeline?.name ??
+          '',
+      )
     } catch (error) {
       rollbackSteer()
       toast.error('Failed to steer subagent', {

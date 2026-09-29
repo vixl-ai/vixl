@@ -71,6 +71,56 @@ fn sensitive_paths_are_blocked() {
 }
 
 #[test]
+fn env_template_paths_are_not_sensitive() {
+    for path in [
+        ".env.example",
+        ".env.sample",
+        ".env.template",
+        ".ENV.EXAMPLE",
+        ".Env.Sample",
+        "config/.env.example",
+        "nested/dir/.env.template",
+    ] {
+        assert!(
+            !is_sensitive_relative_path(path),
+            "template path should be allowed: {path}"
+        );
+    }
+
+    for path in [
+        ".env",
+        ".env.local",
+        ".env.production",
+        ".env.development",
+        ".env.example.local",
+        "config/.env.production",
+    ] {
+        assert!(
+            is_sensitive_relative_path(path),
+            "real env path should stay blocked: {path}"
+        );
+    }
+}
+
+#[test]
+fn write_permits_env_templates_without_allow_sensitive() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().to_string_lossy().to_string();
+
+    fs_write_file(root.clone(), ".env.example".into(), "KEY=\n".into(), None)
+        .expect("write .env.example");
+    assert_eq!(
+        fs::read_to_string(dir.path().join(".env.example")).expect("read .env.example"),
+        "KEY=\n"
+    );
+
+    fs_write_file(root.clone(), ".env.sample".into(), "KEY=\n".into(), None)
+        .expect("write .env.sample");
+    fs_write_file(root, ".env.template".into(), "KEY=\n".into(), None)
+        .expect("write .env.template");
+}
+
+#[test]
 fn write_rename_delete_block_env_when_allow_sensitive_is_none() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path().to_string_lossy().to_string();

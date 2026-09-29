@@ -26,6 +26,7 @@ export const shellSpawnTracked = (args: {
   command: string
   sandboxed?: boolean
   allowNetwork?: boolean
+  projectWritable?: boolean
 }): Promise<void> => call('shell_spawn_tracked', args)
 
 export const shellKillTracked = (shellId: string): Promise<ShellExitResult> =>

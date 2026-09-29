@@ -14,14 +14,39 @@ import {
   wrapWithSandboxingFooter,
 } from '@/services/harness/shell/sandbox-result'
 import { runTerminalCommand } from '@/services/harness/shell/run-command'
+import { getSubagent } from '@/services/harness/subagent/registry'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import { clipTerminalLabel } from '@/utils/clip-terminal-label'
 
-const runTerminal = (ctx: HarnessToolContext) =>
-  tool({
-    description:
-      'Run a shell command in the project cwd. If the sandbox blocks the command it retries unsandboxed in the same execute; do not retry yourself. is_background returns shell_id; poll with terminal_output. Do not create project scratch dirs (for example .tmp), redirect TMPDIR, TEMP, or TMP into the repo, or edit .gitignore; if the jail blocks the command, report the denial.',
+const READ_ONLY_SANDBOX_DISABLED =
+  'Read-only subagents cannot run an unsandboxed shell. Enable the OS sandbox, or spawn a write-capable subagent.'
+const READ_ONLY_SANDBOX_UNAVAILABLE =
+  'Read-only subagents require an OS sandbox. This platform has no sandbox, so run_terminal is unavailable.'
+
+export const isReadOnlySubagentShell = (ctx: HarnessToolContext): boolean => {
+  if (!ctx.subagentId) {
+    return false
+  }
+  if (ctx.subagentCapabilities === 'write') {
+    return false
+  }
+  if (ctx.subagentCapabilities === 'read-only') {
+    return true
+  }
+  const record = getSubagent(ctx.subagentId)
+  if (!record) {
+    return false
+  }
+  return (record.capabilities ?? 'read-only') !== 'write'
+}
+
+const runTerminal = (ctx: HarnessToolContext) => {
+  const readOnlyProject = isReadOnlySubagentShell(ctx)
+  return tool({
+    description: readOnlyProject
+      ? 'Run a shell command in the project cwd inside a project-read-only sandbox. Writes to the project are denied. TMPDIR and tool caches stay writable. If the jail blocks the command, report the denial; do not retry unsandboxed.'
+      : 'Run a shell command in the project cwd. If the sandbox blocks the command it retries unsandboxed in the same execute; do not retry yourself. is_background returns shell_id; poll with terminal_output. Do not create project scratch dirs (for example .tmp), redirect TMPDIR, TEMP, or TMP into the repo, or edit .gitignore; if the jail blocks the command, report the denial.',
     inputSchema: z.object({
       command: z.string().describe('Shell command to run in the project cwd'),
       is_background: z.boolean().optional().describe('Return shell_id without waiting'),
@@ -34,9 +59,20 @@ const runTerminal = (ctx: HarnessToolContext) =>
     execute: async ({ command, is_background, timeout_ms, description }, { toolCallId }) => {
       const clippedDescription = clipTerminalLabel(description ?? '')
       const uiTitle = clippedDescription || command
-      const sandboxEnabled =
-        (ctx.settings['agent.sandbox.enabled'] ?? true) &&
-        !sessionAllowsUnsandboxed(ctx.sessionAllows)
+      const sandboxSettingEnabled = ctx.settings['agent.sandbox.enabled'] ?? true
+      if (readOnlyProject && !sandboxSettingEnabled) {
+        return attachSandboxResult(
+          { rejected: true, error: READ_ONLY_SANDBOX_DISABLED },
+          resolveSandboxResultMeta({
+            sandboxed: false,
+            allowNetwork: false,
+          }),
+        )
+      }
+      // Read-only nested shells stay jailed: session unsandboxed allowances do not apply.
+      const sandboxEnabled = readOnlyProject
+        ? true
+        : sandboxSettingEnabled && !sessionAllowsUnsandboxed(ctx.sessionAllows)
       const needsNetwork =
         sandboxEnabled && commandNeedsSandboxNetwork(command)
       const settingsAllowNetwork =
@@ -82,6 +118,7 @@ const runTerminal = (ctx: HarnessToolContext) =>
         is_background,
         timeout_ms,
         description: clippedDescription || undefined,
+        projectWritable: !readOnlyProject,
       }
 
       const retryUnsandboxed = async (
@@ -120,6 +157,16 @@ const runTerminal = (ctx: HarnessToolContext) =>
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
 
+        if (readOnlyProject) {
+          if (message.startsWith('SANDBOX_UNAVAILABLE:')) {
+            return attachSandboxResult(
+              { rejected: true, error: READ_ONLY_SANDBOX_UNAVAILABLE },
+              meta,
+            )
+          }
+          throw wrapWithSandboxingFooter(error, meta)
+        }
+
         if (sandboxEnabled && isSandboxSpawnError(message)) {
           const priorPhase = attachSandboxResult(
             {
@@ -135,5 +182,6 @@ const runTerminal = (ctx: HarnessToolContext) =>
       }
     },
   })
+}
 
 export default runTerminal

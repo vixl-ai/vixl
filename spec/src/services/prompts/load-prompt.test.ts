@@ -62,13 +62,13 @@ describe('load-prompt', () => {
       'If an early todo creates a worktree or needs a workspace move, sequence that create, then parent `move_workspace`, then implementers;',
     )
     expect(rendered).toContain(
-      'After spawning, leave a one-line visible status covering what was spawned, what is still running, and what happens next. Do not poll with `terminal_output`.',
+      'After spawning, leave a one-line visible status covering what was spawned, what is still running, and what happens next. `terminal_output` is only for the parent\'s own shell_id values and never for checking on subagents.',
     )
     expect(rendered).toContain(
       'End the turn; the harness resumes as each background subagent finishes.',
     )
     expect(rendered).toContain(
-      'Review outputs, update plan todo status with `update_plan_todo`, and continue.',
+      'Review outputs, update plan todo status with `update_plan_todo`, and continue. Validate results yourself (run CI/tests, read PR comments) instead of spawning a subagent just to run a command.',
     )
     expect(rendered).toContain(
       'Todos still go through `update_plan_todo`. Never write code or mutate files directly;',

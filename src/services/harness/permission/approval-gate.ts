@@ -1,4 +1,5 @@
 import picomatch from 'picomatch'
+import { isRunningBackgroundSubagent } from '@/services/harness/subagent/registry'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type {
   ApprovalKind,
@@ -55,9 +56,19 @@ export const resolveApproval = (toolCallId: string, result: ApprovalResolution):
   entry.resolve(result)
 }
 
-export const rejectPendingForChat = (chatId: string): void => {
+export const rejectPendingForChat = (
+  chatId: string,
+  options?: { keepBackground?: boolean },
+): void => {
   for (const [toolCallId, entry] of pending.entries()) {
     if (entry.chatId !== chatId) {
+      continue
+    }
+    if (
+      options?.keepBackground &&
+      entry.subagentId &&
+      isRunningBackgroundSubagent(entry.subagentId)
+    ) {
       continue
     }
     pending.delete(toolCallId)

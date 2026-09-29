@@ -8,18 +8,29 @@ import {
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const knownIdsLabel = (chatId: string): string => {
-  const ids = listSubagentsForChat(chatId).map((record) => record.subagentId)
-  return ids.length > 0 ? ids.join(', ') : '(none)'
+  const records = listSubagentsForChat(chatId)
+  if (records.length === 0) {
+    return '(none)'
+  }
+  return records
+    .map((record) => `${record.subagentId} (${record.agentName}, ${record.status})`)
+    .join(', ')
 }
+
+const namesMatch = (actual: string, expected: string): boolean =>
+  actual.trim().toLowerCase() === expected.trim().toLowerCase()
 
 const deliverSteer = async (
   ctx: HarnessToolContext,
   subagentId: string,
   message: string,
-): Promise<
-  | { subagentId: string; name: string; status: 'running'; note: string }
-  | { error: string }
-> => {
+  agentName: string,
+): Promise<{
+  subagentId: string
+  name: string
+  status: 'running'
+  note: string
+}> => {
   assertNotAwaitingPlanGo(ctx.projectSlug, ctx.chatId)
 
   if (ctx.signal?.aborted) {
@@ -28,9 +39,15 @@ const deliverSteer = async (
 
   const record = getSubagent(subagentId)
   if (!record || record.chatId !== ctx.chatId) {
-    return {
-      error: `Unknown subagentId: ${subagentId}. Known subagent ids for this chat: ${knownIdsLabel(ctx.chatId)}`,
-    }
+    throw new Error(
+      `Unknown subagentId: ${subagentId}. Known subagent ids for this chat: ${knownIdsLabel(ctx.chatId)}`,
+    )
+  }
+
+  if (!namesMatch(record.agentName, agentName)) {
+    throw new Error(
+      `Subagent ${subagentId} is "${record.agentName}", not "${agentName}". Known subagents: ${knownIdsLabel(ctx.chatId)}`,
+    )
   }
 
   if (record.status === 'running') {
@@ -47,9 +64,9 @@ const deliverSteer = async (
     return resumeSubagent(ctx, subagentId, message)
   }
 
-  return {
-    error: `Subagent ${subagentId} is ${record.status} and cannot be steered.`,
-  }
+  throw new Error(
+    `Subagent ${subagentId} is ${record.status} and cannot be steered.`,
+  )
 }
 
 export default deliverSteer

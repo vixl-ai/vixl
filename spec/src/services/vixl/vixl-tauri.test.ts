@@ -152,4 +152,46 @@ describe('vixl-tauri IPC adapters', () => {
       replacements: [{ oldString: 'old', newString: 'new' }],
     })
   })
+
+  it('wraps serialized Tauri invoke rejections as Errors with a useful message', async () => {
+    invoke.mockRejectedValueOnce({ message: 'stdout unavailable' })
+
+    const { workspaceGlob } = await import('@/services/vixl/vixl-tauri')
+
+    await expect(workspaceGlob('/project', '**/*.ts')).rejects.toMatchObject({
+      name: 'Error',
+      message: 'stdout unavailable',
+    })
+  })
+
+  it('wraps object invoke rejections that use an error field', async () => {
+    invoke.mockRejectedValueOnce({ error: 'permission denied' })
+
+    const { workspaceGlob } = await import('@/services/vixl/vixl-tauri')
+
+    await expect(workspaceGlob('/project', '**/*.ts')).rejects.toMatchObject({
+      name: 'Error',
+      message: 'permission denied',
+    })
+  })
+
+  it('wraps JSON-stringifiable invoke rejections without message fields', async () => {
+    invoke.mockRejectedValueOnce({ code: 'Io', details: 'broken pipe' })
+
+    const { workspaceGlob } = await import('@/services/vixl/vixl-tauri')
+
+    await expect(workspaceGlob('/project', '**/*.ts')).rejects.toMatchObject({
+      name: 'Error',
+      message: '{"code":"Io","details":"broken pipe"}',
+    })
+  })
+
+  it('preserves Error invoke rejections', async () => {
+    const original = new Error('boom')
+    invoke.mockRejectedValueOnce(original)
+
+    const { workspaceGlob } = await import('@/services/vixl/vixl-tauri')
+
+    await expect(workspaceGlob('/project', '**/*.ts')).rejects.toBe(original)
+  })
 })

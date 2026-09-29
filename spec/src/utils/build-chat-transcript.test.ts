@@ -309,4 +309,93 @@ describe('buildChatTranscript', () => {
       ].join('\n'),
     )
   })
+
+  it('emits subagent reasoning and text in history order around tools', () => {
+    const transcript = buildChatTranscript([
+      subagentItem({
+        messages: [
+          { role: 'user', content: 'look around' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'reasoning', text: 'Need the file first.' },
+              {
+                type: 'tool-call',
+                toolCallId: 't1',
+                toolName: 'read_file',
+                input: { path: 't1.ts' },
+              },
+              { type: 'text', text: 'It exports foo.' },
+            ],
+          },
+        ],
+      }),
+    ])
+    expect(transcript).toBe(
+      [
+        'SUBAGENT explore [done]',
+        'look around',
+        'Need the file first.',
+        'TOOL read_file [done] {"path":"t1.ts"}',
+        'It exports foo.',
+        'summary: found things',
+      ].join('\n'),
+    )
+  })
+
+  it('keeps subagent history text around compaction and steer boundaries', () => {
+    const transcript = buildChatTranscript([
+      subagentItem({
+        tools: [
+          toolRun({ name: 'read_file', toolCallId: 't1', args: { path: 't1.ts' } }),
+          toolRun({ name: 'grep', toolCallId: 't2', args: { path: 't2.ts' } }),
+        ],
+        compactions: [
+          { summary: 'Kept the file reads', focus: 'auth', toolBoundary: 1 },
+        ],
+        steers: [{ message: 'keep going', toolBoundary: 2 }],
+        messages: [
+          { role: 'user', content: 'look around' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'reasoning', text: 'Start with a read.' },
+              {
+                type: 'tool-call',
+                toolCallId: 't1',
+                toolName: 'read_file',
+                input: { path: 't1.ts' },
+              },
+            ],
+          },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'text', text: 'Now search.' },
+              {
+                type: 'tool-call',
+                toolCallId: 't2',
+                toolName: 'grep',
+                input: { path: 't2.ts' },
+              },
+            ],
+          },
+        ],
+      }),
+    ])
+    expect(transcript).toBe(
+      [
+        'SUBAGENT explore [done]',
+        'look around',
+        'Start with a read.',
+        'TOOL read_file [done] {"path":"t1.ts"}',
+        'compaction: Kept the file reads',
+        'focus: auth',
+        'Now search.',
+        'TOOL grep [done] {"path":"t2.ts"}',
+        'steer: keep going',
+        'summary: found things',
+      ].join('\n'),
+    )
+  })
 })

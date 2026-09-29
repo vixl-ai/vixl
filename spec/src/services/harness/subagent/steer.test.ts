@@ -30,6 +30,7 @@ import {
   resetInboxForTests,
 } from '@/services/harness/subagent/inbox'
 import {
+  abortOne,
   fail,
   register,
   resetSubagentRegistryForTests,
@@ -57,13 +58,14 @@ const execute = (
   ctx: HarnessToolContext,
   subagentId: string,
   message: string,
+  agentName = 'explorer',
 ): Promise<unknown> => {
   const built = steerSubagent(ctx)
   const runner = built.execute as (
     value: Record<string, unknown>,
     options: { toolCallId: string },
   ) => Promise<unknown>
-  return runner({ subagentId, message }, { toolCallId: 'steer-1' })
+  return runner({ subagentId, agentName, message }, { toolCallId: 'steer-1' })
 }
 
 describe('steer_subagent routing', () => {
@@ -136,16 +138,73 @@ describe('steer_subagent routing', () => {
     expect(resumeSubagent).toHaveBeenCalled()
   })
 
-  it('returns known ids when the subagent is unknown', async () => {
+  it('matches agentName case-insensitively after trim', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'Explorer',
+    })
+
+    await expect(
+      execute(baseCtx(), 'sub-1', 'look at auth', '  explorer  '),
+    ).resolves.toMatchObject({
+      subagentId: 'sub-1',
+      name: 'Explorer',
+      status: 'running',
+    })
+    expect(drainSteers('sub-1')).toEqual(['look at auth'])
+  })
+
+  it('throws when agentName does not match the registered name', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    register('chat-1', 'sub-2', new AbortController(), {
+      toolCallId: 'tc-2',
+      agentName: 'writer',
+    })
+
+    await expect(
+      execute(baseCtx(), 'sub-1', 'look at auth', 'writer'),
+    ).rejects.toThrow(
+      'Subagent sub-1 is "explorer", not "writer". Known subagents: sub-1 (explorer, running), sub-2 (writer, running)',
+    )
+    expect(drainSteers('sub-1')).toEqual([])
+    expect(resumeSubagent).not.toHaveBeenCalled()
+  })
+
+  it('throws known ids when the subagent is unknown', async () => {
     register('chat-1', 'sub-known', new AbortController(), {
       toolCallId: 'tc-1',
       agentName: 'explorer',
     })
 
-    await expect(execute(baseCtx(), 'missing', 'hello')).resolves.toEqual({
-      error:
-        'Unknown subagentId: missing. Known subagent ids for this chat: sub-known',
-    })
+    await expect(execute(baseCtx(), 'missing', 'hello')).rejects.toThrow(
+      'Unknown subagentId: missing. Known subagent ids for this chat: sub-known (explorer, running)',
+    )
     expect(resumeSubagent).not.toHaveBeenCalled()
+  })
+
+  it('throws when the subagent cannot be steered', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    abortOne('sub-1')
+
+    await expect(execute(baseCtx(), 'sub-1', 'hello')).rejects.toThrow(
+      'Subagent sub-1 is aborted and cannot be steered.',
+    )
+    expect(resumeSubagent).not.toHaveBeenCalled()
+  })
+
+  it('requires agentName on the tool input schema', () => {
+    const built = steerSubagent(baseCtx())
+    const schema = built.inputSchema as unknown as {
+      shape: { agentName: { description?: string } }
+    }
+    expect(schema.shape.agentName.description).toContain(
+      'Name returned by spawn_subagent',
+    )
   })
 })

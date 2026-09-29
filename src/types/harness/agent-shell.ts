@@ -11,4 +11,5 @@ export type AgentShellRecord = {
   exitCode: number | null
   exitSignal: number | null
   startedAt: string
+  subagentId?: string
 }

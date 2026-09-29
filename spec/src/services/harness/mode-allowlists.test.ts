@@ -23,13 +23,25 @@ describe('mode allowlists codebase tools', () => {
   })
 })
 
+describe('mode allowlists subagent shell tools', () => {
+  const shellTools = ['run_terminal', 'terminal_output', 'stop_terminal'] as const
+
+  it('includes shell tools in read-only and write subagent sets', () => {
+    for (const name of shellTools) {
+      expect(SUBAGENT_READ_ONLY_TOOLS).toContain(name)
+      expect(SUBAGENT_WRITE_TOOLS).toContain(name)
+    }
+  })
+})
+
 describe('mode allowlists parent shell tools', () => {
   const shellTools = ['run_terminal', 'terminal_output', 'stop_terminal'] as const
 
-  it('includes run_terminal, terminal_output, and stop_terminal in ask and plan', () => {
+  it('includes run_terminal, terminal_output, and stop_terminal in ask, plan, and orchestrator', () => {
     for (const name of shellTools) {
       expect(MODE_TOOL_ALLOWLIST.ask).toContain(name)
       expect(MODE_TOOL_ALLOWLIST.plan).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.orchestrator).toContain(name)
     }
   })
 })

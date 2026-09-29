@@ -17,6 +17,7 @@ type RunCompactRewriteInput = {
   messages: ModelMessage[]
   highWater: number
   hardWindow?: number
+  transformSummary?: (summary: string) => string
 }
 
 type RunCompactRewriteResult = {
@@ -58,12 +59,15 @@ export default async (
     typeof input.hardWindow === 'number' && estimated > input.hardWindow
 
   let summary: string
+  const finalizeSummary = (raw: string): string =>
+    input.transformSummary ? input.transformSummary(raw) : raw
+
   if (skipGenerate) {
-    summary = buildFallbackCheckpoint(input.messages)
+    summary = finalizeSummary(buildFallbackCheckpoint(input.messages))
   } else {
     try {
       compacted = await generateCheckpoint(input.checkpointInput)
-      summary = compacted.summary
+      summary = finalizeSummary(compacted.summary)
     } catch (error) {
       if (input.checkpointInput.signal.aborted) {
         throw error
@@ -72,12 +76,12 @@ export default async (
         compacted = await generateCheckpoint(
           withRetryNote(input.checkpointInput),
         )
-        summary = compacted.summary
+        summary = finalizeSummary(compacted.summary)
       } catch (retryError) {
         if (input.checkpointInput.signal.aborted) {
           throw retryError
         }
-        summary = buildFallbackCheckpoint(input.messages)
+        summary = finalizeSummary(buildFallbackCheckpoint(input.messages))
       }
     }
   }
@@ -86,7 +90,9 @@ export default async (
   let rewrittenEstimate = estimatePromptTokens(input.system, rewritten)
 
   if (rewrittenEstimate > input.highWater && compacted) {
-    const fallbackSummary = buildFallbackCheckpoint(input.messages)
+    const fallbackSummary = finalizeSummary(
+      buildFallbackCheckpoint(input.messages),
+    )
     const fallbackRewritten = rewriteMessages(input.messages, fallbackSummary)
     const fallbackEstimate = estimatePromptTokens(
       input.system,

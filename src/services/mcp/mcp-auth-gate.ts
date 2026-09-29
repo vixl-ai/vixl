@@ -1,3 +1,5 @@
+import { isRunningBackgroundSubagent } from '@/services/harness/subagent/registry'
+
 export type McpAuthKind = 'oauth' | 'inputs' | 'trust' | 'client'
 
 export type McpAuthResolution =
@@ -87,8 +89,18 @@ export const patchPendingMcpAuthForServer = (
   }
 }
 
-export const rejectPendingMcpAuthForChat = (chatId: string): void => {
+export const rejectPendingMcpAuthForChat = (
+  chatId: string,
+  options?: { keepBackground?: boolean },
+): void => {
   for (const entry of listPendingMcpAuthForChat(chatId)) {
+    if (
+      options?.keepBackground &&
+      entry.subagentId &&
+      isRunningBackgroundSubagent(entry.subagentId)
+    ) {
+      continue
+    }
     pending.delete(entry.toolCallId)
     entry.resolve({ action: 'cancelled' })
   }
