@@ -15,6 +15,7 @@ import {
 } from '@/services/harness/subagent/registry'
 import { getPlanExecutionSession } from '@/services/harness/plan-execution-session'
 import toCachedInstructions from '@/services/models/to-cached-instructions'
+import describeOutputLimitTruncation from './describe-output-limit-truncation'
 import emitContextUsage from './emit-context-usage'
 import extractPartialToolFields from './extract-partial-tool-fields'
 import { resolveStreamError, resolveToolErrorMessage } from './helpers'
@@ -45,6 +46,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
   } = prepared
 
   let streamError: Error | null = null
+  let hitOutputLimit = false
   let lastStepHadTokens = false
   const toolInputBuffers = new Map<string, string>()
   const toolInputNames = new Map<string, string>()
@@ -149,6 +151,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     }
 
     if (part.type === 'finish-step') {
+      hitOutputLimit ||= part.finishReason === 'length'
       const usage = part.usage
       lastStepHadTokens = emitContextUsage(usage, modelId, onEvent)
       await captureStepUsage(usage, {
@@ -308,6 +311,13 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
 
     if (!signal.aborted) {
       await persistCollectedAssistant()
+    }
+
+    if (hitOutputLimit && !signal.aborted) {
+      throw new Error(describeOutputLimitTruncation({
+        maxOutputTokens: callOptions.maxOutputTokens,
+        cutOffToolNames: toolInputNames.values(),
+      }))
     }
   } finally {
     clearStagedImages({ chatId, turnId: assistantId })

@@ -210,6 +210,71 @@ describe('toolRunToUiParts', () => {
       ),
     ).toEqual([])
   })
+
+  it('projects undefined args as empty object input for done runs', () => {
+    const parts = toolRunToUiParts(
+      stepWithTools([
+        run({
+          toolCallId: 'tc-trunc',
+          name: 'create_plan',
+          result: { title: 'partial' },
+        }),
+      ]),
+    )
+
+    expect(parts[1]).toMatchObject({
+      type: 'dynamic-tool',
+      toolName: 'create_plan',
+      toolCallId: 'tc-trunc',
+      state: 'output-available',
+      input: {},
+    })
+  })
+
+  it('projects undefined args as empty object input for error runs', () => {
+    const parts = toolRunToUiParts(
+      stepWithTools([
+        run({
+          toolCallId: 'tc-err-trunc',
+          name: 'create_plan',
+          status: 'error',
+          result: { error: 'truncated' },
+        }),
+      ]),
+    )
+
+    expect(parts[1]).toMatchObject({
+      type: 'dynamic-tool',
+      toolName: 'create_plan',
+      toolCallId: 'tc-err-trunc',
+      state: 'output-error',
+      input: {},
+    })
+  })
+
+  it('preserves plain object args as input', () => {
+    const args = { title: 'Ship it', body: 'Do the thing' }
+    const parts = toolRunToUiParts(
+      stepWithTools([
+        run({
+          toolCallId: 'tc-obj',
+          name: 'create_plan',
+          args,
+          result: { ok: true },
+        }),
+      ]),
+    )
+
+    expect(parts[1]).toMatchObject({
+      type: 'dynamic-tool',
+      state: 'output-available',
+      input: args,
+    })
+    if (parts[1]?.type !== 'dynamic-tool') {
+      return
+    }
+    expect(parts[1].input).toBe(args)
+  })
 })
 
 describe('convertToModelMessages with projected tool parts', () => {
@@ -344,6 +409,52 @@ describe('convertToModelMessages with projected tool parts', () => {
             toolCallId: 'tc-err',
             toolName: 'grep',
             output: { type: 'error-text', value: 'nope' },
+          },
+        ],
+      },
+    ])
+  })
+
+  it('converts missing args into a tool-call with empty object input', async () => {
+    const result = { title: 'partial' }
+    const projected = toolRunToUiParts(
+      stepWithTools([
+        run({
+          toolCallId: 'tc-trunc',
+          name: 'create_plan',
+          result,
+        }),
+      ]),
+    )
+
+    const modelMessages = await convertToModelMessages([
+      {
+        role: 'assistant',
+        parts: projected,
+      },
+    ])
+
+    expect(modelMessages).toEqual([
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'tc-trunc',
+            toolName: 'create_plan',
+            input: {},
+            providerExecuted: undefined,
+          },
+        ],
+      },
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'tc-trunc',
+            toolName: 'create_plan',
+            output: { type: 'json', value: result },
           },
         ],
       },

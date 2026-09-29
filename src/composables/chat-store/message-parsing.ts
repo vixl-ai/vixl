@@ -78,6 +78,12 @@ export const createStep = (id: string, text = ''): AgentStep => ({
   tools: [],
 })
 
+const isEmptyPlainObject = (value: unknown): boolean =>
+  typeof value === 'object' &&
+  value !== null &&
+  !Array.isArray(value) &&
+  Object.keys(value as Record<string, unknown>).length === 0
+
 export const upsertToolInStep = (step: AgentStep, run: ToolRun): AgentStep => {
   const tools = [...step.tools]
   const index = tools.findIndex((item) => item.toolCallId === run.toolCallId)
@@ -88,14 +94,16 @@ export const upsertToolInStep = (step: AgentStep, run: ToolRun): AgentStep => {
       run.status === 'running'
         ? existing.status
         : run.status
+    const keepExistingArgs = run.args == null || isEmptyPlainObject(run.args)
     tools[index] = {
       ...existing,
       ...run,
       status,
-      args: run.args ?? existing.args,
+      args: keepExistingArgs ? existing.args : run.args,
       result: run.result ?? existing.result,
       artifact: run.artifact ?? existing.artifact,
       diffs: run.diffs ?? existing.diffs,
+      ...(existing.started || run.started ? { started: true } : {}),
     }
   } else {
     tools.push(run)
@@ -105,15 +113,23 @@ export const upsertToolInStep = (step: AgentStep, run: ToolRun): AgentStep => {
 
 export const closeRunningTools = (step: AgentStep): AgentStep => ({
   ...step,
-  tools: step.tools.map((tool) =>
-    tool.status === 'running'
-      ? {
-          ...tool,
-          status: 'done' as const,
-          result: tool.result ?? { stopped: true },
-        }
-      : tool,
-  ),
+  tools: step.tools.map((tool) => {
+    if (tool.status !== 'running') {
+      return tool
+    }
+    if (tool.started) {
+      return {
+        ...tool,
+        status: 'done' as const,
+        result: tool.result ?? { stopped: true },
+      }
+    }
+    return {
+      ...tool,
+      status: 'error' as const,
+      result: tool.result ?? { error: 'Tool call was cut off before it finished' },
+    }
+  }),
 })
 
 export const updateTimelineTurn = (session: ChatSession, turn: AgentTurn): void => {

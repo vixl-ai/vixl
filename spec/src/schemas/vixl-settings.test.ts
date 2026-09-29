@@ -274,7 +274,7 @@ describe('resolveModelCallOptions', () => {
       { version: 1 },
       { providerId: 'anthropic', modelId: 'claude-sonnet-4-5' },
     )
-    expect(options.maxOutputTokens).toBe(8192)
+    expect(options.maxOutputTokens).toBe(32_768)
     expect(options.temperature).toBeUndefined()
     expect(options.providerOptions).toEqual({
       anthropic: {

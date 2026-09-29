@@ -59,6 +59,7 @@ export default (
             name: event.name,
             status: 'running',
             args: existing?.args,
+            ...(existing?.started ? { started: true } : {}),
           }
           toolRuns.value = [
             ...toolRuns.value.filter((item) => item.toolCallId !== event.toolCallId),
@@ -83,6 +84,7 @@ export default (
           name,
           status: 'running',
           args,
+          ...(existing?.started ? { started: true } : {}),
         }
         toolRuns.value = [
           ...toolRuns.value.filter((item) => item.toolCallId !== event.toolCallId),
@@ -101,6 +103,7 @@ export default (
         name: event.name,
         status: 'running',
         args: mergeToolRunArgs(existing?.args, event.args),
+        started: true,
       }
       toolRuns.value = [
         ...toolRuns.value.filter((item) => item.toolCallId !== event.toolCallId),
@@ -126,6 +129,7 @@ export default (
         result: event.result,
         artifact: event.artifact ?? existing?.artifact,
         diffs: event.diffs ?? existing?.diffs,
+        started: true,
       }
       toolRuns.value = toolRuns.value.map((item) =>
         item.toolCallId === event.toolCallId ? run : item,

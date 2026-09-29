@@ -55,4 +55,46 @@ describe('resolveCompactHighWater reserved output', () => {
       Math.floor((100_000 - 10_000) * 0.7),
     )
   })
+
+  it('subtracts the 32768 main-agent default when no catalog max output is set', () => {
+    const settings = {
+      version: 1,
+      'models.catalogMeta': {
+        'openai::gpt-4o': { contextWindow: 200_000 },
+      },
+    } as VixlSettings
+    expect(resolveCompactHighWater(settings, ref)).toBe(
+      Math.floor((200_000 - DEFAULT_MAX_OUTPUT_TOKENS) * 0.7),
+    )
+  })
+
+  it('uses the half-window fallback so a 32k context still has a positive high water', () => {
+    const settings = {
+      version: 1,
+      'models.catalogOptions': {
+        'openai::gpt-4o': { contextWindow: 32_768 },
+      },
+      'models.catalogMeta': {
+        'openai::gpt-4o': { contextWindow: 32_768 },
+      },
+    } as VixlSettings
+    expect(resolveCompactHighWater(settings, ref)).toBe(
+      Math.floor((32_768 - 16_384) * 0.7),
+    )
+  })
+
+  it('uses the half-window fallback on a 40k context', () => {
+    const settings = {
+      version: 1,
+      'models.catalogOptions': {
+        'openai::gpt-4o': { contextWindow: 40_000 },
+      },
+      'models.catalogMeta': {
+        'openai::gpt-4o': { contextWindow: 40_000 },
+      },
+    } as VixlSettings
+    expect(resolveCompactHighWater(settings, ref)).toBe(
+      Math.floor((40_000 - 20_000) * 0.7),
+    )
+  })
 })

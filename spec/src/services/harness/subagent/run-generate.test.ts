@@ -87,6 +87,7 @@ vi.mock('@/services/harness/resolve-model-vision', () => ({
 }))
 
 import runSubagentGenerate from '@/services/harness/subagent/run-generate'
+import { DEFAULT_MAX_OUTPUT_TOKENS } from '@/services/models/resolve-model-call-options'
 import { pushSteer } from '@/services/harness/subagent/inbox'
 import {
   getSubagent,
@@ -109,6 +110,7 @@ type GenerateConfig = {
   repairToolCall?: unknown
   messages?: unknown[]
   prompt?: string
+  maxOutputTokens?: number
   onToolExecutionEnd?: (event: ToolExecutionEndEvent) => void
 }
 
@@ -168,6 +170,31 @@ describe('runSubagentGenerate compaction wiring', () => {
     expect(result).toMatchObject({ truncated: true })
     expect(estimateTextTokens(JSON.stringify(result))).toBeLessThanOrEqual(TOKEN_CAP)
     expect(grepExecute).toHaveBeenCalled()
+  })
+
+  it('requests the 32768 main-agent default max output', async () => {
+    await runSubagentGenerate({
+      ctx: {
+        ...baseCtx(),
+        settings: {
+          version: 1,
+          'models.catalogMeta': {
+            'local::qwen': { contextWindow: 128_000 },
+          },
+        } as VixlSettings,
+      },
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+
+    const config = generateText.mock.calls[0]?.[0] as GenerateConfig
+    expect(config.maxOutputTokens).toBe(DEFAULT_MAX_OUTPUT_TOKENS)
+    expect(DEFAULT_MAX_OUTPUT_TOKENS).toBe(32_768)
   })
 })
 
@@ -590,6 +617,71 @@ describe('runSubagentGenerate summary validation', () => {
     await run()
     const config = generateText.mock.calls[0]?.[0] as GenerateConfig
     expect(config.repairToolCall).toBe(repairToolCall)
+  })
+})
+
+describe('runSubagentGenerate output-limit truncation', () => {
+  const run = () =>
+    runSubagentGenerate({
+      ctx: baseCtx(),
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetSubagentRegistryForTests()
+    createModel.mockResolvedValue({ id: 'stub-model' })
+    captureBillableUsage.mockResolvedValue(undefined)
+    resolveAgentDefinition.mockResolvedValue(null)
+    compactStep.mockResolvedValue(undefined)
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'call-1',
+      agentName: 'explore',
+      model: 'local::qwen',
+    })
+  })
+
+  it('returns partial text plus a truncation notice when generateText hits the output limit', async () => {
+    generateText.mockResolvedValue({
+      text: 'partial summary',
+      usage: {},
+      finishReason: 'length',
+      response: { messages: [{ role: 'assistant', content: 'partial summary' }] },
+    })
+
+    const notice = `[The model hit its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`
+    await expect(run()).resolves.toBe(`partial summary\n\n${notice}`)
+    expect(captureBillableUsage).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns only the truncation notice when generateText hits the limit with no text', async () => {
+    generateText.mockResolvedValue({
+      text: '',
+      usage: {},
+      finishReason: 'length',
+      response: { messages: [] },
+    })
+
+    await expect(run()).resolves.toBe(
+      `[The model hit its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`,
+    )
+  })
+
+  it('returns text when generateText finishes with stop', async () => {
+    generateText.mockResolvedValue({
+      text: 'summary',
+      usage: {},
+      finishReason: 'stop',
+      response: { messages: [{ role: 'assistant', content: 'summary' }] },
+    })
+
+    await expect(run()).resolves.toBe('summary')
   })
 })
 

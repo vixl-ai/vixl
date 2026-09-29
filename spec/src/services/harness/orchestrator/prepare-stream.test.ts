@@ -51,7 +51,7 @@ vi.mock('@/services/harness/resolve-model-vision', () => ({
 }))
 
 vi.mock('@/services/models/resolve-model-call-options', () => ({
-  DEFAULT_MAX_OUTPUT_TOKENS: 8192,
+  DEFAULT_MAX_OUTPUT_TOKENS: 32768,
   resolveModelCallOptions: () => ({}),
 }))
 

@@ -33,6 +33,7 @@ vi.mock('@/services/harness/plan-execution-session', () => ({
 
 import { toast } from 'vue-sonner'
 import createEvents from '@/composables/agent-harness/events'
+import { closeRunningTools, createStep } from '@/composables/chat-store/message-parsing'
 
 const buildState = (): AgentHarnessState =>
   ({
@@ -141,6 +142,7 @@ describe('agent-harness events partial tool path', () => {
         name: 'edit_file',
         status: 'running',
         args: { path: 'src/a.ts', content: 'hello' },
+        started: true,
       },
     ])
     expect(state.session.upsertLocalToolRun).toHaveBeenCalledTimes(2)
@@ -165,6 +167,83 @@ describe('agent-harness events partial tool path', () => {
       },
     ])
     expect(state.session.upsertLocalToolRun).toHaveBeenCalledTimes(1)
+    expect(state.toolRuns.value[0]?.started).toBeUndefined()
+  })
+
+  it('marks a tool-input-start that never started as cut off when the step closes', () => {
+    const state = buildState()
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'tool-input-start',
+      toolCallId: 'call-plan',
+      name: 'create_plan',
+    })
+
+    const closed = closeRunningTools({
+      ...createStep('step-1'),
+      tools: [...state.toolRuns.value],
+    })
+    expect(closed.tools[0]).toMatchObject({
+      toolCallId: 'call-plan',
+      name: 'create_plan',
+      status: 'error',
+      result: { error: 'Tool call was cut off before it finished' },
+    })
+    expect(closed.tools[0]?.status).not.toBe('done')
+  })
+
+  it('keeps a started tool as done with stopped when the step closes', () => {
+    const state = buildState()
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'tool-input-start',
+      toolCallId: 'call-3',
+      name: 'read_file',
+    })
+    handleEvent({
+      type: 'tool-start',
+      toolCallId: 'call-3',
+      name: 'read_file',
+      args: { path: 'a.ts' },
+    })
+
+    expect(state.toolRuns.value[0]?.started).toBe(true)
+    const closed = closeRunningTools({
+      ...createStep('step-1'),
+      tools: [...state.toolRuns.value],
+    })
+    expect(closed.tools[0]).toMatchObject({
+      toolCallId: 'call-3',
+      name: 'read_file',
+      status: 'done',
+      result: { stopped: true },
+      started: true,
+    })
+  })
+
+  it('treats a tool-result as started', () => {
+    const state = buildState()
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'tool-input-start',
+      toolCallId: 'call-4',
+      name: 'read_file',
+    })
+    handleEvent({
+      type: 'tool-result',
+      toolCallId: 'call-4',
+      result: { content: 'ok' },
+    })
+
+    expect(state.toolRuns.value[0]).toMatchObject({
+      toolCallId: 'call-4',
+      status: 'done',
+      started: true,
+      result: { content: 'ok' },
+    })
   })
 })
 

@@ -18,4 +18,5 @@ export type ToolRun = {
   result?: unknown
   artifact?: ChatArtifact
   diffs?: FileDiff[]
+  started?: boolean
 }

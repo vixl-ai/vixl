@@ -8,6 +8,7 @@ import type { PrefixSnapshot } from '@/types/harness/prefix-snapshot'
 import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ActiveContextSlice } from '@/services/context/filter-messages-for-active-context'
 import countContextBudget from '@/services/context/count-context-budget'
+import { DEFAULT_MAX_OUTPUT_TOKENS } from '@/services/models/resolve-model-call-options'
 import parseModelRef from '@/utils/parse-model-ref'
 
 export type LastStepUsage = {
@@ -20,7 +21,7 @@ export type LastStepUsage = {
 
 const estimatedPromptUsed = ref(0)
 const limit = ref(128_000)
-const reservedOutput = ref(8192)
+const reservedOutput = ref(DEFAULT_MAX_OUTPUT_TOKENS)
 const safetyBuffer = ref(2000)
 const estimatedFree = ref(0)
 const buckets = ref<ContextBucket[]>([])

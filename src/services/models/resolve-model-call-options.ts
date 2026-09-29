@@ -38,7 +38,7 @@ export type ResolvedModelContextLimits = {
   maxOutputTokens?: number
 }
 
-const DEFAULT_MAX_OUTPUT_TOKENS = 8192
+const DEFAULT_MAX_OUTPUT_TOKENS = 32_768
 const DEFAULT_SIDE_TASK_MAX_OUTPUT_TOKENS = 256
 const FALLBACK_CONTEXT_WINDOW = 128_000
 
@@ -124,6 +124,16 @@ const clampToReportedMax = (
   return value
 }
 
+const clampFallbackToContextWindow = (
+  value: number,
+  window: number,
+): number => {
+  if (window <= 1) {
+    return value
+  }
+  return Math.min(value, Math.max(1, Math.floor(window / 2)))
+}
+
 const resolveMaxOutputTokens = (
   settings: VixlSettings,
   ref: ModelRef,
@@ -148,7 +158,8 @@ const resolveMaxOutputTokens = (
   // Advertised max output is a ceiling, not the tokens to request or reserve.
   // GLM 5.3 Flash lists 131k max output on a 1M window; using that as the
   // call size would carve ~123k usable out of a 256k selection.
-  return clampToReportedMax(fallback, reported)
+  const requested = clampToReportedMax(fallback, reported)
+  return clampFallbackToContextWindow(requested, resolveContextWindow(settings, ref))
 }
 
 export const resolveMaxInputTokens = (
@@ -164,7 +175,11 @@ export const resolveMaxInputTokens = (
     return model.maxInputTokens
   }
   if (typeof model.contextWindow === 'number') {
-    const maxOutput = model.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS
+    const maxOutput = resolveMaxOutputTokens(
+      settings,
+      ref,
+      DEFAULT_MAX_OUTPUT_TOKENS,
+    )
     const derived = model.contextWindow - maxOutput
     return derived > 0 ? derived : model.contextWindow
   }
