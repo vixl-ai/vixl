@@ -11,7 +11,7 @@ const { el, visible } = useReveal()
 <template>
   <section
     ref="el"
-    class="vx-closing relative isolate flex items-center justify-center bg-background py-24 lg:py-36"
+    class="vx-closing relative isolate flex items-center justify-center bg-background pb-24 pt-14 lg:pb-36 lg:pt-20"
     aria-labelledby="closing-heading"
   >
     <div

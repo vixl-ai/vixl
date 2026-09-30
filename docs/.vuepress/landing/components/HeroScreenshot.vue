@@ -1,10 +1,36 @@
 <script setup lang="ts">
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useReveal } from '@landing/composables/useReveal'
-
-const HERO_LIGHT = '/media/landing/hero-light.webp'
-const HERO_DARK = '/media/landing/hero-dark.webp'
+import { useLandingColorMode } from '@landing/composables/useLandingColorMode'
+import {
+  HERO_IMAGE_SIZES,
+  landingImageSrc,
+  landingImageSrcset,
+} from '@landing/lib/media'
 
 const { el, visible } = useReveal()
+const { resolved } = useLandingColorMode()
+
+const imgEl = ref<HTMLImageElement | null>(null)
+const hydrated = ref(false)
+
+// SSR can only follow the OS scheme; after hydration the source follows the
+// resolved theme so a stored override or the toggle picks the right shot.
+const darkMedia = computed(() => {
+  if (!hydrated.value) return '(prefers-color-scheme: dark)'
+  return resolved.value === 'dark' ? 'all' : 'not all'
+})
+
+onMounted(async () => {
+  hydrated.value = true
+  const root = document.documentElement
+  if (!root.classList.contains('vx-theme-override')) return
+  await nextTick()
+  const reveal = () => root.classList.remove('vx-theme-override')
+  imgEl.value?.addEventListener('load', reveal, { once: true })
+  imgEl.value?.addEventListener('error', reveal, { once: true })
+  setTimeout(reveal, 3000)
+})
 </script>
 
 <template>
@@ -33,26 +59,27 @@ const { el, visible } = useReveal()
               aria-hidden="true"
             />
 
-            <img
-              :src="HERO_LIGHT"
-              alt="Vixl desktop app in light theme, showing chat, editor, and files"
-              width="2400"
-              height="960"
-              class="absolute inset-0 z-10 size-full object-cover dark:hidden"
-              loading="eager"
-              fetchpriority="high"
-              decoding="async"
-            >
-            <img
-              :src="HERO_DARK"
-              alt="Vixl desktop app in dark theme, showing chat, editor, and files"
-              width="2400"
-              height="960"
-              class="absolute inset-0 z-10 hidden size-full object-cover dark:block"
-              loading="eager"
-              fetchpriority="high"
-              decoding="async"
-            >
+            <picture>
+              <source
+                :media="darkMedia"
+                :srcset="landingImageSrcset('hero-dark')"
+                :sizes="HERO_IMAGE_SIZES"
+                type="image/webp"
+              >
+              <img
+                ref="imgEl"
+                :src="landingImageSrc('hero-light')"
+                :srcset="landingImageSrcset('hero-light')"
+                :sizes="HERO_IMAGE_SIZES"
+                alt="Vixl desktop app showing chat, editor, and files"
+                width="2400"
+                height="960"
+                class="vx-hero-shot absolute inset-0 z-10 size-full object-cover"
+                loading="eager"
+                fetchpriority="high"
+                decoding="async"
+              >
+            </picture>
           </div>
         </div>
       </div>

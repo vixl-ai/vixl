@@ -1,8 +1,8 @@
 <script setup lang="ts">
-const mindsLight = '/media/sponsors/minds-light.png'
-const mindsDark = '/media/sponsors/minds-dark.png'
+const mindsLight = '/media/sponsors/minds-light.webp'
+const mindsDark = '/media/sponsors/minds-dark.webp'
 const nicheLight = '/media/sponsors/niche-light.webp'
-const nicheDark = '/media/sponsors/niche-dark.png'
+const nicheDark = '/media/sponsors/niche-dark.webp'
 </script>
 
 <template>
@@ -13,7 +13,7 @@ const nicheDark = '/media/sponsors/niche-dark.png'
     <div class="vx-container">
       <p
         id="sponsors-caption"
-        class="vx-sponsors-caption text-center text-[1rem] font-medium text-muted-foreground"
+        class="vx-sponsors-caption text-center text-[1.25rem] font-medium tracking-[-0.01em] lg:text-[1.5rem] text-muted-foreground"
       >
         Sponsored by
       </p>
@@ -32,6 +32,7 @@ const nicheDark = '/media/sponsors/niche-dark.png'
             width="116"
             height="54"
             class="vx-sponsor-logo vx-sponsor-logo--minds dark:hidden"
+            loading="lazy"
             decoding="async"
           >
           <img
@@ -40,6 +41,7 @@ const nicheDark = '/media/sponsors/niche-dark.png'
             width="116"
             height="54"
             class="vx-sponsor-logo vx-sponsor-logo--minds hidden dark:block"
+            loading="lazy"
             decoding="async"
           >
         </a>
@@ -52,17 +54,19 @@ const nicheDark = '/media/sponsors/niche-dark.png'
           <img
             :src="nicheLight"
             alt="Niche"
-            width="1592"
-            height="597"
+            width="256"
+            height="96"
             class="vx-sponsor-logo vx-sponsor-logo--niche dark:hidden"
+            loading="lazy"
             decoding="async"
           >
           <img
             :src="nicheDark"
             alt="Niche"
-            width="500"
-            height="187"
+            width="257"
+            height="96"
             class="vx-sponsor-logo vx-sponsor-logo--niche hidden dark:block"
+            loading="lazy"
             decoding="async"
           >
         </a>

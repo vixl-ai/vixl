@@ -2,6 +2,11 @@
 import type { FeatureSection } from '@landing/data/features'
 import MonoText from '@landing/components/MonoText.vue'
 import { useReveal } from '@landing/composables/useReveal'
+import {
+  FEATURE_IMAGE_SIZES,
+  landingImageSrc,
+  landingImageSrcset,
+} from '@landing/lib/media'
 
 const props = defineProps<{
   feature: FeatureSection
@@ -9,8 +14,8 @@ const props = defineProps<{
 
 const { el, visible } = useReveal()
 
-const lightSrc = `/media/landing/${props.feature.scene}-light.webp`
-const darkSrc = `/media/landing/${props.feature.scene}-dark.webp`
+const lightName = `${props.feature.scene}-light`
+const darkName = `${props.feature.scene}-dark`
 </script>
 
 <template>
@@ -22,7 +27,7 @@ const darkSrc = `/media/landing/${props.feature.scene}-dark.webp`
     :aria-labelledby="`${feature.id}-heading`"
   >
     <div
-      class="vx-container relative grid items-center gap-10 lg:grid-cols-12 lg:gap-x-10"
+      class="vx-container vx-container--wide relative grid items-center gap-10 lg:grid-cols-12 lg:gap-x-10"
     >
       <div
         class="min-w-0 text-left lg:col-span-4 lg:col-start-1"
@@ -60,8 +65,11 @@ const darkSrc = `/media/landing/${props.feature.scene}-dark.webp`
               class="vx-img-placeholder pointer-events-none absolute inset-0 z-0"
               aria-hidden="true"
             />
+            <!-- Lazy is load-bearing: the display:none theme image is never fetched. -->
             <img
-              :src="lightSrc"
+              :src="landingImageSrc(lightName)"
+              :srcset="landingImageSrcset(lightName)"
+              :sizes="FEATURE_IMAGE_SIZES"
               :alt="feature.altLight"
               width="2400"
               height="960"
@@ -71,7 +79,9 @@ const darkSrc = `/media/landing/${props.feature.scene}-dark.webp`
               @error="($event.target as HTMLImageElement).classList.add('vx-img-missing')"
             >
             <img
-              :src="darkSrc"
+              :src="landingImageSrc(darkName)"
+              :srcset="landingImageSrcset(darkName)"
+              :sizes="FEATURE_IMAGE_SIZES"
               :alt="feature.altDark"
               width="2400"
               height="960"

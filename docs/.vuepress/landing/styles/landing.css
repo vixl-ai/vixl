@@ -259,6 +259,11 @@
   padding-inline: 20px;
 }
 
+/* Feature rows and principles share this width so their left edges align. */
+.vx-landing .vx-container--wide {
+  max-width: 1440px;
+}
+
 @media (min-width: 640px) {
   .vx-landing .vx-container {
     padding-inline: 32px;
@@ -287,14 +292,14 @@
 
 .vx-landing .vx-sponsors {
   /* Extra breathing room between hero screenshot and Coding section. */
-  padding-top: 2.25rem;
-  padding-bottom: 2.75rem;
+  padding-top: 4rem;
+  padding-bottom: 4.5rem;
 }
 
 @media (min-width: 1024px) {
   .vx-landing .vx-sponsors {
-    padding-top: 2.75rem;
-    padding-bottom: 3.25rem;
+    padding-top: 6rem;
+    padding-bottom: 6.5rem;
   }
 }
 
@@ -352,6 +357,12 @@ html.dark .vx-landing .vx-sponsors-caption {
   .vx-landing .vx-sponsor-logo--niche {
     height: 46px;
   }
+}
+
+/* Set by a head script when the stored theme differs from the OS scheme, so the
+   SSR <picture> (OS scheme) never flashes the wrong theme before hydration. */
+html.vx-theme-override .vx-landing .vx-hero-shot {
+  visibility: hidden;
 }
 
 /* Soft-fade the aurora clip so the breathe/scale animation does not hard-cut
@@ -676,16 +687,6 @@ html.dark .vx-landing .vx-sponsors-caption {
   filter: blur(28px);
   transform: scale(1.04);
   opacity: 0.55;
-}
-
-@media (min-width: 1024px) {
-  .vx-landing .vx-feature-media {
-    width: min(
-      1120px,
-      calc(100% + (100vw - min(100vw, 1200px)) / 2 + 40px - 24px)
-    );
-    max-width: none;
-  }
 }
 
 .vx-landing .vx-img-missing {

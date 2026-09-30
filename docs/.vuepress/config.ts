@@ -148,6 +148,10 @@ function faqJsonLd(): HeadConfig {
   })
 }
 
+// The landing hero <picture> follows the OS scheme until hydration. When the
+// stored theme disagrees, HeroScreenshot hides the shot until the right one loads.
+const themeOverrideScript = `try{var c=localStorage.getItem('vuepress-color-scheme'),d=matchMedia('(prefers-color-scheme: dark)').matches;if((c==='dark'&&!d)||(c==='light'&&d))document.documentElement.classList.add('vx-theme-override')}catch(e){}`
+
 const sharedSeoHead: HeadConfig[] = [
   [
     'link',
@@ -350,6 +354,9 @@ export default defineUserConfig({
       llmsTxt: true,
       llmsFullTxt: true,
       llmsPageTxt: true,
+      // Default template's empty {alternateLinks} (single locale) eats the
+      // blank line and glues {details} onto the description.
+      llmsTxtTemplate: '# {title}\n\n{description}\n\n{details}\n\n## Table of Contents\n\n{toc}',
     }),
   ],
   extendsPage(page) {
@@ -371,6 +378,16 @@ export default defineUserConfig({
     if (relativePath) {
       const canonical = canonicalUrl(relativePath)
       head.push(['link', { rel: 'canonical', href: canonical }])
+      // Markdown twin written by llmsPlugin (llmsPageTxt) next to the .html.
+      head.push([
+        'link',
+        {
+          rel: 'alternate',
+          type: 'text/markdown',
+          href: `${siteOrigin}/${page.htmlFilePathRelative.replace(/\.html$/, '.md')}`,
+          title: 'Markdown',
+        },
+      ])
       head.push(['meta', { property: 'og:url', content: canonical }])
       head.push([
         'meta',
@@ -380,6 +397,7 @@ export default defineUserConfig({
 
     if (isHome) {
       head.push(homeJsonLd(siteDescription))
+      head.push(['script', {}, themeOverrideScript])
     }
     if (relativePath === 'resources/faq.md') {
       head.push(faqJsonLd())

@@ -12,7 +12,7 @@ const { el, visible } = useReveal()
     aria-labelledby="principles-heading"
   >
     <div
-      class="vx-container relative"
+      class="vx-container vx-container--wide relative"
       :class="visible ? 'vx-reveal-in' : 'vx-reveal-out'"
     >
       <h2
