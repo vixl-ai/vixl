@@ -626,7 +626,7 @@ describe('consumeStream output-limit truncation', () => {
     prepared.callOptions.maxOutputTokens = 4096
 
     await expect(consumeStream(prepared)).rejects.toThrow(
-      'The model hit its output limit (4096 tokens) before finishing. create_plan was cut off and did not run. Raise max output in model options or ask for a shorter response.',
+      'The model reached its output limit (4096 tokens) before finishing. create_plan was cut off and did not run. Raise max output in model options or ask for a shorter response.',
     )
   })
 
@@ -641,7 +641,7 @@ describe('consumeStream output-limit truncation', () => {
     ;(prepared.steps as { stepOpen: boolean }).stepOpen = true
 
     await expect(consumeStream(prepared)).rejects.toThrow(
-      'The model hit its output limit (2048 tokens) before finishing. Raise max output in model options or ask for a shorter response.',
+      'The model reached its output limit (2048 tokens) before finishing. Raise max output in model options or ask for a shorter response.',
     )
   })
 
@@ -694,7 +694,7 @@ describe('consumeStream output-limit truncation', () => {
     prepared.callOptions.maxOutputTokens = 4096
 
     await expect(consumeStream(prepared)).rejects.toThrow(
-      'The model hit its output limit (4096 tokens) before finishing.',
+      'The model reached its output limit (4096 tokens) before finishing.',
     )
     expect(persistLine).toHaveBeenCalledWith(
       'demo',
@@ -719,7 +719,7 @@ describe('consumeStream output-limit truncation', () => {
     ;(prepared.steps as { sealedReasoningSeconds: number }).sealedReasoningSeconds = 3
 
     await expect(consumeStream(prepared)).rejects.toThrow(
-      'The model hit its output limit (4096 tokens) before finishing.',
+      'The model reached its output limit (4096 tokens) before finishing.',
     )
     expect(persistLine).toHaveBeenCalledWith(
       'demo',

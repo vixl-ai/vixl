@@ -31,7 +31,7 @@ const parseSandboxRuntimeDenialKind = (
 const SANDBOX_DENIAL_DETAIL_MAX = 500
 
 const SANDBOX_JAIL_RETRY_HINT =
-  'This is the OS jail (Seatbelt or bubblewrap), not a missing package. Approve an unsandboxed retry. Do not rewrite this as a Python script.'
+  'The OS sandbox (Seatbelt or bubblewrap) blocked this, not a missing package; the fix is an approved unsandboxed retry rather than a script rewrite.'
 
 const trimSandboxDenialDetail = (detail: string): string => {
   const trimmed = detail.trim()

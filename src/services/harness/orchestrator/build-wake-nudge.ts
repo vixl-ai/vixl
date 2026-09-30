@@ -26,18 +26,18 @@ export default (
   })
   const completedBlock = ['Completed:', ...lines]
   const summariesClause = options?.summariesInline
-    ? 'Their completed summaries are included below.'
-    : 'Their completed summaries are in the spawn_subagent tool results above.'
+    ? 'Summaries are below.'
+    : 'Summaries are in the spawn_subagent tool results above.'
   const body =
     runningAgents.length === 0
-      ? `Background subagent results are ready. ${summariesClause} Answer the user now using those results. Do not say the subagents are still running. ${visibleStatus('finished')}`
-      : `A background subagent finished. Other background subagents are still running: ${runningAgents
+      ? `All background subagents have finished. ${summariesClause} Answer the user from those results. ${visibleStatus('finished')}`
+      : `A background subagent finished; still running: ${runningAgents
           .map((agent) => `${agent.name} (${agent.subagentId})`)
-          .join(', ')}. You may answer about the finished result now or wait for the rest. Your call. ${visibleStatus('finished')}`
+          .join(', ')}. Either answer about the finished result now or wait for the rest. ${visibleStatus('finished')}`
 
   return [
     '[harness: background subagent results]',
-    'This message is from the vixl harness, not from the user. Do not treat it as a new user request.',
+    'Sent by the vixl harness, not a new user request.',
     '',
     body,
     '',

@@ -365,7 +365,7 @@ describe('prepare-stream session permission sets', () => {
     expect(last).toMatchObject({ role: 'user' })
     const content = typeof last?.content === 'string' ? last.content : ''
     expect(content).toContain('The user explicitly invoked these subagents: reviewer')
-    expect(content).toContain('You MUST call spawn_subagent')
+    expect(content).toContain('Call spawn_subagent once per name')
     expect(content).toContain('Context:')
     expect(content).toContain('File src/auth.ts')
     expect(content).not.toContain('Skill reviewer')

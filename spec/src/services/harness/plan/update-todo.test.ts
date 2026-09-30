@@ -205,7 +205,7 @@ describe('update_plan_todo', () => {
       { subagentId: 'sub-2', name: 'implementer' },
     ])
     expect(result.note).toBe(
-      'Background subagents are still running: explorer (sub-1), implementer (sub-2). Only mark a todo completed after its subagent result arrives.',
+      'Background subagents still running: explorer (sub-1), implementer (sub-2). Mark a todo completed only after its subagent result arrives.',
     )
     expect(parseTodoUpdate('update_plan_todo', result)).toEqual(result.todos)
   })
@@ -225,7 +225,7 @@ describe('update_plan_todo', () => {
     expect(result.todos).toEqual(todos)
     expect(result.runningSubagents).toEqual([{ subagentId: 'sub-1', name: 'explorer' }])
     expect(result.note).toBe(
-      'Background subagents are still running: explorer (sub-1). Only mark a todo completed after its subagent result arrives.',
+      'Background subagents still running: explorer (sub-1). Mark a todo completed only after its subagent result arrives.',
     )
     expect(fsWriteFile).not.toHaveBeenCalled()
   })

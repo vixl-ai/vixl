@@ -8,7 +8,7 @@ export const createPlanInputSchema = z.object({
     .array(planTodoItemSchema)
     .optional()
     .describe(
-      'Initial todos: one short verb-first line naming a single actionable item; details in the plan body',
+      'Initial todos, each one short verb-first actionable line; details go in the body',
     ),
 })
 

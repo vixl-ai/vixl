@@ -20,9 +20,9 @@ import { getMcpAuthMode } from '@/types/vixl/mcp-config'
 const callMcpTool = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Call an MCP tool on a running trusted server. Pass fields flat in args, never nested like query.query.',
+      'Call an MCP tool on a running trusted server. Pass fields flat in args (query, not query.query).',
     inputSchema: z.object({
-      serverId: z.string().describe('MCP server id from config / get_mcp_tools'),
+      serverId: z.string().describe('Server id from get_mcp_tools'),
       tool: z.string().describe('Tool name from that server'),
       args: z
         .object({})
@@ -39,7 +39,7 @@ const callMcpTool = (ctx: HarnessToolContext) =>
           }
         }
         return {
-          error: `MCP server "${serverId}" has not been granted trust. Open Settings → MCP and start the server to grant trust before the agent can call its tools.`,
+          error: `MCP server "${serverId}" is not trusted yet. Starting it in Settings, MCP grants trust.`,
         }
       }
       const allowed = await gateToolPermission({

@@ -45,28 +45,21 @@ const withRunningSubagentContext = <T extends Record<string, unknown>>(
   return {
     ...result,
     runningSubagents,
-    note: `Background subagents are still running: ${runningList}. Only mark a todo completed after its subagent result arrives.`,
+    note: `Background subagents still running: ${runningList}. Mark a todo completed only after its subagent result arrives.`,
   }
 }
 
 const updatePlanTodo = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Update todos in a plan file; omit planPath for the active plan or in-chat Tasks. Todos merge by id: passed todos update matching ids, new ids append, unmentioned todos keep their state. To drop a todo, mark it cancelled.',
+      'Merge todos by id into a plan: matching ids update, new ids append, others keep their state. Mark a todo cancelled to drop it. planPath defaults to the active plan, or in-chat Tasks when none exists.',
     inputSchema: z.object({
-      planPath: z
-        .string()
-        .optional()
-        .describe(
-          'Path to PLAN.md; omit to use the active plan, or in-chat Tasks if none',
-        ),
+      planPath: z.string().optional(),
       todos: z.array(
         z.object({
           id: z.string().describe('Stable todo id'),
-          content: z.string().describe('Todo text'),
-          status: z
-            .enum(['pending', 'in_progress', 'completed', 'cancelled'])
-            .describe('Todo status'),
+          content: z.string(),
+          status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']),
         }),
       ),
     }),

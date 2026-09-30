@@ -8,7 +8,7 @@ const describeOutputLimitTruncation = (input: OutputLimitTruncationInput): strin
     typeof input.maxOutputTokens === 'number' && input.maxOutputTokens > 0
       ? ` (${input.maxOutputTokens} tokens)`
       : ''
-  const parts = [`The model hit its output limit${limitLabel} before finishing.`]
+  const parts = [`The model reached its output limit${limitLabel} before finishing.`]
   const names = [
     ...new Set(
       [...(input.cutOffToolNames ?? [])].filter((name) => name.length > 0),

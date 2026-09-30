@@ -307,7 +307,7 @@ describe('build-tools call_mcp_tool args normalization', () => {
 
     expect(result).toEqual({
       error:
-        'MCP server "brave" has not been granted trust. Open Settings → MCP and start the server to grant trust before the agent can call its tools.',
+        'MCP server "brave" is not trusted yet. Starting it in Settings, MCP grants trust.',
     })
     expect(mcpCallTool).not.toHaveBeenCalled()
   })

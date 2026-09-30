@@ -6,7 +6,7 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const codebaseImpact = (ctx: HarnessToolContext) =>
   tool({
-    description: 'Analyze CodeGraph blast radius for changing a symbol.',
+    description: 'CodeGraph change impact for a symbol.',
     inputSchema: z.object({
       symbol: z.string().describe('Symbol name'),
       file: z.string().optional().describe('Optional path to disambiguate'),

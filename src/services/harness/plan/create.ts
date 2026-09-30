@@ -10,7 +10,7 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 const createPlanTool = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Create a new plan under .vixl/plans/. A chat can hold many plans; the newest becomes the default for update_plan and update_plan_todo. After success, stop so the user can review.',
+      'Create a new plan under .vixl/plans. The newest plan in a chat is the default for update_plan and update_plan_todo. After success, end the turn for user review.',
     inputSchema: createPlanInputSchema,
     execute: async ({ title, body, todos }) => {
       const planTodos = todos ?? []

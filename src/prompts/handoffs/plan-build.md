@@ -3,6 +3,4 @@ name: plan-build-handoff
 description: Handoff message when starting plan execution in agent mode
 ---
 
-Start the plan in `{{planPath}}` ({{planTitle}}) 
-
-Complete its todos
+Work through the plan in {{planPath}} ({{planTitle}}) until its todos are complete.

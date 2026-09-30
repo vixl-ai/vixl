@@ -23,20 +23,12 @@ export const resolveSandboxResultMeta = (args: {
 
 export const sandboxingFooter = (meta: SandboxResultMeta): string => {
   if (!meta.sandboxed) {
-    return [
-      'SANDBOXING: This command ran outside the sandbox.',
-      '- Filesystem and devices: not jailed',
-      '- Network: allow',
-    ].join('\n')
+    return 'SANDBOXING: ran unsandboxed. Network: allow'
   }
 
   return [
-    'SANDBOXING: This command ran in a sandbox with the following restrictions:',
-    '- Filesystem: writes limited to the project; devices are isolated (no /dev/disk)',
-    `- Network: ${meta.network}`,
-    'If this failed due to the jail, the harness retries outside the sandbox if the user already approved this command. Do not retry the same sandboxed command yourself. Do not write a .py workaround.',
-    'Do not create temp or scratch directories inside the project (for example .tmp). Do not redirect TMPDIR, TEMP, or TMP into the repo, and do not edit .gitignore to hide harness artifacts.',
-    'If the jail blocks the command, report the denial instead of working around it.',
+    `SANDBOXING: writes limited to the project, devices isolated (no /dev/disk). Network: ${meta.network}`,
+    'On a sandbox block, the harness retries outside the sandbox when the user already approved this command; otherwise report the denial as the result, with no workaround such as a .py script, in-repo temp dirs, TMPDIR redirects, or .gitignore edits.',
   ].join('\n')
 }
 

@@ -15,7 +15,7 @@ vi.mock('tokenlens', () => ({
 vi.mock('@/services/context/system-prompt-parts/assemble', () => ({
   default: async () => ({
     base: 'base-system',
-    tools: 'Tools are provided as function calls; do not grep the repo for them.',
+    tools: 'Tools are function calls, not repo code.',
     mcp: 'mcp-catalog',
     agentsMd: '',
     rules: 'rules-body',

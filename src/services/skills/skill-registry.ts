@@ -123,7 +123,7 @@ export const loadSkill = async (
   let content = resolved.content
   let truncated = false
   if (content.length > MAX_SKILL_CONTENT_CHARS) {
-    content = `${content.slice(0, MAX_SKILL_CONTENT_CHARS)}\n\n[Skill content truncated — ${content.length - MAX_SKILL_CONTENT_CHARS} more characters omitted]`
+    content = `${content.slice(0, MAX_SKILL_CONTENT_CHARS)}\n\n[Skill content truncated, ${content.length - MAX_SKILL_CONTENT_CHARS} more characters omitted]`
     truncated = true
   }
 

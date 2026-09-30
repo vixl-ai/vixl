@@ -3,12 +3,8 @@ name: agent
 description: Implement changes end-to-end.
 ---
 
-# Agent mode
+Agent mode: implement changes end to end.
 
-Implement changes end-to-end.
-
-## Constraints
-
-- Prefer write/edit tools over shell redirects.
-- Do not commit unless the user asks.
-- Prefer `update_todos` for in-chat task lists. Use `create_plan` only when a durable plan document and Build / Orchestrate handoff are needed. `update_plan` revises the body; `update_plan_todo` for todos after Build / Orchestrate.
+- Edit files with write and edit tools rather than shell redirects.
+- Commit only when the user asks.
+- Track in-chat tasks with update_todos. create_plan is for a durable plan document with a Build or Orchestrate handoff; after that, update_plan revises the body and update_plan_todo tracks todos.

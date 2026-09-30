@@ -19,27 +19,21 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const spawnSubagent = (ctx: HarnessToolContext) =>
   tool({
-    description: `Spawn a subagent. Background returns immediately. ${visibleStatus('spawned')} ${noPoll}`,
+    description: `Spawn a subagent. Background mode returns immediately. ${visibleStatus('spawned')} ${noPoll}`,
     inputSchema: z.object({
       agentName: z
         .string()
         .describe(
-          'Catalog name to use a custom agent; otherwise a short verb phrase describing the task (e.g. "Review auth changes"), shown as the subagent label.',
+          'Catalog name for a custom agent, or a short verb phrase label for the task such as Review auth changes',
         ),
-      prompt: z.string().describe('Task instructions for the subagent'),
-      mode: z
-        .enum(['blocking', 'background'])
-        .default('blocking')
-        .describe('blocking (default) or background'),
-      model: z
-        .string()
-        .optional()
-        .describe('Exact provider::modelId from resolve_models. Fuzzy names are rejected.'),
+      prompt: z.string().describe('Task instructions'),
+      mode: z.enum(['blocking', 'background']).default('blocking'),
+      model: z.string().optional().describe('Exact provider::modelId from resolve_models'),
       capabilities: z
         .enum(['read-only', 'write'])
         .default('read-only')
         .describe(
-          'read-only (default) can run tests, lint, git log/diff, and gh in a sandbox where the project is not writable; write can edit files',
+          'read-only runs tests, lint, git log, git diff, and gh in a sandbox with the project read-only; write can edit files',
         ),
     }),
     execute: async (
@@ -171,7 +165,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
           subagentId,
           name: agentName,
           status: 'running',
-          note: `${noPoll} ${visibleStatus('spawned')} subagentId is not a shell_id.`,
+          note: `${visibleStatus('spawned')} ${noPoll}`,
         }
       }
 

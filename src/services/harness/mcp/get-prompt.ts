@@ -19,7 +19,7 @@ const getMcpPrompt = (ctx: HarnessToolContext) =>
       const trust = await resolveTrustedMcpServer(ctx, serverId)
       if (!trust.trusted) {
         return {
-          error: `MCP server "${serverId}" has not been granted trust.`,
+          error: `MCP server "${serverId}" is not trusted yet.`,
         }
       }
       const allowed = await gateToolPermission({

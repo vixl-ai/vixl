@@ -167,7 +167,7 @@ describe('spawn_subagent agentName', () => {
     const built = spawnSubagent(baseCtx())
     expect(built.description).toContain(visibleStatus('spawned'))
     expect(built.description).toContain(noPoll)
-    expect(built.description).toContain('Background returns immediately')
+    expect(built.description).toContain('Background mode returns immediately')
   })
 
   it('guides agentName naming without describing rejections', () => {

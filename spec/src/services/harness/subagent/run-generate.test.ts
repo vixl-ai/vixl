@@ -235,7 +235,7 @@ describe('runSubagentGenerate capabilities', () => {
     expect(toolNames).not.toContain('edit_file')
     expect(toolNames).not.toContain('apply_patch')
     expect(toolNames).not.toContain('git_commit')
-    expect(config.system).toContain('read-only sub-agent')
+    expect(config.system).toContain('read-only subagent')
     expect(config.system).toContain('run_terminal runs in a sandbox')
     expect(config.system).not.toContain('read-only tools only')
   })
@@ -647,7 +647,7 @@ describe('runSubagentGenerate output-limit truncation', () => {
     })
   })
 
-  it('returns partial text plus a truncation notice when generateText hits the output limit', async () => {
+  it('returns partial text plus a truncation notice when generateText reaches the output limit', async () => {
     generateText.mockResolvedValue({
       text: 'partial summary',
       usage: {},
@@ -655,12 +655,12 @@ describe('runSubagentGenerate output-limit truncation', () => {
       response: { messages: [{ role: 'assistant', content: 'partial summary' }] },
     })
 
-    const notice = `[The model hit its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`
+    const notice = `[The model reached its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`
     await expect(run()).resolves.toBe(`partial summary\n\n${notice}`)
     expect(captureBillableUsage).toHaveBeenCalledTimes(1)
   })
 
-  it('returns only the truncation notice when generateText hits the limit with no text', async () => {
+  it('returns only the truncation notice when generateText reaches the limit with no text', async () => {
     generateText.mockResolvedValue({
       text: '',
       usage: {},
@@ -669,7 +669,7 @@ describe('runSubagentGenerate output-limit truncation', () => {
     })
 
     await expect(run()).resolves.toBe(
-      `[The model hit its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`,
+      `[The model reached its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`,
     )
   })
 

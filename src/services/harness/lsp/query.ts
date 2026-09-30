@@ -31,12 +31,12 @@ const lspQuery = () =>
             .number()
             .int()
             .nonnegative()
-            .describe('0-based line (Monaco lineNumber - 1). Not read_file 1-based lines.'),
+            .describe('0-based line, one less than read_file line numbers'),
           character: z
             .number()
             .int()
             .nonnegative()
-            .describe('0-based UTF-16 character offset (Monaco column - 1).'),
+            .describe('0-based UTF-16 column'),
         })
         .optional()
         .describe('Required for goToDefinition, findReferences, and hover'),
@@ -47,7 +47,7 @@ const lspQuery = () =>
       includeDeclaration: z
         .boolean()
         .optional()
-        .describe('findReferences only; defaults to true when omitted'),
+        .describe('findReferences only, default true'),
     }),
     execute: async ({ method, path, extension, position, query, includeDeclaration }) => {
       const ext = extension ?? path.split('.').pop() ?? ''

@@ -3,24 +3,14 @@ name: plan-orchestrate-handoff
 description: Handoff message when orchestrating plan execution
 ---
 
-Orchestrate the plan in `{{planPath}}` ({{planTitle}}).
+Orchestrate the plan in {{planPath}} ({{planTitle}}).
 
-Use {{subagentModel}} to handle all work. 
+Subagents run on {{subagentModel}}, locked by the harness to the user's choice, so spawn_subagent takes no model argument.
 
-Do not pass `model` to spawn_subagent; 
+When an early todo creates a worktree or folder, create it first, then call move_workspace, then spawn implementers.
 
-The harness has locked the model to the users selected choice.
+After spawning, leave a one-line visible status: what was spawned, what is still running, what happens next. Then end the turn; the harness resumes as each background subagent finishes. terminal_output reads only the parent's own shell_id values.
 
-If an early todo creates a worktree or needs a workspace move, sequence that create, then parent `move_workspace`, then implementers;
+On each result, review it, set todo status with update_plan_todo, and continue. Validate directly through the shell (CI, tests, PR comments) rather than spawning a subagent to run a command. Revise the plan body with update_plan if scope changes.
 
-After spawning, leave a one-line visible status covering what was spawned, what is still running, and what happens next. `terminal_output` is only for the parent's own shell_id values and never for checking on subagents.
-
-End the turn; the harness resumes as each background subagent finishes. 
-
-Review outputs, update plan todo status with `update_plan_todo`, and continue. Validate results yourself (run CI/tests, read PR comments) instead of spawning a subagent just to run a command.
-
-If scope changes, the parent may revise the plan body with `update_plan`;
-
-Todos still go through `update_plan_todo`. Never write code or mutate files directly;
-
-Delegate all implementation to sub-agents.
+All implementation goes to subagents; the parent edits no files.

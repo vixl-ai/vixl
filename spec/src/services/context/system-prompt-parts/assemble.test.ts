@@ -124,7 +124,7 @@ beforeEach(() => {
 describe('assemble system prompt parts', () => {
   it('replaces the prose tool catalog with a one-line hint', async () => {
     const parts = await assembleSystemPromptParts(input('ask'))
-    expect(parts.tools).toBe('Tools are provided as function calls; do not grep the repo for them.')
+    expect(parts.tools).toBe('Tools are function calls, not repo code.')
     expect(parts.tools).not.toContain('Available tools in')
     expect(parts.base).not.toContain('- read_file:')
   })

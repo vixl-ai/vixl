@@ -25,9 +25,9 @@ describe('buildWakeNudge', () => {
     expect(content).toBe(
       [
         '[harness: background subagent results]',
-        'This message is from the vixl harness, not from the user. Do not treat it as a new user request.',
+        'Sent by the vixl harness, not a new user request.',
         '',
-        `Background subagent results are ready. Their completed summaries are in the spawn_subagent tool results above. Answer the user now using those results. Do not say the subagents are still running. ${visibleStatus('finished')}`,
+        `All background subagents have finished. Summaries are in the spawn_subagent tool results above. Answer the user from those results. ${visibleStatus('finished')}`,
         '',
         'Completed:',
         '- explorer (sub-1, completed): mapped the repo',
@@ -47,9 +47,9 @@ describe('buildWakeNudge', () => {
       true,
     )
     expect(content).toContain(
-      'This message is from the vixl harness, not from the user. Do not treat it as a new user request.',
+      'Sent by the vixl harness, not a new user request.',
     )
-    expect(content).toContain('Their completed summaries are included below.')
+    expect(content).toContain('Summaries are below.')
     expect(content).not.toContain('spawn_subagent tool results above')
     expect(content).toContain('- explorer (sub-1, completed): mapped the repo')
     expect(content).toContain('- explorer (sub-1): completed')
@@ -73,13 +73,13 @@ describe('buildWakeNudge', () => {
       true,
     )
     expect(content).toContain(
-      'This message is from the vixl harness, not from the user. Do not treat it as a new user request.',
+      'Sent by the vixl harness, not a new user request.',
     )
     expect(content).toContain(
-      'Other background subagents are still running: writer (sub-2), reviewer (sub-3)',
+      'still running: writer (sub-2), reviewer (sub-3)',
     )
     expect(content).toContain(
-      'You may answer about the finished result now or wait for the rest. Your call.',
+      'Either answer about the finished result now or wait for the rest.',
     )
     expect(content).toContain(visibleStatus('finished'))
     expect(content).toContain('- explorer (sub-1, completed): mapped the repo')

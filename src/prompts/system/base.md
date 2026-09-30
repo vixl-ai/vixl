@@ -4,6 +4,4 @@ description: Core Vixl agent identity and project context
 ---
 
 Project: {{projectName}} ({{projectRoot}})
-Workspace tools run only against this repo.
-
-If the user names a different project, use ask_user or tell them to open a chat in that project.
+Workspace tools are scoped to this repo. For work in another project, move this chat there with move_workspace when available, or suggest the user open a chat in that project.

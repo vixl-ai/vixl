@@ -6,7 +6,7 @@ describe('formatExplicitAgentInvocation', () => {
   it('builds a trusted per-turn spawn instruction from agent mentions', () => {
     const text = formatExplicitAgentInvocation([{ type: 'agent', name: 'reviewer' }])
     expect(text).toContain('The user explicitly invoked these subagents: reviewer')
-    expect(text).toContain('You MUST call spawn_subagent')
+    expect(text).toContain('Call spawn_subagent once per name')
     expect(text).toContain('agentName set to that catalog name exactly')
   })
 

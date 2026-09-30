@@ -11,7 +11,7 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   grep: 'Search file contents with regex',
   codebase_explore: 'Explore CodeGraph for architecture, flows, and structural context',
   codebase_search: 'Search CodeGraph symbols by name (locations only)',
-  codebase_impact: 'Analyze CodeGraph blast radius for a symbol change',
+  codebase_impact: 'CodeGraph change impact for a symbol',
   codebase_status: 'Check CodeGraph index health and sync status',
   git_status: 'Show git working tree status',
   git_diff: 'Show git diff against the index, HEAD, or a ref',

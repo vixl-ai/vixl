@@ -157,7 +157,7 @@ describe('spawn_subagent capability enforcement', () => {
     await expect(execute('agent', 'read-only', 'background')).resolves.toMatchObject({
       name: 'Reading auth',
       status: 'running',
-      note: `${noPoll} ${visibleStatus('spawned')} subagentId is not a shell_id.`,
+      note: `${visibleStatus('spawned')} ${noPoll}`,
     })
   })
 
@@ -167,7 +167,7 @@ describe('spawn_subagent capability enforcement', () => {
       shape: { capabilities: { description?: string } }
     }
     expect(schema.shape.capabilities.description).toContain(
-      'sandbox where the project is not writable',
+      'sandbox with the project read-only',
     )
     expect(schema.shape.capabilities.description).toContain('write can edit files')
     expect(schema.shape.capabilities.description).not.toContain('can only report')

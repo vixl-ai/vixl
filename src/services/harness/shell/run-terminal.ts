@@ -45,10 +45,10 @@ const runTerminal = (ctx: HarnessToolContext) => {
   const readOnlyProject = isReadOnlySubagentShell(ctx)
   return tool({
     description: readOnlyProject
-      ? 'Run a shell command in the project cwd inside a project-read-only sandbox. Writes to the project are denied. TMPDIR and tool caches stay writable. If the jail blocks the command, report the denial; do not retry unsandboxed.'
-      : 'Run a shell command in the project cwd. If the sandbox blocks the command it retries unsandboxed in the same execute; do not retry yourself. is_background returns shell_id; poll with terminal_output. Do not create project scratch dirs (for example .tmp), redirect TMPDIR, TEMP, or TMP into the repo, or edit .gitignore; if the jail blocks the command, report the denial.',
+      ? 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. When the sandbox blocks a command, report the denial as the result.'
+      : 'Run a shell command in the project cwd. A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell_id for terminal_output. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.',
     inputSchema: z.object({
-      command: z.string().describe('Shell command to run in the project cwd'),
+      command: z.string().describe('Shell command'),
       is_background: z.boolean().optional().describe('Return shell_id without waiting'),
       timeout_ms: z.number().optional().describe('Optional max wait for blocking runs'),
       description: z

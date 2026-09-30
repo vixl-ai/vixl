@@ -246,13 +246,13 @@ describe('build-tools run_terminal', () => {
       'SANDBOXING:',
     )
     expect(String((result as { sandboxing: string }).sandboxing)).toContain(
-      'the harness retries outside the sandbox if the user already approved this command',
+      'the harness retries outside the sandbox when the user already approved this command',
     )
     expect(String((result as { sandboxing: string }).sandboxing)).toContain(
-      'Do not redirect TMPDIR, TEMP, or TMP into the repo',
+      'TMPDIR redirects',
     )
     expect(tools.run_terminal.description).toContain(
-      'Do not create project scratch dirs (for example .tmp), redirect TMPDIR, TEMP, or TMP into the repo, or edit .gitignore',
+      'Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is',
     )
   })
 
@@ -271,7 +271,7 @@ describe('build-tools run_terminal', () => {
     const tools = buildTools(ctx)
 
     await expect(runTool(tools.run_terminal.execute, { command: 'false' })).rejects.toThrow(
-      /Command failed \(killed by signal 6\): Aborted/,
+      /Command failed \(stopped by signal 6\): Aborted/,
     )
     await expect(runTool(tools.run_terminal.execute, { command: 'false' })).rejects.toThrow(
       /SANDBOXING:[\s\S]*harness retries outside the sandbox/,

@@ -20,6 +20,6 @@ export default (mentions: ContextMention[]): string => {
   }
   return [
     `The user explicitly invoked these subagents: ${names.join(', ')}`,
-    'You MUST call spawn_subagent for each, with agentName set to that catalog name exactly. Use the rest of the user message as prompt. Do not do that specialist work yourself.',
+    'Call spawn_subagent once per name, with agentName set to that catalog name exactly and the rest of the user message as prompt; the specialist work belongs to those subagents.',
   ].join('\n')
 }

@@ -190,11 +190,11 @@ describe('resumeOrchestrator background waves', () => {
     expect(wakeNudge.role).toBe('user')
     expect(wakeNudge.content).toContain('[harness: background subagent results]')
     expect(wakeNudge.content).toContain(
-      'This message is from the vixl harness, not from the user. Do not treat it as a new user request.',
+      'Sent by the vixl harness, not a new user request.',
     )
     expect(wakeNudge.content).toContain('- explorer (sub-1, completed): mapped the repo')
     expect(wakeNudge.content).toContain('Completed:')
-    expect(wakeNudge.content).toContain('Do not say the subagents are still running')
+    expect(wakeNudge.content).toContain('All background subagents have finished')
     expect(wakeNudge.content).toContain(
       'Subagent ledger:\n- explorer (sub-1): completed',
     )
@@ -474,7 +474,7 @@ describe('resumeOrchestrator background waves', () => {
     })
     const wakeNudge = modelMessages[modelMessages.length - 1]
     expect(wakeNudge?.content).toContain(
-      'Their completed summaries are in the spawn_subagent tool results above.',
+      'Summaries are in the spawn_subagent tool results above.',
     )
   })
 
@@ -521,13 +521,13 @@ describe('resumeOrchestrator background waves', () => {
     expect(wakeNudge?.role).toBe('user')
     expect(wakeNudge?.content).toContain('[harness: background subagent results]')
     expect(wakeNudge?.content).toContain(
-      'This message is from the vixl harness, not from the user. Do not treat it as a new user request.',
+      'Sent by the vixl harness, not a new user request.',
     )
     expect(wakeNudge?.content).toContain(
       '- explorer (sub-1, completed): steered rewrite after flush',
     )
     expect(wakeNudge?.content).toContain(
-      'Their completed summaries are included below.',
+      'Summaries are below.',
     )
     expect(wakeNudge?.content).not.toContain('spawn_subagent tool results above')
     expect(wakeNudge?.content).toContain(

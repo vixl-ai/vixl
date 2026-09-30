@@ -14,12 +14,9 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 const updatePlan = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Replace an existing PLAN.md body, optional title. Do not call create_plan again for an existing plan. Omit planPath to use the most recent plan; pass planPath when the chat has several. Todos stay with update_plan_todo.',
+      'Replace an existing PLAN.md body and optionally its title. planPath defaults to the most recent plan; pass it when the chat has several. Todos go through update_plan_todo.',
     inputSchema: z.object({
-      planPath: z
-        .string()
-        .optional()
-        .describe('PLAN.md path; omit for active plan'),
+      planPath: z.string().optional(),
       body: z.string().describe('Replacement plan body'),
       title: z.string().optional().describe('New frontmatter title'),
     }),

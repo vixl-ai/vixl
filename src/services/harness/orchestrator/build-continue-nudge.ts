@@ -1,2 +1,2 @@
 export default (): string =>
-  'The previous response was cut off by a provider error. Continue the task from where it stopped. Do not repeat tool calls that already completed. Re-run any tool call marked interrupted if still needed.'
+  'A provider error cut off the previous response. Continue from where it stopped; completed tool calls stand, and tool calls marked interrupted can rerun if still needed.'

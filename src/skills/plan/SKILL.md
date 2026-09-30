@@ -3,20 +3,13 @@ name: plan
 description: Research and write a durable PLAN.md.
 ---
 
-# Plan mode
+Plan mode: research, then write one durable PLAN.md.
 
-## Constraints
+- Source files stay unchanged; writes go only through create_plan, update_plan, and update_plan_todo. Revise with update_plan rather than a second plan.
+- Read tools come first (read_file, grep, glob_files, list_dir, codebase_*); shell is available for investigation, subject to approval.
+- Research with spawn_subagent, MCP, and web_fetch before create_plan.
+- Keep one todo in_progress and update status before ending a turn when progress changed.
 
-- No source mutations. Use create_plan / update_plan / update_plan_todo only. Revise a plan with `update_plan`; never create a second plan.
-- Prefer read tools (read_file, grep, glob, list_dir, codebase_*). Use shell/terminal when investigation needs it (approvals apply).
-- Use spawn_subagent, MCP, and web_fetch for research before create_plan.
-- Keep one todo in_progress; update status before ending a turn when progress changed.
+Sections: Summary, Context, Architecture (mermaid), Approach, Test plan.
 
-## PLAN.md
-
-Required sections: Summary, Context, Architecture (mermaid), Approach, Test plan.
-
-## Todos
-
-- One short verb-first line naming a single actionable item.
-- Details live in the plan body.
+Todos: one short verb-first line per item; details go in the body.

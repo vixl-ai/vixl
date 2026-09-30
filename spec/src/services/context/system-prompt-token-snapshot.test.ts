@@ -11,7 +11,7 @@ import estimateBuiltinToolDefinitionTokens from '@/services/context/estimate-bui
 import estimateTextTokens from '@/utils/estimate-text-tokens'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 
-const TOOLS_HINT = 'Tools are provided as function calls; do not grep the repo for them.'
+const TOOLS_HINT = 'Tools are function calls, not repo code.'
 
 const MODES: VixlChatMode[] = ['ask', 'plan', 'agent', 'orchestrator']
 
@@ -19,21 +19,22 @@ const MODES: VixlChatMode[] = ['ask', 'plan', 'agent', 'orchestrator']
  * Empty-project (standalone, no rules, no MCP) ceilings after slim prompts
  * and builtin tool descriptions.
  * Measured totals (system join + builtin tool defs, chars/4):
- * ask 3386, plan 3969, agent 4846, orchestrator 4311.
+ * ask 3227, plan 3777, agent 4590, orchestrator 4066.
  * Headroom is about 3 percent so waste cannot return unnoticed.
  */
 const TOTAL_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 3488,
-  plan: 4089,
-  agent: 4992,
-  orchestrator: 4441,
+  ask: 3324,
+  plan: 3891,
+  agent: 4728,
+  orchestrator: 4188,
 }
 
+/** Measured base tokens: ask 229, plan 289, agent 213, orchestrator 356. */
 const BASE_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 290,
-  plan: 337,
-  agent: 270,
-  orchestrator: 418,
+  ask: 236,
+  plan: 298,
+  agent: 220,
+  orchestrator: 367,
 }
 
 /** Available skills catalog with ungated command skills; measured 59. */
@@ -46,15 +47,14 @@ const SKILLS_CEILINGS: Record<VixlChatMode, number> = {
 
 /**
  * Measured builtin tool-def tokens (chars/4):
- * ask 3067, plan 3597, agent 4543, orchestrator 3828.
- * Agent stays measured plus one. Ask, plan, and orchestrator are measured
- * plus about 3 percent after the spawn capabilities describe change.
+ * ask 2929, plan 3419, agent 4308, orchestrator 3641.
+ * Ceilings are measured plus about 3 percent.
  */
 const TOOL_DEF_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 3160,
-  plan: 3705,
-  agent: 4544,
-  orchestrator: 3943,
+  ask: 3017,
+  plan: 3522,
+  agent: 4437,
+  orchestrator: 3750,
 }
 
 type ModeSnapshot = {

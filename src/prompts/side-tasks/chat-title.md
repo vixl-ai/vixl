@@ -3,16 +3,11 @@ name: chat-title
 description: Generate a short chat title from a user message
 ---
 
-Name this chat with a short topical label.
+Output only a 3 to 6 word topical title for this chat, naming the topic in fresh words rather than echoing the message.
 
 Examples:
-- "fix the login redirect bug in the auth middleware" -> Login Redirect Bug
-- "help me plan a postgres migration for the billing schema" -> Billing Schema Migration
+fix the login redirect bug in the auth middleware -> Login Redirect Bug
+help me plan a postgres migration for the billing schema -> Billing Schema Migration
 
-Rules:
-- 3 to 6 words
-- Output only the title
-- Do not reuse the user's opening words or quote or copy the message
-
-User message:
+Message:
 {{prompt}}

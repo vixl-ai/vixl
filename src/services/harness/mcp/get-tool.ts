@@ -12,7 +12,7 @@ const getMcpTool = (ctx: HarnessToolContext) =>
     description:
       'Load the full schema and description for one MCP tool by serverId and tool name.',
     inputSchema: z.object({
-      serverId: z.string().describe('MCP server id from config / get_mcp_tools'),
+      serverId: z.string().describe('Server id from get_mcp_tools'),
       tool: z.string().describe('Tool name from that server'),
     }),
     execute: async ({ serverId, tool: toolName }) => {

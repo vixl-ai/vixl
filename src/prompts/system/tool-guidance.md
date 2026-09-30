@@ -3,14 +3,5 @@ name: tool-guidance
 description: Shared tool usage rules for all chat modes
 ---
 
-Follow each tool's description and input schema.
-
-Prefer codebase_explore for structural/"where is X"; codebase_search for symbols; codebase_impact for blast radius.
-
-Treat explore snippets as already read.
-
-Fall back to lsp, grep, or read_file if the index is not ready.
-
-Prefer lsp for definitions, references, and types;
-
-Approvals may deny tools.
+Code lookup: codebase_explore for structure and where-is questions, codebase_search for symbols, codebase_impact for change impact, lsp for definitions, references, and types. Explore snippets count as read. Until the index is ready, use lsp, grep, or read_file.
+Approvals can deny any tool call.

@@ -394,16 +394,15 @@ npm error audit endpoint returned an error`
 })
 
 describe('sandboxRuntimeDenialError', () => {
-  it('tells the model this is the OS jail and not to rewrite as Python', () => {
+  it('names the OS sandbox and points to an approved unsandboxed retry', () => {
     const filesystem = sandboxRuntimeDenialError('filesystem', 'lstat eperm')
     const devices = sandboxRuntimeDenialError('devices', 'lsblk not available')
     const network = sandboxRuntimeDenialError('network', 'Could not resolve host')
 
     for (const error of [filesystem, devices, network]) {
       expect(error.message.startsWith('SANDBOX_RUNTIME_BLOCKED:')).toBe(true)
-      expect(error.message).toContain('OS jail')
-      expect(error.message).toContain('Approve an unsandboxed retry')
-      expect(error.message).toContain('Do not rewrite this as a Python script')
+      expect(error.message).toContain('The OS sandbox (Seatbelt or bubblewrap) blocked this')
+      expect(error.message).toContain('approved unsandboxed retry rather than a script rewrite')
     }
 
     expect(network.message).toContain('Sandboxed shell has no network.')

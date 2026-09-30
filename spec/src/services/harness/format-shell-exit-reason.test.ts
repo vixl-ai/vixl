@@ -8,7 +8,7 @@ describe('format-shell-exit-reason', () => {
   })
 
   it('formats signal deaths', () => {
-    expect(formatShellExitReason({ exitCode: -1, signal: 6 })).toBe('killed by signal 6')
-    expect(formatShellExitReason({ exitCode: -1, signal: 9 })).toBe('killed by signal 9')
+    expect(formatShellExitReason({ exitCode: -1, signal: 6 })).toBe('stopped by signal 6')
+    expect(formatShellExitReason({ exitCode: -1, signal: 9 })).toBe('stopped by signal 9')
   })
 })

@@ -37,9 +37,9 @@ const imageMediaType = (contentType: string): string => {
 const webFetchTool = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Fetch an http(s) URL as markdown (default), text, or html. No JavaScript. Image URLs are loaded into context automatically for vision models.',
+      'Fetch an http(s) URL as markdown, text, or html, without running JavaScript. Image URLs load into context for vision models.',
     inputSchema: z.object({
-      url: z.string().describe('http or https URL to fetch'),
+      url: z.string().describe('http or https URL'),
       max_length: z
         .number()
         .optional()

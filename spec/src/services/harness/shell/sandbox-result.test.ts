@@ -20,23 +20,26 @@ describe('sandbox-result', () => {
     ).toEqual({ sandboxed: false, network: 'allow' })
   })
 
-  it('tells the model the harness retries unsandboxed and not to write a py workaround', () => {
+  it('tells the model the harness retries unsandboxed and to report denials without workarounds', () => {
     const footer = sandboxingFooter({ sandboxed: true, network: 'deny' })
     expect(footer.startsWith('SANDBOXING:')).toBe(true)
     expect(footer).toContain('Network: deny')
     expect(footer).toContain(
-      'the harness retries outside the sandbox if the user already approved this command',
+      'the harness retries outside the sandbox when the user already approved this command',
     )
     expect(footer).not.toContain('Run outside sandbox')
-    expect(footer).toContain('Do not retry the same sandboxed command yourself')
-    expect(footer).toContain('Do not write a .py workaround')
-    expect(footer).toContain(
-      'Do not create temp or scratch directories inside the project (for example .tmp)',
-    )
-    expect(footer).toContain('Do not redirect TMPDIR, TEMP, or TMP into the repo')
-    expect(footer).toContain('do not edit .gitignore to hide harness artifacts')
-    expect(footer).toContain('report the denial instead of working around it')
+    expect(footer).toContain('report the denial as the result')
+    expect(footer).toContain('.py script')
+    expect(footer).toContain('in-repo temp dirs')
+    expect(footer).toContain('TMPDIR redirects')
+    expect(footer).toContain('.gitignore edits')
     expect(footer).not.toContain('required_permissions')
+  })
+
+  it('reports unsandboxed runs in one line', () => {
+    expect(sandboxingFooter({ sandboxed: false, network: 'allow' })).toBe(
+      'SANDBOXING: ran unsandboxed. Network: allow',
+    )
   })
 
   it('attaches structured fields and a footer string on success payloads', () => {

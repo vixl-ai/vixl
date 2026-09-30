@@ -21,7 +21,7 @@ const imageReadResult = (args: {
 const readFile = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Read a file from the workspace. For vision models, images are loaded into context automatically. Otherwise images return metadata, optionally with base64.',
+      'Read a workspace file. Images load into context for vision models; otherwise they return metadata and optional base64.',
     inputSchema: z.object({
       path: z.string().describe('Workspace-relative file path'),
       offset: z.number().optional().describe('1-based start line'),

@@ -8,9 +8,9 @@ import type { ResolveCatalogMatchesResult } from '@/types/models/resolve-catalog
 const resolveModels = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Look up allowed model refs by query. Results are exact provider::modelId refs for spawn_subagent. If the same model appears from multiple providers, ask the user which to use.',
+      'Find allowed exact provider::modelId refs for spawn_subagent. When one model appears under several providers, ask the user which to use.',
     inputSchema: z.object({
-      query: z.string().describe('Model id or name fragment to search'),
+      query: z.string().describe('Model id or name fragment'),
     }),
     execute: async ({ query }): Promise<ResolveCatalogMatchesResult> => {
       const groups = await loadProviderModelsCatalog(ctx.settings)

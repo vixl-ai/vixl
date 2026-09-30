@@ -70,12 +70,9 @@ const catalogEntry = async (
 const getMcpTools = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'List configured MCP servers and tool names. Pass serverId to include full tool schemas for one server.',
+      'List configured MCP servers and tool names. Pass serverId for full tool schemas and examples from that server.',
     inputSchema: z.object({
-      serverId: z
-        .string()
-        .optional()
-        .describe('When set, include full inputSchema and inputExamples for this server only'),
+      serverId: z.string().optional(),
     }),
     execute: async ({ serverId }) => {
       const personal = migrateMcpConfig(await readMcpConfig('personal', null))
