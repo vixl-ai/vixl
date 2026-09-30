@@ -79,7 +79,7 @@
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "dompurify": "3.4.13",
+    "dompurify": "3.4.16",
     "embla-carousel-vue": "^8.6.0",
     "jsonrepair": "^3.15.0",
     "linkedom": "^0.18.13",
@@ -161,11 +161,11 @@
     "@vue/server-renderer": "beta",
     "@vue/shared": "beta",
     "@vue/compat": "beta",
-    "dompurify": "3.4.13",
+    "dompurify": "3.4.16",
     "decode-uri-component": "0.5.0",
     "qs": "6.16.0",
     "browserslist": "4.28.7",
-    "fast-uri": "3.1.7",
+    "fast-uri": "3.1.8",
     "maplibre-gl": "^6.8.0"
   }
 }
