@@ -9,7 +9,7 @@ Vixl is a local-first desktop app for chatting with LLMs and running coding agen
 
 The UI is [Vue](https://vuejs.org/). The shell is [Tauri](https://tauri.app/). The backend is [Rust](https://www.rust-lang.org/). The agent harness runs on your machine. The Vue process talks to the local Tauri/Rust process, which owns the filesystem, PTY, git, MCP stdio, keychain, and SQLite.
 
-![Vixl chat thread with an agent turn](/features/harness.png)
+![Vixl chat beside an editor completion menu in keyboard.ts and the project file tree](/media/landing/hero-dark.webp)
 
 ## Network
 

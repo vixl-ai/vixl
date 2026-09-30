@@ -15,7 +15,7 @@ If a **Terminal** or **Changes** tab is already open for that project, Vixl asks
 
 ## Editor
 
-![Workbench editor tab with a TypeScript file open, the file tree, and language server status](/features/editor.png)
+![Workbench editor with debounce.ts open, the file tree, and the language server status chip](/media/landing/editor-dark.webp)
 
 Editor tabs host a Monaco editor. One tab can hold several open files. Project row **Open Editor** opens `README.md`. Graph nodes, skills, agents, rules, and file-tree clicks open at a path. Markdown can preview. Git diffs from **Changes** open a read-only side-by-side diff.
 
@@ -27,7 +27,7 @@ Closing a dirty file asks before discarding.
 
 ## Terminals
 
-![Workbench terminal tab with a git prompt in the project root](/features/terminal.png)
+![Workbench terminal in the project root after a passing vitest run](/media/landing/terminal-dark.webp)
 
 **Terminal** is a real interactive PTY, not the agent's `run_terminal` tool. The shell is `$SHELL` or `/bin/zsh` (Windows `COMSPEC` / `cmd.exe`). The working directory is the project root, or a folder from **Open in terminal**. A terminal needs a project root and a PTY that can spawn.
 

@@ -55,6 +55,8 @@ Click a row to open the plan tab.
 
 The tab shows the title, the todo list (Pending, In progress, Completed, Cancelled), then the markdown body. Mermaid fences render as diagrams.
 
+![Plan tab for Offline Note Sync with the todo list, and Orchestrate and Build in the header](/media/landing/planning-dark.webp)
+
 While any todo is still open, the header has **Orchestrate** and **Build**. If the linked build chat is already running, **Build** becomes **Open the active build chat**, and **Orchestrate** is disabled. When every todo is completed or cancelled, both buttons hide and a Done check appears. A plan with no todos keeps the buttons.
 
 If the document does not parse, those actions are disabled. You need at least one configured provider.

@@ -23,6 +23,8 @@ See [Use the workbench](/using/use-the-workbench) for how tabs open.
 
 Before the agent mutates a file, Vixl captures a baseline keyed to the user message that started that turn. After a turn that changed files, the thread shows a count such as `3 files changed`. Expand it for paths.
 
+![Agent reply with three files changed expanded, listing added and modified paths](/media/landing/coding-dark.webp)
+
 1. Expand the file list on the agent message.
 2. Click **Restore files** and confirm.
 

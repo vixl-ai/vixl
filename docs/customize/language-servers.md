@@ -7,6 +7,8 @@ description: Language servers drive hover and completion in the Vixl workbench. 
 
 Language servers power hover, completion, and diagnostics in the workbench editor, and they back the agent's `lsp` and `diagnostics` tools. Settings > LSP is personal: enable/disable and install state live in `{appData}/.vixl/lsp.json`, auto-download in `settings.json` (`lsp.autoDownload`, default on). A project folder cannot override `lsp.*`. Language servers require the desktop app.
 
+![Editor tab with the language servers menu open, listing TypeScript, Vue, Markdown, and a config diagnostic](/features/editor.png)
+
 ## Which languages
 
 Vixl can download servers for TypeScript / JavaScript, JSON, YAML, Markdown, Vue / Nuxt, Python, Rust, Go, Bash, HTML, CSS, Tailwind CSS, Svelte, Astro, Prisma, GraphQL, Dockerfile, Lua, C / C++, Terraform, TOML, Zig, PHP, Kotlin, XML, Postgres, Clojure, and Java.
