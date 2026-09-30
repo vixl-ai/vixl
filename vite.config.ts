@@ -86,8 +86,9 @@ export default defineConfig({
   server: {
     watch: {
       // Project `.vixl/` is runtime config (mcp.json, settings); writing it
-      // must not trigger a Vite full reload / app reboot.
-      ignored: ['**/src-tauri/**', '**/.vixl/**'],
+      // must not trigger a Vite full reload / app reboot. `docs/` is a
+      // separate VuePress build, not part of the app bundle.
+      ignored: ['**/src-tauri/**', '**/.vixl/**', '**/docs/**'],
     },
   },
 })

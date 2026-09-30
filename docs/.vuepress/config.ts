@@ -1,9 +1,20 @@
-import { defineConfig, type HeadConfig } from 'vitepress'
-import llmstxt from 'vitepress-plugin-llms'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
+import tailwindcss from '@tailwindcss/vite'
+import { viteBundler } from '@vuepress/bundler-vite'
+import { llmsPlugin } from '@vuepress/plugin-llms'
+import { slimsearchPlugin } from '@vuepress/plugin-slimsearch'
+import { defaultTheme } from '@vuepress/theme-default'
+import { defineUserConfig, type HeadConfig } from 'vuepress'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const landingRoot = resolve(__dirname, 'landing')
 
 const githubRepo = 'https://github.com/vixl-ai/vixl'
 const siteOrigin = 'https://vixl.app'
 const ogImage = `${siteOrigin}/hero.png`
+const siteDescription =
+  'Local-first BYOK AI coding agents. The open alternative to Cursor, VS Code agents, and Antigravity.'
 
 type FaqItem = {
   question: string
@@ -45,12 +56,12 @@ const faqItems: FaqItem[] = [
   {
     question: 'What happens when I delete a chat?',
     answer:
-      'The SQLite row and the chat directory are removed. There is no archive and no Vixl-side memory of that thread. If you used a cloud provider, that provider\'s retention is the provider\'s business. See Privacy.',
+      "The SQLite row and the chat directory are removed. There is no archive and no Vixl-side memory of that thread. If you used a cloud provider, that provider's retention is the provider's business. See Privacy.",
   },
   {
     question: 'Does Vixl send analytics?',
     answer:
-      'No. The only telemetry-related string in the app is CODEGRAPH_TELEMETRY=0, which turns off the CodeGraph package\'s own telemetry. Vixl still makes the network calls listed on Privacy.',
+      "No. The only telemetry-related string in the app is CODEGRAPH_TELEMETRY=0, which turns off the CodeGraph package's own telemetry. Vixl still makes the network calls listed on Privacy.",
   },
   {
     question: 'What license is Vixl?',
@@ -80,14 +91,14 @@ function jsonLdScript(data: Record<string, unknown>): HeadConfig {
   ]
 }
 
-function homeJsonLd(siteDescription: string): HeadConfig {
+function homeJsonLd(description: string): HeadConfig {
   return jsonLdScript({
     '@context': 'https://schema.org',
     '@graph': [
       {
         '@type': 'SoftwareApplication',
         name: 'Vixl',
-        description: siteDescription,
+        description,
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'macOS, Windows, Linux',
         offers: {
@@ -96,6 +107,20 @@ function homeJsonLd(siteDescription: string): HeadConfig {
           priceCurrency: 'USD',
         },
         url: siteOrigin,
+        downloadUrl: `${githubRepo}/releases/latest`,
+        screenshot: [
+          `${siteOrigin}/media/landing/coding-dark.webp`,
+          `${siteOrigin}/media/landing/planning-dark.webp`,
+          `${siteOrigin}/media/landing/editor-dark.webp`,
+          `${siteOrigin}/media/landing/terminal-dark.webp`,
+        ],
+        featureList: [
+          'Coding: Agent mode edits files, runs tools, and shows reviewable diffs with per-turn rollback',
+          'Planning: Plan mode writes a durable PLAN.md under .vixl/plans, then Build or Orchestrate',
+          'Integrated Editor: Monaco workbench with language servers, search, diffs, and markdown preview',
+          'Terminals: Real PTY terminals and agent shell tabs beside the chat',
+          'Local-first: no account, any model, MIT licensed for macOS, Windows, and Linux',
+        ],
         sameAs: githubRepo,
         license: `${githubRepo}/blob/main/LICENSE`,
       },
@@ -123,81 +148,78 @@ function faqJsonLd(): HeadConfig {
   })
 }
 
-export default defineConfig({
+const sharedSeoHead: HeadConfig[] = [
+  [
+    'link',
+    {
+      rel: 'alternate',
+      type: 'text/plain',
+      href: `${siteOrigin}/llms.txt`,
+      title: 'llms.txt',
+    },
+  ],
+  ['link', { rel: 'help', href: `${siteOrigin}/getting-started/` }],
+  ['meta', { property: 'og:image', content: ogImage }],
+  ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+  ['meta', { name: 'twitter:image', content: ogImage }],
+]
+
+export default defineUserConfig({
+  lang: 'en-US',
   title: 'Vixl',
-  description: 'Local-first LLMs UI',
-  cleanUrls: true,
-  lastUpdated: true,
-  sitemap: {
-    hostname: 'https://vixl.app',
-  },
+  description: siteDescription,
+  // VuePress 2.0.0-rc.31 has no route.cleanUrls. Output stays .html;
+  // canonical URLs use extensionless paths (GitHub Pages resolves them).
+  public: resolve(__dirname, '../public'),
+  dest: resolve(__dirname, 'dist'),
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico', sizes: 'any' }],
     ['link', { rel: 'icon', type: 'image/png', href: '/favicon.png' }],
     ['link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }],
   ],
-  transformHead({ pageData, title, description, siteData }) {
-    const canonical = canonicalUrl(pageData.relativePath)
-    const isHome = pageData.relativePath === 'index.md'
-    const ogType = isHome ? 'website' : 'article'
-    const head: HeadConfig[] = [
-      ['link', { rel: 'canonical', href: canonical }],
-      [
-        'link',
-        {
-          rel: 'alternate',
-          type: 'text/plain',
-          href: `${siteOrigin}/llms.txt`,
-          title: 'llms.txt',
+  bundler: viteBundler({
+    viteOptions: {
+      plugins: [tailwindcss()],
+      resolve: {
+        alias: {
+          '@landing': landingRoot,
         },
-      ],
-      ['link', { rel: 'help', href: `${siteOrigin}/getting-started/` }],
-      ['meta', { property: 'og:title', content: title }],
-      ['meta', { property: 'og:description', content: description }],
-      ['meta', { property: 'og:url', content: canonical }],
-      ['meta', { property: 'og:type', content: ogType }],
-      ['meta', { property: 'og:image', content: ogImage }],
-      ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
-      ['meta', { name: 'twitter:title', content: title }],
-      ['meta', { name: 'twitter:description', content: description }],
-      ['meta', { name: 'twitter:image', content: ogImage }],
-    ]
-    if (isHome) {
-      head.push(homeJsonLd(siteData.description))
-    }
-    if (pageData.relativePath === 'resources/faq.md') {
-      head.push(faqJsonLd())
-    }
-    return head
-  },
-  vite: {
-    plugins: [
-      llmstxt({
-        domain: 'https://vixl.app',
-        generateLLMFriendlyDocsForEachPage: true,
-        generateLLMsFullTxt: true,
-        excludeIndexPage: false,
-      }),
-    ],
-  },
-  themeConfig: {
-    search: {
-      provider: 'local',
+      },
+      // Keep public /media paths as runtime URLs (media is produced separately).
+      vue: {
+        template: {
+          transformAssetUrls: {
+            includeAbsolute: false,
+          },
+        },
+      },
+      ssr: {
+        noExternal: [
+          '@vuepress/plugin-slimsearch',
+          '@vuepress/search-helper',
+          'reka-ui',
+        ],
+      },
     },
-    editLink: {
-      pattern: `${githubRepo}/edit/main/docs/:path`,
-      text: 'Edit this page on GitHub',
-    },
-    nav: [
-      { text: 'Home', link: '/' },
+  }),
+  theme: defaultTheme({
+    hostname: siteOrigin,
+    logo: '/favicon.png',
+    repo: 'vixl-ai/vixl',
+    docsRepo: githubRepo,
+    docsDir: 'docs',
+    docsBranch: 'main',
+    editLink: true,
+    lastUpdated: true,
+    contributors: false,
+    navbar: [
       { text: 'Docs', link: '/getting-started/' },
-      { text: 'GitHub', link: githubRepo },
       { text: 'Changelog', link: `${githubRepo}/releases` },
     ],
     sidebar: [
       {
         text: 'Get Started',
-        items: [
+        children: [
           { text: 'Overview', link: '/getting-started/' },
           { text: 'Philosophy', link: '/getting-started/philosophy' },
           { text: 'Installation', link: '/getting-started/installation' },
@@ -211,7 +233,7 @@ export default defineConfig({
       },
       {
         text: 'Concepts',
-        items: [
+        children: [
           { text: 'How Vixl works', link: '/concepts/' },
           { text: 'Chat modes', link: '/concepts/chat-modes' },
           {
@@ -230,7 +252,7 @@ export default defineConfig({
       },
       {
         text: 'Using Vixl',
-        items: [
+        children: [
           { text: 'Manage chats', link: '/using/manage-chats' },
           {
             text: 'Queue and stop messages',
@@ -260,7 +282,7 @@ export default defineConfig({
       },
       {
         text: 'Customize',
-        items: [
+        children: [
           { text: 'Providers', link: '/customize/providers' },
           { text: 'Models', link: '/customize/models' },
           { text: 'MCP servers', link: '/customize/mcp-servers' },
@@ -280,7 +302,7 @@ export default defineConfig({
       },
       {
         text: 'Reference',
-        items: [
+        children: [
           { text: 'settings.json', link: '/reference/settings-json' },
           { text: 'mcp.json', link: '/reference/mcp-json' },
           {
@@ -302,7 +324,7 @@ export default defineConfig({
       },
       {
         text: 'Resources',
-        items: [
+        children: [
           { text: 'Troubleshooting', link: '/resources/troubleshooting' },
           { text: 'FAQ', link: '/resources/faq' },
           { text: 'Privacy', link: '/resources/privacy' },
@@ -313,5 +335,57 @@ export default defineConfig({
         ],
       },
     ],
+    // Built-in SEO plugin appends a second robots.txt block over our public one.
+    // Meta tags and JSON-LD are handled in extendsPage below. Sitemap stays on.
+    themePlugins: {
+      seo: false,
+    },
+  }),
+  plugins: [
+    slimsearchPlugin({
+      indexContent: true,
+    }),
+    llmsPlugin({
+      domain: siteOrigin,
+      llmsTxt: true,
+      llmsFullTxt: true,
+      llmsPageTxt: true,
+    }),
+  ],
+  extendsPage(page) {
+    const relativePath = page.filePathRelative ?? ''
+    const isHome = relativePath === 'index.md'
+    const pageTitle = page.title || 'Vixl'
+    const pageDescription =
+      (typeof page.frontmatter.description === 'string'
+        ? page.frontmatter.description
+        : null) || siteDescription
+    const head: HeadConfig[] = [
+      ...sharedSeoHead,
+      ['meta', { property: 'og:title', content: pageTitle }],
+      ['meta', { property: 'og:description', content: pageDescription }],
+      ['meta', { name: 'twitter:title', content: pageTitle }],
+      ['meta', { name: 'twitter:description', content: pageDescription }],
+    ]
+
+    if (relativePath) {
+      const canonical = canonicalUrl(relativePath)
+      head.push(['link', { rel: 'canonical', href: canonical }])
+      head.push(['meta', { property: 'og:url', content: canonical }])
+      head.push([
+        'meta',
+        { property: 'og:type', content: isHome ? 'website' : 'article' },
+      ])
+    }
+
+    if (isHome) {
+      head.push(homeJsonLd(siteDescription))
+    }
+    if (relativePath === 'resources/faq.md') {
+      head.push(faqJsonLd())
+    }
+
+    page.frontmatter.head ??= []
+    page.frontmatter.head.push(...head)
   },
 })

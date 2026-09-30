@@ -1,0 +1,792 @@
+/*
+  Layer order for theme/base. Utilities are imported UNLAYERED so class
+  selectors beat VuePress helper normalize (unlayered h1/a/etc) by specificity.
+*/
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css";
+@import "tw-animate-css";
+
+@source "../../landing";
+
+/* VuePress theme uses data-theme on <html>; keep .dark for shadcn patterns. */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme=dark], [data-theme=dark] *));
+
+/*
+  Unlayered neutralize at element specificity (0,0,1): ties VuePress helper
+  normalize and wins by source order, loses to Tailwind class utilities (0,1,0).
+*/
+:where(.vx-landing) h1,
+:where(.vx-landing) h2,
+:where(.vx-landing) h3,
+:where(.vx-landing) h4,
+:where(.vx-landing) h5,
+:where(.vx-landing) h6 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: normal;
+  line-height: inherit;
+  overflow-wrap: normal;
+  text-wrap: balance;
+  border: none;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+:where(.vx-landing) p,
+:where(.vx-landing) ul,
+:where(.vx-landing) ol,
+:where(.vx-landing) li,
+:where(.vx-landing) span,
+:where(.vx-landing) a,
+:where(.vx-landing) button,
+:where(.vx-landing) label,
+:where(.vx-landing) svg {
+  font-style: normal;
+}
+
+:where(.vx-landing) p,
+:where(.vx-landing) ul,
+:where(.vx-landing) ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-wrap: pretty;
+}
+
+:where(.vx-landing) li {
+  list-style: none;
+}
+
+:where(.vx-landing) a {
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
+  overflow-wrap: normal;
+}
+
+/* Stock shadcn-vue new-york NEUTRAL theme, scoped to the landing shell. */
+.vx-landing {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  --vx-purple: #7c3aed;
+  --vx-blue: #2563eb;
+  --vx-green: #059669;
+
+  /* Soft pastels for feature section titles only (same in light and dark). */
+  --vx-title-purple: #c4b5fd;
+  --vx-title-blue: #93c5fd;
+  --vx-title-green: #86efac;
+
+  --vx-aurora-lavender: color-mix(in oklch, var(--vx-purple) 55%, white);
+  --vx-aurora-blue: color-mix(in oklch, var(--vx-blue) 50%, white);
+  --vx-aurora-mint: color-mix(in oklch, var(--vx-green) 50%, white);
+
+  color: var(--foreground);
+  background-color: var(--background);
+  font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  font-style: normal;
+  font-feature-settings: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.dark .vx-landing,
+[data-theme='dark'] .vx-landing,
+.vx-landing.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+
+  --vx-purple: #c4b5fd;
+  --vx-blue: #93c5fd;
+  --vx-green: #86efac;
+
+  --vx-title-purple: #c4b5fd;
+  --vx-title-blue: #93c5fd;
+  --vx-title-green: #86efac;
+
+  --vx-aurora-lavender: var(--vx-purple);
+  --vx-aurora-blue: var(--vx-blue);
+  --vx-aurora-mint: #a7f3d0;
+}
+
+@layer base {
+  .vx-landing *,
+  .vx-landing *::before,
+  .vx-landing *::after {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
+
+  .vx-landing img,
+  .vx-landing video {
+    display: block;
+    max-width: 100%;
+  }
+
+  .vx-landing button {
+    font: inherit;
+    font-style: normal;
+    color: inherit;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+
+  .vx-landing .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.vx-landing .vx-container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+
+@media (min-width: 640px) {
+  .vx-landing .vx-container {
+    padding-inline: 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .vx-landing .vx-container {
+    padding-inline: 40px;
+  }
+}
+
+.vx-landing .vx-mono {
+  font-family: 'Geist Mono Variable', ui-monospace, monospace;
+  font-size: 0.92em;
+  font-style: normal;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.vx-landing .vx-atmosphere {
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+.vx-landing .vx-sponsors {
+  /* Extra breathing room between hero screenshot and Coding section. */
+  padding-top: 2.25rem;
+  padding-bottom: 2.75rem;
+}
+
+@media (min-width: 1024px) {
+  .vx-landing .vx-sponsors {
+    padding-top: 2.75rem;
+    padding-bottom: 3.25rem;
+  }
+}
+
+.vx-landing .vx-sponsors-caption {
+  color: color-mix(in oklch, var(--muted-foreground) 55%, var(--foreground));
+}
+
+html.dark .vx-landing .vx-sponsors-caption {
+  color: color-mix(in oklch, var(--muted-foreground) 78%, var(--foreground));
+}
+
+.vx-landing .vx-sponsors + .vx-feature {
+  padding-top: 0;
+}
+
+.vx-landing .vx-sponsors-row {
+  gap: 2.5rem;
+  row-gap: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .vx-landing .vx-sponsors-row {
+    gap: 4rem;
+    row-gap: 1.5rem;
+  }
+}
+
+.vx-landing .vx-sponsor-logo {
+  width: auto;
+  height: 36px;
+  max-width: none;
+}
+
+@media (min-width: 1024px) {
+  .vx-landing .vx-sponsor-logo {
+    height: 46px;
+  }
+}
+
+.vx-landing .vx-sponsor-logo--minds {
+  height: 44px;
+}
+
+@media (min-width: 1024px) {
+  .vx-landing .vx-sponsor-logo--minds {
+    height: 54px;
+  }
+}
+
+.vx-landing .vx-sponsor-logo--niche {
+  height: 36px;
+}
+
+@media (min-width: 1024px) {
+  .vx-landing .vx-sponsor-logo--niche {
+    height: 46px;
+  }
+}
+
+/* Soft-fade the aurora clip so the breathe/scale animation does not hard-cut
+   into a thin pulsing line (often visible through the Sponsors band). */
+.vx-landing .vx-page-aurora {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 58%,
+    rgb(0 0 0 / 0.55) 78%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 58%,
+    rgb(0 0 0 / 0.55) 78%,
+    transparent 100%
+  );
+}
+
+.vx-landing .vx-page-aurora > .vx-aurora {
+  inset: 0;
+  z-index: 0;
+}
+
+.vx-landing .vx-section-title {
+  border: none;
+  border-bottom: none;
+  padding-bottom: 0;
+  text-decoration: none;
+}
+
+.vx-landing .vx-feature--purple .vx-section-title {
+  color: var(--vx-title-purple);
+}
+
+.vx-landing .vx-feature--blue .vx-section-title {
+  color: var(--vx-title-blue);
+}
+
+.vx-landing .vx-feature--green .vx-section-title {
+  color: var(--vx-title-green);
+}
+
+.vx-landing .vx-feature--purple {
+  --vx-feature-glow: var(--vx-purple);
+}
+
+.vx-landing .vx-feature--blue {
+  --vx-feature-glow: var(--vx-blue);
+}
+
+.vx-landing .vx-feature--green {
+  --vx-feature-glow: var(--vx-green);
+}
+
+.vx-landing .vx-shimmer-text,
+.vx-landing .vx-hero-local {
+  --vx-local-shimmer-highlight: rgb(255 255 255 / 0.75);
+  background-image:
+    linear-gradient(
+      110deg,
+      transparent 40%,
+      var(--vx-local-shimmer-highlight) 50%,
+      transparent 60%
+    ),
+    linear-gradient(
+      105deg,
+      var(--vx-purple) 0%,
+      var(--vx-blue) 50%,
+      var(--vx-green) 100%
+    );
+  background-size: 220% 100%, 100% 100%;
+  background-position: 200% 0, 0 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: vx-local-shimmer 4.1s linear infinite;
+}
+
+.vx-landing .vx-shimmer-text--closing {
+  background-size: 220% 100%, 100% 100%;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  animation-duration: 5.2s;
+}
+
+.dark .vx-landing .vx-shimmer-text,
+.dark .vx-landing .vx-hero-local,
+[data-theme='dark'] .vx-landing .vx-shimmer-text,
+[data-theme='dark'] .vx-landing .vx-hero-local,
+.vx-landing.dark .vx-shimmer-text,
+.vx-landing.dark .vx-hero-local {
+  --vx-local-shimmer-highlight: rgb(255 255 255 / 0.9);
+}
+
+@keyframes vx-local-shimmer {
+  0% {
+    background-position: 200% 0, 0 0;
+  }
+  26.829% {
+    background-position: -120% 0, 0 0;
+  }
+  100% {
+    background-position: -120% 0, 0 0;
+  }
+}
+
+.vx-landing .vx-aurora {
+  z-index: 0;
+  overflow: visible;
+}
+
+.vx-landing .vx-aurora-wash {
+  position: absolute;
+  inset: 0 0 28% 0;
+  background:
+    radial-gradient(
+      ellipse 95% 48% at 50% 0%,
+      color-mix(in oklch, var(--vx-aurora-lavender) 55%, var(--vx-aurora-blue)),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 80% 60% at 18% 4%,
+      color-mix(in oklch, var(--vx-aurora-lavender) 82%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 75% 55% at 84% 4%,
+      color-mix(in oklch, var(--vx-aurora-blue) 76%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 85% 58% at 50% 18%,
+      color-mix(in oklch, var(--vx-aurora-mint) 52%, transparent),
+      transparent 74%
+    );
+  opacity: 0.95;
+  animation: vx-aurora-breathe 28s ease-in-out infinite;
+}
+
+.vx-landing .vx-aurora-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(92px);
+  opacity: 0.42;
+  animation: vx-aurora-drift 24s ease-in-out infinite;
+}
+
+.vx-landing .vx-aurora[data-intensity='soft'] .vx-aurora-wash {
+  opacity: 0.4;
+}
+
+.vx-landing .vx-aurora[data-intensity='soft'] .vx-aurora-orb {
+  opacity: 0.22;
+  filter: blur(96px);
+}
+
+.vx-landing .vx-aurora-orb--a {
+  top: 0%;
+  left: 2%;
+  width: min(58vw, 640px);
+  height: min(36vw, 400px);
+  background: var(--vx-aurora-lavender);
+  animation-duration: 26s;
+}
+
+.vx-landing .vx-aurora-orb--b {
+  top: 0%;
+  right: 2%;
+  width: min(60vw, 660px);
+  height: min(34vw, 380px);
+  background: var(--vx-aurora-blue);
+  animation-delay: -8s;
+  animation-duration: 30s;
+}
+
+.vx-landing .vx-aurora-orb--c {
+  top: 8%;
+  left: 28%;
+  width: min(46vw, 500px);
+  height: min(28vw, 320px);
+  background: var(--vx-aurora-mint);
+  animation-delay: -14s;
+  animation-duration: 28s;
+}
+
+.vx-landing .vx-aurora-orb--d {
+  top: 14%;
+  left: 42%;
+  width: min(38vw, 420px);
+  height: min(24vw, 280px);
+  background: color-mix(in oklch, var(--vx-aurora-lavender) 55%, var(--vx-aurora-blue));
+  opacity: 0.26;
+  animation-delay: -4s;
+  animation-duration: 22s;
+}
+
+.vx-landing .vx-aurora-noise {
+  position: absolute;
+  inset: 0 0 30% 0;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 100%);
+}
+
+.dark .vx-landing .vx-aurora-wash,
+[data-theme='dark'] .vx-landing .vx-aurora-wash {
+  opacity: 0.72;
+}
+
+.dark .vx-landing .vx-aurora-orb,
+[data-theme='dark'] .vx-landing .vx-aurora-orb {
+  opacity: 0.36;
+}
+
+.dark .vx-landing .vx-aurora[data-intensity='soft'] .vx-aurora-orb,
+[data-theme='dark'] .vx-landing .vx-aurora[data-intensity='soft'] .vx-aurora-orb {
+  opacity: 0.18;
+}
+
+.dark .vx-landing .vx-aurora-noise,
+[data-theme='dark'] .vx-landing .vx-aurora-noise {
+  opacity: 0.04;
+}
+
+@keyframes vx-aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(4%, -5%, 0) scale(1.06);
+  }
+  66% {
+    transform: translate3d(-5%, 4%, 0) scale(0.95);
+  }
+}
+
+@keyframes vx-aurora-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  50% {
+    opacity: 0.92;
+    transform: scale(1.03) translate3d(1%, -1%, 0);
+  }
+}
+
+.dark .vx-landing .vx-aurora-wash,
+[data-theme='dark'] .vx-landing .vx-aurora-wash {
+  animation-name: vx-aurora-breathe-dark;
+}
+
+@keyframes vx-aurora-breathe-dark {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(1.04) translate3d(1%, -1%, 0);
+  }
+}
+
+.vx-landing .vx-glass-frame {
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--background) 70%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--foreground) 4%, transparent) inset;
+}
+
+.vx-landing .vx-demo-aspect {
+  aspect-ratio: 5 / 2;
+}
+
+.vx-landing .vx-demo-surface {
+  background: var(--muted);
+}
+
+.vx-landing .vx-demo-glow {
+  border-radius: 1.25rem;
+  background: radial-gradient(
+    ellipse 70% 60% at 50% 50%,
+    color-mix(in oklch, var(--vx-purple) 28%, transparent),
+    color-mix(in oklch, var(--vx-blue) 18%, transparent) 45%,
+    transparent 72%
+  );
+  filter: blur(28px);
+  transform: scale(1.06);
+  opacity: 0.85;
+}
+
+/* Opacity-only reveal for the demo frame so the box never slides or scales. */
+.vx-landing .vx-demo-reveal-out {
+  opacity: 0;
+}
+
+.vx-landing .vx-demo-reveal-in {
+  opacity: 1;
+  transition: opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.vx-landing .vx-feature-glow {
+  border-radius: 1.25rem;
+  background: radial-gradient(
+    ellipse 65% 55% at 50% 50%,
+    color-mix(in oklch, var(--vx-feature-glow) 18%, transparent),
+    transparent 72%
+  );
+  filter: blur(28px);
+  transform: scale(1.04);
+  opacity: 0.55;
+}
+
+@media (min-width: 1024px) {
+  .vx-landing .vx-feature-media {
+    width: min(
+      1120px,
+      calc(100% + (100vw - min(100vw, 1200px)) / 2 + 40px - 24px)
+    );
+    max-width: none;
+  }
+}
+
+.vx-landing .vx-img-missing {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+.vx-landing .vx-img-placeholder {
+  background: var(--muted);
+}
+
+.vx-landing .vx-feature-media {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.vx-landing .vx-feature-frame {
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.45s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .vx-landing .vx-feature-media:hover .vx-feature-frame {
+    transform: translateY(-3px);
+  }
+}
+
+.vx-landing .vx-learn-more {
+  transition: color 0.2s ease;
+}
+
+.vx-landing .vx-learn-arrow {
+  display: inline-block;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.vx-landing .vx-learn-more:hover .vx-learn-arrow {
+  transform: translateX(2px);
+}
+
+.vx-landing .vx-reveal-out {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+}
+
+.vx-landing .vx-reveal-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.vx-landing .vx-reveal-delay {
+  transition-delay: 0.12s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vx-landing .vx-aurora-orb,
+  .vx-landing .vx-aurora-wash,
+  .vx-landing .vx-shimmer-text,
+  .vx-landing .vx-hero-local {
+    animation: none !important;
+  }
+
+  .vx-landing .vx-shimmer-text,
+  .vx-landing .vx-hero-local {
+    background-image: linear-gradient(
+      105deg,
+      var(--vx-purple) 0%,
+      var(--vx-blue) 50%,
+      var(--vx-green) 100%
+    );
+    background-size: 100% 100%;
+    background-position: 0 0;
+  }
+
+  .vx-landing .vx-reveal-out,
+  .vx-landing .vx-reveal-in {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .vx-landing .vx-demo-reveal-out,
+  .vx-landing .vx-demo-reveal-in {
+    opacity: 1;
+    transition: none;
+  }
+
+  .vx-landing .vx-feature-media:hover .vx-feature-frame {
+    transform: none;
+  }
+}
+
+body:has(.vx-landing) {
+  overflow-x: hidden;
+}
+
+body:has(.vx-landing) .vp-back-to-top-button,
+body:has(.vx-landing) .back-to-top,
+body:has(.vx-landing) #back-to-top {
+  display: none !important;
+}

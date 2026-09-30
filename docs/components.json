@@ -1,0 +1,19 @@
+{
+  "$schema": "https://shadcn-vue.com/schema.json",
+  "style": "new-york",
+  "typescript": true,
+  "tailwind": {
+    "config": "",
+    "css": ".vuepress/landing/styles/landing.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@landing/components",
+    "utils": "@landing/lib/utils",
+    "ui": "@landing/components/ui",
+    "lib": "@landing/lib",
+    "composables": "@landing/composables"
+  }
+}

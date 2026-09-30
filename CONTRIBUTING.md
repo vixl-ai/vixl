@@ -33,7 +33,7 @@ npm run tauri -- dev
 
 ### Docs
 
-The site is VitePress in `docs/`. Preview it with:
+The site is VuePress in `docs/`. Preview it with:
 
 ```bash
 npm run docs:dev
@@ -88,7 +88,7 @@ Breaking changes should be called out in the PR description.
 | `src/services/harness/` | Agent harness and tool loop |
 | `src-tauri/` | Tauri / Rust shell |
 | `src/prompts/` | System and tool guidance prompts |
-| `docs/` | VitePress documentation site |
+| `docs/` | VuePress documentation site |
 
 ## Commit messages
 
