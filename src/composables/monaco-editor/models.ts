@@ -5,6 +5,7 @@ import formatMonacoError from '@/utils/format-monaco-error'
 import { detectMonacoLanguage } from '@/utils/monaco-language'
 import { ensureMonacoLanguage } from '@/utils/monaco-shiki'
 import { gitHeadUri, workingFileUri } from '@/utils/monaco-working-uri'
+import { runFormatBeforeSave, shouldFormatBeforeSave } from './format-on-save'
 import { ensureLanguageRegistered } from './helpers'
 import type { MonacoHelpers } from './helpers'
 import type { MonacoLsp } from './lsp'
@@ -244,32 +245,56 @@ export const createModels = (ctx: MonacoEditorContext, deps: ModelsDeps) => {
     }
   }
 
-  const save = async (targetPath?: string): Promise<boolean> => {
+  const save = async (
+    targetPath?: string,
+    options?: { silent?: boolean },
+  ): Promise<boolean> => {
     const root = ctx.projectRoot.value
     const path = targetPath ?? ctx.props.path
     if (!root || !path || !ctx.editor || ctx.props.diffView || ctx.saving.value) {
       return false
     }
 
-    if (ctx.editor.getModel() !== ctx.models.get(path)) {
+    const isActivePath = path === ctx.props.path
+    if (isActivePath && ctx.editor.getModel() !== ctx.models.get(path)) {
       await attachModel(path)
     }
 
-    const model = ctx.editor.getModel()
+    const model = isActivePath
+      ? ctx.editor.getModel()
+      : (ctx.models.get(path) ?? null)
     if (!model) {
       return false
     }
 
     ctx.saving.value = true
     try {
+      if (
+        shouldFormatBeforeSave({
+          enabled: Boolean(ctx.props.formatOnSave),
+          silent: options?.silent,
+          isActivePath,
+        })
+      ) {
+        await runFormatBeforeSave({
+          model,
+          requestFormattingEdits: deps.lsp.requestFormattingEdits,
+        })
+        if (model.isDisposed()) {
+          return false
+        }
+      }
+
       const content = model.getValue()
       await fsWriteFile({ projectRoot: root, path, content, allowSensitive: true })
       deps.helpers.setPathDirty(path, false)
       ctx.emit('saved', { path, content })
-      if (ctx.lspActive.value) {
+      if (ctx.lspActive.value && !model.isDisposed()) {
         await deps.lsp.refreshDiagnostics(path, model)
       }
-      toast.success('Saved')
+      if (!options?.silent) {
+        toast.success('Saved')
+      }
       return true
     } catch (error) {
       toast.error('Failed to save file', {

@@ -18,4 +18,5 @@ export {
   parseLspHoverContents,
   parseLspCompletionItems,
   parseLspLocations,
+  parseLspTextEdits,
 } from './language-features'

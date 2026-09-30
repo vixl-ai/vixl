@@ -11,7 +11,10 @@ import { bindEditorViewStateListeners } from './view-state'
 type EditorDeps = {
   helpers: MonacoHelpers
   models: MonacoModels
-  save: (targetPath?: string) => Promise<boolean>
+  save: (
+    targetPath?: string,
+    options?: { silent?: boolean },
+  ) => Promise<boolean>
 }
 
 export const createEditorInstances = (ctx: MonacoEditorContext, deps: EditorDeps) => {

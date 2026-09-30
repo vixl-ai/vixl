@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref, shallowRef, type Ref } from 'vue'
 import type { AgentHarnessState, AttentionHelpers } from '@/composables/agent-harness/types'
 import type { PendingQuestionState } from '@/types/chat/pending-question'
@@ -18,6 +18,7 @@ const listConfiguredProviders = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => string[]>(() => ['openai']),
 )
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
+const toastInfo = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 const normalizeImageDataUrl = vi.hoisted(() =>
   vi.fn<(args: { dataUrl: string; mediaType: string }) => Promise<{
     dataUrl: string
@@ -92,6 +93,7 @@ vi.mock('@/services/config/vixl-config', () => ({
 vi.mock('vue-sonner', () => ({
   toast: {
     error: (...args: unknown[]) => toastError(...args),
+    info: (...args: unknown[]) => toastInfo(...args),
   },
 }))
 
@@ -1956,6 +1958,309 @@ describe('agent-harness send continue', () => {
     expect(continueOrchestrator).not.toHaveBeenCalled()
     expect(runOrchestrator).not.toHaveBeenCalled()
     expect(state.status.value).toBe('ready')
+  })
+})
+
+describe('agent-harness send transient auto-retry', () => {
+  const transientError = (): Error =>
+    new Error('error sending request')
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.clearAllMocks()
+    updateChatMeta.mockResolvedValue(undefined)
+    runOrchestrator.mockResolvedValue(undefined)
+    continueOrchestrator.mockResolvedValue(undefined)
+    listConfiguredProviders.mockReturnValue(['openai'])
+    listAgentIndex.mockResolvedValue([])
+    listSlashSkillIndex.mockResolvedValue([])
+    resolveAgentDefinition.mockResolvedValue(null)
+    loadEffectiveSettings.mockResolvedValue({ version: 1 })
+    hasPendingBackgroundResume.mockReturnValue(false)
+    hasRunningSubagentsForChat.mockReturnValue(false)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('continues the turn after a transient error and skips the error UI', async () => {
+    runOrchestrator.mockRejectedValueOnce(transientError())
+    continueOrchestrator.mockResolvedValueOnce(undefined)
+    const state = buildState()
+    const attention = buildAttention()
+    const maybeDrainQueue = vi
+      .fn<(...args: unknown[]) => Promise<void>>()
+      .mockResolvedValue(undefined)
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+      maybeDrainQueue,
+    })
+
+    const pending = send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+      appendedUserMessageId: 'user-1',
+    })
+    await vi.advanceTimersByTimeAsync(2_000)
+    await pending
+
+    const turnId = vi.mocked(state.session.startAgentTurn).mock.calls[0]?.[0]
+    expect(turnId).toEqual(expect.any(String))
+    expect(toastInfo).toHaveBeenCalledWith('Connection dropped, retrying (1 of 2)')
+    expect(state.session.resumeAgentTurn).toHaveBeenCalledWith(turnId)
+    expect(continueOrchestrator).toHaveBeenCalledTimes(1)
+    expect(continueOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assistantId: turnId,
+        userMessageId: 'user-1',
+      }),
+    )
+    expect(runOrchestrator).toHaveBeenCalledTimes(1)
+    expect(state.session.setAgentTurnError).not.toHaveBeenCalled()
+    expect(attention.applyTurnEndAttention).toHaveBeenCalledTimes(1)
+    expect(attention.applyTurnEndAttention).toHaveBeenCalledWith('success')
+    expect(toastError).not.toHaveBeenCalledWith(
+      'Agent run failed',
+      expect.anything(),
+    )
+    expect(state.status.value).toBe('ready')
+    expect(maybeDrainQueue).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts during backoff without setting a turn error or continuing', async () => {
+    runOrchestrator.mockRejectedValueOnce(transientError())
+    const state = buildState()
+    const attention = buildAttention()
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+      maybeDrainQueue: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+    })
+
+    const pending = send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+      appendedUserMessageId: 'user-1',
+      internal: true,
+    })
+    await vi.waitFor(() => {
+      expect(toastInfo).toHaveBeenCalled()
+      expect(state.abortController.value).not.toBeNull()
+    })
+    state.abortController.value?.abort()
+    await pending
+
+    expect(continueOrchestrator).not.toHaveBeenCalled()
+    expect(runOrchestrator).toHaveBeenCalledTimes(1)
+    expect(state.session.setAgentTurnError).not.toHaveBeenCalled()
+    expect(attention.applyTurnEndAttention).not.toHaveBeenCalled()
+    expect(toastError).not.toHaveBeenCalledWith(
+      'Agent run failed',
+      expect.anything(),
+    )
+    expect(state.status.value).toBe('ready')
+    expect(state.abortController.value).toBeNull()
+  })
+
+  it('does not retry a non-transient orchestrator error', async () => {
+    runOrchestrator.mockRejectedValueOnce(new Error('provider down'))
+    const state = buildState()
+    const attention = buildAttention()
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+      maybeDrainQueue: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+      appendedUserMessageId: 'user-1',
+      internal: true,
+    })
+
+    expect(toastInfo).not.toHaveBeenCalled()
+    expect(continueOrchestrator).not.toHaveBeenCalled()
+    expect(runOrchestrator).toHaveBeenCalledTimes(1)
+    expect(state.session.setAgentTurnError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'error',
+        message: 'provider down',
+      }),
+    )
+    expect(attention.applyTurnEndAttention).toHaveBeenCalledWith('error')
+    expect(toastError).toHaveBeenCalledWith(
+      'Agent run failed',
+      expect.objectContaining({ description: 'provider down' }),
+    )
+    expect(state.status.value).toBe('error')
+  })
+
+  it('falls through to the error UI after retries are exhausted', async () => {
+    runOrchestrator.mockRejectedValueOnce(transientError())
+    continueOrchestrator
+      .mockRejectedValueOnce(transientError())
+      .mockRejectedValueOnce(transientError())
+    const state = buildState()
+    const attention = buildAttention()
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+      maybeDrainQueue: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+    })
+
+    const pending = send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+      appendedUserMessageId: 'user-1',
+      internal: true,
+    })
+    await vi.advanceTimersByTimeAsync(2_000)
+    await vi.advanceTimersByTimeAsync(6_000)
+    await pending
+
+    expect(toastInfo).toHaveBeenCalledWith('Connection dropped, retrying (1 of 2)')
+    expect(toastInfo).toHaveBeenCalledWith('Connection dropped, retrying (2 of 2)')
+    expect(runOrchestrator).toHaveBeenCalledTimes(1)
+    expect(continueOrchestrator).toHaveBeenCalledTimes(2)
+    expect(state.session.setAgentTurnError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'error',
+        message: 'error sending request',
+      }),
+    )
+    expect(attention.applyTurnEndAttention).toHaveBeenCalledWith('error')
+    expect(toastError).toHaveBeenCalledWith(
+      'Agent run failed',
+      expect.objectContaining({ description: 'error sending request' }),
+    )
+    expect(state.status.value).toBe('error')
+  })
+
+  it('surfaces the original error when compaction blocks the retry', async () => {
+    runOrchestrator.mockRejectedValueOnce(transientError())
+    const state = buildState()
+    const attention = buildAttention()
+    const maybeDrainQueue = vi
+      .fn<(...args: unknown[]) => Promise<void>>()
+      .mockResolvedValue(undefined)
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+      maybeDrainQueue,
+    })
+
+    const pending = send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+      appendedUserMessageId: 'user-1',
+    })
+    await vi.waitFor(() => {
+      expect(toastInfo).toHaveBeenCalled()
+    })
+    state.compacting.value = true
+    await vi.advanceTimersByTimeAsync(2_000)
+    await pending
+
+    expect(continueOrchestrator).not.toHaveBeenCalled()
+    expect(runOrchestrator).toHaveBeenCalledTimes(1)
+    expect(state.session.resumeAgentTurn).not.toHaveBeenCalled()
+    expect(state.session.setAgentTurnError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'error',
+        message: 'error sending request',
+      }),
+    )
+    expect(attention.applyTurnEndAttention).toHaveBeenCalledWith('error')
+    expect(toastError).toHaveBeenCalledWith(
+      'Agent run failed',
+      expect.objectContaining({ description: 'error sending request' }),
+    )
+    expect(toastError).not.toHaveBeenCalledWith(
+      'Chat is busy',
+      expect.anything(),
+    )
+    expect(maybeDrainQueue).not.toHaveBeenCalled()
+    expect(state.status.value).toBe('error')
+  })
+
+  it('surfaces the original error when background resume blocks the retry', async () => {
+    runOrchestrator.mockRejectedValueOnce(transientError())
+    const state = buildState()
+    const attention = buildAttention()
+    const maybeDrainQueue = vi
+      .fn<(...args: unknown[]) => Promise<void>>()
+      .mockResolvedValue(undefined)
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+      maybeDrainQueue,
+    })
+
+    const pending = send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+      appendedUserMessageId: 'user-1',
+    })
+    await vi.waitFor(() => {
+      expect(toastInfo).toHaveBeenCalled()
+    })
+    state.resumingBackgroundBatch.value = true
+    await vi.advanceTimersByTimeAsync(2_000)
+    await pending
+
+    expect(continueOrchestrator).not.toHaveBeenCalled()
+    expect(runOrchestrator).toHaveBeenCalledTimes(1)
+    expect(state.session.resumeAgentTurn).not.toHaveBeenCalled()
+    expect(state.session.setAgentTurnError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'error',
+        message: 'error sending request',
+      }),
+    )
+    expect(attention.applyTurnEndAttention).toHaveBeenCalledWith('error')
+    expect(toastError).toHaveBeenCalledWith(
+      'Agent run failed',
+      expect.objectContaining({ description: 'error sending request' }),
+    )
+    expect(toastError).not.toHaveBeenCalledWith(
+      'Chat is busy',
+      expect.anything(),
+    )
+    expect(maybeDrainQueue).not.toHaveBeenCalled()
+    expect(state.status.value).toBe('submitted')
   })
 })
 

@@ -65,17 +65,22 @@ export default (props: MonacoEditorProps, emit: MonacoEditorEmit) => {
   }
   const models = createModels(ctx, { helpers, lsp, attachModelRef })
 
-  const saveRef: { current: ((targetPath?: string) => Promise<boolean>) | null } = {
+  const saveRef: {
+    current: ((
+      targetPath?: string,
+      options?: { silent?: boolean },
+    ) => Promise<boolean>) | null
+  } = {
     current: null,
   }
   const editors = createEditorInstances(ctx, {
     helpers,
     models,
-    save: (targetPath) => {
+    save: (targetPath, options) => {
       if (!saveRef.current) {
         return Promise.resolve(false)
       }
-      return saveRef.current(targetPath)
+      return saveRef.current(targetPath, options)
     },
   })
   saveRef.current = models.save

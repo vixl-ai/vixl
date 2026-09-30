@@ -13,12 +13,12 @@ import collectExplicitAgentMentions from '@/utils/collect-explicit-agent-mention
 import { loadEffectiveSettings } from '@/services/config/vixl-config'
 import flushPendingBackgroundResume from '@/services/harness/subagent/flush-pending-resume'
 import { hasPendingBackgroundResume } from '@/services/harness/subagent/registry'
-import describeAgentRunError from '@/utils/describe-agent-run-error'
 import normalizeAttachmentFiles from '@/utils/normalize-attachment-files'
 import appendSendUserMessage from './append-send-user-message'
 import applyParentTurnStart from './apply-parent-turn-start'
 import deferOverlappingParentTurn from './defer-overlapping-parent-turn'
 import enqueueComposerSend from './enqueue-composer-send'
+import handleSendCatch from './handle-send-catch'
 import runParentOrchestrator from './run-parent-orchestrator'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
@@ -38,7 +38,10 @@ export type SendArgs = {
   // resume is in flight: drain/retry/edit re-enqueue, force-send waits first.
   // Continue toasts instead of enqueueing.
   internal?: boolean
+  autoRetryAttempt?: number
 }
+
+export type SendResult = 'completed' | 'failed' | 'skipped'
 
 type SendDeps = {
   handleEvent: (event: HarnessEvent) => void | Promise<void>
@@ -68,44 +71,47 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
     suppressQueueDrainAfterStop,
   } = state
 
-  const send = async (args: SendArgs): Promise<void> => {
+  const send = async (args: SendArgs): Promise<SendResult> => {
     const pending = session.pendingQuestion.value
     if (!args.internal && pending && args.text.trim().length > 0) {
       session.submitAnswer(pending.toolCallId, args.text)
       attention.maybeClearAttentionWhenGatesEmpty()
-      return
+      return 'skipped'
     }
 
     if (!args.internal && attention.isParentBusy()) {
       enqueueComposerSend(messageQueue, args)
-      return
+      return 'skipped'
     }
 
-    if (status.value === 'streaming' || status.value === 'submitted') {
-      return
+    if (
+      (status.value === 'streaming' || status.value === 'submitted') &&
+      args.autoRetryAttempt == null
+    ) {
+      return 'skipped'
     }
 
     if (!args.model) {
       toast.error('Select a model before sending')
-      return
+      return 'skipped'
     }
 
     if (!config.hydrated.value) {
       toast.error('Settings are still loading')
-      return
+      return 'skipped'
     }
 
     if (listConfiguredProviders(config.effectiveSettings.value).length === 0) {
       toast.error('No provider configured', {
         description: 'Add a provider in Settings.',
       })
-      return
+      return 'skipped'
     }
 
     const parsedModel = parseModelRef(args.model)
     if (!parsedModel) {
       toast.error('Select a valid model before sending')
-      return
+      return 'skipped'
     }
 
     const settingsRoot = options.standalone ? null : options.projectRoot
@@ -117,12 +123,12 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
       toast.error('Failed to load project settings', {
         description: settingsError instanceof Error ? settingsError.message : 'Unknown error',
       })
-      return
+      return 'skipped'
     }
 
     if (!args.internal && attention.isParentBusy()) {
       enqueueComposerSend(messageQueue, args)
-      return
+      return 'skipped'
     }
 
     error.value = null
@@ -139,6 +145,8 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
     const controller = new AbortController()
     abortController.value = controller
     let turnStarted = false
+    let turnId: string | undefined
+    let appendedUserMessageId = args.appendedUserMessageId
 
     try {
       let files: FileUIPart[]
@@ -150,7 +158,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         })
         status.value = 'ready'
         await fleetSidebar.refreshSlug(options.projectSlug)
-        return
+        return 'skipped'
       }
 
       if (
@@ -163,11 +171,10 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         })
         status.value = 'ready'
         await fleetSidebar.refreshSlug(options.projectSlug)
-        return
+        return 'skipped'
       }
 
       let userMessageAppended = false
-      let appendedUserMessageId = args.appendedUserMessageId
       if (!args.skipUserMessage) {
         const appended = await appendSendUserMessage({
           session,
@@ -182,7 +189,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         if (!appended) {
           status.value = 'ready'
           await fleetSidebar.refreshSlug(options.projectSlug)
-          return
+          return 'skipped'
         }
         appendedUserMessageId = appended.id
         userMessageAppended = true
@@ -191,7 +198,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
       if (controller.signal.aborted) {
         status.value = 'ready'
         await fleetSidebar.refreshSlug(options.projectSlug)
-        return
+        return 'skipped'
       }
 
       if (
@@ -199,6 +206,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
           resumeInFlight: resumingBackgroundBatch.value,
           compacting: compacting.value,
           continueTurnId: args.continueTurnId,
+          suppressBusyToast: args.autoRetryAttempt != null,
           enqueue: () =>
             enqueueComposerSend(messageQueue, {
               ...args,
@@ -213,7 +221,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         })
       ) {
         await fleetSidebar.refreshSlug(options.projectSlug)
-        return
+        return 'skipped'
       }
 
       await applyParentTurnStart({
@@ -225,7 +233,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         effectiveSettings: chatSettings,
       })
 
-      const turnId = args.continueTurnId ?? crypto.randomUUID()
+      turnId = args.continueTurnId ?? crypto.randomUUID()
       if (args.continueTurnId) {
         session.resumeAgentTurn(args.continueTurnId)
       } else {
@@ -275,40 +283,29 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
       if (!args.internal) {
         await deps.maybeDrainQueue()
       }
+      return 'completed'
     } catch (err) {
-      const aborted = controller.signal.aborted
-      const timedOut =
-        err instanceof Error && (err.name === 'TimeoutError' || /timeout/i.test(err.message))
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      const runDescription = describeAgentRunError(message)
-      if (aborted) {
-        status.value = 'ready'
-        if (turnStarted) {
-          session.finishAgentTurn()
-        }
-        await fleetSidebar.refreshSlug(options.projectSlug)
-        return
-      }
-      error.value = message
-      status.value = 'error'
-      if (turnStarted) {
-        session.setAgentTurnError({
-          kind: timedOut ? 'timeout' : 'error',
-          message: timedOut
-            ? 'The model took too long to respond.'
-            : message.includes('No output generated')
-              ? 'The model returned an empty response. Check your API key and model ID in Settings.'
-              : runDescription,
-        })
-        session.finishAgentTurn()
-        attention.applyTurnEndAttention('error')
-      }
-      toast.error('Agent run failed', {
-        description: error.value.includes('No output generated')
-          ? 'The model returned an empty response. Check your Gateway API key and model ID in Settings.'
-          : runDescription,
+      return await handleSendCatch({
+        err,
+        aborted: controller.signal.aborted,
+        turnStarted,
+        turnId,
+        appendedUserMessageId,
+        args,
+        status,
+        error,
+        abortController,
+        session,
+        suppressQueueDrainAfterStop,
+        resumeInFlight: resumingBackgroundBatch,
+        projectSlug: options.projectSlug,
+        refreshSlug: (slug) => fleetSidebar.refreshSlug(slug),
+        applyTurnEndAttention: (outcome) => {
+          attention.applyTurnEndAttention(outcome)
+        },
+        maybeDrainQueue: deps.maybeDrainQueue,
+        send,
       })
-      await fleetSidebar.refreshSlug(options.projectSlug)
     } finally {
       contextBudgetSync.setDraftMentions([])
       if (abortController.value === controller) {

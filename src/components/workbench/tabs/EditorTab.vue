@@ -41,6 +41,7 @@ import WorkbenchEditorFileSearchDialog from '@/components/workbench/EditorFileSe
 import WorkbenchEditorMarkdownPreview from '@/components/workbench/EditorMarkdownPreview.vue'
 import WorkbenchEditorSidePane from '@/components/workbench/EditorSidePane.vue'
 import WorkbenchMonacoEditor from '@/components/workbench/MonacoEditor.vue'
+import useEditorAutoSave from '@/composables/use-editor-auto-save'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { fsReadFile, revealInFolder } from '@/services/vixl/vixl-tauri'
 import type { EditorPayload, WorkbenchTab } from '@/types/workbench/workbench-tab'
@@ -165,7 +166,7 @@ const handleFileTabMiddleClick = (event: MouseEvent, path: string): void => {
     return
   }
   event.preventDefault()
-  handleSubTabClose(path)
+  void handleSubTabClose(path)
 }
 
 const handleOpenFileSearch = (): void => {
@@ -281,23 +282,47 @@ const removeDirtyPath = (path: string): void => {
   syncWorkbenchDirty()
 }
 
-const handleSubTabClose = (path: string): void => {
+const { onDirtyChange: notifyAutoSaveDirty, pausePath, resumePath, settle } =
+  useEditorAutoSave({
+    autoSave,
+    selectedPath,
+    diffView,
+    isDirty: (path) => fileDirty.value[path] === true,
+    save: async (targetPath, options) => {
+      const editor = monacoRef.value
+      if (!editor) {
+        return false
+      }
+      return editor.save(targetPath, options)
+    },
+  })
+
+const handleSubTabClose = async (path: string): Promise<void> => {
+  pausePath(path)
+  await settle()
   if (fileDirty.value[path]) {
     closeTargetPath.value = path
     closeConfirmOpen.value = true
     return
   }
-  workbench.closeEditorFile(props.tab.id, path).catch((error) => {
+  resumePath(path)
+  try {
+    await workbench.closeEditorFile(props.tab.id, path)
+  } catch (error) {
     toast.error('Failed to close file', {
       description: error instanceof Error ? error.message : 'Unknown error',
     })
-  })
+  }
 }
 
 const handleCloseConfirmOpenChange = (open: boolean): void => {
   closeConfirmOpen.value = open
   if (!open) {
+    const path = closeTargetPath.value
     closeTargetPath.value = null
+    if (path) {
+      resumePath(path)
+    }
   }
 }
 
@@ -306,9 +331,10 @@ const handleDiscardClose = async (): Promise<void> => {
   if (!path) {
     return
   }
-  closeConfirmOpen.value = false
   closeTargetPath.value = null
+  closeConfirmOpen.value = false
   removeDirtyPath(path)
+  resumePath(path)
   try {
     await workbench.closeEditorFile(props.tab.id, path)
   } catch (error) {
@@ -335,8 +361,9 @@ const handleSaveAndClose = async (): Promise<void> => {
       return
     }
     removeDirtyPath(path)
-    closeConfirmOpen.value = false
     closeTargetPath.value = null
+    closeConfirmOpen.value = false
+    resumePath(path)
     await workbench.closeEditorFile(props.tab.id, path)
   } catch (error) {
     toast.error('Failed to save file', {
@@ -350,6 +377,7 @@ const handleSaveAndClose = async (): Promise<void> => {
 const handleDirtyChange = (payload: { path: string; dirty: boolean }): void => {
   fileDirty.value = { ...fileDirty.value, [payload.path]: payload.dirty }
   syncWorkbenchDirty()
+  notifyAutoSaveDirty(payload)
 }
 
 const handleSaved = (payload: { path: string; content: string }): void => {
@@ -636,6 +664,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
               :open-paths="openPaths"
               :line-numbers="lineNumbers"
               :word-wrap="wordWrap"
+              :format-on-save="formatOnSave"
               :diff-view="diffView"
               @dirty-change="handleDirtyChange"
               @saved="handleSaved"

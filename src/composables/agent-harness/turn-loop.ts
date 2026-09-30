@@ -105,7 +105,9 @@ export default (
     maybeDrainQueue,
   })
 
-  const send = async (args: SendArgs): Promise<void> => sendImpl(args)
+  const send = async (args: SendArgs): Promise<void> => {
+    await sendImpl(args)
+  }
 
   const resumeAfterBackgroundSubagents = async (): Promise<void> => {
     if (resumingBackgroundBatch.value) {

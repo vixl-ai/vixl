@@ -5,6 +5,7 @@ import {
   parseLspCompletionItems,
   parseLspDiagnostics,
   parseLspHoverContents,
+  parseLspTextEdits,
 } from '@/utils/monaco-lsp'
 
 const monacoStub = {
@@ -119,5 +120,47 @@ describe('monaco-lsp', () => {
     expect(suggestions).toHaveLength(1)
     expect(suggestions[0]?.label).toBe('console')
     expect(suggestions[0]?.kind).toBe(14)
+  })
+
+  it('parses lsp text edits to monaco 1-based ranges', () => {
+    expect(parseLspTextEdits(null)).toEqual([])
+    expect(parseLspTextEdits({})).toEqual([])
+
+    const edits = parseLspTextEdits([
+      {
+        range: {
+          start: { line: 0, character: 0 },
+          end: { line: 1, character: 2 },
+        },
+        newText: 'formatted\n',
+      },
+      {
+        range: { start: { line: 2, character: 3 }, end: { line: 2, character: 5 } },
+        newText: 'x',
+      },
+      { newText: 'missing-range' },
+      { range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } } },
+    ])
+
+    expect(edits).toEqual([
+      {
+        range: {
+          startLineNumber: 1,
+          startColumn: 1,
+          endLineNumber: 2,
+          endColumn: 3,
+        },
+        text: 'formatted\n',
+      },
+      {
+        range: {
+          startLineNumber: 3,
+          startColumn: 4,
+          endLineNumber: 3,
+          endColumn: 6,
+        },
+        text: 'x',
+      },
+    ])
   })
 })

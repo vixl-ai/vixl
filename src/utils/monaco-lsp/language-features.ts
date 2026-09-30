@@ -181,3 +181,32 @@ export const parseLspLocations = (result: unknown): LspLocationLink[] => {
   }
   return locations
 }
+
+export const parseLspTextEdits = (
+  result: unknown,
+): monaco.languages.TextEdit[] => {
+  if (!Array.isArray(result)) {
+    return []
+  }
+
+  const edits: monaco.languages.TextEdit[] = []
+  for (const item of result) {
+    if (!isRecord(item) || typeof item.newText !== 'string') {
+      continue
+    }
+    const range = readRange(item.range)
+    if (!range) {
+      continue
+    }
+    edits.push({
+      range: {
+        startLineNumber: range.start.line + 1,
+        startColumn: range.start.character + 1,
+        endLineNumber: range.end.line + 1,
+        endColumn: range.end.character + 1,
+      },
+      text: item.newText,
+    })
+  }
+  return edits
+}

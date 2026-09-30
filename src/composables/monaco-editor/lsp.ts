@@ -9,6 +9,7 @@ import {
   lspDiagnosticsToMarkers,
   normalizeFileUri,
   parseLspDiagnostics,
+  parseLspTextEdits,
   workspacePathToFileUri,
 } from '@/utils/monaco-lsp'
 import type { LspDiagnosticsEvent, MonacoEditorContext } from './types'
@@ -236,6 +237,45 @@ export const createLsp = (ctx: MonacoEditorContext) => {
   const resolvePathForModel = (model: monaco.editor.ITextModel): string | null =>
     ctx.pathByModel.get(model) ?? null
 
+  const requestFormattingEdits = async (
+    model: monaco.editor.ITextModel,
+  ): Promise<monaco.languages.TextEdit[]> => {
+    if (!ctx.lspActive.value) {
+      return []
+    }
+
+    const path = resolvePathForModel(model)
+    const primaryId = path ? getLspServerId(path) : null
+    if (!path || !primaryId) {
+      return []
+    }
+
+    const modelOptions = model.getOptions()
+    try {
+      await syncDocumentToLsp(path, model.getValue())
+      for (const serverId of serversForLspFeature(path, primaryId)) {
+        try {
+          const result = await lspRequest(serverId, 'textDocument/formatting', {
+            path,
+            options: {
+              tabSize: modelOptions.tabSize,
+              insertSpaces: modelOptions.insertSpaces,
+            },
+          })
+          const edits = parseLspTextEdits(result)
+          if (edits.length > 0) {
+            return edits
+          }
+        } catch {
+          continue
+        }
+      }
+      return []
+    } catch {
+      return []
+    }
+  }
+
   return {
     clearLspMarkers,
     getLspServerId,
@@ -250,6 +290,7 @@ export const createLsp = (ctx: MonacoEditorContext) => {
     teardownLspForPath,
     setupLspForPath,
     resolvePathForModel,
+    requestFormattingEdits,
   }
 }
 

@@ -127,6 +127,9 @@ pub(crate) async fn start_server(
                 }
               },
               "definition": { "linkSupport": true },
+              "formatting": {
+                "dynamicRegistration": false
+              },
               "references": {},
               "documentSymbol": {
                 "hierarchicalDocumentSymbolSupport": true

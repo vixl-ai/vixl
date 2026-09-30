@@ -183,6 +183,12 @@ export const createLspProviders = (ctx: MonacoEditorContext, lsp: MonacoLsp) => 
         },
       }),
     )
+
+    ctx.lspProviderDisposables.push(
+      monaco.languages.registerDocumentFormattingEditProvider('*', {
+        provideDocumentFormattingEdits: (model) => lsp.requestFormattingEdits(model),
+      }),
+    )
   }
 
   return { registerLspProviders }

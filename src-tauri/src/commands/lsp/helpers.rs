@@ -396,3 +396,38 @@ pub fn apply_server_disabled_flag(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        lsp_method_is_notification, normalize_lsp_method, normalize_lsp_params,
+        position_needs_method,
+    };
+
+    #[test]
+    fn formatting_is_a_supported_text_document_request() {
+        assert_eq!(
+            normalize_lsp_method("textDocument/formatting").unwrap(),
+            "textDocument/formatting"
+        );
+        assert!(!lsp_method_is_notification("textDocument/formatting"));
+        assert!(!position_needs_method("textDocument/formatting"));
+    }
+
+    #[test]
+    fn formatting_params_keep_options_and_do_not_require_position() {
+        let params = serde_json::json!({
+            "options": { "tabSize": 2, "insertSpaces": true },
+            "textDocument": { "uri": "file:///tmp/a.ts" }
+        });
+        let normalized = normalize_lsp_params("textDocument/formatting", params).unwrap();
+        assert_eq!(
+            normalized
+                .get("options")
+                .and_then(|value| value.get("tabSize"))
+                .and_then(|value| value.as_u64()),
+            Some(2)
+        );
+        assert!(normalized.get("position").is_none());
+    }
+}

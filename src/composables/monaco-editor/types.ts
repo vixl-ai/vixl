@@ -9,6 +9,7 @@ export type MonacoEditorProps = {
   openPaths?: string[]
   lineNumbers?: boolean
   wordWrap?: boolean
+  formatOnSave?: boolean
   diffView?: boolean
 }
 

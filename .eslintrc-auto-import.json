@@ -229,6 +229,7 @@
     "useDocumentVisibility": true,
     "useDraggable": true,
     "useDropZone": true,
+    "useEditorAutoSave": true,
     "useEditorMissingPaths": true,
     "useElementBounding": true,
     "useElementByPoint": true,

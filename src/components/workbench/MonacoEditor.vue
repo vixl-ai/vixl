@@ -7,6 +7,7 @@ const props = defineProps<{
   openPaths?: string[]
   lineNumbers?: boolean
   wordWrap?: boolean
+  formatOnSave?: boolean
   diffView?: boolean
 }>()
 
