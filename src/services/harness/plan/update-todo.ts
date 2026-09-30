@@ -74,7 +74,6 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
       const session = getPlanExecutionSession(ctx.projectSlug, ctx.chatId)
       const resolvedPlanPath = resolveUpdatePlanTodoPath(
         planPath,
-        session.awaitingPlanGo,
         session.activePlanPath,
       )
       if (!resolvedPlanPath) {

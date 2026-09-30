@@ -1,10 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { noPoll, visibleStatus } from '@/services/harness/guidance'
-import {
-  assertNotAwaitingPlanGo,
-  getPlanExecutionSession,
-} from '@/services/harness/plan-execution-session'
+import { getPlanExecutionSession } from '@/services/harness/plan-execution-session'
 import {
   register as registerSubagent,
   resolve as resolveSubagent,
@@ -57,8 +54,6 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
           note: string
         }
     > => {
-      assertNotAwaitingPlanGo(ctx.projectSlug, ctx.chatId)
-
       if (ctx.signal?.aborted) {
         throw new Error('Subagent aborted')
       }

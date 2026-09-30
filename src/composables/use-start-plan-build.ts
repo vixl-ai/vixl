@@ -14,7 +14,6 @@ import { setPendingChatMessage } from '@/services/chat/pending-message'
 import parsePlan from '@/services/plans/parse-plan'
 import updatePlanFrontmatter from '@/services/plans/update-plan-frontmatter'
 import {
-  clearAwaitingPlanGo,
   setActivePlanPath,
   setSubagentModelLock,
 } from '@/services/harness/plan-execution-session'
@@ -203,7 +202,6 @@ export default () => {
         subagentReasoning: subagentReasoning ?? null,
       })
 
-      clearAwaitingPlanGo(project.slug, chatId)
       setActivePlanPath(project.slug, chatId, input.planPath)
       setSubagentModelLock(
         project.slug,

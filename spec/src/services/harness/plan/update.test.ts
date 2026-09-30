@@ -40,7 +40,7 @@ vi.mock('@/composables/use-workbench-store', () => ({
 const projectSlug = 'project'
 const chatId = 'chat-update-plan'
 const projectRoot = '/tmp/project'
-const awaitingPlanPath = '.vixl/plans/awaiting/PLAN.md'
+const latestPlanPath = '.vixl/plans/latest/PLAN.md'
 const activePlanPath = '.vixl/plans/bound/PLAN.md'
 const explicitPlanPath = '.vixl/plans/explicit/PLAN.md'
 const replacementBody = '## Summary\n\nRevised plan body.\n'
@@ -100,12 +100,9 @@ describe('update_plan', () => {
     fsReadFile.mockResolvedValue({ content: existingPlan.content })
   })
 
-  it('resolves omitted planPath via awaitingPlanGo before session.activePlanPath', async () => {
-    markCreatedPlanThisTurn(projectSlug, chatId, {
-      planPath: awaitingPlanPath,
-      planId: 'awaiting',
-    })
-    setActivePlanPath(projectSlug, chatId, activePlanPath)
+  it('resolves omitted planPath to the most recently created plan', async () => {
+    markCreatedPlanThisTurn(projectSlug, chatId, activePlanPath)
+    markCreatedPlanThisTurn(projectSlug, chatId, latestPlanPath)
     const updatePlan = (await import('@/services/harness/plan/update')).default
     const tool = updatePlan(planCtx())
 
@@ -113,15 +110,15 @@ describe('update_plan', () => {
       body: replacementBody,
     })) as { planPath: string; title: string }
 
-    expect(result.planPath).toBe(awaitingPlanPath)
+    expect(result.planPath).toBe(latestPlanPath)
     expect(fsReadFile).toHaveBeenCalledWith({
       projectRoot,
-      path: awaitingPlanPath,
+      path: latestPlanPath,
     })
-    expect(writtenCall().path).toBe(awaitingPlanPath)
+    expect(writtenCall().path).toBe(latestPlanPath)
   })
 
-  it('resolves omitted planPath via session.activePlanPath when awaitingPlanGo is absent', async () => {
+  it('resolves omitted planPath via session.activePlanPath', async () => {
     setActivePlanPath(projectSlug, chatId, existingPlan.path)
     const updatePlan = (await import('@/services/harness/plan/update')).default
     const tool = updatePlan(planCtx())
@@ -139,11 +136,7 @@ describe('update_plan', () => {
   })
 
   it('prefers an explicit planPath over session state', async () => {
-    markCreatedPlanThisTurn(projectSlug, chatId, {
-      planPath: awaitingPlanPath,
-      planId: 'awaiting',
-    })
-    setActivePlanPath(projectSlug, chatId, activePlanPath)
+    markCreatedPlanThisTurn(projectSlug, chatId, latestPlanPath)
     const updatePlan = (await import('@/services/harness/plan/update')).default
     const tool = updatePlan(planCtx())
 

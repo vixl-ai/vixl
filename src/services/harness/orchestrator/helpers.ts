@@ -6,10 +6,6 @@ import { fileDiffListSchema } from '@/schemas/file-diff'
 import buildTools from '@/services/harness/build-tools'
 import formatToolValidationError from '@/services/harness/format-tool-validation-error'
 import { MODE_TOOL_ALLOWLIST } from '@/services/harness/mode-allowlists'
-import {
-  PLAN_GO_BLOCKED_TOOLS,
-  PLAN_GO_EXECUTE_GATE_TOOLS,
-} from '@/services/harness/plan-execution-session'
 import truncateToolResult from '@/utils/truncate-tool-result'
 
 export type HarnessStatus = ChatStatus
@@ -34,22 +30,9 @@ export const deriveToolDiffs = (result: unknown): FileDiff[] | undefined => {
 export const filterToolsForMode = (
   mode: VixlChatMode,
   tools: ReturnType<typeof buildTools>,
-  options?: { awaitingPlanGo?: boolean },
 ): Partial<ReturnType<typeof buildTools>> => {
   const allow = new Set(MODE_TOOL_ALLOWLIST[mode])
-  const entries = Object.entries(tools).filter(([name]) => {
-    if (!allow.has(name)) {
-      return false
-    }
-    if (
-      options?.awaitingPlanGo &&
-      PLAN_GO_BLOCKED_TOOLS.has(name) &&
-      !PLAN_GO_EXECUTE_GATE_TOOLS.has(name)
-    ) {
-      return false
-    }
-    return true
-  })
+  const entries = Object.entries(tools).filter(([name]) => allow.has(name))
   return Object.fromEntries(entries) as Partial<ReturnType<typeof buildTools>>
 }
 

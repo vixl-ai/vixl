@@ -8,9 +8,6 @@ const resolveAgentDefinition = vi.hoisted(() =>
 const getPlanExecutionSession = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => { subagentModel: string | null }>(),
 )
-const assertNotAwaitingPlanGo = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => void>(),
-)
 const registerSubagent = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 const resolveSubagent = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 const emitSubagentResult = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
@@ -32,8 +29,6 @@ vi.mock('@/services/agents/resolve-agent-definition', () => ({
 vi.mock('@/services/harness/plan-execution-session', () => ({
   getPlanExecutionSession: (...args: unknown[]) =>
     getPlanExecutionSession(...args),
-  assertNotAwaitingPlanGo: (...args: unknown[]) =>
-    assertNotAwaitingPlanGo(...args),
 }))
 
 vi.mock('@/services/harness/subagent/registry', () => ({

@@ -156,7 +156,6 @@ vi.mock('@/services/plans/update-plan-frontmatter', () => ({
 }))
 
 vi.mock('@/services/harness/plan-execution-session', () => ({
-  clearAwaitingPlanGo: vi.fn<(projectSlug: string, chatId: string) => void>(),
   setActivePlanPath: vi.fn<(projectSlug: string, chatId: string, path: string | null) => void>(),
   setSubagentModelLock: vi.fn<
     (

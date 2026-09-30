@@ -101,11 +101,12 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     }),
   ])
 
-  const planSession = beginPlanExecutionTurn(workspace.projectSlug, chatId)
+  beginPlanExecutionTurn(workspace.projectSlug, chatId)
   if (existingMeta) {
     hydratePlanExecutionSession(workspace.projectSlug, chatId, {
-      awaitingPlanGo: existingMeta.awaitingPlanGo ?? null,
-      activePlanPath: existingMeta.activePlanPath ?? null,
+      // Legacy awaitingPlanGo is newer than activePlanPath; writers now clear it.
+      activePlanPath:
+        existingMeta.awaitingPlanGo?.planPath ?? existingMeta.activePlanPath ?? null,
       subagentModel: existingMeta.subagentModel ?? null,
       subagentReasoning: isReasoningLevel(existingMeta.subagentReasoning)
         ? existingMeta.subagentReasoning
@@ -282,9 +283,7 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
       signal,
     }),
   )
-  const tools = filterToolsForMode(mode, allTools, {
-    awaitingPlanGo: Boolean(planSession.awaitingPlanGo),
-  })
+  const tools = filterToolsForMode(mode, allTools)
 
   const steps = createStreamSteps({ workspace, chatId, onEvent })
 

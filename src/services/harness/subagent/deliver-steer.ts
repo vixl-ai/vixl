@@ -1,4 +1,3 @@
-import { assertNotAwaitingPlanGo } from '@/services/harness/plan-execution-session'
 import { pushSteer } from '@/services/harness/subagent/inbox'
 import resumeSubagent from '@/services/harness/subagent/resume'
 import {
@@ -31,8 +30,6 @@ const deliverSteer = async (
   status: 'running'
   note: string
 }> => {
-  assertNotAwaitingPlanGo(ctx.projectSlug, ctx.chatId)
-
   if (ctx.signal?.aborted) {
     throw new Error('Subagent aborted')
   }

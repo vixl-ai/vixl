@@ -14,7 +14,7 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 const updatePlan = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Replace an existing PLAN.md body, optional title. Do not call create_plan again for an existing plan. Omit planPath to use the active plan. Todos stay with update_plan_todo.',
+      'Replace an existing PLAN.md body, optional title. Do not call create_plan again for an existing plan. Omit planPath to use the most recent plan; pass planPath when the chat has several. Todos stay with update_plan_todo.',
     inputSchema: z.object({
       planPath: z
         .string()
@@ -25,11 +25,7 @@ const updatePlan = (ctx: HarnessToolContext) =>
     }),
     execute: async ({ planPath, body, title }) => {
       const session = getPlanExecutionSession(ctx.projectSlug, ctx.chatId)
-      const resolvedPlanPath = resolvePlanPath(
-        planPath,
-        session.awaitingPlanGo,
-        session.activePlanPath,
-      )
+      const resolvedPlanPath = resolvePlanPath(planPath, session.activePlanPath)
       if (!resolvedPlanPath) {
         return {
           error:

@@ -2,9 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
-const assertNotAwaitingPlanGo = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => void>(),
-)
 const resumeSubagent = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{
     subagentId: string
@@ -13,11 +10,6 @@ const resumeSubagent = vi.hoisted(() =>
     note: string
   }>>(),
 )
-
-vi.mock('@/services/harness/plan-execution-session', () => ({
-  assertNotAwaitingPlanGo: (...args: unknown[]) =>
-    assertNotAwaitingPlanGo(...args),
-}))
 
 vi.mock('@/services/harness/subagent/resume', () => ({
   default: (...args: unknown[]) => resumeSubagent(...args),

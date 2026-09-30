@@ -1,10 +1,7 @@
 import { toast } from 'vue-sonner'
 import useAgentHarness from '@/composables/use-agent-harness'
 import { consumePendingChatMessage } from '@/services/chat/pending-message'
-import {
-  clearAwaitingPlanGo,
-  setSubagentModelLock,
-} from '@/services/harness/plan-execution-session'
+import { setSubagentModelLock } from '@/services/harness/plan-execution-session'
 import { getUserHomeDir, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import { isReasoningLevel } from '@/types/models/reasoning-level'
@@ -68,15 +65,12 @@ export const createSessionOps = (state: AgentThreadViewState) => {
           subagentModel: pending.subagentModel,
           subagentReasoning,
           reasoning: isReasoningLevel(pending.reasoning) ? pending.reasoning : null,
-          awaitingPlanGo: null,
         })
       } catch (error) {
         toast.error('Failed to update chat for plan build', {
           description: error instanceof Error ? error.message : 'Unknown error',
         })
       }
-    } else {
-      clearAwaitingPlanGo(state.projectSlug.value, state.chatId.value)
     }
 
     await state.harness.value.send({

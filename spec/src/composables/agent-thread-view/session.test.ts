@@ -15,7 +15,6 @@ vi.mock('@/services/vixl/vixl-tauri', () => ({
 }))
 
 vi.mock('@/services/harness/plan-execution-session', () => ({
-  clearAwaitingPlanGo: vi.fn<() => void>(),
   setSubagentModelLock: vi.fn<(...args: unknown[]) => void>(),
 }))
 

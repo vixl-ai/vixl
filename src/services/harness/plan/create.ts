@@ -4,26 +4,22 @@ import createPlanInputSchema from '@/schemas/plans/create-plan-input'
 import { fsWriteFile, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { HOME_WORKSPACE_ID, isHomeChatSlug } from '@/constants/home-chat'
-import {
-  assertCreatePlanNotAwaitingPlanGo,
-  markCreatedPlanThisTurn,
-} from '@/services/harness/plan-execution-session'
+import { markCreatedPlanThisTurn } from '@/services/harness/plan-execution-session'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const createPlanTool = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Create a plan under .vixl/plans/. After success, stop and wait for Build or Orchestrate.',
+      'Create a new plan under .vixl/plans/. A chat can hold many plans; the newest becomes the default for update_plan and update_plan_todo. After success, stop so the user can review.',
     inputSchema: createPlanInputSchema,
     execute: async ({ title, body, todos }) => {
-      assertCreatePlanNotAwaitingPlanGo(ctx.projectSlug, ctx.chatId)
       const planTodos = todos ?? []
       const plan = createPlan({ title, body, todos: planTodos, sourceChatId: ctx.chatId })
       await fsWriteFile({ projectRoot: ctx.projectRoot, path: plan.path, content: plan.content })
-      const awaiting = { planPath: plan.path, planId: plan.planId }
-      markCreatedPlanThisTurn(ctx.projectSlug, ctx.chatId, awaiting)
+      markCreatedPlanThisTurn(ctx.projectSlug, ctx.chatId, plan.path)
       await updateChatMeta(ctx.projectSlug, ctx.chatId, {
-        awaitingPlanGo: awaiting,
+        activePlanPath: plan.path,
+        awaitingPlanGo: null,
       })
       const workbench = useWorkbenchStore()
       let projectId: string | null = null
@@ -40,9 +36,7 @@ const createPlanTool = (ctx: HarnessToolContext) =>
         planId: plan.planId,
         path: plan.path,
         todos: planTodos,
-        awaitingGo: true,
-        message:
-          'Plan created. Stop and wait for the user to click Build now or Orchestrate on the plan tab before making any further changes.',
+        message: 'Plan created. Stop here so the user can review it.',
       }
     },
   })

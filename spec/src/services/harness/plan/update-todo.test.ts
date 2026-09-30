@@ -128,7 +128,7 @@ describe('update_plan_todo', () => {
     expect(parsed.frontmatter?.todos).toEqual(merged)
   })
 
-  it('resolves via session.activePlanPath when planPath and awaitingPlanGo are absent', async () => {
+  it('resolves via session.activePlanPath when planPath is omitted', async () => {
     setActivePlanPath(projectSlug, chatId, existingPlan.path)
     const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
     const tool = updatePlanTodo(planCtx())

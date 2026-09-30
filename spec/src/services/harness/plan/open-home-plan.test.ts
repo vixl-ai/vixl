@@ -112,4 +112,31 @@ describe('plan tools home workspace', () => {
     )
     expect(refreshPlanTabs).toHaveBeenCalled()
   })
+
+  it('create_plan can create many plans in one chat, newest active', async () => {
+    const { beginPlanExecutionTurn, dropPlanExecutionSession, getPlanExecutionSession } =
+      await import('@/services/harness/plan-execution-session')
+    dropPlanExecutionSession(HOME_CHAT_SLUG, 'home-chat-1')
+    const createPlanTool = (await import('@/services/harness/plan/create')).default
+    const tool = createPlanTool(homeCtx())
+
+    const first = (await runTool(tool.execute, {
+      title: 'Ticket one',
+      body: '## Goal\n\nOne.\n',
+    })) as { path: string }
+    beginPlanExecutionTurn(HOME_CHAT_SLUG, 'home-chat-1')
+    const second = (await runTool(tool.execute, {
+      title: 'Ticket two',
+      body: '## Goal\n\nTwo.\n',
+    })) as { path: string }
+
+    expect(second.path).not.toBe(first.path)
+    const session = getPlanExecutionSession(HOME_CHAT_SLUG, 'home-chat-1')
+    expect(session.activePlanPath).toBe(second.path)
+    expect(session.createdPlanThisTurn).toBe(true)
+    expect(updateChatMeta).toHaveBeenLastCalledWith(HOME_CHAT_SLUG, 'home-chat-1', {
+      activePlanPath: second.path,
+      awaitingPlanGo: null,
+    })
+  })
 })
