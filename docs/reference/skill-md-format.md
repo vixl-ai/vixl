@@ -1,19 +1,23 @@
 ---
 title: SKILL.md format
-description: A Vixl skill is a folder with SKILL.md YAML name and description plus a markdown body the agent can load.
+description: SKILL.md frontmatter, folder layout, and how Vixl resolves skill names.
 ---
 
 # SKILL.md format
 
-A skill is a folder that contains `SKILL.md`:
+A skill is a folder that contains `SKILL.md`. Agents see a short catalog, then load the body with `load_skill`. You can attach one from the chat input with `/`. How-to: [Skills](/customize/skills).
+
+## Locations and names
 
 | Scope | Path |
 | --- | --- |
-| Personal | `{appData}/.vixl/skills/{slug}/SKILL.md` |
+| Personal | `{app data}/.vixl/skills/{slug}/SKILL.md` |
 | Project | `<repo>/.vixl/skills/{slug}/SKILL.md` |
-| Built-in | bundled from `src/skills/{name}/SKILL.md` |
+| Built-in | shipped with the app |
 
-The list name is the folder name. Description comes from YAML `description`. Create skills from Settings or the project Skills tab. See [Skills](/customize/skills).
+The list name is the folder name, not the frontmatter `name`. Creating from the UI slugifies the name (lowercase, hyphens). Description comes from YAML `description`.
+
+Reserved slash names cannot run via `/`: `ask`, `plan`, `agent`, `orchestrator`. Those are [chat modes](/concepts/chat-modes).
 
 ## SKILL.md document
 
@@ -28,30 +32,23 @@ Steps to deploy this repo.
 
 Frontmatter schema:
 
-| Field | Type | Required |
-| --- | --- | --- |
-| `name` | string, min length 1 | yes |
-| `description` | string, min length 1 | yes |
+| Field | Type | Required | Effect |
+| --- | --- | --- | --- |
+| `name` | string, min length 1 | yes | Display name inside the file. The catalog still keys off the folder name |
+| `description` | string, min length 1 | yes | Shown in `/` and in Available skills |
 
 There are no other frontmatter fields. The create form JSON-stringifies `name` and `description`. Body is free markdown.
 
 Loaders strip frontmatter and inject the body. If the loaded body is longer than 4000 characters, it is truncated and the agent is told characters were omitted.
 
-## How a skill is found
+## How a name is resolved
 
-Load by name (case-insensitive): internal first, then project, then user. Catalog merge for `/` and the available-skills list: vendored command skills first, then user, then project overlay (project wins over user). On a home chat, `/` lists vendored command skills, personal skills, and skills under the home workspace `.vixl`. Available skills lists vendored commands and home-workspace skills. It does not add personal skills.
+Load by name (case-insensitive): built-in first, then project, then personal.
 
-`/create-agent`, `/create-skill`, `/create-rule`, and `/create-plan` are vendored command skills. They are listed in `/` and in Available skills. They work on home chats. The workspace root is the user home directory. The agent writes the same relative `.vixl/` paths there with `write_file` (or `create_plan` for plans). The agent loads them with `load_skill`. A same-named user or project skill cannot override them: the slash index and catalog keep the vendored command, and `load_skill` already prefers internal.
+`/` and the Available skills list merge in this order: vendored command skills first, then personal, then project overlay (project wins over personal). Vendored command skills cannot be overridden by a same-named user or project skill.
 
-Reserved slash names cannot run via `/`: `ask`, `plan`, `agent`, `orchestrator`. Those are [chat modes](/concepts/chat-modes). Mode skills stay hidden from `/` and stay inlined only in their matching chat mode, then omitted from Available skills.
+Vendored command skills: `create-agent`, `create-skill`, `create-rule`, `create-plan`. They are listed in `/` and in Available skills, including on home chats. The matching built-in mode skill (`ask`, `plan`, `agent`, `orchestrator`) is inlined for that chat mode and omitted from Available skills.
 
-| Mode skill | When inlined |
-| --- | --- |
-| `ask` | Ask mode |
-| `plan` | Plan mode |
-| `agent` | Agent mode |
-| `orchestrator` | Orchestrator mode |
+What `/` versus Available skills shows on a home chat versus a project chat is on [Context](/concepts/context). Selecting `/` inserts a skill mention. The agent loads the full text with `load_skill`. Missing name, unknown name, and catalog load failures return errors.
 
-Selecting `/` inserts a skill mention. The agent loads the full text with `load_skill`. Missing name, unknown name, and catalog load failures return errors.
-
-See [Context](/concepts/context) and [Custom agent frontmatter](/reference/custom-agent-frontmatter).
+See [Custom agent frontmatter](/reference/custom-agent-frontmatter) for the sibling agent file format.

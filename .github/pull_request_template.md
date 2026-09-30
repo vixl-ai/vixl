@@ -24,6 +24,6 @@ Closes #
 - [ ] I read [CONTRIBUTING.md](../CONTRIBUTING.md) and agree to the [Code of Conduct](../CODE_OF_CONDUCT.md)
 - [ ] I tested these changes locally
 - [ ] Added/updated tests if needed
-- [ ] Updated README if needed
+- [ ] Updated docs if needed
 - [ ] `npm run ci` passes (or `npm run lint` and `npm run type-check` at minimum)
 - [ ] No breaking changes, or I documented them above

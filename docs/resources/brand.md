@@ -13,23 +13,11 @@ Vixl is a local-first, BYOK desktop LLM UI and agent harness for macOS, Windows,
 
 These files live in `docs/public/` and are served from the site root.
 
-Favicon:
-
-![Favicon](/favicon.png)
-
-https://vixl.app/favicon.png
-
-Apple touch icon:
-
-![Apple touch icon](/apple-touch-icon.png)
-
-https://vixl.app/apple-touch-icon.png
-
-Hero:
-
-![Hero](/hero.png)
-
-https://vixl.app/hero.png
+| Asset | Preview | URL |
+| --- | --- | --- |
+| Favicon | ![Favicon](/favicon.png) | https://vixl.app/favicon.png |
+| Apple touch icon | ![Apple touch icon](/apple-touch-icon.png) | https://vixl.app/apple-touch-icon.png |
+| Hero | ![Hero](/hero.png) | https://vixl.app/hero.png |
 
 ## Link to us
 

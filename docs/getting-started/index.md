@@ -5,7 +5,7 @@ description: Install Vixl, add a BYOK provider, optionally open a project, then 
 
 # A note from a human
 
-I originally wrote Vixl (originally named Pyrola) to create a nice feeling agents harness UI to use Qwen on my Halo Strix.
+I originally wrote Vixl (originally named Pyrola) to create a nice-feeling agent harness UI to use Qwen on my Strix Halo.
 
 Local LLMs helped me manage media on my local Jellyfin server, and test harnesses or projects.
 
@@ -13,7 +13,7 @@ At work I had used the Vercel AI SDK countless times to build features, so this 
 
 The resulting project is now my daily driver at work.
 
-Like all personal projects Vixl does have opinions, you can read about the [Philosophy](/getting-started/philosophy), however I try to strictly limit them.
+Like all personal projects, Vixl does have opinions. You can read them in [Philosophy](/getting-started/philosophy). I try to strictly limit them.
 
 ## Start here
 

@@ -1,28 +1,20 @@
 ---
 title: Appearance
-description: Set Vixl theme, transparency, keyboard shortcuts, and GitHub Releases updates from Settings > General.
+description: Set Vixl theme and window transparency from Settings > General.
 ---
 
 # Appearance
 
-Theme and display live in Settings > General. They write personal `settings.json` only (`appearance.theme`, `appearance.transparency`, `appearance.transparencyHue`, `appearance.transparencyIntensity`). Projects do not override appearance.
+Theme and window transparency live in Settings > General. The Settings UI writes personal `settings.json`. Keys and defaults are on [settings.json](/reference/settings-json).
+
+The same Settings section also has a shortcuts list and the GitHub Releases updater. See [Shortcuts and the command palette](/using/shortcuts-and-the-command-palette) and [Installation](/getting-started/installation).
 
 ## Theme
 
-Three icon buttons: Light, Dark, System. Default is System.
-
-The title-bar toggle switches Light and Dark (not System) and writes the same `appearance.theme` key.
+Choose **Light**, **Dark**, or **System**. The default is System. The title-bar control toggles Light and Dark only (not System) and writes the same `appearance.theme` key.
 
 ## Transparency
 
-**Enabled** switch (`appearance.transparency`, default on).
+Turn **Enabled** on to tint the window (`appearance.transparency`, default on). Hue runs 0 to 360 (default 265). Intensity runs 0 to 100 (default 0). The preview updates while you drag the sliders.
 
-When on, two sliders. Hue runs 0 to 360 (default 265). Intensity runs 0 to 100 (default 0).
-
-Changes persist after a 300ms debounce. Live preview updates while you drag.
-
-## Shortcuts and updates on General
-
-General is the same section as appearance. A keyboard icon opens the shortcuts dialog (Command palette, New Agent, left sidebar, right workbench, Esc to leave Settings). Full list: [Keyboard shortcuts](/reference/keyboard-shortcuts). Updates show the current version, a check button, and **Download and restart** when an update exists. The updater endpoint is GitHub Releases. See [Installation](/getting-started/installation).
-
-Next: [Permission settings](/customize/permission-settings).
+These keys are `appearance.transparencyHue` and `appearance.transparencyIntensity`.

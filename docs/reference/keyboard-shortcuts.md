@@ -1,25 +1,42 @@
 ---
 title: Keyboard shortcuts
-description: Vixl app shortcuts include the command palette, New Agent, sidebars, send, and Escape to leave Settings.
+description: App keyboard shortcuts on Mac and Windows/Linux, including the command palette.
 ---
 
 # Keyboard shortcuts
 
-App shortcuts are registered in source. This list is those bindings only. Monaco and the PTY terminal keep their own editor and shell keys.
+These are the app bindings. Monaco and the terminal keep their own editor and shell keys. The in-app list is Settings > General, Keyboard shortcuts. How to use the palette: [Shortcuts and the command palette](/using/shortcuts-and-the-command-palette).
 
-| Keys | Action |
-| --- | --- |
-| Cmd/Ctrl+K | Toggle the command palette |
-| Cmd/Ctrl+N | Open Home (New Agent) |
-| Cmd/Ctrl+B | Toggle the left sidebar |
-| Cmd/Ctrl+Shift+B | Toggle the right workbench |
-| Esc | Leave Settings or the project page (go Home) |
-| Enter | Send the chat input |
-| Shift+Enter | Insert a newline in the chat input |
-| Backspace | On an empty chat input with attachments, remove the last file |
+## App
 
-Cmd/Ctrl+N and Cmd/Ctrl+Shift+B do nothing while you are typing in an input, textarea, contenteditable, Monaco, or xterm. Cmd/Ctrl+K still opens the palette. Cmd/Ctrl+B is handled by the sidebar provider and is not gated on typing.
+| Mac | Windows / Linux | Action | While typing |
+| --- | --- | --- | --- |
+| Cmd+K | Ctrl+K | Toggle the command palette | Works |
+| Cmd+N | Ctrl+N | Open Home (New Agent) | Ignored in an input, textarea, contenteditable, Monaco, or xterm |
+| Cmd+B | Ctrl+B | Toggle the left sidebar | Works |
+| Cmd+Shift+B | Ctrl+Shift+B | Toggle the right workbench | Ignored in an input, textarea, contenteditable, Monaco, or xterm |
+| Esc | Esc | Leave Settings or the project page (go Home) | Works |
 
-Escape on Settings and on a project page navigates to `/`. The in-app shortcut dialog labels Escape as Leave Settings.
+The in-app dialog labels Escape as Leave Settings. The same key also goes Home from a project page.
 
-The command palette lists New Agent, Open Settings, Open Terminal, Open Editor, projects, chats, pinned chats, and every personal Settings section. See [Shortcuts and the command palette](/using/shortcuts-and-the-command-palette).
+## Chat input
+
+| Mac | Windows / Linux | Action |
+| --- | --- | --- |
+| Enter | Enter | Send |
+| Shift+Enter | Shift+Enter | Insert a newline |
+| Backspace | Backspace | On an empty input with attachments, remove the last file |
+
+## Editor tab
+
+These apply when an editor tab is the active workbench tab.
+
+| Mac | Windows / Linux | Action |
+| --- | --- | --- |
+| Cmd+S | Ctrl+S | Save the buffer |
+| Cmd+Shift+F | Ctrl+Shift+F | Open Find and replace |
+| Cmd+Shift+H | Ctrl+Shift+H | Open Find and replace with replace expanded |
+
+## Command palette
+
+Cmd/Ctrl+K (or sidebar Search) opens the palette. It lists New Agent, Open Settings, Open Terminal, Open Editor, projects, chats, pinned chats, and every personal Settings section: General, Graphs, MCP, Providers, Models, LSP, Permissions, Plans, Skills, Agents, Rules.

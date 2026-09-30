@@ -1,57 +1,47 @@
 ---
 title: Manage chats
-description: Manage Vixl chats in the sidebar by renaming, pinning, forking, deleting, copying the id, or exporting a transcript.
+description: Rename, pin, fork, or delete chats from the sidebar, and copy an id or export a transcript from the thread.
 ---
 
 # Manage chats
 
-Chats live in the left sidebar, grouped under each [project](/concepts/projects-and-home-chats). Home chats sit under a **Home** folder. Click a row to open it.
+Chats live in the left sidebar, grouped under each [project](/concepts/projects-and-home-chats). Home chats sit under **Home**. Click a row to open it. Right-click a sidebar row to rename, fork, pin or unpin, or delete. Right-click the open thread for **Copy ID**, **Export Transcript**, rename, and pin or unpin. Fork and delete are sidebar-only.
 
-Right-click a sidebar chat for Rename, Fork, Pin or Unpin, and Delete. Right-click the thread for Copy ID, Export Transcript, Rename, and Pin or Unpin. Fork and Delete are sidebar-only.
+Sidebar status icons (running, needs approval, and the rest) are on [Chat statuses](/reference/chat-statuses).
 
 ## Rename a chat
 
-New chats start titled New Agent. If `chat.autoTitle` is on (the default), a title job can replace that after the first message. Rename overwrites whatever is there.
+New chats start titled **New Agent**. If [Auto-title](/customize/models) is on (the default), a title job can replace that after the first message. Rename overwrites whatever is there.
 
-1. Right-click the chat in the sidebar.
-2. Choose Rename.
-3. Type the new title.
-4. Click Save.
-
-The dialog is titled Rename chat. Cancel leaves the title unchanged. You can rename from the thread menu the same way.
+1. Right-click the chat in the sidebar or on the thread.
+2. Choose **Rename**.
+3. Type the new title and save.
 
 ## Pin a chat
 
-Pin stores `pinned` and `pinned_at` on the chat row in [SQLite](https://www.sqlite.org). Pinned chats also appear under Pinned in the sidebar header.
+Pin a chat you want to find quickly. Pinned chats also appear under **Pinned** in the sidebar header.
 
-1. Right-click the chat.
-2. Choose Pin.
-
-Unpin is the same menu once the chat is pinned.
+1. Right-click the chat in the sidebar or on the thread.
+2. Choose **Pin**. Choose **Unpin** from the same menu when you no longer want it pinned.
 
 ## Fork a chat
 
-Fork copies the messages and file checkpoints into a new chat. The title becomes `<title> (fork)`. The new row records `forked_from` as the source id. Status is idle. The fork is not auto-renamed.
+Fork when you want a copy of the thread (messages and file checkpoints) so you can try a different direction without losing the original. The new chat is titled `<title> (fork)`, starts idle, and is not auto-titled. Vixl opens the fork.
 
-1. Right-click the chat.
-2. Choose Fork.
-
-Vixl opens the fork.
+1. Right-click the chat in the sidebar.
+2. Choose **Fork**.
 
 ## Delete a chat
 
-Delete means delete. There is no archive, no memory, and no user profiling. Removing a chat drops the [SQLite](https://www.sqlite.org) row (messages and usage cascade with it) and removes the chat directory under the personal [`.vixl`](/concepts/the-vixl-directory) tree: `{app data}/.vixl/chats/<projectSlug>/<chatId>/` (macOS: `~/Library/Application Support/app.vixl/.vixl/chats/`). File checkpoints live in that directory, so they go with it. The open harness, plan session, and agent shells for that chat are torn down first.
+::: warning
+Delete is permanent. There is no archive. See [Privacy](/resources/privacy) for what delete removes on the client, and what it does not cover at a cloud provider.
+:::
 
-If a [cloud provider](/customize/providers) was used, that provider's data policies are the provider's business. Delete covers Vixl only. See [Privacy](/resources/privacy).
+1. Right-click the chat in the sidebar.
+2. Choose **Delete** and confirm.
 
-1. Right-click the chat.
-2. Choose Delete.
-3. Click Delete.
+If that chat was open, Vixl goes Home. The open run, plan session, and agent shells for that chat are stopped first.
 
-The dialog is titled Delete chat?. It warns that the title and its message history are permanently deleted. Cancel aborts. If that chat was open, Vixl routes Home.
+The project **Chats** table can rename and delete the same way. It does not fork or pin.
 
-The project Chats table can Rename and Delete the same way. It does not Fork or Pin.
-
-Sidebar status chrome (Running, Needs approval, Needs input, Needs MCP auth, Done, Error) is documented under [Chat statuses](/reference/chat-statuses).
-
-[Queue and stop messages](/using/queue-and-stop-messages)
+Next, [queue and stop messages](/using/queue-and-stop-messages), or [export a transcript](/using/export-a-transcript) from the thread menu.

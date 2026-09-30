@@ -1,44 +1,45 @@
 ---
 title: Models
-description: Model picks in Vixl are personal BYOK role defaults in settings.json; send stays blocked until a provider exists.
+description: Pick personal default and role models in Vixl Settings after you add a provider.
 ---
 
 # Models
 
-Model picks are personal. Settings > Models writes `models.*` in the user [`.vixl` `settings.json`](/reference/settings-json). Project folders cannot override them. Runtime still reads the provider key from the [OS keychain](/customize/providers).
+Model picks are personal. Settings > Models writes `models.*` in the user [`.vixl` `settings.json`](/reference/settings-json). A project folder cannot override them. Runtime still reads the provider key from the [OS keychain](/customize/providers).
 
-Until a provider exists, the section is blocked: "Configure at least one provider before choosing models." The [chat input](/getting-started/your-first-chat) picker is disabled in the same case and offers **Add a provider**. Send requires a model.
+Until a provider exists, this section is blocked. The chat input picker is disabled in the same case and offers **Add a provider**. Send requires a model.
 
 Saved values are `providerId::modelId`. Pick a model to persist it.
 
-## Role defaults
+## Set the default
 
-Each role has a picker. Roles other than Default can fall back to Default. **Use default** clears that role and its reasoning override.
+**Default** (`models.default`) is the fallback every other role uses when that role has no override. Set this first. Without a resolved Default (or Agent, which falls back to Default), starting a chat from a plan is blocked until you pick one here.
 
-Default (`models.default`) is the fallback for every other role. Placeholder: "Select default model". Ask (`models.ask`) is [Ask mode](/concepts/chat-modes). Plan (`models.plan`) is Plan mode. Agent (`models.agent`) is Agent mode and single-agent plan runs. Orchestrator (`models.orchestrator`) is Orchestrator mode and plan orchestration, with nested pickers **Parent** and **Subagent**. Subagent (`models.subagent`) is nested `spawn_subagent` runs when an [agent file](/customize/custom-agents) does not set its own model; unset falls back to Agent, then Default. Title (`models.title`) generates short titles for new chats.
+## Role models
 
-Title also has an **Auto-title** switch (`chat.autoTitle`, default on). Off disables the Title picker. If Title is still using Default, an amber warning asks you to prefer a small, low-cost model for that background task.
+Each role has its own picker. Roles other than Default can fall back to Default. **Use default** clears that role and its reasoning override.
 
-Resolution order (no chat override): the role's own setting if set; for Subagent, then Agent, then Default; for chat modes and Title, Default. A per-chat picker override wins when present.
+Ask, Plan, Agent, and Orchestrator are the [chat mode](/concepts/chat-modes) defaults. Agent is also used for single-agent plan builds. Orchestrator is the parent for Orchestrator mode and for Orchestrate from a plan, with nested **Parent** and **Subagent** pickers.
 
-See [Models and roles](/concepts/models-and-roles) for how modes consume these defaults.
+Subagent (`models.subagent`) is the default for nested `spawn_subagent` runs when an [agent file](/customize/custom-agents) does not set its own model. If Subagent is unset, resolution uses Agent, then Default.
 
-## Add models
+Title (`models.title`) generates short titles for new chats. **Auto-title** (`chat.autoTitle`, on by default) lives on that row. Turning it off disables the Title picker. If Title is still using Default, Settings warns you to prefer a small, low-cost model for that background task.
 
-Catalog providers list live `/models` from that endpoint (Ollama and LM Studio use their default base URLs). You do not maintain a static model list for those.
+Resolution (when the chat has no picker override): the role's own setting if set; for Subagent, then Agent, then Default; for chat modes and Title, Default. A per-chat picker override wins when present.
 
-For a [custom OpenAI-compatible](/customize/providers) provider, the manage dialog can:
+How modes consume these defaults is on [Models and roles](/concepts/models-and-roles).
 
-1. Import from `/models`.
-2. Add a model row (id, display name, context, max in/out, Tools / Vision / Thinking / Stream, pricing).
-3. Keep the list empty for live `/models` listing.
-
-A row you added without pricing shows an amber warning.
+Catalog providers list live `/models` from that endpoint (Ollama and LM Studio use their [default base URLs](/customize/providers)). You do not maintain a static list for those. Custom endpoint model rows (import, id, capabilities, pricing) are edited on the [provider](/customize/providers), not here.
 
 ## Per-model options
 
-The picker extras panel (`models.catalogOptions`) can set Allowed in chat, Fast (when the model supports it), Reasoning (when supported: Default, None, Minimal, Low, Medium, High, Extra high, Max), Context window, and Max output.
+The extras panel on a model picker writes `models.catalogOptions` for that `providerId::modelId`:
 
-Plans that start a chat still need a resolved Agent or Default model in Settings.
+- **Allowed in chat** hides the model from chat pickers when off.
+- **Fast** when the model has a fast sibling.
+- **Reasoning** when the model supports it: Default, None, Minimal, Low, Medium, High, Extra high, Max.
+- **Context window** and **Max output** when the catalog reports those limits.
 
-Next: [MCP servers](/customize/mcp-servers), or back to [Set up providers and models](/getting-started/set-up-providers-and-models).
+Role reasoning overrides are separate (`models.<role>Reasoning`) and are covered with the rest of role behavior on [Models and roles](/concepts/models-and-roles).
+
+First-run setup is [Set up providers and models](/getting-started/set-up-providers-and-models). To attach tools from outside the model, [add MCP servers](/customize/mcp-servers).

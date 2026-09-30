@@ -11,9 +11,9 @@ This is a managed install. Source: that npm package. See [Managed components](/r
 
 ## Init and index
 
-On project activate, if `codegraph.db` is missing, Vixl runs `npx -y @colbymchenry/codegraph init` against the project root. Rebuild from the Graph tab runs `index` with `--force`.
+On project activate, if the graph database is missing, Vixl runs `npx -y @colbymchenry/codegraph init` against the project root. Rebuild from the Graph tab runs `index` with `--force`.
 
-The store directory is `{personal .vixl}/graphs/{sha256(canonical root)}/` (`codegraph.db` plus a Node preload so the database is not written into the repo). Graph id is the SHA-256 hex of the canonical absolute project root. An in-repo `.codegraph` folder is treated as leftover and cleaned after CLI.
+The store directory is under personal `.vixl/graphs/`, keyed by the SHA-256 of the canonical absolute project root (`codegraph.db` plus a Node preload so the database is not written into the repo). An in-repo `.codegraph` folder is treated as leftover and cleaned after CLI.
 
 Vixl strips any user `codegraph` entry from personal and project `mcp.json` and starts an in-memory stdio [MCP](https://modelcontextprotocol.io/) server instead: `npx -y @colbymchenry/codegraph serve --mcp --path {root}`, with session trust. It does not appear in the chat MCP picker or Settings MCP list.
 
@@ -21,17 +21,15 @@ Vixl strips any user `codegraph` entry from personal and project `mcp.json` and 
 
 Allowed MCP tools on that server: `explore`, `node`, `search`, `callers`, `callees`, `impact`, `files`, `status`.
 
-The agent calls `codebase_explore` for architecture, flows, and where-is-X (MCP `codegraph_explore`), `codebase_search` for symbol names and locations (`codegraph_search`), `codebase_impact` for blast radius (`codegraph_impact`), and `codebase_status` for index health (`codegraph_status`).
+The agent calls `codebase_explore` for architecture, flows, and where-is-X (`codegraph_explore`), `codebase_search` for symbol names and locations (`codegraph_search`), `codebase_impact` for blast radius (`codegraph_impact`), and `codebase_status` for index health (`codegraph_status`).
 
 Shared tool guidance tells the agent to prefer those for structure, then fall back to [LSP](https://microsoft.github.io/language-server-protocol/), grep, or `read_file` if the index is not ready. All four [chat modes](/concepts/chat-modes) include the `codebase_*` tools.
 
 If a codebase mention is present on send, and the graph is connected with enough free context, Vixl may prefetch `codegraph_explore` into that mention. Prefetch failure still sends.
 
-## The Graph tab
+## Graph tab and Settings
 
-Project page > **Graph**. Status icon (idle, indexing, syncing, ready, error) plus stats: Files, Nodes, Edges, Size, and language icons. Search box placeholder: **Search symbol or file** (350ms debounce).
-
-Symbol searches load callers (left), callees (right), and impact (dashed). Node labels are Focus, Caller, Callee, Impact. Click a node to open that file at the line in the [workbench](/using/use-the-workbench). **Rebuild index** runs `index`. Rebuild needs an open project with a running graph. Empty search: empty canvas.
+The project **Graph** tab shows index status and stats, and lets you search symbols or files and rebuild the index. Click a node to open that file at the line in the [workbench](/using/use-the-workbench). Rebuild needs an open project with a running graph.
 
 Settings > Graphs lists stores by name and size, can reveal the folder, and can delete an index (the project stays in the sidebar).
 

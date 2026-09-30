@@ -1,23 +1,27 @@
 ---
 title: Managed components
-description: Vixl installs CodeGraph via npx and a catalog of language servers; PATH-only toolchains are not downloaded.
+description: Language servers and CodeGraph that Vixl downloads or runs for you, including storage and how to turn them off.
 ---
 
 # Managed components
 
-Vixl installs a small set of third-party binaries as opinions: the CodeGraph CLI via [npx](https://docs.npmjs.com/cli/v10/commands/npx), and language servers from the catalog. This page lists each installable component and its upstream source. PATH-only catalog rows are not downloaded: `deno`, `ruby`, `csharp`, `swift`, `elixir`, `haskell`, `ocaml`, `dart`, `gleam`, `nix`, `r`, `scala`. Project-local linters `eslint`, `oxlint`, and `biome` have no managed installer.
-
-See [Language servers](/customize/language-servers) and [Code graphs](/concepts/code-graphs).
+Vixl downloads a catalog of language servers, and runs [CodeGraph](https://www.npmjs.com/package/@colbymchenry/codegraph) via npx. PATH-only catalog rows are not downloaded. Project-local linters have no managed installer. How to use language servers in the editor: [Language servers](/customize/language-servers). How the graph is used in chat: [Code graphs](/concepts/code-graphs).
 
 ## CodeGraph
 
-Package: [`@colbymchenry/codegraph`](https://www.npmjs.com/package/@colbymchenry/codegraph).
+Package: `@colbymchenry/codegraph` (unpinned; npx fetches current).
 
-Vixl runs `npx -y @colbymchenry/codegraph` for `init`, `index --force`, and `serve --mcp --path {root}`. Indexes live under personal `.vixl/graphs/`, never in the repo.
+When you activate a project, Vixl starts CodeGraph for that root. If `codegraph.db` is missing it runs `npx -y @colbymchenry/codegraph init`. Rebuild from the Graph tab runs `index --force`. The MCP server is `npx -y @colbymchenry/codegraph serve --mcp --path {root}`. Indexes live under personal `.vixl/graphs/{sha256}/` (`codegraph.db`, `meta.json`, `_preload.cjs`), never in the repo. The folder name is the SHA-256 hex of the canonical absolute project root.
 
 Vixl sets `CODEGRAPH_TELEMETRY=0` so the package's own telemetry is off. It also sets `CODEGRAPH_NO_UPDATE_CHECK=1`. This is the only telemetry-related string in the app. See [Privacy](/resources/privacy).
 
+There is no `settings.json` key to disable CodeGraph. It starts again the next time you activate the project. You can delete a stored index from Settings > Graphs (the next activate runs `init` again). Stop from the chat graph chip lasts until the next activate. A user `codegraph` entry in `mcp.json` is stripped.
+
 ## Language servers Vixl installs
+
+Installs go under personal `{app data}/.vixl/lsp/{id}/{version}/`. npm servers also use a portable Node at `{app data}/.vixl/runtime/node/`. State (enabled, disabled, command overrides) is personal `lsp.json`.
+
+When you activate a project, Vixl prefetches the default set (TypeScript / JavaScript, JSON, YAML, Markdown) if auto-download is on. Settings > LSP, **Install defaults** does the same.
 
 Install kinds: npm package, GitHub release (repo / tag / asset), HTTP archive, or `go install`.
 
@@ -42,7 +46,7 @@ Install kinds: npm package, GitHub release (repo / tag / asset), HTTP archive, o
 | `dockerfile` | `dockerfile-language-server-nodejs@0.13.0` | [dockerfile-language-server-nodejs](https://www.npmjs.com/package/dockerfile-language-server-nodejs) |
 | `php` | `intelephense@1.14.4` | [intelephense](https://www.npmjs.com/package/intelephense) |
 
-`typescript-classic` is the Vue LS 3 hybrid install source. It is not a separate catalog row. It is spawned as id `typescript`.
+`typescript-classic` is the Vue LS 3 hybrid install source. It is not a separate catalog row you disable. It is spawned as id `typescript`.
 
 ### GitHub releases
 
@@ -74,4 +78,17 @@ Install kinds: npm package, GitHub release (repo / tag / asset), HTTP archive, o
 | --- | --- |
 | `gopls` | [`golang.org/x/tools/gopls@v0.18.1`](https://pkg.go.dev/golang.org/x/tools/gopls@v0.18.1) via `go install` (Go must be on PATH) |
 
-See [Language servers](/customize/language-servers) and [Privacy](/resources/privacy).
+## PATH-only (not downloaded)
+
+These catalog rows use a binary already on PATH: `deno`, `ruby`, `csharp`, `swift`, `elixir`, `haskell`, `ocaml`, `dart`, `gleam`, `nix`, `r`, `scala`.
+
+Project-local linters `eslint`, `oxlint`, and `biome` have no managed installer. They require workspace trust. See [settings.json](/reference/settings-json) (`workspace.trust`).
+
+## Turn language servers off
+
+- Settings > LSP: turn off **Auto-download** (`lsp.autoDownload`, personal). Prefetch on project activate becomes a no-op.
+- Environment: `VIXL_DISABLE_LSP_DOWNLOAD` set to `1`, `true`, `TRUE`, or `yes` also skips prefetch, even if the setting is on.
+- Settings > LSP, or `lsp.json`: disable individual servers. `lsp.json` set to `false` disables all of them.
+- Uninstall a managed install from the LSP row. Files remain under `.vixl/lsp/` until removed.
+
+`lsp.*` cannot be overridden by a project `settings.json`.

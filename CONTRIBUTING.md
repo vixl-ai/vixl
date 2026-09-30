@@ -1,27 +1,14 @@
 # Contributing to Vixl
 
-Thank you for your interest in contributing! This document explains how to get
+Thank you for your interest in contributing. This document explains how to get
 involved. By participating, you agree to abide by our
 [Code of Conduct](./CODE_OF_CONDUCT.md).
-
-## Where GitHub looks for these files
-
-GitHub's [community profile](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/about-community-profiles-for-public-repositories)
-checks the **repository root** for:
-
-| File | Purpose |
-| --- | --- |
-| `CONTRIBUTING.md` | How to contribute (this file) |
-| `CODE_OF_CONDUCT.md` | Community standards |
-
-Optional but recommended in `.github/`: issue templates, pull request template,
-and `SECURITY.md` for security reports.
 
 ## Ways to contribute
 
 - **Bug reports**: open an issue with reproduction steps, OS, and relevant provider/MCP setup.
 - **Feature requests**: open an issue describing the use case before large PRs.
-- **Documentation**: fixes and clarifications in `README.md`.
+- **Documentation**: fixes and clarifications in `docs/`. Preview with `npm run docs:dev`.
 - **Code**: bug fixes, tests, and features via pull request.
 
 ## Development setup
@@ -44,6 +31,16 @@ npm run dev
 npm run tauri -- dev
 ```
 
+### Docs
+
+The site is VitePress in `docs/`. Preview it with:
+
+```bash
+npm run docs:dev
+```
+
+`npm run docs:build` and `npm run docs:preview` match the scripts in the root `package.json`.
+
 ### Quality checks
 
 Run these before opening a PR:
@@ -60,8 +57,8 @@ CI also runs a Tauri build job. Match existing style and the conventions in `AGE
 
 1. Fork the repo and create a branch from `main`.
 2. Make focused changes; avoid unrelated drive-by edits.
-3. Add or update tests when changing harness, tools, or other covered behaviour.
-4. Update `README.md` when behaviour or public surfaces change.
+3. Add or update tests when changing harness, tools, or other covered behavior.
+4. Update `docs/` when behavior or public surfaces change. Preview with `npm run docs:dev`.
 5. Ensure `npm run ci` passes (and Rust audit when you touch `src-tauri`).
 6. Open a PR against `main` and fill out the [PR template](.github/pull_request_template.md).
 7. Wait for required checks (`CI`, `Rust audit`, `Tauri build`) and a [CODEOWNERS](.github/CODEOWNERS) review.
@@ -91,6 +88,7 @@ Breaking changes should be called out in the PR description.
 | `src/services/harness/` | Agent harness and tool loop |
 | `src-tauri/` | Tauri / Rust shell |
 | `src/prompts/` | System and tool guidance prompts |
+| `docs/` | VitePress documentation site |
 
 ## Commit messages
 
@@ -107,8 +105,8 @@ Maintainers handle releases. Contributors do not need to publish builds.
 3. Tag and push, or run the **Release** workflow manually:
 
 ```bash
-git tag v0.1.0-beta.5
-git push origin v0.1.0-beta.5
+git tag v0.10.22
+git push origin v0.10.22
 ```
 
 The [Release](.github/workflows/release.yml) workflow builds macOS (arm64), Linux x64, and Windows via [`tauri-action`](https://v2.tauri.app/distribute/pipelines/github/), uploads installers to a GitHub Release, then attaches `SHA256SUMS.txt` and `SHA512SUMS.txt` and publishes the release.

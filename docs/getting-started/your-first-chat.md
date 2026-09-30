@@ -5,41 +5,30 @@ description: Send a first Vixl chat from the home screen after you pick a projec
 
 # Your first chat
 
-First launch is the home screen: a centered chat input, nothing else. **New Agent** in the sidebar (or `Cmd` or `Ctrl+N`) returns here.
-
-You need a [provider and a model](/getting-started/set-up-providers-and-models) before send. The model control says **Select model**. With no provider it is disabled. Send requires a model.
+First launch opens the home screen: a chat input in the main pane. **New Agent** in the sidebar, or `Cmd/Ctrl+N`, returns here. You need a [provider and a model](/getting-started/set-up-providers-and-models) before you can send. With no provider, the model picker is disabled.
 
 ## Send from home
 
 1. Click **New Agent** if you are not already on home.
-2. Select a project. The picker defaults to the last active project, or **No project**.
-3. Choose a mode: **Agent**, **Ask**, **Plan**, or **Orchestrator**.
-4. Choose a model.
-5. Type in the chat input.
-6. Send the message.
+2. Select a project, or leave **No project**. The picker defaults to the last active project.
+3. Choose a mode. The default is **Agent**.
+4. Choose a model if one is not already filled from your Default role.
+5. Type a message and send. Enter sends. Shift-Enter inserts a new line.
 
-Enter sends. Shift-Enter inserts a line. Placeholder: `@ for context, / for commands`.
+**No project** creates a [home chat](/concepts/projects-and-home-chats) whose workspace is your user home directory. A selected project creates a project chat and opens that thread. New chats are titled **New Agent** until Auto-title fills one in (on by default).
 
-**No project** creates a [home chat](/concepts/projects-and-home-chats) (`_home_`) whose workspace is your user home directory. A selected project creates a project chat and opens that thread. New chats are titled **New Agent** until [Auto-title](/getting-started/set-up-providers-and-models) fills one in (on by default).
+The plus menu attaches images. The shield under the input is the [permission dial](/concepts/permissions-and-approvals) (default **Allowlist**). On a git workspace, a branch control appears next to it. The MCP control lists configured servers. Skills and custom agents are `/` in the editor.
 
-The plus menu is **Upload photos or files**. The picker accepts images. The shield under the input is the permission dial: **Ask**, **Allowlist**, or **Bypass**. Default is **Allowlist** unless you changed it in Settings. See [Permissions and approvals](/concepts/permissions-and-approvals).
+## Modes
 
-On a git workspace, a branch control appears under the input. Home with **No project** does not show it.
-
-The [MCP](https://modelcontextprotocol.io/) control lists configured servers. Skills and custom agents are `/` in the editor, not a separate button.
-
-## Four modes
-
-Default on a new chat input is **Agent**. Changing mode does not swap a model you already picked. An empty model field fills from that mode's role.
-
-**Ask** is read-only exploration: no file writes, no git mutations. **Plan** researches, then writes a durable `PLAN.md`, still without source mutations. **Agent** implements changes (files, shell, git tools, MCP, plans, sub-agents). Its skill says not to commit unless asked. **Orchestrator** coordinates through sub-agents. The parent does not mutate files or run shell, except `move_workspace` after a folder or worktree exists.
-
-Tool allowlists and mode skills are on [Chat modes](/concepts/chat-modes).
+**Agent** implements changes in this chat. **Ask** is read-only exploration. **Plan** researches, then writes a durable `PLAN.md`. **Orchestrator** coordinates work through sub-agents. Tool allowlists live on [Chat modes](/concepts/chat-modes).
 
 ## After you send
 
-The thread opens and the first message is sent. The agent can read the workspace, call tools the mode allows, and ask before actions the [permission dial](/concepts/permissions-and-approvals) does not already allow. The right sidebar is the [workbench](/using/use-the-workbench): editor, terminals, git, and plan tabs.
+The thread opens and the first message is sent.
 
-While a reply is running, send becomes **Stop generating**.
+![A Vixl chat thread with the composer at the bottom and an empty workbench](/features/harness.png)
 
-[Manage chats](/using/manage-chats) covers rename, pin, fork, and delete. Delete is permanent on the client. See [Philosophy](/getting-started/philosophy).
+The agent can read the workspace, call tools the mode allows, and ask before actions the permission dial does not already allow. The [workbench](/using/use-the-workbench) is the right-side panel: editor, terminals, git Changes, and plan tabs. While a reply is running, send becomes **Stop generating**.
+
+To rename, pin, fork, or delete a thread, see [Manage chats](/using/manage-chats). Delete is permanent. See [Philosophy](/getting-started/philosophy).

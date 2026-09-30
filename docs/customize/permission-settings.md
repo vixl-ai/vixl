@@ -1,40 +1,42 @@
 ---
 title: Permission settings
-description: Configure the Vixl permission dial, sandbox, and allow/deny list from the chat input and Settings > Permissions.
+description: Change the Vixl permission dial default, sandbox, auto-approve globs, and persisted allow or deny rows.
 ---
 
 # Permission settings
 
-Two surfaces. The permission dial sits on the [chat input](/getting-started/your-first-chat). Settings > Permissions holds the sandbox switches and the persisted allow/deny list. See [Permissions and approvals](/concepts/permissions-and-approvals).
+The shield under the [chat input](/getting-started/your-first-chat) is the permission dial. Settings > Permissions holds the sandbox switches and the personal allow/deny list. What Ask, Allowlist, and Bypass mean is on [Permissions and approvals](/concepts/permissions-and-approvals).
 
-Default level is Allowlist (`agent.permissionLevel`). Changing the dial writes that personal setting.
+## Change the default dial
 
-## The dial (Ask, Allowlist, Bypass)
+The default is Allowlist (`agent.permissionLevel`). On a live thread, changing the dial writes that personal setting, so later chats start at the same level.
 
-Ask prompts before each write, shell, git, web, or [MCP](https://modelcontextprotocol.io) action. Allowlist auto-approves paths matching `agent.autoApproveGlobs` and asks for the rest. Bypass skips prompts for file, shell, git, web, and MCP actions. Sensitive paths still ask.
+::: warning
+Bypass skips prompts for file, shell, git, web, and MCP actions. Sensitive paths and denied capabilities still block or ask. Confirm **Enable bypass** only when you trust the current task.
+:::
 
-Switching to Bypass opens **Enable bypass mode?** Copy: "Bypass mode runs all tool actions without asking. Sensitive paths and denied capabilities still block or ask." Confirm: **Enable bypass**.
+## Auto-approve globs
 
-Sensitive paths (`.env`, `.ssh`, credential-like names, key files, and similar) always ask. That check wins over persisted allow, session allow, and Bypass.
-
-There is no glob editor in Settings. `agent.autoApproveGlobs` lives in [settings.json](/reference/settings-json) (default empty; personal and project lists union). Matching globs auto-approve `fs.write` / `fs.delete` when every path matches.
+There is no glob editor in Settings. `agent.autoApproveGlobs` lives in [settings.json](/reference/settings-json) (default empty). Personal and project lists are unioned. When every path on a filesystem write or delete matches, that action auto-approves. Matching globs also auto-approve those writes when the dial is Ask.
 
 ## Sandbox
 
-Settings > Permissions has **Sandbox terminal** (`agent.sandbox.enabled`, default on). Sandboxed commands can auto-run. Leaving the sandbox always asks. **Sandbox network** is Deny or Allow (`agent.sandbox.network`, default Allow), disabled when sandbox is off. Network access for sandboxed commands. Allow is the default.
+Settings > Permissions has **Sandbox terminal** (`agent.sandbox.enabled`, default on). Sandboxed commands can auto-run. Leaving the sandbox always asks. **Sandbox network** is Deny or Allow (`agent.sandbox.network`, default Allow). The network control is disabled when sandbox is off.
 
-OS sandboxing is separate from the permission gate. Unsandboxed or network hops still go through the dial.
+OS sandboxing is separate from the permission dial. Unsandboxed or network hops still go through Ask, Allowlist, or Bypass.
 
-## Allowlists from chat approvals
+## Allow and deny records
 
-Settings does not add allow/deny rows. Rows appear after you approve or deny in chat with a persisting scope.
+Settings does not add rows. They appear after you approve or deny in chat with a persist scope.
 
-Persisted records (`agent.permissions`) only store `scope: "workspace"` or `scope: "always"` with verdict allow or deny. Groups: Filesystem, Shell, Git, MCP, Web. MCP and some filesystem groups use accordions. Each row: capability label, scope, allow/deny badge, trash.
+- **Always** writes personal `agent.permissions` and shows up here.
+- **Workspace** writes the project's `settings.json`. Home chats have no project, so workspace persist is refused. Those project rows do not appear in Settings > Permissions.
+- Once and session do not persist.
 
-Remove one row with its trash control. Header trash **Clear all** writes `[]`.
+Shell persist scopes are once, session, and never only. They never become Settings rows.
 
-Approval actions in chat include Allow once, Allow session, Allow workspace, Always allow, Deny, and Never. Shell persist scopes are once / session / never only (no workspace or always row for shell). Session and once do not show in Settings.
+The list is grouped as Filesystem, Shell, Git, MCP, and Web. Remove one row, or **Clear all** to empty the personal list. That is how you take back a persisted allow or deny.
 
-Personal `deny` wins on merge with project. Then project `deny`. Else project. Project overlay still cannot write `providers.*`, `models.*`, or `lsp.*`.
+Personal `deny` wins when personal and project records share a capability. See [the `.vixl` directory](/concepts/the-vixl-directory) for the merge.
 
-MCP trust is separate: see [MCP servers](/customize/mcp-servers). Trusted servers still pass `mcp.call` through this dial.
+MCP server trust is separate: see [MCP servers](/customize/mcp-servers). A trusted server still passes `mcp.call` through this dial.

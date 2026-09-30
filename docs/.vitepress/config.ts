@@ -20,37 +20,37 @@ const faqItems: FaqItem[] = [
   {
     question: 'Is Vixl going to keep adding features forever?',
     answer:
-      'No. Once the roadmap is met, Vixl gets only optimizations and bug fixes. Paid harnesses bloat because employees working 40-hour weeks need something to do.',
+      'No. Once the roadmap is met, Vixl gets only optimizations and bug fixes. Paid harnesses bloat because employees working 40-hour weeks need something to do. See Philosophy.',
   },
   {
     question: 'Is there a cloud service?',
     answer:
-      'No, never. There is no Vixl account and no Vixl home server. You bring your own keys and hosts.',
+      'No, never. There is no Vixl account and no Vixl home server. You bring your own keys and hosts. See Privacy.',
   },
   {
     question: 'Where are my keys?',
     answer:
-      'In the OS keychain. Provider secrets use vixl:provider:<apiKeyRef>. MCP input secrets use vixl:mcp:<serverId>:input:<inputId>. They are never written to .vixl or settings.json. On Linux without Secret Service, they fall back to secrets-vault.json in the app config dir.',
+      'In the OS keychain, never in .vixl or settings.json. On Linux without Secret Service, they fall back to secrets-vault.json in the app config dir. See Providers for the key format.',
   },
   {
     question: 'Do I need an account to use a local model?',
     answer:
-      'No. Ollama and other local OpenAI-compatible hosts work without a Vixl account and without an API key. Add a provider when you want one.',
+      'No. Ollama and other local OpenAI-compatible hosts work without a Vixl account and without an API key. Add a provider when you want one. See Set up providers and models.',
   },
   {
     question: 'Where is my data?',
     answer:
-      'Personal config is {appData}/.vixl (on macOS, ~/Library/Application Support/app.vixl/.vixl). Project config is <repo>/.vixl. Chat rows live in vixl.sqlite. Chat files live under .vixl/chats/.',
+      'Personal config is {appData}/.vixl (on macOS, ~/Library/Application Support/app.vixl/.vixl). Project config is <repo>/.vixl. Chats live in vixl.sqlite and under .vixl/chats/. See .vixl layout.',
   },
   {
     question: 'What happens when I delete a chat?',
     answer:
-      'The SQLite row and the chat directory are removed. There is no archive and no Vixl-side memory of that thread. If you used a cloud provider, that provider\'s retention is the provider\'s business.',
+      'The SQLite row and the chat directory are removed. There is no archive and no Vixl-side memory of that thread. If you used a cloud provider, that provider\'s retention is the provider\'s business. See Privacy.',
   },
   {
     question: 'Does Vixl send analytics?',
     answer:
-      'No. The only telemetry string in the app is CODEGRAPH_TELEMETRY=0, which turns off the CodeGraph package\'s own telemetry. Network calls are the ones you configure: providers, MCP servers, and updates from GitHub Releases.',
+      'No. The only telemetry-related string in the app is CODEGRAPH_TELEMETRY=0, which turns off the CodeGraph package\'s own telemetry. Vixl still makes the network calls listed on Privacy.',
   },
   {
     question: 'What license is Vixl?',
@@ -60,7 +60,7 @@ const faqItems: FaqItem[] = [
   {
     question: 'How do I install it?',
     answer:
-      'Download a build from GitHub Releases (macOS arm64, Linux x64, Windows), or build from source.',
+      'Download a build from GitHub Releases (macOS arm64, Linux x64, Windows), or build from source. macOS and Windows installers are unsigned, so Gatekeeper or SmartScreen may prompt on first open. See Installation.',
   },
 ]
 

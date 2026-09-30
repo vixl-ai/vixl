@@ -1,13 +1,13 @@
 ---
 title: mcp.json
-description: mcp.json holds Vixl MCP server configs for personal and project scope; secrets stay in the OS keychain, not this file.
+description: Personal and project mcp.json schema for stdio, HTTP, and SSE servers, including inputs and templates.
 ---
 
 # mcp.json
 
-MCP ([Model Context Protocol](https://modelcontextprotocol.io/)) server configs live in `mcp.json`. Personal file: `{appData}/.vixl/mcp.json`. Project file: `<repo>/.vixl/mcp.json`. Secrets are not written here. They go in the OS keychain. See [MCP servers](/customize/mcp-servers).
+MCP ([Model Context Protocol](https://modelcontextprotocol.io/)) server configs live in `mcp.json`. Personal file: `{app data}/.vixl/mcp.json`. Project file: `<repo>/.vixl/mcp.json`. Secrets are not written here. They go in the OS keychain. How to add and trust servers: [MCP servers](/customize/mcp-servers). Paths: [.vixl layout](/reference/vixl-layout).
 
-Read and write go through `read_mcp_config` / `write_mcp_config`. A missing file is an empty config (`{ "servers": {} }`). Invalid server entries are dropped. If every server fails to parse, load errors with `MCP config servers failed to parse` and migrate falls back to empty.
+A missing or empty file is `{ "servers": {} }`. Invalid individual server entries are dropped. If every server fails to parse, load fails with `MCP config servers failed to parse` and migrate falls back to empty.
 
 ## Config shape
 
@@ -45,19 +45,25 @@ Project `servers[id]` replaces personal `servers[id]` (scope `overridden`). Inpu
 
 `enabled: false` turns a server off. Missing `enabled` is on.
 
+Home chats see personal servers only. Project chats see the merged set.
+
 ## Stdio servers
 
 A stdio server has `command` (required) plus optional `args`, `env`, `envFile`, and `enabled`. There is no `type` field.
 
 `command` must be a PATH basename, not a filesystem path. Allowed names: `npx`, `npm`, `node`, `pnpm`, `yarn`, `bun`, `bunx`, `deno`, `uvx`, `uv`, `python`, `python3`, `pipx`, `codegraph`, `docker`, `podman`, `nerdctl`. Typical forms: `npx -y <pkg>`, `uvx <pkg>`, or `docker run`.
 
-Stdio is a [Tauri](https://v2.tauri.app/) child process over stdin/stdout. It does not use the JS MCP SDK. A project stdio server starts in that project's folder, not the directory Vixl was launched from. Relative args such as `server/mcp/index.ts` resolve against `<repo>`. If the project folder is missing, start fails instead of waiting on a handshake. Personal servers are not given a project working directory. There is no `cwd` field.
+Stdio is a child process over stdin/stdout. A project stdio server starts in that project's folder, not the directory Vixl was launched from. Relative args such as `server/mcp/index.ts` resolve against `<repo>`. If the project folder is missing, start fails. Personal servers are not given a project working directory. There is no `cwd` field.
+
+`env` is a string map. Values may use `${input:id}` and `${env:NAME}` templates. Overlay keys that would rewrite process search path, preload, or interpreter options (for example `PATH`, `LD_*`, `DYLD_*`, `NODE_OPTIONS`, `PYTHONPATH`) are rejected.
+
+`envFile` is an optional dotenv path. Relative paths resolve against the project root for project servers, or against the personal `.vixl` directory for personal servers. Absolute paths are used as-is. File values load first; `env` keys overlay them.
 
 ## HTTP and SSE servers
 
 HTTP and SSE servers set `type` to `"http"` or `"sse"` and require `url`. `url` may include `${input:id}` and `${env:NAME}` templates. Templates are replaced with a placeholder, then the result must parse as a URL. Optional: `auth`, `headers`, `oauth`, `enabled`.
 
-URL policy: `https`, or `http` only on `localhost`, `127.0.0.1`, or `::1`. These clients run in the [Vue](https://vuejs.org/) UI process via [`@ai-sdk/mcp`](https://ai-sdk.dev/).
+URL policy: `https`, or `http` only on `localhost`, `127.0.0.1`, or `::1`. These clients run in the UI process.
 
 `auth` is `"none"`, `"headers"`, or `"oauth"`:
 
@@ -91,11 +97,11 @@ Bearer token example:
 | `authServerMetadataUrl` | string | Optional. Must be a valid URL. |
 | `allowedAuthorizationServers` | string[] | Optional. Each value must be a valid URL. |
 
-Tokens and client secrets stay in the keychain (`vixl:mcp:<serverId>:oauth:tokens` and related keys).
+Tokens and client secrets stay in the keychain (`vixl:mcp:<serverId>:oauth:tokens` and related keys). See [Providers](/customize/providers) for how the vault works.
 
 ## Templates and inputs
 
-Values in `args`, `env`, `headers`, and HTTP `url` may contain `${input:id}` and `${env:NAME}`. Missing input at start sets status `auth_required` and opens the secrets form. Missing env throws `Missing environment variable: NAME`.
+Values in `command`, `args`, `env`, `headers`, HTTP `url`, and `oauth.clientSecret` may contain `${input:id}` and `${env:NAME}`. Missing input at start sets status `auth_required` (error `auth_required:inputs`) and opens the secrets form. Missing env throws `Missing environment variable: NAME`.
 
 Each input is:
 
@@ -106,14 +112,14 @@ Each input is:
 | `description` | string | Optional. |
 | `password` | boolean | Optional. |
 
-Resolved input values are stored as `vixl:mcp:<serverId>:input:<inputId>`.
+Resolved input values are stored as `vixl:mcp:<serverId>:input:<inputId>`. An input id that appears in a template but is not declared in `inputs` is still required; Vixl treats it as a password prompt.
 
 ## Trust
 
-Trust is not in `mcp.json`. It lives in `settings.json` as `agent.mcp.trust`, keyed by server id and a fingerprint of command plus args, or of the URL. Untrusted servers cannot start or be called. Choices: This session, This workspace, Always, Never. See [settings.json](/reference/settings-json).
+Trust is not in `mcp.json`. It lives in `settings.json` as `agent.mcp.trust`, keyed by server id and a fingerprint of command plus args, or of the URL and HTTP vs SSE. Untrusted servers cannot start or be called. Choices: This session, This workspace, Always, Never. See [settings.json](/reference/settings-json).
 
 ## Runtime statuses
 
 These are connection states, not chat statuses: `connected`, `starting`, `stopped`, `error`, `auth_required`, `refreshing`.
 
-See also [Chat statuses](/reference/chat-statuses) and [Troubleshooting](/resources/troubleshooting).
+See [Chat statuses](/reference/chat-statuses) for sidebar labels, and [Troubleshooting](/resources/troubleshooting) if a server will not start.

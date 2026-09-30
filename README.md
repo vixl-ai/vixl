@@ -62,13 +62,11 @@
 
 ---
 
-**Vixl is a local-first alternative to Cursor agents, Antigravity agents, and VS Code agents.**
+**Vixl is a local-first, bring-your-own-key alternative to Cursor, Antigravity, and VS Code agents.** There is no Vixl account and no Vixl subscription.
 
-Save about [70%](https://vixl.app/using/best-practices) vs the same work in one full-price chat.
+Use any catalog provider or a local host. Four [chat modes](https://vixl.app/concepts/chat-modes), durable [plans](https://vixl.app/using/work-with-plans), [MCP](https://vixl.app/customize/mcp-servers), and a workbench. In a [worked example](https://vixl.app/using/best-practices), planning once and running implementation on a cheaper sub-agent costs about 70% less than one long full-price chat.
 
-Get [cloud-like inference](https://vixl.app/getting-started/philosophy) using local LLMs.
-
-Follow the [getting started page](https://vixl.app/getting-started/) or jump right in by downloading the [latest release](https://github.com/vixl-ai/vixl/releases).
+[Get started](https://vixl.app/getting-started/) or download the [latest release](https://github.com/vixl-ai/vixl/releases).
 
 ## Roadmap
 

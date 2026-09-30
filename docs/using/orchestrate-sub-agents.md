@@ -1,38 +1,54 @@
 ---
 title: Orchestrate sub-agents
-description: Orchestrator mode locks the Vixl parent to guiding sub-agents; it can run validation commands but does not write files or mutate git itself.
+description: Run work through Orchestrator mode and nested sub-agents, from a plan tab or by switching the chat to Orchestrator.
 ---
 
 # Orchestrate sub-agents
 
-[Orchestrator mode](/concepts/chat-modes) is the lock: the parent guides sub-agents. It does not write files, edit, patch, delete, or move files, or run [git](https://git-scm.com) mutations itself. It can run validation shell commands (CI, tests, `gh` PR comments).
+Orchestrator mode is for splitting work across nested agents. The parent stays on the long context and guides; workers get a focused prompt and do the writes, often on the cheaper Subagent role. You can start from a plan's **Orchestrate**, or switch the mode picker to **Orchestrator** and describe the work ad hoc.
 
-The mode allowlist is reads, codebase tools, git status/diff/log/branch, lsp, diagnostics, `load_skill`, `ask_user`, `web_fetch`, the shell suite (`run_terminal`, `terminal_output`, `stop_terminal`), [MCP](https://modelcontextprotocol.io) getters/calls, `create_plan`, `update_plan`, `update_plan_todo`, `update_todos`, `spawn_subagent`, `steer_subagent`, `resolve_models`, and `move_workspace`. The built-in skill says the parent never edits source files; shell is for validation only. Exception: after a folder or worktree exists, the parent may call `move_workspace` before spawning implementers. Network goes through `web_fetch`, user MCP, or validation shell commands such as `gh`.
+The parent does not write files or run git mutations. It can still read the repo, run shell (the [allowlist](/concepts/chat-modes) includes it; the built-in skill limits it to validation such as tests, CI, and `gh`), and spawn sub-agents. Approvals still apply; see [Permissions and approvals](/concepts/permissions-and-approvals).
 
-Approvals still apply. See [Permissions and approvals](/concepts/permissions-and-approvals).
+## From a plan
 
-## Spawn
+On a plan tab, **Orchestrate** starts (or resumes) an Orchestrator-mode chat, locks the nested sub-agent model, and tells the parent to spawn one background sub-agent per open todo. After spawning, the parent leaves a one-line status and ends the turn. The harness resumes the parent as each worker finishes. The parent then reviews output, updates plan todos, and continues. Lifecycle and the dialog are on [Work with plans](/using/work-with-plans).
 
-The parent calls `spawn_subagent`. `agentName` is a catalog custom-agent name, or any other label (ideally a short verb phrase) for a generic helper. `prompt` is the task. `mode` is `blocking` (default) or `background`. Optional `model` is an exact `provider::modelId` from `resolve_models` (ignored when a plan locked a subagent model). `capabilities` is `read-only` (default) or `write`.
+A plan lock ignores a `model` argument on `spawn_subagent` and ignores a model pinned in a custom agent file. Workers use the Subagent pick from the dialog.
 
-Ask and Plan cannot spawn write-capable helpers. Nested agents cannot spawn further sub-agents. They also do not get `steer_subagent`, `create_plan`, `update_plan`, `update_plan_todo`, `update_todos`, `ask_user`, `move_workspace`, or `resolve_models`.
+## Ad hoc
 
-Read-only nested tools: reads, codebase, git status/diff/log/branch, lsp, diagnostics, `load_skill`, `web_fetch`, MCP, and the terminal suite in a sandbox where the project is not writable. Write adds write/edit/patch/delete/move and git commit/checkout/branch_create.
+Set the mode picker to **Orchestrator** and send the task. The parent calls `spawn_subagent` the same way, without a plan file or a locked sub-agent model.
 
-Model pick order when there is no plan lock: the spawn `model` argument, else the agent file's `model`, else Settings `models.subagent`. Fuzzy names are rejected. Call `resolve_models` first. A plan Orchestrate lock ignores the spawn `model` and the agent-file model. See [Models and roles](/concepts/models-and-roles).
+Agent mode can also spawn sub-agents, but that parent can still write files itself. Use Orchestrator when you want the parent locked to guiding. Ask and Plan can spawn read-only helpers for research; they cannot spawn write-capable ones.
 
-Background spawn returns `{ status: 'running' }` immediately. The parent should leave a one-line status and end the turn. The harness resumes the parent as each background subagent finishes. Do not treat a `subagentId` as a shell id.
+## Background vs blocking
 
-Blocking spawn waits for a summary, then returns it.
+`spawn_subagent` takes `mode`: `blocking` (the default) or `background`.
 
-Custom agents invoked with `/name` in the chat input force `spawn_subagent` for each named agent. See [Custom agents](/customize/custom-agents).
+A blocking spawn waits until that worker finishes, then returns its summary. A background spawn returns immediately with status `running`. The parent should leave a one-line status covering what was spawned and what happens next, then end the turn. The harness resumes the parent as each background worker finishes. A terminal is not how the parent waits on a worker.
 
-## Monitor running sub-agents
+For parallel todos, prefer background. The plan-orchestrate handoff does that: one background worker per todo.
 
-Running work shows inline on the turn, and as a stack pill `1 agent` / `N agents`. Open the pill for the list. Stop sub agent aborts that one.
+`agentName` is a catalog custom-agent name, or any other label (a short verb phrase) for a generic helper. `prompt` is the task. `capabilities` is `read-only` (default) or `write`.
 
-Open the nested thread at `/chat/:chatId/subagent/:subagentId` (or the project equivalent). That transcript is read-only. The chat input there steers: the follow-up is delivered at the next nested step, or it resumes a finished or failed subagent in the background. The parent can also call `steer_subagent`.
+## What a sub-agent can do
 
-Stop generating on the parent aborts every subagent for that chat. See [Queue and stop messages](/using/queue-and-stop-messages).
+Read-only workers can explore, and they can run tests, lint, and similar commands in a sandbox where the project is not writable. Write workers can edit files and use git commit, checkout, and branch-create. Nested agents cannot spawn further sub-agents. The nested tool lists are on [Chat modes](/concepts/chat-modes#nested-sub-agents).
 
-From a plan tab, Orchestrate is the same lock plus a subagent model lock. See [Work with plans](/using/work-with-plans) and [Best practices](/using/best-practices).
+## Which model a worker uses
+
+When there is no plan lock, the model is the spawn call's exact `provider::modelId` (from `resolve_models`), else the custom agent's `model` frontmatter, else Settings **Subagent** (`models.subagent`). Fuzzy names are rejected. See [Models and roles](/concepts/models-and-roles).
+
+## Custom agents as sub-agents
+
+A `/name` mention of a catalog agent tells the parent to call `spawn_subagent` for each named agent, with `agentName` set to that name exactly. The file body becomes the worker's system prompt. Optional `tools` in the agent file intersect the nested allowlist. See [Custom agents](/customize/custom-agents) and [Chat modes](/concepts/chat-modes#nested-sub-agents).
+
+## Watch, steer, and stop
+
+Running workers show inline on the turn, and as a stack pill (`1 agent` / `N agents`). Open the pill for the list. **Stop sub agent** stops that one.
+
+Open the nested thread from the turn (or the pill). That view is the worker's transcript. Send from the input there to steer: the follow-up is delivered at the next nested step, or it resumes a finished or failed worker in the background. The parent can also call `steer_subagent`.
+
+**Stop generating** on the parent stops every sub-agent for that chat. Stopping from the nested thread stops only that worker. See [Queue and stop messages](/using/queue-and-stop-messages).
+
+Cost, cache, and when to keep the parent on the planning model are on [Best practices](/using/best-practices).

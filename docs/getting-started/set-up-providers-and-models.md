@@ -1,40 +1,32 @@
 ---
 title: Set up providers and models
-description: Add a BYOK provider in Vixl Settings, test the connection, then assign default models for each chat role.
+description: Add a BYOK provider in Settings, test the connection, then set a default model so you can send a chat.
 ---
 
 # Set up providers and models
 
-## Adding a provider
+Vixl does not host models. Add a provider, store a key if it needs one, then pick a default model. You cannot send a chat until a model is selected.
 
-Open **Settings** from the left sidebar footer.
+## Add a provider
 
-Click on the Providers tab.
+1. Open **Settings** in the left sidebar footer.
+2. Open **Providers**.
+3. Click **Add provider**.
+4. Pick a catalog provider, or **Custom OpenAI-compatible**.
+5. Save an API key if you are asked for one.
+6. On the provider row, use **Test connection**.
 
-The providers list comes from [AI SDK](https://ai-sdk.dev/) providers, plus OpenAI-compatible hosts.
+[Ollama](https://ollama.com/) and [LM Studio](https://lmstudio.ai/) skip the API key step. Default URLs and the rest of the catalog are on [Providers](/customize/providers). Adding a provider does not pick a default model for you.
 
-1. Select **Providers**.
-2. Click **Add provider**.
-3. Choose a catalog provider, or **Custom OpenAI-compatible**.
-4. Save an API key if the dialog asks for one.
-5. Click **Test connection**.
+A 401 or 403 on test means the key is wrong.
 
-[Ollama](https://ollama.com/) and [LM Studio](https://lmstudio.ai/) skip the API key dialog. Ollama defaults to `http://localhost:11434/v1`. LM Studio defaults to `http://localhost:1234/v1`. Adding Ollama does not pick a default model for you.
+## Set a default model
 
-With no providers, the section is empty until you add one. **Test connection** checks the endpoint. A 401 or 403 means the key is wrong.
-
-## Set model roles
-
-1. Select **Models** in settings.
+1. Open **Models** in Settings.
 2. Set **Default**.
-3. Override other roles only if you want them different from Default.
 
-**Default** is the fallback every other role uses. **Ask**, **Plan**, and **Agent** set the four chat modes (**Agent** also covers single-agent plan builds). **Orchestrator** has **Parent** plus nested **Subagent**. **Title** generates short chat titles, with an **Auto-title** switch (on by default).
+Every other role uses Default until you override it. You do not need those overrides for a first chat. Role defaults, Auto-title, and per-chat picks are on [Models](/customize/models) and [Models and roles](/concepts/models-and-roles).
 
-Pick a model to persist that role. **Use default** clears an override. Title warns if it is still on the default, and asks you to prefer a small, low-cost model for that background task.
+Starting a chat from the sidebar is blocked until Default or Agent is set. Sending from the home input requires a model on the picker.
 
-Without a Default (or Agent) model, starting a chat from the sidebar is blocked until you set one in Settings. Sending from the home chat input requires a model.
-
-More on roles: [Models and roles](/concepts/models-and-roles) and [Models](/customize/models).
-
-Next: [add a project](/getting-started/add-a-project), or skip that and [send a chat](/getting-started/your-first-chat).
+Next, [add a project](/getting-started/add-a-project), or skip that and [send a chat](/getting-started/your-first-chat).

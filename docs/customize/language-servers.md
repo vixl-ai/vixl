@@ -1,83 +1,49 @@
 ---
 title: Language servers
-description: Language servers drive hover and completion in the Vixl workbench; Settings > LSP is personal and requires the desktop app.
+description: Language servers drive hover and completion in the Vixl workbench. Settings > LSP is personal and requires the desktop app.
 ---
 
 # Language servers
 
-Language servers drive hover and completion in the workbench editor. Settings > LSP is personal: install and disable state in `{appData}/.vixl/lsp.json`, auto-download in `settings.json` (`lsp.autoDownload`, default on). Project folders cannot override `lsp.*`. Language servers require the desktop app.
+Language servers power hover, completion, and diagnostics in the workbench editor, and they back the agent's `lsp` and `diagnostics` tools. Settings > LSP is personal: enable/disable and install state live in `{appData}/.vixl/lsp.json`, auto-download in `settings.json` (`lsp.autoDownload`, default on). A project folder cannot override `lsp.*`. Language servers require the desktop app.
 
-Header **Install defaults** starts the Tier A set (TypeScript / JavaScript, JSON, YAML, Markdown). The same prefetch runs when a project is activated. Auto-download: download default language support on project open. Disable for airgapped machines.
+## Which languages
 
-Per row: enable/disable (Play / Ban), Install when missing, Retry on error, Uninstall when `source` is `managed`. Status badges include Disabled, Requires workspace trust, Running, Managed install, Available on PATH, Not installed, Needs toolchain on PATH, and live install states. Events: `lsp://install`.
+Vixl can download servers for TypeScript / JavaScript, JSON, YAML, Markdown, Vue / Nuxt, Python, Rust, Go, Bash, HTML, CSS, Tailwind CSS, Svelte, Astro, Prisma, GraphQL, Dockerfile, Lua, C / C++, Terraform, TOML, Zig, PHP, Kotlin, XML, Postgres, Clojure, and Java.
 
-Project-local servers that require trust ([ESLint](https://eslint.org), [Oxlint](https://oxc.rs), [Biome](https://biomejs.dev)) need `workspace.trust` for the active project. Vue / Nuxt hybrid installs [typescript-language-server](https://www.npmjs.com/package/typescript-language-server) `5.3.0` plus [typescript](https://www.npmjs.com/package/typescript) `5.8.2` as `typescript-classic`, which appears in Settings > LSP as TypeScript (Vue / Nuxt Hybrid), an install-only row with no disable toggle.
+These catalog rows are not downloaded. They use a binary already on PATH: Deno, Ruby, C# (`csharp-ls`), Swift, Elixir, Haskell, OCaml, Dart, Gleam, Nix, R, and Scala.
 
-Every installable server below is what Vixl actually fetches. Toolchain rows are listed after that: they are in the catalog but Vixl does not download them. Duplicate listing with sources: [Managed components](/reference/managed-components).
+ESLint, Oxlint, and Biome are project-local. Vixl does not install them. They need [workspace trust](/concepts/permissions-and-approvals) for the active project.
 
-## Installable servers
+Vue / Nuxt also installs a TypeScript hybrid helper, shown as TypeScript (Vue / Nuxt Hybrid): an install-only row with no disable toggle.
 
-npm:
+Package names, versions, and download sources are on [Managed components](/reference/managed-components).
 
-- TypeScript / JavaScript (`typescript`): [typescript](https://www.npmjs.com/package/typescript) `7.0.2` (native bin)
-- JSON (`json`): [vscode-langservers-extracted](https://www.npmjs.com/package/vscode-langservers-extracted) `4.10.0`
-- YAML (`yaml`): [yaml-language-server](https://www.npmjs.com/package/yaml-language-server) `1.17.0`
-- Vue / Nuxt (`vue`): [@vue/language-server](https://www.npmjs.com/package/@vue/language-server) `3.3.9`, [@vue/typescript-plugin](https://www.npmjs.com/package/@vue/typescript-plugin) `3.3.9`, [typescript](https://www.npmjs.com/package/typescript) `5.8.2` ([Vue](https://vuejs.org))
-- Python (`python`): [pyright](https://www.npmjs.com/package/pyright) `1.1.414`
-- Bash (`bash`): [bash-language-server](https://www.npmjs.com/package/bash-language-server) `5.4.3`
-- HTML (`html`): [vscode-langservers-extracted](https://www.npmjs.com/package/vscode-langservers-extracted) `4.10.0`
-- CSS (`css`): [vscode-langservers-extracted](https://www.npmjs.com/package/vscode-langservers-extracted) `4.10.0`
-- Tailwind CSS (`tailwindcss`): [@tailwindcss/language-server](https://www.npmjs.com/package/@tailwindcss/language-server) `0.0.27`
-- Svelte (`svelte`): [svelte-language-server](https://www.npmjs.com/package/svelte-language-server) `0.17.10`
-- Astro (`astro`): [@astrojs/language-server](https://www.npmjs.com/package/@astrojs/language-server) `2.15.4`
-- Prisma (`prisma`): [@prisma/language-server](https://www.npmjs.com/package/@prisma/language-server) `6.5.0`
-- GraphQL (`graphql`): [graphql-language-service-cli](https://www.npmjs.com/package/graphql-language-service-cli) `3.5.0`
-- Dockerfile (`dockerfile`): [dockerfile-language-server-nodejs](https://www.npmjs.com/package/dockerfile-language-server-nodejs) `0.13.0`
-- PHP (`php`): [intelephense](https://www.npmjs.com/package/intelephense) `1.14.4`
+## Download
 
-GitHub Releases (repo, tag, asset template):
+When you activate a project, Vixl prefetches the default set (TypeScript / JavaScript, JSON, YAML, Markdown) if `lsp.autoDownload` is on. Settings > LSP has the same action. Turn auto-download off for airgapped machines.
 
-- Markdown (`markdown`): [artempyanykh/marksman](https://github.com/artempyanykh/marksman) tag `2024-12-18`, asset `marksman-{target}` ([marksman](https://github.com/artempyanykh/marksman))
-- Rust (`rust`): [rust-lang/rust-analyzer](https://github.com/rust-lang/rust-analyzer) tag `2025-03-10`, asset `rust-analyzer-{target}.gz`
-- Lua (`lua`): [LuaLS/lua-language-server](https://github.com/LuaLS/lua-language-server) tag `3.13.6`, asset `lua-language-server-{version}-{target}.tar.gz`
-- C / C++ (`clangd`): [clangd/clangd](https://github.com/clangd/clangd) tag `19.1.2`, asset `clangd-{target}-{version}.zip`
-- TOML (`toml`): [tamasfe/taplo](https://github.com/tamasfe/taplo) tag `0.9.3`, asset `taplo-full-{target}.gz`
-- Zig (`zig`): [zigtools/zls](https://github.com/zigtools/zls) tag `0.13.0`, asset `zls-{target}.tar.xz`
-- Kotlin (`kotlin`): [fwcd/kotlin-language-server](https://github.com/fwcd/kotlin-language-server) tag `1.3.13`, asset `server.zip`
-- XML (`xml`): [redhat-developer/vscode-xml](https://github.com/redhat-developer/vscode-xml) tag `0.29.0`, asset `lemminx-{target}.zip`
-- Postgres (`sql`): [supabase-community/postgres-language-server](https://github.com/supabase-community/postgres-language-server) tag `0.25.7`, asset `postgres-language-server_{target}`
-- Clojure (`clojure`): [clojure-lsp/clojure-lsp](https://github.com/clojure-lsp/clojure-lsp) tag `2026.07.06-14.34.19`, asset `clojure-lsp-native-{target}.zip`
+You can still install or uninstall an individual downloadable server from its row. Uninstall applies to managed installs only.
 
-Go install:
+## Where they are stored
 
-- Go (`gopls`): [`golang.org/x/tools/gopls@v0.18.1`](https://pkg.go.dev/golang.org/x/tools/gopls) (needs Go on PATH)
+Install and disable state: personal `{appData}/.vixl/lsp.json` (see [`.vixl` layout](/reference/vixl-layout)). Managed downloads: `{appData}/.vixl/lsp/<server-id>/<version>/`. PATH toolchains are not copied there.
 
-HTTP archives:
+## Use your own
 
-- Terraform (`terraform`): [terraform-ls 0.36.4](https://releases.hashicorp.com/terraform-ls/0.36.4/) from `https://releases.hashicorp.com/terraform-ls/{version}/terraform-ls_{version}_{target}.zip` ([hashicorp/terraform-ls](https://github.com/hashicorp/terraform-ls))
-- Java (`java`): Eclipse JDT LS snapshot from [download.eclipse.org](https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz) (`jdt-language-server-latest.tar.gz`)
+Resolution order for a server: a personal absolute `command` in `lsp.json`, then the managed download, then an allowlisted basename on PATH, then (if the workspace is trusted) a project-relative path or `node_modules/.bin`.
 
-TypeScript (Vue / Nuxt Hybrid) (`typescript-classic`): visible install-only row in Settings > LSP with no disable toggle. [typescript-language-server](https://www.npmjs.com/package/typescript-language-server) `5.3.0` and [typescript](https://www.npmjs.com/package/typescript) `5.8.2`.
+To prefer a binary you installed:
 
-## Toolchain on PATH (not downloaded)
+- Put an allowlisted name on PATH, and uninstall the managed copy if one is present (managed wins over PATH).
+- Or set `command` in `lsp.json` to an absolute path.
 
-These catalog rows use a binary already on PATH. Badge: Needs toolchain on PATH, or Available on PATH when found.
+To add a language that is not in the catalog, add an id in `lsp.json` with `command` (argv array) and `extensions`. The program must be an absolute path or an allowlisted basename. Project-relative commands and `node_modules/.bin` require workspace trust. There is no Settings control to add a custom server; edit the file.
 
-- [Deno](https://deno.land) (`deno lsp`)
-- [Ruby](https://github.com/Shopify/ruby-lsp) (`ruby-lsp`)
-- [csharp-ls](https://github.com/razzmatazz/csharp-language-server) (`csharp-ls`)
-- [Swift](https://github.com/swiftlang/sourcekit-lsp) (`sourcekit-lsp`)
-- [Elixir](https://github.com/elixir-lsp/elixir-ls) (`elixir-ls`)
-- [Haskell](https://github.com/haskell/haskell-language-server) (`haskell-language-server-wrapper --lsp`)
-- [OCaml](https://github.com/ocaml/ocaml-lsp) (`ocamllsp`)
-- [Dart](https://dart.dev) (`dart language-server --protocol=lsp`)
-- [Gleam](https://gleam.run) (`gleam lsp`)
-- [Nix](https://github.com/oxalica/nil) (`nil`)
-- [R](https://github.com/REditorSupport/languageserver) (`R --slave -e languageserver::run()`)
-- [Scala](https://scalameta.org/metals/) (`metals`)
+For toolchain rows (Deno, Ruby, and the rest above), install that toolchain so the binary is on PATH. Vixl will not download it.
 
-## Trust-required project-local
+## What the agent uses
 
-[ESLint](https://eslint.org), [Oxlint](https://oxc.rs), and [Biome](https://biomejs.dev) are in the catalog with no managed install. They require workspace trust. Badge: Requires workspace trust.
+The workbench uses language servers for hover, completion, and diagnostics. The agent calls `lsp` for go-to-definition, find-references, hover, document symbols, workspace symbols, and per-file diagnostics, and `diagnostics` for file or workspace issue summaries. Prefer those over grep when you need precise symbols.
 
-See [Use the workbench](/using/use-the-workbench) and [Managed components](/reference/managed-components).
+See [Use the workbench](/using/use-the-workbench) for the editor status chip, and [Managed components](/reference/managed-components) for upstream sources.
