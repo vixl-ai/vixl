@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import type { FileUIPart } from 'ai'
-import { PromptInput, PromptInputSubmit } from '@/components/ai-elements/prompt-input'
+import {
+  PromptInput,
+  PromptInputActionAddAttachments,
+  PromptInputActionMenuTrigger,
+  PromptInputSubmit,
+} from '@/components/ai-elements/prompt-input'
 import ChatPromptInput from '@/components/chat/ChatPromptInput.vue'
 import ChatPromptEditor from '@/components/chat/prompt-editor/ChatPromptEditor.vue'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
@@ -306,6 +311,31 @@ describe('ChatPromptInput subagent composer props', () => {
     await flushPromises()
 
     expect(wrapper.findComponent(ModelOptionsRow).exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('hides the mode picker when hideMode is set', async () => {
+    const wrapper = mountPromptInput({ hideMode: true })
+    await flushPromises()
+
+    const modeTrigger = wrapper
+      .findAllComponents(PromptInputActionMenuTrigger)
+      .find((trigger) => trigger.attributes('title') === 'Agent mode')
+    expect(modeTrigger).toBeUndefined()
+    expect(wrapper.findComponent(PromptInputActionAddAttachments).exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('renders the mode picker by default', async () => {
+    const wrapper = mountPromptInput()
+    await flushPromises()
+
+    const modeTrigger = wrapper
+      .findAllComponents(PromptInputActionMenuTrigger)
+      .find((trigger) => trigger.attributes('title') === 'Agent mode')
+    expect(modeTrigger).toBeDefined()
 
     wrapper.unmount()
   })

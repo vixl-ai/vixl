@@ -227,6 +227,7 @@ const pills = computed(() => {
           :waiting-on-background="isSubagentView ? false : isWaitingOnBackground"
           :allow-submit-while-busy="isSubagentView"
           :hide-model="isSubagentView"
+          :hide-mode="isSubagentView"
           :hide-stop="isSubagentView"
           @submit="handleSubmit"
           @submit-edit="handleSubmitEdit"

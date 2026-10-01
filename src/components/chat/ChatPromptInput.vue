@@ -74,6 +74,7 @@ const props = withDefaults(
     waitingOnBackground?: boolean
     allowSubmitWhileBusy?: boolean
     hideModel?: boolean
+    hideMode?: boolean
     hideStop?: boolean
   }>(),
   {
@@ -84,6 +85,7 @@ const props = withDefaults(
     waitingOnBackground: false,
     allowSubmitWhileBusy: false,
     hideModel: false,
+    hideMode: false,
     hideStop: false,
   },
 )
@@ -608,7 +610,7 @@ watch(
                 <PromptInputActionAddAttachments label="Upload photos or files" />
               </PromptInputActionMenuContent>
             </PromptInputActionMenu>
-            <PromptInputActionMenu>
+            <PromptInputActionMenu v-if="!hideMode">
               <PromptInputActionMenuTrigger
                 size="sm"
                 class="shrink-0"
