@@ -1,10 +1,14 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { lspEnsureServer, lspRequest } from '@/services/vixl/vixl-tauri'
+import {
+  blockedEnsureResponse,
+  failedEnsureState,
+} from '@/services/harness/lsp/failed-ensure-state'
 import {
   LSP_DIAGNOSTICS_METHODS,
   parseLspDiagnosticItems,
 } from '@/services/harness/lsp/parse-diagnostics'
+import { lspEnsureServer, lspRequest } from '@/services/vixl/vixl-tauri'
 
 const lspQuery = () =>
   tool({
@@ -51,28 +55,16 @@ const lspQuery = () =>
     }),
     execute: async ({ method, path, extension, position, query, includeDeclaration }) => {
       const ext = extension ?? path.split('.').pop() ?? ''
-      const server = await lspEnsureServer(ext).catch((error: unknown) => ({
-        id: '',
-        running: false,
-        error: error instanceof Error ? error.message : 'LSP ensure failed',
-        installState: 'error',
-      }))
-      if (server.installState === 'installing') {
+      const server = await lspEnsureServer(ext).catch((error: unknown) =>
+        failedEnsureState(error),
+      )
+      const blocked = blockedEnsureResponse(server)
+      if (blocked) {
         return {
           method,
           path,
           result: null,
-          error: 'installing',
-          installState: 'installing',
-        }
-      }
-      if (!server.running) {
-        return {
-          method,
-          path,
-          result: null,
-          error: server.error ?? 'LSP unavailable',
-          installState: server.installState ?? null,
+          ...blocked,
         }
       }
 

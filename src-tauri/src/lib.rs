@@ -64,13 +64,17 @@ pub fn run_with_launch_path(launch_path: Option<String>) {
         .manage(HttpStreamRegistry::default())
         .manage(OAuthLoopbackState::new())
         .setup(move |app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
+            let mut log_builder =
+                tauri_plugin_log::Builder::default().level(log::LevelFilter::Info);
+            if !cfg!(debug_assertions) {
+                log_builder = log_builder
+                    .targets([tauri_plugin_log::Target::new(
+                        tauri_plugin_log::TargetKind::LogDir { file_name: None },
+                    )])
+                    .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
+                    .max_file_size(1024 * 1024);
             }
+            app.handle().plugin(log_builder.build())?;
 
             let sqlite_path = commands::paths::user_vixl_sqlite_path(app.handle())?;
             let db = db::open_managed(&sqlite_path)?;

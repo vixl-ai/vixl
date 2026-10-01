@@ -1,5 +1,7 @@
 export type {
+  LspActivity,
   LspHealth,
+  LspPhase,
   LspProblemItem,
   LspServerDisplayState,
   LspStatusServerRow,

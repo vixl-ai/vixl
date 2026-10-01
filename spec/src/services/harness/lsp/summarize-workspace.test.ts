@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import summarizeWorkspace from '@/services/harness/lsp/summarize-workspace'
+import type { LspPhase } from '@/services/vixl/vixl-tauri/types'
 import type {
   LspWorkspaceDiagnosticFile,
   LspWorkspaceDiagnosticMode,
@@ -45,7 +46,7 @@ const server = (input: {
   mode: LspWorkspaceDiagnosticMode
   items?: LspWorkspaceDiagnosticFile[]
   error?: string | null
-  installState?: string | null
+  installState?: LspPhase | null
 }): LspWorkspaceDiagnosticsServer => ({
   id: input.id,
   mode: input.mode,
@@ -202,6 +203,17 @@ describe('summarizeWorkspace', () => {
           installState: 'installing',
         }),
         server({
+          id: 'needs-trust',
+          mode: 'unavailable',
+          installState: 'needs_trust',
+        }),
+        server({
+          id: 'failed',
+          mode: 'unavailable',
+          error: 'timed out',
+          installState: 'error',
+        }),
+        server({
           id: 'null-install',
           mode: 'unavailable',
           installState: null,
@@ -216,6 +228,17 @@ describe('summarizeWorkspace', () => {
         mode: 'unavailable',
         error: 'still installing',
         installState: 'installing',
+      },
+      {
+        id: 'needs-trust',
+        mode: 'unavailable',
+        installState: 'needs_trust',
+      },
+      {
+        id: 'failed',
+        mode: 'unavailable',
+        error: 'timed out',
+        installState: 'error',
       },
       { id: 'null-install', mode: 'unavailable' },
     ])

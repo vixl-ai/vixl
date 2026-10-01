@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, type Component } from 'vue'
+import { computed, nextTick, ref, watch, type Component } from 'vue'
+import { useIntervalFn } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import {
   Ban,
+  Circle,
   CircleAlert,
   CircleCheck,
   CircleOff,
@@ -28,6 +30,11 @@ import {
 } from '@/components/shadcn/ui/tooltip'
 import WorkbenchFileEntryIcon from '@/components/workbench/FileEntryIcon.vue'
 import useFleetRegistry from '@/composables/use-fleet-registry'
+import {
+  formatActivityLabel,
+  isTransientPhase,
+  phaseLabel,
+} from '@/composables/lsp-status/helpers'
 import useLspStatus from '@/composables/use-lsp-status'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import type {
@@ -78,66 +85,122 @@ const warningsTooltip = computed((): string => {
   return `${count} warning${count === 1 ? '' : 's'}`
 })
 
-const stateMeta = (
-  state: LspServerDisplayState,
-): { icon: Component; label: string; className: string } => {
-  switch (state) {
-    case 'installing':
-      return {
-        icon: Loader2,
-        label: 'Installing',
-        className: 'text-muted-foreground animate-spin',
-      }
-    case 'starting':
-      return {
-        icon: Loader2,
-        label: 'Starting',
-        className: 'text-muted-foreground animate-spin',
-      }
-    case 'running':
-      return {
-        icon: CircleCheck,
-        label: 'Running',
-        className: 'text-emerald-600 dark:text-emerald-400',
-      }
-    case 'stopped':
-      return {
-        icon: Pause,
-        label: 'Stopped',
-        className: 'text-muted-foreground',
-      }
-    case 'error':
-      return {
-        icon: CircleAlert,
-        label: 'Error',
-        className: 'text-destructive',
-      }
-    case 'needs_trust':
-      return {
-        icon: ShieldAlert,
-        label: 'Needs trust',
-        className: 'text-amber-600 dark:text-amber-400',
-      }
-    case 'disabled':
-      return {
-        icon: Ban,
-        label: 'Disabled',
-        className: 'text-muted-foreground',
-      }
-    case 'missing':
-      return {
-        icon: CircleOff,
-        label: 'Not installed',
-        className: 'text-muted-foreground',
-      }
-    default:
-      return {
-        icon: CircleOff,
-        label: 'Unknown',
-        className: 'text-muted-foreground',
-      }
-  }
+const PHASE_META: Record<
+  LspServerDisplayState,
+  { icon: Component; label: string; className: string }
+> = {
+  installing: {
+    icon: Loader2,
+    label: phaseLabel.installing,
+    className: 'text-muted-foreground',
+  },
+  starting: {
+    icon: Loader2,
+    label: phaseLabel.starting,
+    className: 'text-muted-foreground',
+  },
+  stopping: {
+    icon: Loader2,
+    label: phaseLabel.stopping,
+    className: 'text-muted-foreground',
+  },
+  running: {
+    icon: CircleCheck,
+    label: phaseLabel.running,
+    className: 'text-emerald-600 dark:text-emerald-400',
+  },
+  idle: {
+    icon: Circle,
+    label: phaseLabel.idle,
+    className: 'text-muted-foreground',
+  },
+  stopped: {
+    icon: Pause,
+    label: phaseLabel.stopped,
+    className: 'text-muted-foreground',
+  },
+  exited: {
+    icon: CircleOff,
+    label: phaseLabel.exited,
+    className: 'text-muted-foreground',
+  },
+  error: {
+    icon: CircleAlert,
+    label: phaseLabel.error,
+    className: 'text-destructive',
+  },
+  crashed: {
+    icon: CircleAlert,
+    label: phaseLabel.crashed,
+    className: 'text-destructive',
+  },
+  needs_trust: {
+    icon: ShieldAlert,
+    label: phaseLabel.needs_trust,
+    className: 'text-amber-600 dark:text-amber-400',
+  },
+  disabled: {
+    icon: Ban,
+    label: phaseLabel.disabled,
+    className: 'text-muted-foreground',
+  },
+  missing: {
+    icon: CircleOff,
+    label: phaseLabel.missing,
+    className: 'text-muted-foreground',
+  },
 }
+
+const formatElapsed = (phaseSinceMs: number, now: number): string => {
+  const secondsTotal = Math.max(0, Math.floor((now - phaseSinceMs) / 1000))
+  const minutes = Math.floor(secondsTotal / 60)
+  const seconds = secondsTotal % 60
+  if (minutes === 0) {
+    return `${seconds}s`
+  }
+  return `${minutes}m ${seconds}s`
+}
+
+const nowMs = ref(Date.now())
+const hasTransientVisible = computed(() =>
+  lsp.visibleRows.value.some(
+    (row) => isTransientPhase(row.displayState) && row.phaseSinceMs > 0,
+  ),
+)
+const { pause, resume } = useIntervalFn(
+  () => {
+    nowMs.value = Date.now()
+  },
+  1000,
+  { immediate: false, immediateCallback: true },
+)
+watch(
+  hasTransientVisible,
+  (active) => {
+    if (active) {
+      resume()
+      return
+    }
+    pause()
+  },
+  { immediate: true },
+)
+
+const statusRows = computed(() => {
+  const now = nowMs.value
+  return lsp.visibleRows.value.map((row) => {
+    const transient = isTransientPhase(row.displayState)
+    return {
+      row,
+      meta: PHASE_META[row.displayState],
+      spinning: transient,
+      elapsed:
+        transient && row.phaseSinceMs > 0
+          ? formatElapsed(row.phaseSinceMs, now)
+          : null,
+    }
+  })
+})
 
 const problemLabel = (problem: LspProblemItem): string => {
   const base = problem.path.split('/').pop() ?? problem.path
@@ -255,6 +318,13 @@ const handleOpenSettings = async (): Promise<void> => {
                   </Button>
                 </div>
               </div>
+              <p
+                v-if="lsp.installMessage.value"
+                class="mt-1 truncate text-xs text-muted-foreground"
+                :title="lsp.installMessage.value"
+              >
+                {{ lsp.installMessage.value }}
+              </p>
             </DropdownMenuLabel>
 
             <template v-if="lsp.problems.value.length > 0">
@@ -294,35 +364,61 @@ const handleOpenSettings = async (): Promise<void> => {
               No language servers active
             </div>
             <div
-              v-for="row in lsp.visibleRows.value"
-              :key="row.id"
+              v-for="item in statusRows"
+              :key="item.row.id"
               class="flex flex-col gap-0.5 px-2 py-1.5"
             >
               <div class="flex items-center justify-between gap-2">
                 <div class="flex min-w-0 items-center gap-1.5">
                   <WorkbenchFileEntryIcon
-                    :name="lspServerIconName(row.id, row.extensions)"
+                    :name="lspServerIconName(item.row.id, item.row.extensions)"
                     class="size-3.5"
                   />
-                  <span class="truncate text-sm">{{ row.label }}</span>
+                  <span class="truncate text-sm">{{ item.row.label }}</span>
                 </div>
-                <span
-                  class="inline-flex shrink-0"
-                  :title="stateMeta(row.displayState).label"
-                  :aria-label="stateMeta(row.displayState).label"
-                >
+                <span class="inline-flex shrink-0 items-center gap-1">
+                  <span
+                    v-if="item.elapsed"
+                    class="text-[11px] text-muted-foreground"
+                  >
+                    {{ item.elapsed }}
+                  </span>
+                  <span
+                    class="text-[11px]"
+                    :class="item.meta.className"
+                  >
+                    {{ item.meta.label }}
+                  </span>
                   <component
-                    :is="stateMeta(row.displayState).icon"
+                    :is="item.meta.icon"
                     class="h-3.5 w-3.5"
-                    :class="stateMeta(row.displayState).className"
+                    :class="[
+                      item.meta.className,
+                      item.spinning ? 'animate-spin' : '',
+                    ]"
                   />
                 </span>
               </div>
               <p
-                v-if="row.error"
-                class="truncate text-xs text-destructive"
+                v-if="item.row.message"
+                class="truncate text-xs text-muted-foreground"
+                :title="item.row.message"
               >
-                {{ row.error }}
+                {{ item.row.message }}
+              </p>
+              <p
+                v-if="item.row.activity"
+                class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
+              >
+                <Loader2 class="h-3 w-3 shrink-0 animate-spin" />
+                <span class="truncate">{{ formatActivityLabel(item.row.activity) }}</span>
+              </p>
+              <p
+                v-if="item.row.error"
+                class="truncate text-xs text-destructive"
+                :title="item.row.error"
+              >
+                {{ item.row.error }}
               </p>
             </div>
           </DropdownMenuContent>

@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -9,8 +9,9 @@ use tokio::sync::Mutex;
 use super::super::fs::relative_path;
 use super::super::lsp_registry::workspace_warm_plan;
 use super::ensure_running::ensure_running_server;
-use super::helpers::{is_lsp_method_not_found, uri_to_path, LspDiagnosticsEvent, LspServerStatus};
+use super::helpers::{is_lsp_method_not_found, uri_to_path, LspDiagnosticsEvent};
 use super::rpc::{json_rpc_request, LspDiagnosticProvider, LspProcess, LSP_SERVERS};
+use super::state::LspServerState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -185,13 +186,13 @@ fn files_from_uri_map(
     items
 }
 
-fn unavailable_from_status(status: LspServerStatus) -> LspWorkspaceDiagnosticsServer {
+fn unavailable_from_status(status: LspServerState) -> LspWorkspaceDiagnosticsServer {
     LspWorkspaceDiagnosticsServer {
         id: status.id,
         mode: LspWorkspaceDiagnosticMode::Unavailable,
         error: status.error,
         items: vec![],
-        install_state: status.install_state,
+        install_state: Some(status.phase.as_str().to_string()),
     }
 }
 
@@ -329,7 +330,7 @@ async fn pull_workspace_diagnostics(
 
 async fn report_for_status(
     app: &AppHandle,
-    status: LspServerStatus,
+    status: LspServerState,
     workspace_root: &str,
 ) -> LspWorkspaceDiagnosticsServer {
     if !status.running {
@@ -352,7 +353,10 @@ pub async fn lsp_workspace_diagnostics(
     app: AppHandle,
     project_root: String,
 ) -> Result<LspWorkspaceDiagnosticsResult, String> {
-    let plan = workspace_warm_plan(Path::new(&project_root));
+    let root = PathBuf::from(&project_root);
+    let plan = tokio::task::spawn_blocking(move || workspace_warm_plan(&root))
+        .await
+        .map_err(|error| format!("Workspace warm plan failed: {error}"))?;
     let mut seen = HashSet::new();
     let mut servers = Vec::new();
 

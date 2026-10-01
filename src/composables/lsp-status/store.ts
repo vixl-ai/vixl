@@ -1,23 +1,24 @@
 import { computed, onMounted, watch } from 'vue'
-import type { LspHealth, LspProblemItem, LspStatusServerRow } from '@/types/lsp/lsp-status'
+import type { LspProblemItem, LspStatusServerRow } from '@/types/lsp/lsp-status'
 import useFleetRegistry from '@/composables/use-fleet-registry'
+import formatUnknownError from '@/utils/format-unknown-error'
 import { normalizeFileUri } from '@/utils/monaco-lsp'
-import { refreshCatalog, warmDefaults } from './catalog'
+import { refreshCatalog, syncLspStatePoll, warmDefaults } from './catalog'
 import {
   clearDiagnostics,
   countSeverity,
+  deriveHealth,
+  deriveIsBusy,
   fileUriToProjectPath,
-  markAwaitingProjectLoad,
+  selectVisibleRows,
   toStatusRow,
 } from './helpers'
 import { bindListeners, unbindListeners } from './listeners'
 import {
-  awaitingProjectLoad,
   diagnosticsByUri,
   installMessage,
   prefetchBusy,
   servers,
-  warming,
   warmState,
 } from './state'
 
@@ -26,57 +27,34 @@ const useLspStatus = () => {
   const projectRoot = computed(() => fleet.activeProject.value?.rootPath ?? null)
 
   const statusRows = computed((): LspStatusServerRow[] =>
-    servers.value.map(toStatusRow),
+    [...servers.value.values()].map(toStatusRow),
   )
 
-  const visibleRows = computed((): LspStatusServerRow[] => {
-    const busy = prefetchBusy.value || warming.value
-    return statusRows.value.filter((row) => {
-      if (
-        row.running ||
-        row.displayState === 'installing' ||
-        row.displayState === 'starting' ||
-        row.displayState === 'needs_trust' ||
-        row.displayState === 'error'
-      ) {
-        return true
-      }
-      if (busy && awaitingProjectLoad.value.has(row.id)) {
-        return true
-      }
-      return false
-    })
-  })
+  const visibleRows = computed((): LspStatusServerRow[] =>
+    selectVisibleRows(statusRows.value),
+  )
 
   const errorCount = computed(() => countSeverity(1))
   const warningCount = computed(() => countSeverity(2))
 
   const hasServerErrors = computed(() =>
-    statusRows.value.some((row) => row.displayState === 'error' || Boolean(row.error)),
+    statusRows.value.some(
+      (row) => row.displayState === 'error' || row.displayState === 'crashed',
+    ),
   )
 
-  const isBusy = computed(
-    () =>
-      prefetchBusy.value ||
-      warming.value ||
-      awaitingProjectLoad.value.size > 0 ||
-      statusRows.value.some(
-        (row) => row.displayState === 'installing' || row.displayState === 'starting',
-      ),
+  const isBusy = computed(() =>
+    deriveIsBusy(prefetchBusy.value, servers.value.values()),
   )
 
-  const health = computed((): LspHealth => {
-    if (isBusy.value) {
-      return 'busy'
-    }
-    if (hasServerErrors.value || errorCount.value > 0) {
-      return 'error'
-    }
-    if (warningCount.value > 0) {
-      return 'warning'
-    }
-    return 'ok'
-  })
+  const health = computed(() =>
+    deriveHealth(
+      isBusy.value,
+      statusRows.value,
+      errorCount.value,
+      warningCount.value,
+    ),
+  )
 
   const problems = computed((): LspProblemItem[] => {
     const root = projectRoot.value
@@ -117,10 +95,10 @@ const useLspStatus = () => {
     if (root !== previous) {
       clearDiagnostics()
       warmState.lastWarmedRoot = null
-      awaitingProjectLoad.value = new Set()
     }
     if (!root) {
-      servers.value = []
+      servers.value = new Map()
+      syncLspStatePoll()
       return
     }
     refreshCatalog()
@@ -131,8 +109,7 @@ const useLspStatus = () => {
         await warmDefaults(root)
       })
       .catch((error: unknown) => {
-        installMessage.value =
-          error instanceof Error ? error.message : 'Failed to load language servers'
+        installMessage.value = formatUnknownError(error)
       })
   })
 
@@ -147,8 +124,7 @@ const useLspStatus = () => {
       await warmDefaults(root)
     }
     start().catch((error: unknown) => {
-      installMessage.value =
-        error instanceof Error ? error.message : 'Failed to start language status'
+      installMessage.value = formatUnknownError(error)
     })
   })
 
@@ -165,7 +141,6 @@ const useLspStatus = () => {
     projectRoot,
     refreshCatalog,
     warmDefaults,
-    markAwaitingProjectLoad,
     clearDiagnostics,
     bindListeners: () => bindListeners(projectRoot),
     unbindListeners,

@@ -166,12 +166,39 @@ export type CodegraphCliResult = {
   exitCode?: number | null
 }
 
-export type LspServerStatus = {
+export type LspPhase =
+  | 'missing'
+  | 'idle'
+  | 'needs_trust'
+  | 'installing'
+  | 'starting'
+  | 'running'
+  | 'stopping'
+  | 'stopped'
+  | 'exited'
+  | 'crashed'
+  | 'error'
+
+export type LspActivity = {
+  token: string | null
+  title: string
+  message: string | null
+  percentage: number | null
+}
+
+export type LspServerState = {
   id: string
+  phase: LspPhase
+  generation: number
+  revision: number
+  phaseSinceMs: number
+  message: string | null
+  error: string | null
+  activity: LspActivity | null
+  source: string | null
+  workspaceRoot: string | null
+  pid: number | null
   running: boolean
-  error?: string | null
-  source?: string | null
-  installState?: string | null
 }
 
 export type LspWorkspaceProfile = {
@@ -188,10 +215,7 @@ export type LspCatalogEntry = {
   requiresTrust: boolean
   installable: boolean
   installed: boolean
-  running: boolean
   disabled: boolean
   canDisable: boolean
-  error?: string | null
-  source?: string | null
-  installState?: string | null
+  state: LspServerState
 }

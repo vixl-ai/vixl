@@ -13,7 +13,7 @@ use super::archive::{
 use super::managed::{find_file_named, managed_bin_path, version_key_for_spec};
 use super::node::{download_bytes, ensure_portable_node};
 use super::paths::managed_server_dir;
-use super::progress::emit_progress;
+use super::progress::InstallMonitor;
 use super::resolve::{
     github_target_token, resolve_github_asset, resolve_http_archive_url,
     windows_exe_if_extensionless,
@@ -37,6 +37,7 @@ async fn timed_output(command: &mut TokioCommand) -> Result<std::process::Output
 pub(crate) async fn npm_install_packages(
     app: &AppHandle,
     spec: &BuiltinLspSpec,
+    monitor: &InstallMonitor,
 ) -> Result<PathBuf, String> {
     let npm = spec
         .npm
@@ -51,12 +52,9 @@ pub(crate) async fn npm_install_packages(
 
     let node = ensure_portable_node(app).await?;
 
-    emit_progress(
-        app,
-        spec.id,
-        "installing",
-        Some(format!("Installing {}", spec.id)),
-    );
+    monitor
+        .begin(spec.id, format!("Installing {}", spec.id))
+        .await;
 
     let npm_args = [
         vec![
@@ -96,6 +94,7 @@ pub(crate) async fn npm_install_packages(
 pub(crate) async fn github_install(
     app: &AppHandle,
     spec: &BuiltinLspSpec,
+    monitor: &InstallMonitor,
 ) -> Result<PathBuf, String> {
     let github = spec
         .github
@@ -107,12 +106,9 @@ pub(crate) async fn github_install(
         return Ok(existing);
     }
 
-    emit_progress(
-        app,
-        spec.id,
-        "installing",
-        Some(format!("Downloading {}", spec.id)),
-    );
+    monitor
+        .begin(spec.id, format!("Downloading {}", spec.id))
+        .await;
 
     let (url, _asset) = resolve_github_asset(github)?;
     let bytes = download_bytes(&url).await.map_err(|e| {
@@ -196,6 +192,7 @@ pub(crate) fn normalize_lemminx_binary(dir: &Path, binary_name: &str) -> Result<
 pub(crate) async fn http_archive_install(
     app: &AppHandle,
     spec: &BuiltinLspSpec,
+    monitor: &InstallMonitor,
 ) -> Result<PathBuf, String> {
     let http = spec
         .http
@@ -213,12 +210,9 @@ pub(crate) async fn http_archive_install(
         return Ok(existing);
     }
 
-    emit_progress(
-        app,
-        spec.id,
-        "installing",
-        Some(format!("Downloading {}", spec.id)),
-    );
+    monitor
+        .begin(spec.id, format!("Downloading {}", spec.id))
+        .await;
 
     let url = resolve_http_archive_url(http)?;
     let bytes = download_bytes(&url).await.map_err(|e| {
@@ -254,6 +248,7 @@ pub(crate) async fn http_archive_install(
 pub(crate) async fn go_install_package(
     app: &AppHandle,
     spec: &BuiltinLspSpec,
+    monitor: &InstallMonitor,
 ) -> Result<PathBuf, String> {
     let go_spec = spec
         .go
@@ -272,12 +267,9 @@ pub(crate) async fn go_install_package(
         )
     })?;
 
-    emit_progress(
-        app,
-        spec.id,
-        "installing",
-        Some(format!("Running go install for {}", spec.id)),
-    );
+    monitor
+        .begin(spec.id, format!("Running go install for {}", spec.id))
+        .await;
 
     let mut go_cmd = TokioCommand::new(go_bin);
     go_cmd

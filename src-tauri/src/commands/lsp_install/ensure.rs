@@ -2,11 +2,14 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 
 use tauri::AppHandle;
 use tokio::sync::Mutex;
 
-use super::super::lsp_registry::{builtin_spec_by_id, tier_a_ids, LspInstallKind, LspTier};
+use super::super::lsp_registry::{
+    builtin_spec_by_id, tier_a_ids, BuiltinLspSpec, LspInstallKind, LspTier,
+};
 use super::backends::{
     github_install, go_install_package, http_archive_install, npm_install_packages,
 };
@@ -14,7 +17,7 @@ use super::managed::{managed_bin_path, version_key_for_spec};
 use super::named_lock::named_lock_for;
 use super::node::ensure_portable_node;
 use super::paths::{auto_download_enabled, lsp_root, managed_server_dir};
-use super::progress::emit_progress;
+use super::progress::{emit_progress, InstallMonitor};
 
 lazy_static::lazy_static! {
   static ref INSTALL_LOCKS: Mutex<HashMap<String, Arc<Mutex<()>>>> =
@@ -24,13 +27,15 @@ lazy_static::lazy_static! {
 pub async fn ensure_server_installed(
     app: &AppHandle,
     server_id: &str,
-) -> Result<Option<PathBuf>, String> {
+    generation: u64,
+    settle: bool,
+) -> Result<Option<String>, String> {
     let Some(spec) = builtin_spec_by_id(server_id) else {
         return Ok(None);
     };
 
     if !auto_download_enabled(app) {
-        return Ok(managed_bin_path(app, spec));
+        return Ok(None);
     }
 
     if spec.tier == LspTier::D || spec.install == LspInstallKind::None {
@@ -38,62 +43,94 @@ pub async fn ensure_server_installed(
     }
 
     if spec.install == LspInstallKind::ToolchainPath {
-        let bin = spec.command.first().copied().unwrap_or("");
-        return Ok(which::which(bin).ok());
+        return Ok(None);
     }
 
     let install_lock = named_lock_for(&INSTALL_LOCKS, server_id).await;
     let _install_guard = install_lock.lock().await;
+    // settle publishes Idle or Error, so those writes must leave a live row alone.
+    // Ensure passes false while Starting and still needs Installing.
+    let monitor = InstallMonitor::new(app.clone(), generation, settle);
+    let started = Instant::now();
 
+    let mut path_fallback = None;
     let result = match spec.install {
-        LspInstallKind::Npm => npm_install_packages(app, spec).await.map(Some),
-        LspInstallKind::GithubRelease => match github_install(app, spec).await {
+        LspInstallKind::Npm => npm_install_packages(app, spec, &monitor).await.map(Some),
+        LspInstallKind::GithubRelease => match github_install(app, spec, &monitor).await {
             Ok(path) => Ok(Some(path)),
-            Err(error) => {
-                // Allow PATH fallback
-                let fallback = which::which(spec.command.first().copied().unwrap_or("")).ok();
-                if fallback.is_some() {
-                    emit_progress(app, server_id, "path", Some(error));
-                    Ok(fallback)
-                } else {
-                    Err(error)
-                }
-            }
+            Err(error) => path_or_error(spec, error, &mut path_fallback),
         },
-        LspInstallKind::HttpArchive => match http_archive_install(app, spec).await {
+        LspInstallKind::HttpArchive => match http_archive_install(app, spec, &monitor).await {
             Ok(path) => Ok(Some(path)),
-            Err(error) => {
-                let fallback = which::which(spec.command.first().copied().unwrap_or("")).ok();
-                if fallback.is_some() {
-                    emit_progress(app, server_id, "path", Some(error));
-                    Ok(fallback)
-                } else {
-                    Err(error)
-                }
-            }
+            Err(error) => path_or_error(spec, error, &mut path_fallback),
         },
-        LspInstallKind::GoInstall => match go_install_package(app, spec).await {
+        LspInstallKind::GoInstall => match go_install_package(app, spec, &monitor).await {
             Ok(path) => Ok(Some(path)),
-            Err(error) => {
-                let fallback = which::which(spec.command.first().copied().unwrap_or("")).ok();
-                if fallback.is_some() {
-                    emit_progress(app, server_id, "path", Some(error));
-                    Ok(fallback)
-                } else {
-                    Err(error)
-                }
-            }
+            Err(error) => path_or_error(spec, error, &mut path_fallback),
         },
         _ => Ok(None),
     };
 
-    match &result {
-        Ok(Some(_)) => emit_progress(app, server_id, "ready", None),
-        Ok(None) => {}
-        Err(error) => emit_progress(app, server_id, "error", Some(error.clone())),
+    let elapsed_ms = started.elapsed().as_millis();
+    log_install_result(
+        server_id,
+        elapsed_ms,
+        monitor.began(),
+        &result,
+        &path_fallback,
+    );
+
+    if settle {
+        let (error, path_message) = match &result {
+            Ok(_) => (None, path_fallback.clone()),
+            Err(error) => (Some(error.clone()), None),
+        };
+        crate::commands::lsp::finish_standalone_install(
+            app,
+            server_id,
+            generation,
+            monitor.began(),
+            error,
+            path_message,
+        )
+        .await;
     }
 
-    result
+    result.map(|_| path_fallback)
+}
+
+fn path_or_error(
+    spec: &BuiltinLspSpec,
+    error: String,
+    path_fallback: &mut Option<String>,
+) -> Result<Option<PathBuf>, String> {
+    let fallback = which::which(spec.command.first().copied().unwrap_or("")).ok();
+    if fallback.is_some() {
+        *path_fallback = Some(error);
+        Ok(fallback)
+    } else {
+        Err(error)
+    }
+}
+
+fn log_install_result(
+    server_id: &str,
+    elapsed_ms: u128,
+    began: bool,
+    result: &Result<Option<PathBuf>, String>,
+    path_fallback: &Option<String>,
+) {
+    if let Err(error) = result {
+        log::warn!("install failed for {server_id} in {elapsed_ms}ms: {error}");
+        return;
+    }
+    if path_fallback.is_some() {
+        log::info!("install fell back to PATH for {server_id} in {elapsed_ms}ms");
+        return;
+    }
+    if began {
+        log::info!("installed {server_id} in {elapsed_ms}ms");
+    }
 }
 
 pub async fn prefetch_tier_a(app: AppHandle) -> Result<(), String> {
@@ -112,11 +149,11 @@ pub async fn prefetch_tier_a(app: AppHandle) -> Result<(), String> {
     let _ = ensure_portable_node(&app).await;
 
     for id in tier_a_ids() {
-        match ensure_server_installed(&app, id).await {
+        let generation = crate::commands::lsp::current_generation(id).await;
+        match ensure_server_installed(&app, id, generation, true).await {
             Ok(_) => {}
             Err(error) => {
-                log::warn!("LSP prefetch failed for {id}: {error}");
-                emit_progress(&app, id, "error", Some(error));
+                log::warn!("prefetch failed for {id}: {error}");
             }
         }
     }
@@ -135,7 +172,8 @@ pub async fn lsp_prefetch_defaults(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn lsp_install_server(app: AppHandle, server_id: String) -> Result<(), String> {
-    ensure_server_installed(&app, &server_id).await?;
+    let generation = crate::commands::lsp::current_generation(&server_id).await;
+    ensure_server_installed(&app, &server_id, generation, true).await?;
     Ok(())
 }
 

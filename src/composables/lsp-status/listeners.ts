@@ -1,17 +1,25 @@
-import type { Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { isTauri } from '@/services/vixl/vixl-tauri'
+import type { LspServerState } from '@/services/vixl/vixl-tauri'
+import formatUnknownError from '@/utils/format-unknown-error'
 import { parseLspDiagnostics } from '@/utils/monaco-lsp'
-import { refreshCatalog, warmDefaults } from './catalog'
-import { applyReadyInstallState } from './helpers'
+import { applyServerState } from './apply-state'
 import {
-  awaitingProjectLoad,
+  invalidateCatalogRefresh,
+  refreshCatalog,
+  stopLspStatePoll,
+  syncLspStatePoll,
+  warmDefaults,
+} from './catalog'
+import {
   diagnosticsByUri,
   installMessage,
   listenerState,
   prefetchBusy,
   servers,
 } from './state'
+import { noteServerState } from './toasts'
 
 type LspInstallProgress = {
   serverId: string
@@ -25,74 +33,104 @@ type LspDiagnosticsEvent = {
   serverId: string
 }
 
+const handleWindowFocus = (): void => {
+  void refreshCatalog()
+}
+
+const handleVisibilityChange = (): void => {
+  if (document.visibilityState === 'visible') {
+    void refreshCatalog()
+  }
+}
+
+const handleServerState = async (state: LspServerState): Promise<void> => {
+  if (!servers.value.has(state.id)) {
+    await refreshCatalog()
+    const entry = servers.value.get(state.id)
+    if (entry) {
+      noteServerState(entry.state, entry.label)
+    }
+    syncLspStatePoll()
+    return
+  }
+  if (!applyServerState(state)) {
+    return
+  }
+  const entry = servers.value.get(state.id)
+  if (entry) {
+    noteServerState(state, entry.label)
+  }
+  syncLspStatePoll()
+}
+
+const emptyProjectRoot = ref<string | null>(null)
+let activeProjectRoot: Ref<string | null> = emptyProjectRoot
+
+const handleInstall = async (payload: LspInstallProgress): Promise<void> => {
+  const { serverId, state, message } = payload
+  if (serverId !== '*' && serverId !== 'node') {
+    return
+  }
+  installMessage.value = message ?? `${serverId}: ${state}`
+  if (serverId !== '*') {
+    return
+  }
+  if (state === 'installing') {
+    prefetchBusy.value = true
+  }
+  if (state === 'ready' || state === 'error') {
+    prefetchBusy.value = false
+    await refreshCatalog()
+    const root = activeProjectRoot.value
+    if (state === 'ready' && root) {
+      await warmDefaults(root)
+    }
+  }
+  syncLspStatePoll()
+}
+
 export const bindListeners = async (
-  projectRoot: Ref<string | null>,
+  projectRoot?: Ref<string | null>,
 ): Promise<void> => {
+  if (projectRoot) {
+    activeProjectRoot = projectRoot
+  }
   if (!isTauri() || listenerState.bound) {
     return
   }
   listenerState.bound = true
+  window.addEventListener('focus', handleWindowFocus)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 
   try {
     listenerState.unlistenInstall = await listen<LspInstallProgress>(
       'lsp://install',
       async (event) => {
-        const { serverId, state, message } = event.payload
         try {
-          installMessage.value = message ?? `${serverId}: ${state}`
-
-          if (state === 'installing' && serverId === '*') {
-            prefetchBusy.value = true
-          }
-
-          if (state === 'installing' && serverId !== '*') {
-            servers.value = servers.value.map((entry) =>
-              entry.id === serverId
-                ? { ...entry, installState: 'installing', error: null }
-                : entry,
-            )
-          }
-
-          if (state !== 'ready' && state !== 'error') {
-            return
-          }
-
-          if (serverId === '*') {
-            prefetchBusy.value = false
-          }
-          if (serverId !== '*') {
-            if (state === 'ready') {
-              applyReadyInstallState(serverId)
-            } else {
-              servers.value = servers.value.map((entry) =>
-                entry.id === serverId
-                  ? {
-                      ...entry,
-                      installState: 'error',
-                      error: message ?? entry.error ?? 'Install failed',
-                    }
-                  : entry,
-              )
-            }
-          }
-
-          await refreshCatalog()
-          if (state === 'ready' && serverId !== '*') {
-            applyReadyInstallState(serverId)
-          }
-          if (state === 'ready' && serverId === '*' && projectRoot.value) {
-            await warmDefaults(projectRoot.value)
-          }
+          await handleInstall(event.payload)
         } catch (error: unknown) {
-          installMessage.value =
-            error instanceof Error
-              ? error.message
-              : 'Failed to refresh language servers'
+          installMessage.value = formatUnknownError(error)
         }
       },
     )
   } catch (error) {
-    listenerState.bound = false
+    unbindListeners()
+    throw error
+  }
+
+  try {
+    listenerState.unlistenState = await listen<LspServerState>(
+      'lsp://state',
+      async (event) => {
+        try {
+          await handleServerState(event.payload)
+        } catch (error: unknown) {
+          installMessage.value = formatUnknownError(error)
+        }
+      },
+    )
+  } catch (error) {
+    unbindListeners()
     throw error
   }
 
@@ -110,29 +148,27 @@ export const bindListeners = async (
           next.set(event.payload.uri, parsed)
         }
         diagnosticsByUri.value = next
-
-        if (awaitingProjectLoad.value.has(event.payload.serverId)) {
-          const remaining = new Set(awaitingProjectLoad.value)
-          remaining.delete(event.payload.serverId)
-          awaitingProjectLoad.value = remaining
-          if (remaining.size === 0) {
-            installMessage.value = 'Language servers ready'
-          }
-        }
       },
     )
   } catch (error) {
-    installMessage.value =
-      error instanceof Error
-        ? error.message
-        : 'Failed to subscribe to LSP diagnostics'
+    installMessage.value = formatUnknownError(error)
   }
+
+  syncLspStatePoll()
 }
 
 export const unbindListeners = (): void => {
+  invalidateCatalogRefresh()
+  stopLspStatePoll()
+  window.removeEventListener('focus', handleWindowFocus)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   listenerState.unlistenInstall?.()
   listenerState.unlistenInstall = null
+  listenerState.unlistenState?.()
+  listenerState.unlistenState = null
   listenerState.unlistenDiagnostics?.()
   listenerState.unlistenDiagnostics = null
   listenerState.bound = false
+  activeProjectRoot = emptyProjectRoot
+  emptyProjectRoot.value = null
 }

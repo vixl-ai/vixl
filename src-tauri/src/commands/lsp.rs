@@ -1,26 +1,40 @@
 mod documents;
 mod ensure_running;
 mod helpers;
+mod install_progress;
 mod io;
+mod progress;
 mod resolve;
 mod rpc;
 mod start;
+mod state;
 mod typescript;
 mod vue_tsserver;
 mod workspace_diagnostics;
 
 pub use documents::forget_open_document;
-pub use ensure_running::start_lock_for;
+pub use ensure_running::{acquire_start_lock, start_lock_for, ENSURE_DEADLINE, START_LOCK_WAIT};
 pub use helpers::{
     apply_server_disabled_flag, dependent_server_ids, is_lsp_method_not_found,
     normalize_lsp_method, normalize_lsp_params, server_display_label, LspCatalogEntry,
-    LspServerStatus, LspWorkspaceProfile,
+    LspWorkspaceProfile,
 };
 pub use io::{
     append_stderr_snippet, lsp_invalid_stream_error, lsp_request_timeout_error, read_lsp_message,
 };
+pub use progress::{
+    activity_for_running, clear_loading_activity, parse_progress_params, running_activity_decision,
+    server_awaits_project_load, should_emit_progress, ActiveProgress, ProgressKind,
+    PROGRESS_REPORT_MIN_INTERVAL_MS, PROJECT_LOAD_FUSE_MS,
+};
 pub use resolve::{resolve_lsp_servers, LspServerEntry};
-pub use rpc::LspDiagnosticProvider;
+pub use rpc::{
+    claim_once, classify_process_exit, process_exit_detail, process_exit_status,
+    remove_if_generation, LspDiagnosticProvider, ProcessExitStatus,
+};
+pub use state::{
+    apply_transition, LspActivity, LspPhase, LspServerState, LspStatePatch, LspStateWrite,
+};
 pub use typescript::{
     compute_vue_in_play, merge_vue_plugin_options, pick_typescript_tsdk,
     should_inject_vue_typescript_plugin, typescript_lsp_argv,
@@ -32,6 +46,8 @@ pub use workspace_diagnostics::{
     parse_workspace_diagnostic_report, ParsedWorkspaceDocumentReport,
 };
 
+use std::collections::HashMap;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use tauri::{AppHandle, Emitter};
@@ -52,15 +68,44 @@ use helpers::{
     install_kind_label, is_managed_install_kind, lsp_method_is_notification, path_to_uri,
     LspDiagnosticsEvent,
 };
+pub(crate) use install_progress::{finish_standalone_install, mark_server_installing};
 use resolve::{load_effective_servers, server_binary_available};
 use rpc::{
-    cancel_pending_requests, json_rpc_request, respond_to_server_request, send_notification,
-    set_state, LspProcess, LSP_SERVERS, LSP_STATES,
+    cancel_pending_requests, handle_process_exit, json_rpc_request, respond_to_server_request,
+    send_notification, LspProcess, LSP_SERVERS,
 };
+pub(crate) use state::current_generation;
+use state::{all_states, fallback_server_state, now_ms, transition, transition_with};
 use typescript::{vue_in_play_for, workspace_configuration_response};
 use vue_tsserver::{forward_vue_tsserver_request, mirror_vue_document_to_typescript};
 
-pub(crate) fn spawn_reader(process: Arc<Mutex<LspProcess>>, server_id: String, app: AppHandle) {
+pub(crate) async fn commit_running_activity(
+    app: &AppHandle,
+    server_id: &str,
+    generation: u64,
+    process: &Mutex<LspProcess>,
+) {
+    let (progress_activity, project_loading) = {
+        let guard = process.lock().await;
+        (
+            guard.progress.current().cloned(),
+            Arc::clone(&guard.project_loading),
+        )
+    };
+    transition_with(app, server_id, generation, move |existing| {
+        let activity =
+            activity_for_running(progress_activity, project_loading.load(Ordering::SeqCst));
+        running_activity_decision(existing, generation, activity)
+    })
+    .await;
+}
+
+pub(crate) fn spawn_reader(
+    process: Arc<Mutex<LspProcess>>,
+    server_id: String,
+    generation: u64,
+    app: AppHandle,
+) {
     tokio::spawn(async move {
         let stdout = {
             let mut guard = process.lock().await;
@@ -68,14 +113,27 @@ pub(crate) fn spawn_reader(process: Arc<Mutex<LspProcess>>, server_id: String, a
         };
 
         let Some(stdout) = stdout else {
+            handle_process_exit(
+                &app,
+                &server_id,
+                generation,
+                &process,
+                None,
+                Some("LSP stdout unavailable".to_string()),
+            )
+            .await;
             return;
         };
 
         let mut reader = BufReader::new(stdout);
+        let mut last_progress_emit_ms = None;
         let exit_reason = loop {
             let message = match read_lsp_message(&mut reader).await {
                 Ok(message) => message,
-                Err(error) => break cancel_pending_requests(&process, &error).await,
+                Err(error) => {
+                    let _ = cancel_pending_requests(&process, &error).await;
+                    break error;
+                }
             };
 
             if message.get("id").is_some() && message.get("method").is_some() {
@@ -123,6 +181,24 @@ pub(crate) fn spawn_reader(process: Arc<Mutex<LspProcess>>, server_id: String, a
 
             if message.get("id").is_none() {
                 if let Some(method) = message.get("method").and_then(|value| value.as_str()) {
+                    if method == "$/progress" {
+                        if let Some(update) = message.get("params").and_then(parse_progress_params)
+                        {
+                            let kind = update.kind;
+                            {
+                                let mut guard = process.lock().await;
+                                guard.progress.apply(update);
+                            }
+                            let now = now_ms();
+                            if should_emit_progress(kind, now, last_progress_emit_ms) {
+                                commit_running_activity(&app, &server_id, generation, &process)
+                                    .await;
+                                last_progress_emit_ms = Some(now);
+                            }
+                        }
+                        continue;
+                    }
+
                     if method == "tsserver/request" && server_id == "vue" {
                         let params = message
                             .get("params")
@@ -162,6 +238,13 @@ pub(crate) fn spawn_reader(process: Arc<Mutex<LspProcess>>, server_id: String, a
                             server_id: server_id.clone(),
                         };
                         let _ = app.emit("lsp://diagnostics", payload);
+                        let loading_done = {
+                            let guard = process.lock().await;
+                            guard.project_loading.swap(false, Ordering::SeqCst)
+                        };
+                        if loading_done {
+                            commit_running_activity(&app, &server_id, generation, &process).await;
+                        }
                     }
                     continue;
                 }
@@ -183,31 +266,59 @@ pub(crate) fn spawn_reader(process: Arc<Mutex<LspProcess>>, server_id: String, a
             }
         };
 
-        set_state(
+        handle_process_exit(
+            &app,
             &server_id,
-            false,
-            Some(exit_reason),
+            generation,
+            &process,
             None,
-            Some("exited".to_string()),
+            Some(exit_reason),
         )
         .await;
-        let mut servers = LSP_SERVERS.lock().await;
-        servers.remove(&server_id);
     });
 }
 
-pub(crate) async fn stop_server_internal(server_id: &str) -> Result<(), String> {
+pub(crate) async fn stop_server_internal(app: &AppHandle, server_id: &str) -> Result<(), String> {
     let managed = {
-        let mut servers = LSP_SERVERS.lock().await;
-        servers.remove(server_id)
+        let servers = LSP_SERVERS.lock().await;
+        servers.get(server_id).cloned()
     };
 
     let Some(managed) = managed else {
-        set_state(server_id, false, None, None, Some("stopped".to_string())).await;
+        let generation = current_generation(server_id).await;
+        log::info!("stopped {server_id}");
+        transition(
+            app,
+            server_id,
+            generation,
+            LspPhase::Stopped,
+            LspStatePatch::terminal(None),
+        )
+        .await;
         return Ok(());
     };
 
+    let generation = managed.generation;
     let process = managed.process.clone();
+    {
+        let guard = process.lock().await;
+        guard.stop_requested.store(true, Ordering::SeqCst);
+    }
+
+    log::info!("stopping {server_id}");
+    transition(
+        app,
+        server_id,
+        generation,
+        LspPhase::Stopping,
+        LspStatePatch {
+            message: Some(None),
+            activity: Some(None),
+            ..LspStatePatch::default()
+        },
+    )
+    .await;
+
     let uris = {
         let guard = process.lock().await;
         guard.open_documents.keys().cloned().collect::<Vec<_>>()
@@ -225,20 +336,57 @@ pub(crate) async fn stop_server_internal(server_id: &str) -> Result<(), String> 
         let _ = guard.child.kill().await;
     }
 
-    set_state(server_id, false, None, None, Some("stopped".to_string())).await;
+    {
+        let mut servers = LSP_SERVERS.lock().await;
+        remove_if_generation(&mut servers, server_id, generation, |entry| {
+            entry.generation
+        });
+    }
+
+    log::info!("stopped {server_id}");
+    transition(
+        app,
+        server_id,
+        generation,
+        LspPhase::Stopped,
+        LspStatePatch::terminal(None),
+    )
+    .await;
     Ok(())
 }
 
-#[tauri::command]
-pub async fn lsp_status() -> Result<Vec<LspServerStatus>, String> {
-    let states = LSP_STATES.lock().await;
-    if states.is_empty() {
-        return Ok(vec![]);
+/// Kills a published process without writing a phase.
+/// Claims the exit and drops the generation before the kill, so the reader
+/// cannot publish over the stored row.
+pub(crate) async fn retire_server_process(server_id: &str) {
+    let managed = {
+        let servers = LSP_SERVERS.lock().await;
+        servers.get(server_id).cloned()
+    };
+    let Some(managed) = managed else {
+        return;
+    };
+    {
+        let guard = managed.process.lock().await;
+        guard.stop_requested.store(true, Ordering::SeqCst);
+        guard.exit_handled.store(true, Ordering::SeqCst);
     }
+    {
+        let mut servers = LSP_SERVERS.lock().await;
+        remove_if_generation(&mut servers, server_id, managed.generation, |entry| {
+            entry.generation
+        });
+    }
+    {
+        let mut guard = managed.process.lock().await;
+        let _ = guard.child.start_kill();
+        let _ = guard.child.try_wait();
+    }
+}
 
-    let mut statuses = states.values().cloned().collect::<Vec<_>>();
-    statuses.sort_by(|left, right| left.id.cmp(&right.id));
-    Ok(statuses)
+#[tauri::command]
+pub async fn lsp_status() -> Result<Vec<LspServerState>, String> {
+    Ok(all_states().await)
 }
 
 #[tauri::command]
@@ -403,21 +551,23 @@ pub async fn lsp_ensure_server(
     app: AppHandle,
     extension: String,
     project_root: Option<String>,
-) -> Result<LspServerStatus, String> {
+) -> Result<LspServerState, String> {
     ensure_running_server(&app, &extension, project_root).await
 }
 
 #[tauri::command]
-pub async fn lsp_stop_server(server_id: String) -> Result<(), String> {
-    stop_server_internal(&server_id).await
+pub async fn lsp_stop_server(app: AppHandle, server_id: String) -> Result<(), String> {
+    stop_server_internal(&app, &server_id).await
 }
 
 #[tauri::command]
 pub async fn lsp_workspace_profile(project_root: String) -> Result<LspWorkspaceProfile, String> {
-    let root = std::path::Path::new(&project_root);
-    let plan = workspace_warm_plan(root);
+    let root = std::path::PathBuf::from(&project_root);
+    let plan = tokio::task::spawn_blocking(move || workspace_warm_plan(&root))
+        .await
+        .map_err(|error| format!("Workspace warm plan failed: {error}"))?;
     Ok(LspWorkspaceProfile {
-        vue_nuxt: workspace_is_vue_nuxt(root),
+        vue_nuxt: workspace_is_vue_nuxt(std::path::Path::new(&project_root)),
         warm: plan.server_ids,
         warm_extensions: plan.extensions,
     })
@@ -426,13 +576,16 @@ pub async fn lsp_workspace_profile(project_root: String) -> Result<LspWorkspaceP
 #[tauri::command]
 pub async fn lsp_catalog(app: AppHandle) -> Result<Vec<LspCatalogEntry>, String> {
     let effective = load_effective_servers(&app).await.unwrap_or_default();
-    let states = LSP_STATES.lock().await;
+    let states: HashMap<String, LspServerState> = all_states()
+        .await
+        .into_iter()
+        .map(|state| (state.id.clone(), state))
+        .collect();
     let mut entries: Vec<LspCatalogEntry> = Vec::new();
     let mut seen = std::collections::HashSet::new();
 
     for spec in builtin_specs() {
         seen.insert(spec.id.to_string());
-        let state = states.get(spec.id);
         let source = install_source_label(&app, spec.id);
         let installed = source != "none";
         let installable = is_managed_install_kind(spec.install);
@@ -441,6 +594,10 @@ pub async fn lsp_catalog(app: AppHandle) -> Result<Vec<LspCatalogEntry>, String>
             false
         } else {
             !effective.contains_key(spec.id)
+        };
+        let state = match states.get(spec.id) {
+            Some(state) => state.clone(),
+            None => fallback_server_state(spec.id, installed, source),
         };
         entries.push(LspCatalogEntry {
             id: spec.id.to_string(),
@@ -454,20 +611,9 @@ pub async fn lsp_catalog(app: AppHandle) -> Result<Vec<LspCatalogEntry>, String>
             requires_trust: spec.requires_trust,
             installable,
             installed,
-            running: state.map(|s| s.running).unwrap_or(false),
             disabled,
             can_disable,
-            error: state.and_then(|s| s.error.clone()),
-            source: Some(source),
-            install_state: state.and_then(|s| s.install_state.clone()).or_else(|| {
-                if installed {
-                    Some("ready".to_string())
-                } else if installable {
-                    Some("missing".to_string())
-                } else {
-                    Some("toolchain".to_string())
-                }
-            }),
+            state,
         });
     }
 
@@ -475,11 +621,15 @@ pub async fn lsp_catalog(app: AppHandle) -> Result<Vec<LspCatalogEntry>, String>
         if seen.contains(id) {
             continue;
         }
-        let state = states.get(id);
         let source = if server_binary_available(&app, id, entry) {
             "custom".to_string()
         } else {
             "none".to_string()
+        };
+        let installed = source != "none";
+        let state = match states.get(id) {
+            Some(state) => state.clone(),
+            None => fallback_server_state(id, installed, source),
         };
         entries.push(LspCatalogEntry {
             id: id.clone(),
@@ -488,13 +638,10 @@ pub async fn lsp_catalog(app: AppHandle) -> Result<Vec<LspCatalogEntry>, String>
             install_kind: "custom".to_string(),
             requires_trust: false,
             installable: false,
-            installed: source != "none",
-            running: state.map(|s| s.running).unwrap_or(false),
+            installed,
             disabled: false,
             can_disable: true,
-            error: state.and_then(|s| s.error.clone()),
-            source: Some(source),
-            install_state: state.and_then(|s| s.install_state.clone()),
+            state,
         });
     }
 
@@ -504,19 +651,16 @@ pub async fn lsp_catalog(app: AppHandle) -> Result<Vec<LspCatalogEntry>, String>
 
 #[tauri::command]
 pub async fn lsp_uninstall_server(app: AppHandle, server_id: String) -> Result<(), String> {
-    stop_server_internal(&server_id).await?;
+    stop_server_internal(&app, &server_id).await?;
     for extra_id in dependent_server_ids(&server_id) {
-        stop_server_internal(extra_id).await?;
+        stop_server_internal(&app, extra_id).await?;
     }
     remove_managed_install(&app, &server_id)?;
-    set_state(
-        &server_id,
-        false,
-        None,
-        Some("none".to_string()),
-        Some("missing".to_string()),
-    )
-    .await;
+    let generation = current_generation(&server_id).await;
+    let mut patch = LspStatePatch::terminal(None);
+    patch.source = Some(Some("none".to_string()));
+    patch.workspace_root = Some(None);
+    transition(&app, &server_id, generation, LspPhase::Missing, patch).await;
     Ok(())
 }
 
@@ -539,8 +683,116 @@ pub async fn lsp_set_server_disabled(
     super::config::write_lsp_config_internal(&app, config)?;
 
     if disabled {
-        stop_server_internal(&server_id).await.ok();
+        stop_server_internal(&app, &server_id).await.ok();
     }
 
     Ok(())
+}
+
+#[cfg(all(test, unix))]
+mod retire_tests {
+    use std::collections::HashMap;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::Arc;
+
+    use tokio::sync::Mutex;
+
+    use super::progress::ActiveProgress;
+    use super::rpc::{LspProcess, ManagedLspServer, LSP_SERVERS};
+    use super::{claim_once, retire_server_process};
+
+    struct Registered {
+        id: String,
+        process: Arc<Mutex<LspProcess>>,
+    }
+
+    impl Drop for Registered {
+        fn drop(&mut self) {
+            if let Ok(mut guard) = self.process.try_lock() {
+                let _ = guard.child.start_kill();
+            }
+            if let Ok(mut servers) = LSP_SERVERS.try_lock() {
+                servers.remove(&self.id);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn retire_claims_exit_kills_and_writes_no_phase() {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+        let server_id = format!("retire-{}", NEXT_ID.fetch_add(1, Ordering::Relaxed));
+
+        let mut command = tokio::process::Command::new("sleep");
+        command
+            .arg("30")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .kill_on_drop(true);
+        let mut child = command.spawn().expect("spawn sleep");
+        let stdin = child.stdin.take().expect("sleep stdin");
+        let generation = 4;
+        let process = Arc::new(Mutex::new(LspProcess {
+            child,
+            stdin,
+            workspace_root: "/tmp/app".to_string(),
+            open_documents: HashMap::new(),
+            diagnostics_by_uri: HashMap::new(),
+            diagnostic_provider: None,
+            pending: Mutex::new(HashMap::new()),
+            next_id: Mutex::new(0),
+            uses_classic_typescript: false,
+            stderr_tail: Arc::new(Mutex::new(String::new())),
+            generation,
+            pid: None,
+            stop_requested: Arc::new(AtomicBool::new(false)),
+            exit_handled: Arc::new(AtomicBool::new(false)),
+            progress: ActiveProgress::default(),
+            project_loading: Arc::new(AtomicBool::new(false)),
+        }));
+        let registered = Registered {
+            id: server_id.clone(),
+            process: process.clone(),
+        };
+        {
+            let mut servers = LSP_SERVERS.lock().await;
+            servers.insert(
+                server_id.clone(),
+                Arc::new(ManagedLspServer {
+                    process: process.clone(),
+                    generation,
+                }),
+            );
+        }
+
+        retire_server_process(&server_id).await;
+
+        assert!(
+            !LSP_SERVERS.lock().await.contains_key(&server_id),
+            "retired generation stays out of the server map"
+        );
+        assert!(super::state::snapshot(&server_id).await.is_none());
+
+        let guard = process.lock().await;
+        assert!(guard.stop_requested.load(Ordering::SeqCst));
+        assert!(guard.exit_handled.load(Ordering::SeqCst));
+        assert!(
+            !claim_once(&guard.exit_handled),
+            "reader must not claim the exit after retire"
+        );
+        drop(guard);
+
+        let mut exited = false;
+        for _ in 0..40 {
+            let mut guard = process.lock().await;
+            if guard.child.try_wait().ok().flatten().is_some() {
+                exited = true;
+                break;
+            }
+            drop(guard);
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+        assert!(exited, "retired child should be dead");
+        drop(registered);
+    }
 }

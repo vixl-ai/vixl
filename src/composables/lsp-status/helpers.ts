@@ -1,68 +1,147 @@
 import type {
+  LspActivity,
+  LspCatalogEntry,
+  LspPhase,
+  LspServerState,
+} from '@/services/vixl/vixl-tauri'
+import type {
+  LspHealth,
   LspServerDisplayState,
   LspStatusServerRow,
 } from '@/types/lsp/lsp-status'
-import type { LspCatalogEntry } from '@/services/vixl/vixl-tauri'
 import { normalizeFileUri } from '@/utils/monaco-lsp'
-import {
-  awaitingProjectLoad,
-  diagnosticsByUri,
-  installMessage,
-  servers,
-  warmState,
-} from './state'
+import { diagnosticsByUri } from './state'
 
-export const scheduleAwaitingClear = (): void => {
-  if (warmState.awaitingClearTimer !== null) {
-    clearTimeout(warmState.awaitingClearTimer)
-  }
-  warmState.awaitingClearTimer = setTimeout(() => {
-    awaitingProjectLoad.value = new Set()
-    warmState.awaitingClearTimer = null
-  }, 20_000)
+const TRANSIENT_PHASES: ReadonlySet<LspPhase> = new Set([
+  'installing',
+  'starting',
+  'stopping',
+])
+
+export const isTransientPhase = (phase: LspServerDisplayState): boolean =>
+  phase !== 'disabled' && TRANSIENT_PHASES.has(phase)
+
+export const phaseLabel: Record<LspServerDisplayState, string> = {
+  missing: 'Not installed',
+  idle: 'Idle',
+  needs_trust: 'Needs trust',
+  installing: 'Installing',
+  starting: 'Starting',
+  running: 'Running',
+  stopping: 'Stopping',
+  stopped: 'Stopped',
+  exited: 'Exited',
+  crashed: 'Crashed',
+  error: 'Error',
+  disabled: 'Disabled',
 }
 
-export const resolveDisplayState = (entry: LspCatalogEntry): LspServerDisplayState => {
-  if (entry.disabled) {
-    return 'disabled'
+export const formatActivityLabel = (activity: LspActivity): string => {
+  let text = activity.title
+  if (activity.message) {
+    text += `: ${activity.message}`
   }
-  if (entry.installState === 'needs_trust') {
-    return 'needs_trust'
+  if (activity.percentage !== null) {
+    text += ` ${activity.percentage}%`
   }
-  if (entry.error) {
+  return text
+}
+
+const HIDDEN_DISPLAY_STATES: ReadonlySet<LspServerDisplayState> = new Set([
+  'disabled',
+  'idle',
+  'missing',
+  'stopped',
+])
+
+// Revision 0 is the catalog fallback, so a later 0 may replace an earlier 0.
+export const catalogRevisionWins = (stored: number, incoming: number): boolean =>
+  incoming > stored || (incoming === stored && stored === 0)
+
+export const resolveDisplayState = (entry: LspCatalogEntry): LspServerDisplayState =>
+  entry.disabled ? 'disabled' : entry.state.phase
+
+export const stateIsBusy = (state: LspServerState): boolean =>
+  isTransientPhase(state.phase) || state.activity !== null
+
+export const deriveIsBusy = (
+  prefetch: boolean,
+  entries: Iterable<LspCatalogEntry>,
+): boolean => {
+  if (prefetch) {
+    return true
+  }
+  for (const entry of entries) {
+    if (stateIsBusy(entry.state)) {
+      return true
+    }
+  }
+  return false
+}
+
+export const deriveHealth = (
+  busy: boolean,
+  rows: readonly LspStatusServerRow[],
+  errorDiagnostics: number,
+  warningDiagnostics: number,
+): LspHealth => {
+  if (busy) {
+    return 'busy'
+  }
+  if (
+    errorDiagnostics > 0 ||
+    rows.some((row) => row.displayState === 'error' || row.displayState === 'crashed')
+  ) {
     return 'error'
   }
-  // Prefer live process state over a stale "installing" flag left in LSP_STATES.
-  if (entry.running) {
-    return 'running'
+  if (warningDiagnostics > 0) {
+    return 'warning'
   }
-  if (entry.installState === 'starting') {
-    return 'starting'
-  }
-  // Packages already on disk but ensure/start still in flight should read as
-  // starting, not installing (install events cover real downloads).
-  if (entry.installState === 'installing') {
-    return entry.installed ? 'starting' : 'installing'
-  }
-  if (entry.installState === 'ready' || entry.installed) {
-    return 'stopped'
-  }
-  return 'missing'
+  return 'ok'
 }
 
-export const toStatusRow = (entry: LspCatalogEntry): LspStatusServerRow => ({
-  id: entry.id,
-  label: entry.label,
-  extensions: entry.extensions,
-  running: entry.running,
-  installed: entry.installed,
-  disabled: entry.disabled,
-  requiresTrust: entry.requiresTrust,
-  error: entry.error ?? null,
-  source: entry.source ?? null,
-  installState: entry.installState ?? null,
-  displayState: resolveDisplayState(entry),
-})
+const PHASE_ORDER: readonly LspPhase[] = [
+  'error',
+  'crashed',
+  'needs_trust',
+  'installing',
+  'starting',
+  'stopping',
+  'exited',
+  'running',
+  'stopped',
+  'idle',
+  'missing',
+]
+
+export const compareStatusRows = (
+  left: LspStatusServerRow,
+  right: LspStatusServerRow,
+): number => {
+  const byPhase = PHASE_ORDER.indexOf(left.phase) - PHASE_ORDER.indexOf(right.phase)
+  if (byPhase !== 0) {
+    return byPhase
+  }
+  const byLabel = left.label.localeCompare(right.label)
+  if (byLabel !== 0) {
+    return byLabel
+  }
+  return left.id.localeCompare(right.id)
+}
+
+export const selectVisibleRows = (rows: readonly LspStatusServerRow[]): LspStatusServerRow[] =>
+  rows
+    .filter((row) => !HIDDEN_DISPLAY_STATES.has(row.displayState))
+    .sort(compareStatusRows)
+
+export const toStatusRow = (entry: LspCatalogEntry): LspStatusServerRow => {
+  const { state, ...meta } = entry
+  return {
+    ...meta,
+    ...state,
+    displayState: resolveDisplayState(entry),
+  }
+}
 
 export const countSeverity = (severity: number): number => {
   let total = 0
@@ -94,45 +173,4 @@ export const fileUriToProjectPath = (
 
 export const clearDiagnostics = (): void => {
   diagnosticsByUri.value = new Map()
-}
-
-export const markAwaitingProjectLoad = (serverId: string): void => {
-  const next = new Set(awaitingProjectLoad.value)
-  next.add(serverId)
-  awaitingProjectLoad.value = next
-  scheduleAwaitingClear()
-}
-
-export const pruneAwaitingFromRunning = (): void => {
-  const awaiting = awaitingProjectLoad.value
-  if (awaiting.size === 0) {
-    return
-  }
-  const runningIds = new Set(
-    servers.value.filter((entry) => entry.running).map((entry) => entry.id),
-  )
-  const next = new Set(
-    [...awaiting].filter((id) => !runningIds.has(id)),
-  )
-  if (next.size === awaiting.size) {
-    return
-  }
-  awaitingProjectLoad.value = next
-  if (next.size === 0) {
-    installMessage.value = 'Language servers ready'
-  }
-}
-
-export const applyReadyInstallState = (serverId: string): void => {
-  servers.value = servers.value.map((entry) => {
-    if (entry.id !== serverId) {
-      return entry
-    }
-    return {
-      ...entry,
-      installed: true,
-      installState: entry.running ? 'ready' : 'starting',
-      error: null,
-    }
-  })
 }

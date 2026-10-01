@@ -188,25 +188,14 @@ export const createLsp = (ctx: MonacoEditorContext) => {
       if (!server.running) {
         ctx.lspServerByPath.delete(path)
         clearLspMarkers(model)
-        if (extension === 'java' || extension === '.java') {
-          toast.error('Java language server unavailable', {
-            description:
-              'Install a JDK on PATH, or enable lsp.autoDownload so jdtls can be fetched.',
-          })
-        }
         return
       }
 
       ctx.lspServerByPath.set(path, server.id)
-      await ctx.lspStatus.refreshCatalog()
-      if (server.id === 'vue' || server.id === 'typescript') {
-        ctx.lspStatus.markAwaitingProjectLoad(server.id)
-      }
       // Vue LS 3 hybrid: script features need TypeScript + @vue/typescript-plugin.
       if (server.id === 'vue') {
         try {
           await lspEnsureServer('ts', root)
-          await ctx.lspStatus.refreshCatalog()
         } catch (error) {
           toast.error('TypeScript language server unavailable', {
             description:

@@ -158,8 +158,9 @@ describe('build-tools lsp', () => {
     vi.clearAllMocks()
     lspEnsureServer.mockResolvedValue({
       id: 'typescript',
+      phase: 'running',
       running: true,
-      installState: 'ready',
+      error: null,
     })
     lspRequest.mockResolvedValue({ ok: true })
   })
@@ -287,6 +288,117 @@ describe('build-tools lsp', () => {
       path: 'src/main.ts',
       result: null,
       error: 'query is required for workspaceSymbol',
+    })
+    expect(lspRequest).not.toHaveBeenCalled()
+  })
+
+  it('returns installing without calling lspRequest', async () => {
+    lspEnsureServer.mockResolvedValue({
+      id: 'typescript',
+      phase: 'installing',
+      running: false,
+      error: null,
+    })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.lsp.execute,
+      {
+        method: 'hover',
+        path: 'src/main.ts',
+        position: { line: 1, character: 0 },
+      },
+      'tc-lsp-installing',
+    )
+
+    expect(result).toEqual({
+      method: 'hover',
+      path: 'src/main.ts',
+      result: null,
+      error: 'installing',
+      installState: 'installing',
+    })
+    expect(lspRequest).not.toHaveBeenCalled()
+  })
+
+  it('returns still starting without calling lspRequest', async () => {
+    lspEnsureServer.mockResolvedValue({
+      id: 'typescript',
+      phase: 'starting',
+      running: false,
+      error: 'Start already in progress for typescript',
+    })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.lsp.execute,
+      {
+        method: 'hover',
+        path: 'src/main.ts',
+        position: { line: 1, character: 0 },
+      },
+      'tc-lsp-starting',
+    )
+
+    expect(result).toEqual({
+      method: 'hover',
+      path: 'src/main.ts',
+      result: null,
+      error: 'still starting',
+      installState: 'starting',
+    })
+    expect(lspRequest).not.toHaveBeenCalled()
+  })
+
+  it('returns the phase when the language server is not running', async () => {
+    lspEnsureServer.mockResolvedValue({
+      id: 'typescript',
+      phase: 'missing',
+      running: false,
+      error: 'not installed',
+    })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.lsp.execute,
+      {
+        method: 'hover',
+        path: 'src/main.ts',
+        position: { line: 1, character: 0 },
+      },
+      'tc-lsp-missing',
+    )
+
+    expect(result).toEqual({
+      method: 'hover',
+      path: 'src/main.ts',
+      result: null,
+      error: 'not installed',
+      installState: 'missing',
+    })
+    expect(lspRequest).not.toHaveBeenCalled()
+  })
+
+  it('builds an error state when ensure throws', async () => {
+    lspEnsureServer.mockRejectedValue(new Error('bridge down'))
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.lsp.execute,
+      {
+        method: 'hover',
+        path: 'src/main.ts',
+        position: { line: 1, character: 0 },
+      },
+      'tc-lsp-throw',
+    )
+
+    expect(result).toEqual({
+      method: 'hover',
+      path: 'src/main.ts',
+      result: null,
+      error: 'bridge down',
+      installState: 'error',
     })
     expect(lspRequest).not.toHaveBeenCalled()
   })

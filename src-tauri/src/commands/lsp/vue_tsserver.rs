@@ -101,7 +101,7 @@ pub(crate) async fn forward_vue_tsserver_request_inner(
         guard.uses_classic_typescript
     };
     if !uses_classic {
-        stop_server_internal("typescript").await.ok();
+        stop_server_internal(app, "typescript").await.ok();
         let _ = ensure_running_server(app, "ts", Some(workspace_root.clone())).await?;
         let ts_managed = {
             let servers = LSP_SERVERS.lock().await;
@@ -129,7 +129,7 @@ pub(crate) async fn forward_vue_tsserver_request_inner(
             }
 
             // Old typescript-language-server builds lack typescript.tsserverRequest.
-            stop_server_internal("typescript").await.ok();
+            stop_server_internal(app, "typescript").await.ok();
             let _ = ensure_running_server(app, "ts", Some(workspace_root)).await?;
             let ts_managed = {
                 let servers = LSP_SERVERS.lock().await;

@@ -1,8 +1,8 @@
 import type { LspWorkspaceDiagnosticsResult } from '@/types/lsp'
 import { call } from './helpers'
-import type { LspCatalogEntry, LspServerStatus, LspWorkspaceProfile } from './types'
+import type { LspCatalogEntry, LspServerState, LspWorkspaceProfile } from './types'
 
-export const lspStatus = (): Promise<LspServerStatus[]> => call('lsp_status')
+export const lspStatus = (): Promise<LspServerState[]> => call('lsp_status')
 
 export const lspCatalog = (): Promise<LspCatalogEntry[]> => call('lsp_catalog')
 
@@ -20,7 +20,7 @@ export const lspRequest = (
 export const lspEnsureServer = (
   extension: string,
   projectRoot?: string | null,
-): Promise<LspServerStatus> =>
+): Promise<LspServerState> =>
   call('lsp_ensure_server', { extension, projectRoot: projectRoot ?? null })
 
 export const lspStopServer = (serverId: string): Promise<void> =>
