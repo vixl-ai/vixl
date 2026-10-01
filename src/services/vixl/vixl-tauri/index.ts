@@ -20,7 +20,9 @@ export type {
   WorkspaceGlobResult,
   GitCommitResult,
   CodegraphCliResult,
-  LspServerStatus,
+  LspPhase,
+  LspActivity,
+  LspServerState,
   LspCatalogEntry,
   LspWorkspaceProfile,
 } from './types'

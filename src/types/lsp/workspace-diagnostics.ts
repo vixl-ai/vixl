@@ -1,3 +1,5 @@
+import type { LspPhase } from '@/services/vixl/vixl-tauri/types'
+
 export type LspWorkspaceDiagnosticMode =
   | 'workspace'
   | 'open_documents'
@@ -25,7 +27,7 @@ export type LspWorkspaceDiagnosticsServer = {
   mode: LspWorkspaceDiagnosticMode
   error: string | null
   items: LspWorkspaceDiagnosticFile[]
-  installState?: string | null
+  installState?: LspPhase | null
 }
 
 export type LspWorkspaceDiagnosticsResult = {
@@ -45,7 +47,7 @@ export type LspWorkspaceIssuesServer = {
   id: string
   mode: LspWorkspaceDiagnosticMode
   error?: string
-  installState?: string | null
+  installState?: LspPhase | null
 }
 
 export type LspWorkspaceIssuesResult = {

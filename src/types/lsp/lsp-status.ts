@@ -1,12 +1,8 @@
-export type LspServerDisplayState =
-  | 'installing'
-  | 'starting'
-  | 'running'
-  | 'stopped'
-  | 'error'
-  | 'needs_trust'
-  | 'disabled'
-  | 'missing'
+import type { LspActivity, LspPhase } from '@/services/vixl/vixl-tauri/types'
+
+export type { LspActivity, LspPhase }
+
+export type LspServerDisplayState = LspPhase | 'disabled'
 
 export type LspHealth = 'busy' | 'error' | 'warning' | 'ok'
 
@@ -14,13 +10,23 @@ export type LspStatusServerRow = {
   id: string
   label: string
   extensions: string[]
-  running: boolean
+  installKind: string
+  requiresTrust: boolean
+  installable: boolean
   installed: boolean
   disabled: boolean
-  requiresTrust: boolean
+  canDisable: boolean
+  phase: LspPhase
+  generation: number
+  revision: number
+  phaseSinceMs: number
+  message: string | null
   error: string | null
+  activity: LspActivity | null
   source: string | null
-  installState: string | null
+  workspaceRoot: string | null
+  pid: number | null
+  running: boolean
   displayState: LspServerDisplayState
 }
 

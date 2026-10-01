@@ -1,11 +1,16 @@
 import { tool } from 'ai'
 import { z } from 'zod'
+import {
+  blockedEnsureResponse,
+  failedEnsureState,
+} from '@/services/harness/lsp/failed-ensure-state'
 import { parseLspDiagnosticItems } from '@/services/harness/lsp/parse-diagnostics'
 import summarizeWorkspace from '@/services/harness/lsp/summarize-workspace'
 import {
   lspEnsureServer,
   lspRequest,
   lspWorkspaceDiagnostics,
+  type LspServerState,
 } from '@/services/vixl/vixl-tauri'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { LspWorkspaceIssuesResult } from '@/types/lsp'
@@ -40,31 +45,18 @@ const executeFile = async (
   projectRoot: string,
 ) => {
   const ext = extension ?? path.split('.').pop() ?? ''
-  let server: Awaited<ReturnType<typeof lspEnsureServer>>
+  let server: LspServerState
   try {
     server = await lspEnsureServer(ext, projectRoot)
   } catch (error: unknown) {
-    server = {
-      id: '',
-      running: false,
-      error: error instanceof Error ? error.message : 'LSP ensure failed',
-      installState: 'error',
-    }
+    server = failedEnsureState(error)
   }
-  if (server.installState === 'installing') {
+  const blocked = blockedEnsureResponse(server)
+  if (blocked) {
     return {
       path,
       diagnostics: [],
-      error: 'installing',
-      installState: 'installing',
-    }
-  }
-  if (!server.running) {
-    return {
-      path,
-      diagnostics: [],
-      error: server.error ?? 'LSP unavailable',
-      installState: server.installState ?? null,
+      ...blocked,
     }
   }
 

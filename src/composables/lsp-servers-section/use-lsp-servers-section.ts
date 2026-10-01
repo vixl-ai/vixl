@@ -1,5 +1,4 @@
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { listen } from '@tauri-apps/api/event'
+import { computed, onMounted, ref } from 'vue'
 import {
   Ban,
   Download,
@@ -10,29 +9,29 @@ import {
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import useVixlConfig from '@/composables/use-vixl-config'
+import useFleetRegistry from '@/composables/use-fleet-registry'
+import { bindListeners } from '@/composables/lsp-status/listeners'
+import { refreshCatalog } from '@/composables/lsp-status/catalog'
+import { installMessage, servers } from '@/composables/lsp-status/state'
 import {
   isTauri,
-  lspCatalog,
   lspInstallServer,
   lspPrefetchDefaults,
   lspSetServerDisabled,
   lspUninstallServer,
   type LspCatalogEntry,
 } from '@/services/vixl/vixl-tauri'
-import useFleetRegistry from '@/composables/use-fleet-registry'
 import formatUnknownError from '@/utils/format-unknown-error'
 import lspServerIconName from '@/utils/lsp-server-icon-name'
 import { buildStatusBadges } from './status-badges'
 
-
 export default () => {
   const config = useVixlConfig()
   const fleet = useFleetRegistry()
-  const catalog = ref<LspCatalogEntry[]>([])
-  const installMessage = ref<string | null>(null)
   const busyIds = ref<Set<string>>(new Set())
   const prefetching = ref(false)
-  let unlistenInstall: (() => void) | null = null
+
+  const catalog = computed(() => [...servers.value.values()])
 
   const autoDownload = computed(
     () => config.personalSettings.value['lsp.autoDownload'] ?? true,
@@ -60,19 +59,6 @@ export default () => {
   }
 
   const isBusy = (serverId: string): boolean => busyIds.value.has(serverId)
-
-  const refreshCatalog = async (): Promise<void> => {
-    if (!isTauri()) {
-      return
-    }
-    try {
-      catalog.value = await lspCatalog()
-    } catch (error) {
-      toast.error('Failed to load language servers', {
-        description: formatUnknownError(error),
-      })
-    }
-  }
 
   const updateAutoDownload = async (value: boolean): Promise<void> => {
     try {
@@ -150,36 +136,16 @@ export default () => {
   }
 
   onMounted(async () => {
-    await refreshCatalog()
-    if (!isTauri()) {
-      return
-    }
     try {
-      unlistenInstall = await listen<{
-        serverId: string
-        state: string
-        message?: string | null
-      }>('lsp://install', (event) => {
-        installMessage.value = event.payload.message ?? `${event.payload.serverId}: ${event.payload.state}`
-        if (event.payload.state === 'ready' || event.payload.state === 'error') {
-          refreshCatalog().then(() => undefined).catch((error: unknown) => {
-            toast.error('Failed to refresh language servers', {
-              description: formatUnknownError(error),
-            })
-          })
-        }
-      })
+      await bindListeners()
     } catch (error) {
       toast.error('Failed to listen for language server installs', {
         description: formatUnknownError(error),
       })
     }
+    await refreshCatalog()
   })
 
-  onUnmounted(() => {
-    unlistenInstall?.()
-    unlistenInstall = null
-  })
   return {
     catalog,
     installMessage,
@@ -195,7 +161,6 @@ export default () => {
     updateAutoDownload,
     lspServerIconName,
     isTauri,
-    // Icons used by template
     Ban,
     Download,
     Loader2,

@@ -25,7 +25,6 @@ pub use native_npm::{
 pub use node::{ensure_portable_node, find_node_bin};
 pub use npm_command::npm_install_command;
 pub use paths::{auto_download_enabled, lsp_root, managed_server_dir, runtime_node_dir};
-pub(crate) use progress::emit_progress;
 pub use progress::LspInstallProgress;
 pub use resolve::{host_asset_target, resolve_github_asset};
 pub use timeout::{with_timeout, INSTALL_TIMEOUT, LSP_WRITE_TIMEOUT};

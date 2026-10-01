@@ -4,29 +4,105 @@ import {
   lspEnsureServer,
   lspWorkspaceProfile,
 } from '@/services/vixl/vixl-tauri'
-import { pruneAwaitingFromRunning, scheduleAwaitingClear } from './helpers'
+import type { LspCatalogEntry } from '@/services/vixl/vixl-tauri'
+import formatUnknownError from '@/utils/format-unknown-error'
+import { catalogRevisionWins, deriveIsBusy } from './helpers'
 import {
-  awaitingProjectLoad,
   installMessage,
+  listenerState,
+  prefetchBusy,
   servers,
   warming,
   warmState,
 } from './state'
+import { noteServerState } from './toasts'
+
+const POLL_INTERVAL_MS = 5_000
+
+let catalogRequest = 0
+let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollInFlight = false
 
 const desiredServersRunning = (ids: string[]): boolean =>
-  ids.every((id) => Boolean(servers.value.find((entry) => entry.id === id)?.running))
+  ids.every((id) => servers.value.get(id)?.state.phase === 'running')
+
+export const mergeCatalogEntries = (entries: LspCatalogEntry[]): void => {
+  const next = new Map<string, LspCatalogEntry>()
+  for (const entry of entries) {
+    const stored = servers.value.get(entry.id)
+    if (!stored) {
+      next.set(entry.id, entry)
+      continue
+    }
+    const replace = catalogRevisionWins(stored.state.revision, entry.state.revision)
+    const state = replace ? entry.state : stored.state
+    next.set(entry.id, { ...entry, state })
+    if (replace) {
+      noteServerState(state, entry.label)
+    }
+  }
+  for (const [id, stored] of servers.value) {
+    if (!next.has(id) && stored.state.revision > 0) {
+      next.set(id, stored)
+    }
+  }
+  servers.value = next
+}
+
+export const invalidateCatalogRefresh = (): void => {
+  catalogRequest += 1
+}
 
 export const refreshCatalog = async (): Promise<void> => {
   if (!isTauri()) {
     return
   }
+  const request = ++catalogRequest
   try {
-    servers.value = await lspCatalog()
-    pruneAwaitingFromRunning()
+    const entries = await lspCatalog()
+    if (request !== catalogRequest) {
+      return
+    }
+    mergeCatalogEntries(entries)
   } catch (error) {
-    installMessage.value =
-      error instanceof Error ? error.message : 'Failed to load language servers'
+    if (request !== catalogRequest) {
+      return
+    }
+    installMessage.value = formatUnknownError(error)
   }
+  if (request !== catalogRequest) {
+    return
+  }
+  syncLspStatePoll()
+}
+
+export const stopLspStatePoll = (): void => {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+  pollInFlight = false
+}
+
+export const syncLspStatePoll = (): void => {
+  const shouldPoll =
+    listenerState.bound && deriveIsBusy(prefetchBusy.value, servers.value.values())
+  if (!shouldPoll) {
+    stopLspStatePoll()
+    return
+  }
+  if (pollTimer !== null) {
+    return
+  }
+  pollTimer = setInterval(() => {
+    if (pollInFlight) {
+      return
+    }
+    pollInFlight = true
+    void refreshCatalog().finally(() => {
+      pollInFlight = false
+    })
+  }, POLL_INTERVAL_MS)
 }
 
 export const warmDefaults = async (root: string, force = false): Promise<void> => {
@@ -41,10 +117,7 @@ export const warmDefaults = async (root: string, force = false): Promise<void> =
     ids = profile.warm
     extensions = profile.warmExtensions
   } catch (error) {
-    installMessage.value =
-      error instanceof Error
-        ? error.message
-        : 'Failed to detect workspace language servers'
+    installMessage.value = formatUnknownError(error)
   }
   if (ids.length === 0 || extensions.length === 0) {
     warmState.lastWarmedRoot = root
@@ -55,27 +128,9 @@ export const warmDefaults = async (root: string, force = false): Promise<void> =
   }
 
   warming.value = true
-  installMessage.value = 'Starting language servers'
-  awaitingProjectLoad.value = new Set(ids)
-  scheduleAwaitingClear()
   try {
-    const results = await Promise.allSettled(
-      extensions.map((ext) => lspEnsureServer(ext, root)),
-    )
-    const firstRejected = results.find(
-      (result): result is PromiseRejectedResult => result.status === 'rejected',
-    )
-    if (firstRejected) {
-      installMessage.value =
-        firstRejected.reason instanceof Error
-          ? firstRejected.reason.message
-          : 'Failed to start language servers'
-    }
+    await Promise.allSettled(extensions.map((ext) => lspEnsureServer(ext, root)))
     warmState.lastWarmedRoot = root
-  } catch (error) {
-    installMessage.value =
-      error instanceof Error ? error.message : 'Failed to start language servers'
-    awaitingProjectLoad.value = new Set()
   } finally {
     warming.value = false
     await refreshCatalog()

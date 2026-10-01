@@ -111,12 +111,14 @@ const {
                             class="h-3.5 w-3.5"
                             :class="[
                               badge.className,
-                              badge.key === 'state' ? 'animate-spin' : '',
+                              badge.key === 'state' || badge.key === 'activity'
+                                ? 'animate-spin'
+                                : '',
                             ]"
                           />
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent>{{ badge.label }}</TooltipContent>
+                      <TooltipContent>{{ badge.tooltip ?? badge.label }}</TooltipContent>
                     </Tooltip>
                   </div>
                 </div>
@@ -177,7 +179,12 @@ const {
                 <TooltipContent>Install</TooltipContent>
               </Tooltip>
 
-              <Tooltip v-else-if="entry.installable && entry.error">
+              <Tooltip
+                v-else-if="
+                  entry.installable &&
+                  (entry.state.phase === 'error' || entry.state.phase === 'crashed')
+                "
+              >
                 <TooltipTrigger as-child>
                   <Button
                     variant="ghost"
@@ -200,7 +207,13 @@ const {
                 <TooltipContent>Retry</TooltipContent>
               </Tooltip>
 
-              <Tooltip v-if="entry.installable && entry.installed && entry.source === 'managed'">
+              <Tooltip
+                v-if="
+                  entry.installable &&
+                  entry.installed &&
+                  entry.state.source === 'managed'
+                "
+              >
                 <TooltipTrigger as-child>
                   <Button
                     variant="ghost"

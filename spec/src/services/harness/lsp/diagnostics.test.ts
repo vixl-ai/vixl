@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { LspServerState } from '@/services/vixl/vixl-tauri'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
@@ -21,6 +22,25 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
 )
 
 import diagnostics from '@/services/harness/lsp/diagnostics'
+
+const serverState = (overrides: Partial<LspServerState> = {}): LspServerState => {
+  const phase = overrides.phase ?? 'running'
+  return {
+    id: 'typescript',
+    phase,
+    generation: 1,
+    revision: 1,
+    phaseSinceMs: 0,
+    message: null,
+    error: null,
+    activity: null,
+    source: 'managed',
+    workspaceRoot: '/project',
+    pid: 1,
+    running: phase === 'running',
+    ...overrides,
+  }
+}
 
 const ctx: HarnessToolContext = {
   projectRoot: '/project',
@@ -49,11 +69,7 @@ const runTool = async (input: Record<string, unknown>): Promise<unknown> => {
 describe('diagnostics tool', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    lspEnsureServer.mockResolvedValue({
-      id: 'typescript',
-      running: true,
-      installState: 'ready',
-    })
+    lspEnsureServer.mockResolvedValue(serverState())
     lspRequest.mockResolvedValue({ items: [] })
     lspWorkspaceDiagnostics.mockResolvedValue({
       servers: [
@@ -162,11 +178,9 @@ describe('diagnostics tool', () => {
   })
 
   it('returns installing without calling lspRequest', async () => {
-    lspEnsureServer.mockResolvedValue({
-      id: 'typescript',
-      running: false,
-      installState: 'installing',
-    })
+    lspEnsureServer.mockResolvedValue(
+      serverState({ phase: 'installing', running: false, message: 'Downloading' }),
+    )
 
     const result = await runTool({ path: 'src/main.ts' })
 
@@ -179,13 +193,46 @@ describe('diagnostics tool', () => {
     expect(lspRequest).not.toHaveBeenCalled()
   })
 
-  it('returns the server error when the language server is not running', async () => {
-    lspEnsureServer.mockResolvedValue({
-      id: 'typescript',
-      running: false,
-      error: 'not installed',
-      installState: 'missing',
+  it('returns still starting without calling lspRequest', async () => {
+    lspEnsureServer.mockResolvedValue(
+      serverState({
+        phase: 'starting',
+        running: false,
+        error: 'Start already in progress for typescript',
+      }),
+    )
+
+    const result = await runTool({ path: 'src/main.ts' })
+
+    expect(result).toEqual({
+      path: 'src/main.ts',
+      diagnostics: [],
+      error: 'still starting',
+      installState: 'starting',
     })
+    expect(lspRequest).not.toHaveBeenCalled()
+  })
+
+  it('returns stopping without calling lspRequest', async () => {
+    lspEnsureServer.mockResolvedValue(
+      serverState({ phase: 'stopping', running: false }),
+    )
+
+    const result = await runTool({ path: 'src/main.ts' })
+
+    expect(result).toEqual({
+      path: 'src/main.ts',
+      diagnostics: [],
+      error: 'stopping',
+      installState: 'stopping',
+    })
+    expect(lspRequest).not.toHaveBeenCalled()
+  })
+
+  it('returns the server error when the language server is not running', async () => {
+    lspEnsureServer.mockResolvedValue(
+      serverState({ phase: 'missing', running: false, error: 'not installed' }),
+    )
 
     const result = await runTool({ path: 'src/main.ts' })
 
@@ -196,6 +243,53 @@ describe('diagnostics tool', () => {
       installState: 'missing',
     })
     expect(lspRequest).not.toHaveBeenCalled()
+  })
+
+  it('returns the phase when the server needs trust', async () => {
+    lspEnsureServer.mockResolvedValue(
+      serverState({
+        phase: 'needs_trust',
+        running: false,
+        error: 'Workspace is not trusted',
+      }),
+    )
+
+    const result = await runTool({ path: 'src/main.ts' })
+
+    expect(result).toEqual({
+      path: 'src/main.ts',
+      diagnostics: [],
+      error: 'Workspace is not trusted',
+      installState: 'needs_trust',
+    })
+    expect(lspRequest).not.toHaveBeenCalled()
+  })
+
+  it('builds an error state when ensure throws', async () => {
+    lspEnsureServer.mockRejectedValue(new Error('bridge down'))
+
+    const result = await runTool({ path: 'src/main.ts' })
+
+    expect(result).toEqual({
+      path: 'src/main.ts',
+      diagnostics: [],
+      error: 'bridge down',
+      installState: 'error',
+    })
+    expect(lspRequest).not.toHaveBeenCalled()
+  })
+
+  it('uses the fallback message when ensure throws a non-error', async () => {
+    lspEnsureServer.mockRejectedValue('nope')
+
+    const result = await runTool({ path: 'src/main.ts' })
+
+    expect(result).toEqual({
+      path: 'src/main.ts',
+      diagnostics: [],
+      error: 'LSP ensure failed',
+      installState: 'error',
+    })
   })
 
   it('parses per-file diagnostics from an items payload', async () => {

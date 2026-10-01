@@ -5,18 +5,7 @@ use serde::Serialize;
 use super::super::lsp_registry::{
     builtin_server_map, builtin_spec_by_id, BuiltinLspSpec, LspInstallKind,
 };
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LspServerStatus {
-    pub id: String,
-    pub running: bool,
-    pub error: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub source: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub install_state: Option<String>,
-}
+use super::state::LspServerState;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,12 +25,9 @@ pub struct LspCatalogEntry {
     pub requires_trust: bool,
     pub installable: bool,
     pub installed: bool,
-    pub running: bool,
     pub disabled: bool,
     pub can_disable: bool,
-    pub error: Option<String>,
-    pub source: Option<String>,
-    pub install_state: Option<String>,
+    pub state: LspServerState,
 }
 
 #[derive(Debug, Clone, Serialize)]

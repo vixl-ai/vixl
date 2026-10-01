@@ -116,6 +116,18 @@ name = "commands_lsp"
 path = "../spec/src-tauri/commands/lsp.rs"
 
 [[test]]
+name = "commands_lsp_state"
+path = "../spec/src-tauri/commands/lsp_state.rs"
+
+[[test]]
+name = "commands_lsp_lifecycle"
+path = "../spec/src-tauri/commands/lsp_lifecycle.rs"
+
+[[test]]
+name = "commands_lsp_progress"
+path = "../spec/src-tauri/commands/lsp_progress.rs"
+
+[[test]]
 name = "commands_lsp_registry"
 path = "../spec/src-tauri/commands/lsp_registry.rs"
 
