@@ -7,6 +7,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
+use crate::commands::mcp::merged_shell_path;
+
 use super::super::fs::resolve_workspace_path;
 
 pub fn resolve_pty_shell() -> String {
@@ -17,6 +19,17 @@ pub fn resolve_pty_shell() -> String {
     #[cfg(windows)]
     {
         std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string())
+    }
+}
+
+pub fn pty_shell_args() -> &'static [&'static str] {
+    #[cfg(unix)]
+    {
+        &["-l"]
+    }
+    #[cfg(windows)]
+    {
+        &[]
     }
 }
 
@@ -38,13 +51,17 @@ lazy_static::lazy_static! {
 }
 
 #[tauri::command]
-pub fn shell_spawn_pty(
+pub async fn shell_spawn_pty(
     app: AppHandle,
     project_root: String,
     cols: u16,
     rows: u16,
     cwd: Option<String>,
 ) -> Result<PtySessionInfo, String> {
+    let merged_path = tauri::async_runtime::spawn_blocking(merged_shell_path)
+        .await
+        .map_err(|e| e.to_string())?;
+
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -56,6 +73,7 @@ pub fn shell_spawn_pty(
         .map_err(|e| e.to_string())?;
 
     let mut cmd = CommandBuilder::new(resolve_pty_shell());
+    cmd.args(pty_shell_args());
     let work_dir = match cwd {
         Some(relative_cwd) => resolve_workspace_path(&project_root, &relative_cwd)?
             .to_string_lossy()
@@ -63,6 +81,9 @@ pub fn shell_spawn_pty(
         None => project_root,
     };
     cmd.cwd(work_dir);
+    if let Some(merged) = merged_path {
+        cmd.env("PATH", merged);
+    }
     cmd.env("TERM", "xterm-256color");
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
