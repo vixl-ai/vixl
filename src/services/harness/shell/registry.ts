@@ -1,5 +1,6 @@
 import { listen } from '@tauri-apps/api/event'
 import { ref } from 'vue'
+import appendStreamText from '@/services/harness/shell/append-stream-text'
 import { isRunningBackgroundSubagent } from '@/services/harness/subagent/registry'
 import { shellKillTracked, shellSpawnTracked } from '@/services/vixl/vixl-tauri'
 import type { AgentShellRecord, AgentShellStatus } from '@/types/harness/agent-shell'
@@ -30,10 +31,7 @@ const bumpRevision = (): void => {
   agentShellRevision.value++
 }
 
-export const setAgentShellEventEmitter = (
-  chatId: string,
-  emitter: EventEmitter | null,
-): void => {
+export const setAgentShellEventEmitter = (chatId: string, emitter: EventEmitter | null): void => {
   if (emitter) {
     eventEmitters.set(chatId, emitter)
     return
@@ -69,9 +67,9 @@ const appendOutput = (shellId: string, stream: 'stdout' | 'stderr', data: string
   }
 
   if (stream === 'stdout') {
-    shell.stdout = shell.stdout + data
+    shell.stdout = appendStreamText(shell.stdout, data)
   } else {
-    shell.stderr = shell.stderr + data
+    shell.stderr = appendStreamText(shell.stderr, data)
   }
 
   emitHarnessEvent(shell.chatId, { type: 'terminal-output', shellId, stream, data })
@@ -213,7 +211,8 @@ export const waitForShellExit = (
   })
 }
 
-export const getAgentShell = (shellId: string): AgentShellRecord | null => shells.get(shellId) ?? null
+export const getAgentShell = (shellId: string): AgentShellRecord | null =>
+  shells.get(shellId) ?? null
 
 export const listShellsForChat = (chatId: string): AgentShellRecord[] => {
   const shellIds = chatShells.get(chatId)
@@ -283,11 +282,7 @@ export const killShellsForChat = async (
   const toKill: string[] = []
   for (const shellId of shellIds) {
     const owner = shells.get(shellId)?.subagentId
-    if (
-      options?.keepBackground &&
-      owner &&
-      isRunningBackgroundSubagent(owner)
-    ) {
+    if (options?.keepBackground && owner && isRunningBackgroundSubagent(owner)) {
       continue
     }
     toKill.push(shellId)

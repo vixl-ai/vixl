@@ -1,4 +1,5 @@
 import { noPoll } from '@/services/harness/guidance'
+import { clipTerminalOutput } from '@/utils/clip-terminal-output'
 import {
   createAgentShell,
   getAgentShell,
@@ -92,7 +93,7 @@ export const runTerminalCommand = async (
       if (denial) {
         throw sandboxRuntimeDenialError(denial, detail)
       }
-      throw new Error(`Command failed (${reason}): ${detail}`)
+      throw new Error(clipTerminalOutput(`Command failed (${reason}): ${detail}`))
     }
 
     // Empty device probes, silent curl, and empty out-of-workspace find can exit 0.
@@ -109,8 +110,8 @@ export const runTerminalCommand = async (
       {
         shellId: shell.shellId,
         command: args.command,
-        stdout,
-        stderr,
+        stdout: clipTerminalOutput(stdout),
+        stderr: clipTerminalOutput(stderr),
         exitCode: waitResult.exitCode,
         timedOut: false,
         description: args.description ?? null,
@@ -128,9 +129,7 @@ export const readTerminalOutput = async (
   tail?: number,
 ): Promise<Record<string, unknown>> => {
   if (hasSubagent(shellId)) {
-    throw new Error(
-      `That id is a subagent, not a shell. ${noPoll}`,
-    )
+    throw new Error(`That id is a subagent, not a shell. ${noPoll}`)
   }
 
   const shell = getAgentShell(shellId)
@@ -152,8 +151,8 @@ export const readTerminalOutput = async (
   return {
     shellId,
     status: current.status,
-    stdout: output.stdout,
-    stderr: output.stderr,
+    stdout: clipTerminalOutput(output.stdout),
+    stderr: clipTerminalOutput(output.stderr),
     exitCode: current.exitCode,
   }
 }

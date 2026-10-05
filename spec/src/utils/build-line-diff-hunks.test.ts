@@ -3,6 +3,7 @@ import buildLineDiffHunks from '@/utils/build-line-diff-hunks'
 import countDiffLines from '@/utils/count-diff-lines'
 import filePathBasename from '@/utils/file-path-basename'
 import formatToolRunLabel from '@/utils/format-tool-run-label'
+import { TERMINAL_OUTPUT_MAX_CHARS } from '@/utils/clip-terminal-output'
 import { parseTerminalToolView, stripSandboxingFooter } from '@/utils/parse-terminal-tool-view'
 import resolveFileDiffHunks from '@/utils/resolve-file-diff-hunks'
 import type { FileDiff } from '@/types/harness/file-diff'
@@ -452,6 +453,43 @@ describe('parseTerminalToolView', () => {
         'Sandbox blocked: isolated devices\n\nSANDBOXING: This command ran in a sandbox',
       ),
     ).toBe('Sandbox blocked: isolated devices')
+  })
+
+  it('clips giant stdout before it reaches the chat view', () => {
+    const view = parseTerminalToolView(
+      toolRun({
+        name: 'run_terminal',
+        args: { command: 'npm run ci' },
+        result: {
+          command: 'npm run ci',
+          stdout: `${'a'.repeat(400_000)}\nlast-line\n`,
+          stderr: '',
+          exitCode: 0,
+          shellId: 'shell-9',
+        },
+      }),
+    )
+    const output = view?.phases[0]?.output ?? ''
+
+    expect(output).toContain('output clipped')
+    expect(output).toContain('last-line')
+    expect(output.length).toBeLessThanOrEqual(TERMINAL_OUTPUT_MAX_CHARS + 100)
+  })
+
+  it('clips a giant string error result before rendering', () => {
+    const view = parseTerminalToolView(
+      toolRun({
+        name: 'run_terminal',
+        status: 'error',
+        args: { command: 'npm run ci' },
+        result: `Command failed (2): ${'e'.repeat(400_000)}\nError: build failed`,
+      }),
+    )
+    const output = view?.phases[0]?.output ?? ''
+
+    expect(output).toContain('output clipped')
+    expect(output).toContain('build failed')
+    expect(output.length).toBeLessThanOrEqual(TERMINAL_OUTPUT_MAX_CHARS + 100)
   })
 })
 

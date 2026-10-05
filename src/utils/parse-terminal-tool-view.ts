@@ -1,5 +1,6 @@
 import type { ToolRun } from '@/types/harness/tool-run'
 import { clipTerminalLabel } from '@/utils/clip-terminal-label'
+import { clipTerminalOutput } from '@/utils/clip-terminal-output'
 
 export const TERMINAL_TOOL_NAMES = new Set(['run_terminal', 'terminal_output', 'stop_terminal'])
 
@@ -82,7 +83,7 @@ const combinePhaseOutput = (record: Record<string, unknown> | null): string => {
   const stdout = asOptionalString(record.stdout) ?? ''
   const stderr = asOptionalString(record.stderr) ?? ''
   const error = stripSandboxingFooter(asOptionalString(record.error) ?? '')
-  return [stdout, stderr, error].filter((part) => part.length > 0).join('\n')
+  return clipTerminalOutput([stdout, stderr, error].filter((part) => part.length > 0).join('\n'))
 }
 
 const parsePhase = (record: Record<string, unknown> | null): TerminalToolPhaseView | null => {
@@ -139,7 +140,7 @@ export const parseTerminalToolView = (run: ToolRun): TerminalToolView | null => 
     })
   } else if (phases.length === 0 && typeof run.result === 'string') {
     phases.push({
-      output: stripSandboxingFooter(run.result),
+      output: clipTerminalOutput(stripSandboxingFooter(run.result)),
       title: 'Terminal',
     })
   }

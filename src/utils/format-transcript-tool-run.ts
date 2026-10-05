@@ -1,4 +1,5 @@
 import type { ToolRun } from '@/types/harness/tool-run'
+import { clipTerminalOutput } from '@/utils/clip-terminal-output'
 import formatUnknownError from '@/utils/format-unknown-error'
 
 const summarizeArgs = (args: unknown): string | null => {
@@ -23,7 +24,7 @@ export default (run: ToolRun): string => {
     segments.push(args)
   }
   if (run.status === 'error') {
-    segments.push(formatUnknownError(run.result))
+    segments.push(clipTerminalOutput(formatUnknownError(run.result)))
   }
   return segments.join(' ')
 }

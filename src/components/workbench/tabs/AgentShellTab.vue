@@ -13,16 +13,13 @@ import {
 } from '@/components/ai-elements/terminal'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   agentShellRevision,
   getAgentShell,
   killAgentShell,
 } from '@/services/harness/shell/registry'
+import { clipTerminalOutput } from '@/utils/clip-terminal-output'
 import type { AgentShellPayload, WorkbenchTab } from '@/types/workbench/workbench-tab'
 
 const props = defineProps<{
@@ -33,13 +30,14 @@ const { transparencyEnabled } = useTransparency()
 
 const shellId = computed(() => (props.tab.payload as AgentShellPayload).shellId)
 
-const shell = computed(() =>
-  agentShellRevision.value >= 0 ? getAgentShell(shellId.value) : null,
-)
+const shell = computed(() => (agentShellRevision.value >= 0 ? getAgentShell(shellId.value) : null))
 
 const output = computed(() => {
   const record = shell.value
-  return record ? record.stdout + (record.stderr ? `\n${record.stderr}` : '') : ''
+  if (!record) {
+    return ''
+  }
+  return clipTerminalOutput(record.stdout + (record.stderr ? `\n${record.stderr}` : ''))
 })
 
 const isStreaming = computed(() => shell.value?.status === 'running')
@@ -82,11 +80,7 @@ const handleStop = async (): Promise<void> => {
     >
       <TerminalHeader>
         <TerminalTitle class="min-w-0 truncate">
-          <AiElementsShimmerShimmer
-            v-if="isStreaming"
-            :duration="1"
-            as="span"
-          >
+          <AiElementsShimmerShimmer v-if="isStreaming" :duration="1" as="span">
             {{ title }}
           </AiElementsShimmerShimmer>
           <template v-else>{{ title }}</template>

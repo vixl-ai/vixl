@@ -1,7 +1,9 @@
 import type { UIMessage } from 'ai'
 import type { AgentStep } from '@/types/chat/agent-step'
 import type { ToolRun } from '@/types/harness/tool-run'
+import { clipTerminalOutput } from '@/utils/clip-terminal-output'
 import formatUnknownError from '@/utils/format-unknown-error'
+import { isTerminalToolName } from '@/utils/parse-terminal-tool-view'
 
 const RESULT_CHAR_CAP = 8000
 const INCOMPLETE_TOOL_MESSAGE = 'Tool did not complete'
@@ -32,19 +34,24 @@ const capText = (text: string): string => {
   return `${text.slice(0, RESULT_CHAR_CAP)}... [elided ${extra} chars]`
 }
 
-const capProjectedResult = (result: unknown): unknown => {
+// Terminal output carries the diagnostics in its tail, so it keeps a head and
+// tail window instead of the head-only elision other results use.
+const capProjectedText = (run: ToolRun, text: string): string =>
+  isTerminalToolName(run.name) ? clipTerminalOutput(text) : capText(text)
+
+const capProjectedResult = (run: ToolRun, result: unknown): unknown => {
   const serialized = serializeProjectedResult(result)
   if (serialized.length <= RESULT_CHAR_CAP) {
     return result
   }
-  return capText(serialized)
+  return capProjectedText(run, serialized)
 }
 
 const errorTextForRun = (run: ToolRun): string => {
   if (run.status === 'running') {
     return INCOMPLETE_TOOL_MESSAGE
   }
-  return capText(formatUnknownError(run.result))
+  return capProjectedText(run, formatUnknownError(run.result))
 }
 
 const projectToolRun = (run: ToolRun): UIMessage['parts'][number] => {
@@ -55,7 +62,7 @@ const projectToolRun = (run: ToolRun): UIMessage['parts'][number] => {
       toolCallId: run.toolCallId,
       state: 'output-available',
       input: projectToolInput(run.args),
-      output: capProjectedResult(run.result),
+      output: capProjectedResult(run, run.result),
     }
   }
   return {

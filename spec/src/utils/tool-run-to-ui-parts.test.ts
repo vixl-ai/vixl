@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { convertToModelMessages } from 'ai'
 import type { AgentStep } from '@/types/chat/agent-step'
 import type { ToolRun } from '@/types/harness/tool-run'
+import { TERMINAL_OUTPUT_MAX_CHARS } from '@/utils/clip-terminal-output'
 import toolRunToUiParts from '@/utils/tool-run-to-ui-parts'
 
 const RESULT_CHAR_CAP = 8000
@@ -173,6 +174,52 @@ describe('toolRunToUiParts', () => {
     expect(output.length).toBeGreaterThan(RESULT_CHAR_CAP)
   })
 
+  it('keeps the diagnostics tail when capping terminal results', () => {
+    const parts = toolRunToUiParts(
+      stepWithTools([
+        run({
+          toolCallId: 'tc-ci',
+          name: 'run_terminal',
+          args: { command: 'npm run ci' },
+          result: `Command failed (2): ${'e'.repeat(400_000)}\nError: build failed`,
+        }),
+      ]),
+    )
+
+    const toolPart = parts[1]
+    expect(toolPart?.type).toBe('dynamic-tool')
+    if (toolPart?.type !== 'dynamic-tool' || toolPart.state !== 'output-available') {
+      return
+    }
+    const output = toolPart.output as string
+    expect(output).toContain('[output clipped:')
+    expect(output).toContain('Error: build failed')
+    expect(output.length).toBeLessThanOrEqual(TERMINAL_OUTPUT_MAX_CHARS)
+  })
+
+  it('keeps the diagnostics tail in terminal error text', () => {
+    const parts = toolRunToUiParts(
+      stepWithTools([
+        run({
+          toolCallId: 'tc-ci-err',
+          name: 'run_terminal',
+          status: 'error',
+          args: { command: 'npm run ci' },
+          result: `Command failed (2): ${'e'.repeat(400_000)}\nError: build failed`,
+        }),
+      ]),
+    )
+
+    const toolPart = parts[1]
+    expect(toolPart?.type).toBe('dynamic-tool')
+    if (toolPart?.type !== 'dynamic-tool' || toolPart.state !== 'output-error') {
+      return
+    }
+    expect(toolPart.errorText).toContain('[output clipped:')
+    expect(toolPart.errorText).toContain('Error: build failed')
+    expect(toolPart.errorText.length).toBeLessThanOrEqual(TERMINAL_OUTPUT_MAX_CHARS)
+  })
+
   it('emits one step-start before a step with multiple tools', () => {
     const parts = toolRunToUiParts(
       stepWithTools(
@@ -194,21 +241,13 @@ describe('toolRunToUiParts', () => {
       ),
     )
 
-    expect(parts.map((part) => part.type)).toEqual([
-      'step-start',
-      'dynamic-tool',
-      'dynamic-tool',
-    ])
+    expect(parts.map((part) => part.type)).toEqual(['step-start', 'dynamic-tool', 'dynamic-tool'])
     expect(parts[1]).toMatchObject({ toolCallId: 'tc-2', toolName: 'grep' })
     expect(parts[2]).toMatchObject({ toolCallId: 'tc-3', toolName: 'read_file' })
   })
 
   it('returns no parts when the step has no tool runs', () => {
-    expect(
-      toolRunToUiParts(
-        stepWithTools([], { text: 'hello', reasoning: 'think' }),
-      ),
-    ).toEqual([])
+    expect(toolRunToUiParts(stepWithTools([], { text: 'hello', reasoning: 'think' }))).toEqual([])
   })
 
   it('projects undefined args as empty object input for done runs', () => {

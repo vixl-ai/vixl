@@ -2,51 +2,47 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
+import { TERMINAL_OUTPUT_MAX_CHARS } from '@/utils/clip-terminal-output'
 import type { FileDiff } from '@/types/harness/file-diff'
 
-const fsStagePreviewWrite = vi.fn<
-  (args: { projectRoot: string; path: string; content: string }) => Promise<FileDiff[]>
->()
-const fsStagePreviewEdit = vi.fn<
-  (args: {
-    projectRoot: string
-    path: string
-    replacements: Array<{ oldString: string; newString: string }>
-  }) => Promise<FileDiff[]>
->()
-const fsStagePreviewApplyPatch = vi.fn<
-  (args: { projectRoot: string; patch: string }) => Promise<FileDiff[]>
->()
-const fsWriteFile = vi.fn<
-  (args: { projectRoot: string; path: string; content: string }) => Promise<FileDiff>
->()
-const fsEditFile = vi.fn<
-  (args: {
-    projectRoot: string
-    path: string
-    replacements: Array<{ oldString: string; newString: string }>
-  }) => Promise<FileDiff>
->()
-const fsApplyPatch = vi.fn<
-  (args: { projectRoot: string; patch: string }) => Promise<FileDiff[]>
->()
+const fsStagePreviewWrite =
+  vi.fn<(args: { projectRoot: string; path: string; content: string }) => Promise<FileDiff[]>>()
+const fsStagePreviewEdit =
+  vi.fn<
+    (args: {
+      projectRoot: string
+      path: string
+      replacements: Array<{ oldString: string; newString: string }>
+    }) => Promise<FileDiff[]>
+  >()
+const fsStagePreviewApplyPatch =
+  vi.fn<(args: { projectRoot: string; patch: string }) => Promise<FileDiff[]>>()
+const fsWriteFile =
+  vi.fn<(args: { projectRoot: string; path: string; content: string }) => Promise<FileDiff>>()
+const fsEditFile =
+  vi.fn<
+    (args: {
+      projectRoot: string
+      path: string
+      replacements: Array<{ oldString: string; newString: string }>
+    }) => Promise<FileDiff>
+  >()
+const fsApplyPatch = vi.fn<(args: { projectRoot: string; patch: string }) => Promise<FileDiff[]>>()
 const fileCheckpointCapture = vi
   .fn<() => Promise<{ path: string; pathHash: string; existed: boolean; capturedAt: string }>>()
   .mockResolvedValue({
-  path: 'x',
-  pathHash: 'h',
-  existed: true,
-  capturedAt: 'now',
-})
+    path: 'x',
+    pathHash: 'h',
+    existed: true,
+    capturedAt: 'now',
+  })
 
 const lspEnsureServer = vi.fn<() => Promise<unknown>>()
 const lspRequest = vi.fn<() => Promise<unknown>>()
 
 const gateToolPermission = vi.fn<() => Promise<boolean>>().mockResolvedValue(true)
 
-const readMcpConfig = vi.fn<
-  (scope: string, projectRoot: string | null) => Promise<unknown>
->()
+const readMcpConfig = vi.fn<(scope: string, projectRoot: string | null) => Promise<unknown>>()
 
 vi.mock('@/services/vixl/vixl-tauri', () =>
   mockVixlTauri({
@@ -71,20 +67,14 @@ vi.mock('@/services/harness/permission/gate', () => ({
   gateToolPermission,
 }))
 
-const mcpCallTool = vi.fn<
-  (serverId: string, toolName: string, args: Record<string, unknown>) => Promise<unknown>
->()
-const mcpGetStatus = vi.fn<
-  (serverId: string, config?: unknown) => Promise<unknown>
->()
+const mcpCallTool =
+  vi.fn<(serverId: string, toolName: string, args: Record<string, unknown>) => Promise<unknown>>()
+const mcpGetStatus = vi.fn<(serverId: string, config?: unknown) => Promise<unknown>>()
 
 vi.mock('@/services/mcp/mcp-runtime', () => ({
   default: {
-    callTool: (
-      serverId: string,
-      toolName: string,
-      args: Record<string, unknown>,
-    ) => mcpCallTool(serverId, toolName, args),
+    callTool: (serverId: string, toolName: string, args: Record<string, unknown>) =>
+      mcpCallTool(serverId, toolName, args),
     getStatus: (serverId: string, config?: unknown) => mcpGetStatus(serverId, config),
     start: vi.fn<() => Promise<void>>(),
     stop: vi.fn<() => Promise<void>>(),
@@ -107,7 +97,6 @@ vi.mock('@/services/mcp/mcp-trust', () => ({
   clearSessionTrust: vi.fn<() => void>(),
 }))
 
-
 const createAgentShell = vi.fn<
   (args: { chatId: string; projectRoot: string; command: string }) => Promise<{
     shellId: string
@@ -123,15 +112,17 @@ const createAgentShell = vi.fn<
 >()
 const getAgentShell = vi.fn<(shellId: string) => unknown>()
 const killAgentShell = vi.fn<(shellId: string) => Promise<unknown>>()
-const waitForShellExit = vi.fn<
-  (
-    shellId: string,
-    timeoutMs?: number,
-  ) => Promise<{ exitCode: number; signal?: number; timedOut: boolean }>
->()
-const tailShellOutput = vi.fn<
-  (shell: { stdout: string; stderr: string }, tail?: number) => { stdout: string; stderr: string }
->()
+const waitForShellExit =
+  vi.fn<
+    (
+      shellId: string,
+      timeoutMs?: number,
+    ) => Promise<{ exitCode: number; signal?: number; timedOut: boolean }>
+  >()
+const tailShellOutput =
+  vi.fn<
+    (shell: { stdout: string; stderr: string }, tail?: number) => { stdout: string; stderr: string }
+  >()
 
 vi.mock('@/services/harness/shell/registry', () => ({
   createAgentShell,
@@ -151,7 +142,6 @@ vi.mock('@/composables/use-workbench-store', () => ({
     refreshPlanTabs: vi.fn<() => void>(),
   }),
 }))
-
 
 describe('build-tools terminal io', () => {
   beforeEach(() => {
@@ -235,9 +225,8 @@ describe('build-tools terminal io', () => {
   })
 
   it('rejects terminal_output when shell_id is a subagent id', async () => {
-    const { register, resetSubagentRegistryForTests } = await import(
-      '@/services/harness/subagent/registry'
-    )
+    const { register, resetSubagentRegistryForTests } =
+      await import('@/services/harness/subagent/registry')
     resetSubagentRegistryForTests()
     register('chat-1', 'subagent-uuid', new AbortController(), {
       toolCallId: 'tc-1',
@@ -261,5 +250,53 @@ describe('build-tools terminal io', () => {
     expect(killAgentShell).toHaveBeenCalledWith('shell-1')
     expect(result).toEqual({ shellId: 'shell-1', exitCode: 0 })
   })
-})
 
+  it('clips giant stdout on successful run_terminal results', async () => {
+    getAgentShell.mockReturnValue({
+      shellId: 'shell-1',
+      status: 'completed',
+      stdout: `${'a'.repeat(400_000)}\nlast-line\n`,
+      stderr: '',
+      exitCode: 0,
+    })
+    waitForShellExit.mockResolvedValue({ exitCode: 0, timedOut: false })
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = (await runTool(tools.run_terminal.execute, {
+      command: 'npm run ci',
+    })) as { stdout: string }
+
+    expect(result.stdout).toContain('output clipped')
+    expect(result.stdout).toContain('last-line')
+    expect(result.stdout.length).toBeLessThanOrEqual(TERMINAL_OUTPUT_MAX_CHARS + 100)
+  })
+
+  it('clips giant failure detail in the thrown command error', async () => {
+    waitForShellExit.mockResolvedValue({ exitCode: 2, timedOut: false })
+    getAgentShell.mockReturnValue({
+      shellId: 'shell-1',
+      status: 'failed',
+      stdout: '',
+      stderr: `${'e'.repeat(400_000)}\nError: build failed\n`,
+      exitCode: 2,
+    })
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+
+    const error = (await runTool(tools.run_terminal.execute, {
+      command: 'npm run ci',
+    }).then(
+      () => null,
+      (err: unknown) => err,
+    )) as Error | null
+
+    expect(error).toBeInstanceOf(Error)
+    const message = (error as Error).message
+    expect(message).toContain('Command failed')
+    expect(message).toContain('output clipped')
+    expect(message).toContain('build failed')
+    expect(message.length).toBeLessThanOrEqual(TERMINAL_OUTPUT_MAX_CHARS + 2_000)
+  })
+})
