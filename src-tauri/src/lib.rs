@@ -1,3 +1,5 @@
+#[cfg(target_os = "macos")]
+mod app_nap;
 pub mod commands;
 pub mod db;
 mod launch;
@@ -103,6 +105,7 @@ pub fn run_with_launch_path(launch_path: Option<String>) {
                 if let Some(window) = app.get_webview_window("main") {
                     hide_macos_traffic_lights(&window);
                 }
+                app_nap::disable_app_nap();
             }
 
             tray::setup(app.handle())?;

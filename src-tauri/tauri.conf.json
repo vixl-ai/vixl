@@ -22,7 +22,8 @@
         "decorations": false,
         "hiddenTitle": true,
         "transparent": true,
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "backgroundThrottling": "disabled"
       }
     ],
     "macOSPrivateApi": true,
