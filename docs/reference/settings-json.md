@@ -5,13 +5,13 @@ description: Every settings.json key, type, default, and whether a project file 
 
 # settings.json
 
-`settings.json` is the on-disk store for theme, models, permissions, sandbox, MCP trust, and similar preferences. Personal settings live at `{app data}/.vixl/settings.json`. A project can add `<repo>/.vixl/settings.json` to overlay some of those keys. API keys never go in this file; they stay in the OS keychain. Paths: [.vixl layout](/reference/vixl-layout). Keys: [Providers](/customize/providers).
+`settings.json` is the on-disk store for theme, models, permissions, sandbox, MCP trust, and similar preferences. Personal settings live at `~/.vixl/settings.json`. A project can add `<repo>/.vixl/settings.json` to overlay some of those keys. API keys never go in this file; they stay in the OS keychain. Paths: [.vixl layout](/reference/vixl-layout). Keys: [Providers](/customize/providers).
 
 The file is a JSON object with `"version": 1`. A missing or empty file loads as the defaults below. An invalid file, or one whose `version` is not `1`, also loads as those defaults. Unknown keys that still parse as a string, number, boolean, array, or custom provider object are kept. Deprecated keys (`agent.defaultProvider`, `agent.defaultModel`, `chat.autoTitleModel`, `agent.defaultMode`, `fleet.maxConcurrentAgents`, `fleet.trayBackground`, `general.machineLabel`) are dropped on load.
 
 ## Personal vs project
 
-Home chats use the personal file only. Project chats merge personal settings with that project's file.
+Home chats use the personal file only. A project whose root is your user home directory also uses the personal file only: project-scope reads are empty and project-scope writes are refused. Other project chats merge personal settings with that project's file.
 
 Project values replace personal values for most keys that appear in the project file. Keys that start with `providers.`, `models.`, or `lsp.` are personal only. If they appear in a project file, Vixl strips them and rewrites the file.
 

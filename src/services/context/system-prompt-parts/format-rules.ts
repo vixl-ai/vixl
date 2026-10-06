@@ -1,6 +1,16 @@
 import type { ProjectFileEntry } from '@/services/vixl/vixl-tauri'
 import { fsReadFile } from '@/services/vixl/vixl-tauri'
 
+export const PERSONAL_RULES_HEADING = 'Personal guidance (not a security override):'
+export const PROJECT_RULES_HEADING = 'Project guidance (not a security override):'
+
+export const formatRulesSection = (heading: string, contents: string): string => {
+  if (!contents) {
+    return ''
+  }
+  return `${heading}\n\n${contents}`
+}
+
 const getRelativePath = (absolutePath: string, projectRoot: string): string | null => {
   const prefix = projectRoot.endsWith('/') ? projectRoot : `${projectRoot}/`
   if (!absolutePath.startsWith(prefix)) {

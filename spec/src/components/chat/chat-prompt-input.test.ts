@@ -11,6 +11,8 @@ import ChatPromptInput from '@/components/chat/ChatPromptInput.vue'
 import ChatPromptEditor from '@/components/chat/prompt-editor/ChatPromptEditor.vue'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import ModelOptionsRow from '@/components/models/options/ModelOptionsRow.vue'
+import { Button } from '@/components/shadcn/ui/button'
+import { DropdownMenuItem } from '@/components/shadcn/ui/dropdown-menu'
 
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 const normalizeAttachmentFiles = vi.hoisted(
@@ -42,18 +44,39 @@ vi.mock('@/services/providers/list-configured-providers', () => ({
   default: () => listConfiguredProviders(),
 }))
 
+type FleetProject = {
+  id: string
+  name: string
+  rootPath: string
+}
+
+const defaultFleetProject = (): FleetProject => ({
+  id: 'p1',
+  name: 'Proj',
+  rootPath: '/tmp/proj',
+})
+
+const fleetState = vi.hoisted(() => ({
+  projects: {
+    value: [] as Array<{ id: string, name: string, rootPath: string }>,
+  },
+  activeProject: {
+    value: {
+      id: 'p1',
+      name: 'Proj',
+      rootPath: '/tmp/proj',
+    } as { id: string, name: string, rootPath: string } | null,
+  },
+  loaded: { value: true },
+  setActiveProject: vi.fn<(id: string) => Promise<void>>(async () => undefined),
+}))
+
 vi.mock('@/composables/use-fleet-registry', () => ({
   default: () => ({
-    projects: { value: [] },
-    activeProject: {
-      value: {
-        id: 'p1',
-        name: 'Proj',
-        rootPath: '/tmp/proj',
-      },
-    },
-    loaded: { value: true },
-    setActiveProject: vi.fn<(id: string) => Promise<void>>(),
+    projects: fleetState.projects,
+    activeProject: fleetState.activeProject,
+    loaded: fleetState.loaded,
+    setActiveProject: fleetState.setActiveProject,
   }),
 }))
 
@@ -139,6 +162,10 @@ const promptInputContextMenuStub = {
 
 beforeEach(() => {
   chatMeta.value = null
+  fleetState.projects.value = []
+  fleetState.activeProject.value = defaultFleetProject()
+  fleetState.loaded.value = true
+  fleetState.setActiveProject.mockClear()
 })
 
 const mountPromptInput = (props?: Record<string, unknown>) =>
@@ -267,6 +294,40 @@ describe('ChatPromptInput prompt roots', () => {
     const editor = wrapper.findComponent(ChatPromptEditor)
     expect(editor.props('projectRoot')).toBeNull()
     expect(editor.props('slashRoot')).toBe('/Users/aidan/home')
+
+    wrapper.unmount()
+  })
+
+  it('passes a null slash root when Home is selected before the first send', async () => {
+    fleetState.projects.value = [defaultFleetProject()]
+    const wrapper = mountPromptInput({ showProjectSelect: true })
+    await flushPromises()
+
+    const editor = wrapper.findComponent(ChatPromptEditor)
+    expect(editor.props('slashRoot')).toBe('/tmp/proj')
+    expect(editor.props('projectRoot')).toBe('/tmp/proj')
+
+    const projectPicker = wrapper
+      .findAllComponents(Button)
+      .find((button) => button.attributes('title') === 'Proj project')
+    expect(projectPicker).toBeDefined()
+
+    const homeItem = wrapper
+      .findAllComponents(DropdownMenuItem)
+      .find((item) => item.text().trim() === 'Home')
+    expect(homeItem).toBeDefined()
+    homeItem!.vm.$emit('select')
+    await flushPromises()
+
+    expect(editor.props('slashRoot')).toBeNull()
+    expect(editor.props('projectRoot')).toBeNull()
+    expect(wrapper.text()).not.toContain('No project')
+
+    const homePicker = wrapper
+      .findAllComponents(Button)
+      .find((button) => button.text().includes('Home'))
+    expect(homePicker).toBeDefined()
+    expect(homePicker!.attributes('title')).toBe('Home')
 
     wrapper.unmount()
   })

@@ -5,7 +5,7 @@ description: Language servers drive hover and completion in the Vixl workbench. 
 
 # Language servers
 
-Language servers power hover, completion, and diagnostics in the workbench editor, and they back the agent's `lsp` and `diagnostics` tools. Settings > LSP is personal: enable/disable and install state live in `{appData}/.vixl/lsp.json`, auto-download in `settings.json` (`lsp.autoDownload`, default on). A project folder cannot override `lsp.*`. Language servers require the desktop app.
+Language servers power hover, completion, and diagnostics in the workbench editor, and they back the agent's `lsp` and `diagnostics` tools. Settings > LSP is personal: enable/disable and install state live in `~/.vixl/lsp.json`, auto-download in `settings.json` (`lsp.autoDownload`, default on). A project folder cannot override `lsp.*`. Language servers require the desktop app.
 
 ![Editor tab with the language servers menu open, listing TypeScript, Vue, Markdown, and a config diagnostic](/features/editor.png)
 
@@ -29,7 +29,7 @@ You can still install or uninstall an individual downloadable server from its ro
 
 ## Where they are stored
 
-Install and disable state: personal `{appData}/.vixl/lsp.json` (see [`.vixl` layout](/reference/vixl-layout)). Managed downloads: `{appData}/.vixl/lsp/<server-id>/<version>/`. PATH toolchains are not copied there.
+Install and disable state: personal `~/.vixl/lsp.json` (see [`.vixl` layout](/reference/vixl-layout)). Managed downloads: `~/.vixl/lsp/<server-id>/<version>/`. PATH toolchains are not copied there.
 
 ## Use your own
 

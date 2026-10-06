@@ -62,7 +62,7 @@ fn table_exists(conn: &Connection, name: &str) -> bool {
 
 #[test]
 fn vixl_sqlite_path_is_under_user_vixl_dir() {
-    let dir = Path::new("/tmp/app-data/.vixl");
+    let dir = Path::new("/tmp/home/.vixl");
     assert_eq!(vixl_sqlite_path(dir), dir.join("vixl.sqlite"));
 }
 

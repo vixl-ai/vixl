@@ -19,5 +19,5 @@ Like all personal projects, Vixl does have opinions. You can read them in [Philo
 
 1. [Install Vixl](/getting-started/installation).
 2. [Set up a provider and a default model](/getting-started/set-up-providers-and-models).
-3. [Add a project](/getting-started/add-a-project) if you want the chat rooted in a folder. **No project** starts a [home chat](/concepts/projects-and-home-chats).
+3. [Add a project](/getting-started/add-a-project) if you want the chat rooted in a folder. **Home** starts a [home chat](/concepts/projects-and-home-chats).
 4. [Send a first chat](/getting-started/your-first-chat).

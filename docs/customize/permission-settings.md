@@ -30,13 +30,13 @@ OS sandboxing is separate from the permission dial. Unsandboxed or network hops 
 Settings does not add rows. They appear after you approve or deny in chat with a persist scope.
 
 - **Always** writes personal `agent.permissions` and shows up here.
-- **Workspace** writes the project's `settings.json`. Home chats have no project, so workspace persist is refused. Those project rows do not appear in Settings > Permissions.
+- **Workspace** writes the project's `settings.json`. Home chats have no project, so workspace persist is refused. A registered project whose folder is your user home directory is personal only, so workspace persist is refused there too. Those project rows do not appear in Settings > Permissions.
 - Once and session do not persist.
 
 Shell persist scopes are once, session, and never only. They never become Settings rows.
 
 The list is grouped as Filesystem, Shell, Git, MCP, and Web. Remove one row, or **Clear all** to empty the personal list. That is how you take back a persisted allow or deny.
 
-Personal `deny` wins when personal and project records share a capability. See [the `.vixl` directory](/concepts/the-vixl-directory) for the merge.
+Personal `deny` wins when personal and project records share a capability. Home chats, and a project rooted at your user home directory, use the personal list only. See [the `.vixl` directory](/concepts/the-vixl-directory) for the merge.
 
 MCP server trust is separate: see [MCP servers](/customize/mcp-servers). A trusted server still passes `mcp.call` through this dial.

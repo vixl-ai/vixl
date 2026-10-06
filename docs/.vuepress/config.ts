@@ -51,7 +51,7 @@ const faqItems: FaqItem[] = [
   {
     question: 'Where is my data?',
     answer:
-      'Personal config is {appData}/.vixl (on macOS, ~/Library/Application Support/app.vixl/.vixl). Project config is <repo>/.vixl. Chats live in vixl.sqlite and under .vixl/chats/. See .vixl layout.',
+      'Personal config is ~/.vixl on every platform (on Windows, %USERPROFILE%\\.vixl). Project config is <repo>/.vixl. Chats live in vixl.sqlite and under .vixl/chats/. See .vixl layout.',
   },
   {
     question: 'What happens when I delete a chat?',

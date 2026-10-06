@@ -9,11 +9,11 @@ description: Add MCP servers in Vixl over stdio, HTTP, or SSE. Config lives in m
 
 ## Personal vs project
 
-Settings > MCP writes the personal `{appData}/.vixl/mcp.json`. A project's MCP tab writes `<repo>/.vixl/mcp.json`. Same UI, different file. Paths are listed on [`.vixl` layout](/reference/vixl-layout).
+Settings > MCP writes the personal `~/.vixl/mcp.json`. A project's MCP tab writes `<repo>/.vixl/mcp.json`. Same UI, different file. Paths are listed on [`.vixl` layout](/reference/vixl-layout).
 
 A project server with the same id replaces the personal one (scope `overridden`). Inputs merge by id; the project value wins. The managed CodeGraph id `codegraph` is stripped from user lists and is not in the chat picker. Do not add it here; see [Code graphs](/concepts/code-graphs).
 
-Home chats with **No project** only see personal servers. Project chats see the merged set. The chat MCP picker toggles `enabled` on the existing personal or project entry. There is no separate per-chat MCP list.
+Home chats (**Home** in the composer) only see personal servers. Project chats see the merged set. A project whose folder is your user home directory is personal only: project MCP reads are empty and project MCP writes are refused. The chat MCP picker toggles `enabled` on the existing personal or project entry. There is no separate per-chat MCP list.
 
 ## Add a server
 

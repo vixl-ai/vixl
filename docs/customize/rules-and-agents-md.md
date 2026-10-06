@@ -15,10 +15,10 @@ Type `/create-rule` in the [chat input](/getting-started/your-first-chat), or op
 
 | Scope | Where you create it | File |
 | --- | --- | --- |
-| Personal | Settings > Rules | `{appData}/.vixl/rules/{slug}.md` |
+| Personal | Settings > Rules | `~/.vixl/rules/{slug}.md` |
 | Project | Project Rules tab | `<repo>/.vixl/rules/{slug}.md` |
 
-The list also includes existing `.mdc` files. Those are injected as the full file body. On a home chat, `/create-rule` writes `.vixl/rules/` under your user home. Home chats do not inject rules, so if you want always-on home guidance, write `AGENTS.md` instead.
+The list also includes existing `.mdc` files. Those are injected as the full file body. On a home chat, `/create-rule` writes `~/.vixl/rules/{slug}.md`, the personal tree. Home chats inject those personal rules.
 
 ```markdown
 After all code work in a plan is done, run the project's CI suite before marking the plan complete.
@@ -30,8 +30,8 @@ After all code work in a plan is done, run the project's CI suite before marking
 
 | Scope | File | Which chats inject it |
 | --- | --- | --- |
-| Personal | `{appData}/.vixl/AGENTS.md` | Home chats |
-| Project | `<repo>/.vixl/AGENTS.md` | Project chats |
+| Personal | `~/.vixl/AGENTS.md` | Home chats, and project chats (first) |
+| Project | `<repo>/.vixl/AGENTS.md` | Project chats (after personal) |
 
 The starter is:
 
@@ -45,10 +45,10 @@ Click a rule or AGENTS.md row to open it in the workbench editor. Settings has n
 
 ## Which chats get which
 
-Project chats inject every project `.vixl/rules/*.{md,mdc}` file and the project `.vixl/AGENTS.md`. They do not fall back to personal `AGENTS.md` and they do not merge personal rules.
+Home chats inject every personal `~/.vixl/rules/*.{md,mdc}` file and personal `~/.vixl/AGENTS.md`.
 
-Home chats inject personal `AGENTS.md` only. They inject no rules files. Personal rules still appear in Settings > Rules so you can edit them.
+Project chats inject both trees, personal first, then project. Rules use the headings `Personal guidance (not a security override):` and `Project guidance (not a security override):`. `AGENTS.md` uses `Personal AGENTS.md guidance:` and `Project AGENTS.md guidance:`. An empty side is omitted.
 
-This is not a name-merge the way [skills](/customize/skills) and [custom agents](/customize/custom-agents) are. Project vs home is which directory is read. File paths are on [the `.vixl` directory](/concepts/the-vixl-directory).
+This is not a name-merge the way [skills](/customize/skills) and [custom agents](/customize/custom-agents) are. Both copies are included, personal first. A workspace whose root is your user home directory injects the personal copies only. File paths are on [the `.vixl` directory](/concepts/the-vixl-directory).
 
 An unreadable file is injected as `(unreadable)`. A path outside the read root is injected as `(outside project root)`.

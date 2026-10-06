@@ -161,16 +161,20 @@ const selectedModeMeta = computed(() => getChatModeMeta(session.selectedMode))
 
 const activeProjectName = computed(() => {
   if (!props.showProjectSelect) {
-    return fleet.activeProject.value?.name ?? 'No project'
+    return fleet.activeProject.value?.name ?? 'Home'
   }
   if (session.selectedProjectId === null) {
-    return 'No project'
+    return 'Home'
   }
   return (
     fleet.projects.value.find((project) => project.id === session.selectedProjectId)?.name ??
-    'No project'
+    'Home'
   )
 })
+
+const projectPickerTitle = computed(() =>
+  activeProjectName.value === 'Home' ? 'Home' : `${activeProjectName.value} project`,
+)
 
 const isWaitingOnReply = computed(
   () => props.status === 'submitted' || props.status === 'streaming',
@@ -543,7 +547,7 @@ watch(
           variant="ghost"
           size="sm"
           class="mb-2 h-8 w-fit max-w-full gap-1.5 px-1 text-muted-foreground hover:text-foreground"
-          :title="`${activeProjectName} project`"
+          :title="projectPickerTitle"
         >
           <FolderIcon class="size-4 shrink-0" />
           <span class="truncate text-sm">{{ activeProjectName }}</span>
@@ -552,7 +556,7 @@ watch(
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" class="w-56">
         <DropdownMenuItem @select="handleProjectSelect(null)">
-          No project
+          Home
         </DropdownMenuItem>
         <DropdownMenuItem
           v-for="project in fleet.projects.value"

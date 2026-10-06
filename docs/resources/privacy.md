@@ -28,7 +28,7 @@ API keys and MCP secrets are stored in the OS keychain. They are never written t
 
 ## What is stored locally
 
-Personal config is `{appData}/.vixl`. Project config is `<repo>/.vixl`. Chats, messages, and related rows live in `vixl.sqlite` under the personal directory. Each chat also has a directory at `.vixl/chats/<projectSlug>/<chatId>/`. Code graph indexes live under personal `.vixl/graphs/`. Paths are listed on [.vixl layout](/reference/vixl-layout).
+Personal config is `~/.vixl`. Project config is `<repo>/.vixl`. Chats, messages, and related rows live in `vixl.sqlite` under the personal directory. Each chat also has a directory at `.vixl/chats/<projectSlug>/<chatId>/`. Code graph indexes live under personal `.vixl/graphs/`. Paths are listed on [.vixl layout](/reference/vixl-layout).
 
 ## Delete means delete
 

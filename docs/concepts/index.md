@@ -19,7 +19,7 @@ You configure most network calls: model providers, [MCP](https://modelcontextpro
 
 API keys and MCP secrets stay in the OS keychain, never in `.vixl` JSON. How that vault is named and where Linux falls back if Secret Service is missing is on [Providers](/customize/providers).
 
-Chats, messages, usage, and workbench tabs live in SQLite under the personal `.vixl` directory. Each chat also has a directory of files. Deleting a chat drops both. Settings, MCP configs, plans, skills, agents, rules, and `AGENTS.md` live in `.vixl` trees: a personal tree in app data, and a project tree at `<repo>/.vixl` that you can commit. The registered folder list and the active project id are personal. Code graph indexes are personal, not in the repo.
+Chats, messages, usage, and workbench tabs live in SQLite under the personal `.vixl` directory. Each chat also has a directory of files. Deleting a chat drops both. Settings, MCP configs, plans, skills, agents, rules, and `AGENTS.md` live in two `.vixl` trees: personal `~/.vixl`, and a project tree at `<repo>/.vixl` that you can commit. Home chats inject the personal skills, rules, and `AGENTS.md`. Project chats overlay project skills, agents, settings, and MCP on personal, and append project rules and `AGENTS.md` after the personal copies. The registered folder list and the active project id are personal. Code graph indexes are personal, not in the repo. A registered folder that is your user home directory stays on the personal tree only.
 
 The exhaustive path list is on [.vixl layout](/reference/vixl-layout). Merge rules are on [The .vixl directory](/concepts/the-vixl-directory).
 

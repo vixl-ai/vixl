@@ -1,3 +1,4 @@
+import { isHomeWorkspaceRoot } from '@/services/config/is-home-workspace-root'
 import { getVixlDir, listVixlFiles, type ProjectFileEntry } from '@/services/vixl/vixl-tauri'
 import loadAgentsMd from './format-agents-md'
 
@@ -22,16 +23,21 @@ const resolveProjectSource = async (projectRoot: string): Promise<AgentsMdSource
   return { root: projectRoot, entries }
 }
 
+const guidanceBlock = (label: string, contents: string): string =>
+  contents ? `${label} AGENTS.md guidance:\n\n${contents}` : ''
+
 export default async (input: {
   standalone?: boolean
   projectRoot: string
 }): Promise<string> => {
-  const source = input.standalone
-    ? await resolvePersonalSource()
-    : await resolveProjectSource(input.projectRoot)
-  if (!source) {
-    return ''
-  }
-  const contents = await loadAgentsMd(source.entries, source.root)
-  return contents ? `AGENTS.md guidance:\n\n${contents}` : ''
+  const personal = await resolvePersonalSource()
+  const personalContents = personal ? await loadAgentsMd(personal.entries, personal.root) : ''
+
+  const includeProject = !input.standalone && !(await isHomeWorkspaceRoot(input.projectRoot))
+  const project = includeProject ? await resolveProjectSource(input.projectRoot) : null
+  const projectContents = project ? await loadAgentsMd(project.entries, project.root) : ''
+
+  return [guidanceBlock('Personal', personalContents), guidanceBlock('Project', projectContents)]
+    .filter(Boolean)
+    .join('\n\n')
 }

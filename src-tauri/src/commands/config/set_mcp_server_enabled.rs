@@ -4,8 +4,9 @@ use std::path::Path;
 use tauri::AppHandle;
 
 use super::json_patch::patch_server_enabled;
-use super::mcp_path;
+use super::set_scoped_mcp_server_enabled;
 use super::write_json::write_atomic;
+use crate::commands::paths::user_vixl_dir;
 
 pub fn apply_mcp_server_enabled(
     raw: &str,
@@ -56,6 +57,7 @@ pub fn set_mcp_server_enabled(
     server_id: String,
     enabled: bool,
 ) -> Result<bool, String> {
-    let path = mcp_path(&app, &scope, root_path)?;
-    set_mcp_server_enabled_at_path(&path, &server_id, enabled)
+    set_scoped_mcp_server_enabled(&scope, root_path.as_deref(), &server_id, enabled, || {
+        user_vixl_dir(&app)
+    })
 }

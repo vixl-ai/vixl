@@ -1,6 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
+const getUserHomeDir = vi.hoisted(() =>
+  vi.fn<() => Promise<string>>(async () => '/Users/test-home'),
+)
+
+vi.mock('@/services/vixl/vixl-tauri/home-dir', () => ({
+  getUserHomeDir,
+}))
+
+vi.mock('@/services/vixl/vixl-tauri/helpers', async () => {
+  const { createHomeWorkspaceHelpersMock } = await import(
+    '../../../test-utils/mocks/home-workspace-command'
+  )
+  return createHomeWorkspaceHelpersMock(getUserHomeDir)
+})
+
 vi.mock('@/services/vixl/vixl-tauri', () => mockVixlTauri())
 
 vi.mock('@/services/skills/discover-internal-skills', async (importOriginal) => {
@@ -110,6 +125,8 @@ beforeEach(() => {
   vi.mocked(listVixlFiles).mockReset()
   vi.mocked(fsReadFile).mockReset()
   vi.mocked(getVixlDir).mockReset()
+  getUserHomeDir.mockReset()
+  getUserHomeDir.mockResolvedValue('/Users/test-home')
   vi.mocked(listVixlFiles).mockResolvedValue([])
   vi.mocked(getVixlDir).mockResolvedValue(personalDir)
   vi.mocked(fsReadFile).mockResolvedValue({
@@ -140,9 +157,8 @@ describe('assemble system prompt parts', () => {
   })
 
   it('injects listed .vixl/AGENTS.md into agentsMd', async () => {
-    vi.mocked(listVixlFiles).mockImplementation(async (...args) => {
-      const kind = args[1]
-      if (kind === 'agents-md') {
+    vi.mocked(listVixlFiles).mockImplementation(async (scope, kind) => {
+      if (scope === 'project' && kind === 'agents-md') {
         return [
           {
             name: 'AGENTS.md',
@@ -163,7 +179,8 @@ describe('assemble system prompt parts', () => {
     const parts = await assembleSystemPromptParts(input('agent', { standalone: false }))
 
     expect(parts.agentsMd).toContain('Prefer kebab-case filenames.')
-    expect(parts.agentsMd).toContain('AGENTS.md guidance')
+    expect(parts.agentsMd).toContain('Project AGENTS.md guidance')
+    expect(listVixlFiles).toHaveBeenCalledWith('personal', 'agents-md')
     expect(listVixlFiles).toHaveBeenCalledWith('project', 'agents-md', projectRoot)
     expect(fsReadFile).toHaveBeenCalledWith({
       projectRoot,
@@ -195,7 +212,7 @@ describe('assemble system prompt parts', () => {
     const parts = await assembleSystemPromptParts(input('agent', { standalone: true }))
 
     expect(parts.agentsMd).toContain('Prefer short replies.')
-    expect(parts.agentsMd).toContain('AGENTS.md guidance')
+    expect(parts.agentsMd).toContain('Personal AGENTS.md guidance')
     expect(getVixlDir).toHaveBeenCalledWith('personal')
     expect(listVixlFiles).toHaveBeenCalledWith('personal', 'agents-md')
     expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'agents-md', projectRoot)
@@ -219,14 +236,16 @@ describe('assemble system prompt parts', () => {
     const agentsMdCalls = vi
       .mocked(listVixlFiles)
       .mock.calls.filter((call) => call[1] === 'agents-md')
-    expect(agentsMdCalls).toEqual([['project', 'agents-md', projectRoot]])
+    expect(agentsMdCalls).toEqual([
+      ['personal', 'agents-md'],
+      ['project', 'agents-md', projectRoot],
+    ])
     expect(fsReadFile).not.toHaveBeenCalled()
   })
 
   it('does not invent nested src/AGENTS.md when the lister omits it', async () => {
-    vi.mocked(listVixlFiles).mockImplementation(async (...args) => {
-      const kind = args[1]
-      if (kind === 'agents-md') {
+    vi.mocked(listVixlFiles).mockImplementation(async (scope, kind) => {
+      if (scope === 'project' && kind === 'agents-md') {
         return [
           {
             name: 'AGENTS.md',
@@ -400,16 +419,18 @@ describe('assemble system prompt parts', () => {
     expect(parts.skills).not.toContain('- orchestrator:')
   })
 
-  it('lists home-workspace skills and vendored commands on standalone Available skills', async () => {
+  it('lists personal skills and vendored commands on standalone Available skills', async () => {
     stubSkillDisks(otherSkills)
 
     const parts = await assembleSystemPromptParts(input('orchestrator'))
 
     expect(parts.skills).toContain('Available skills:')
-    expect(parts.skills).toContain('- deploy: Project deploy')
+    expect(parts.skills).toContain('- notes: User notes')
     expect(parts.skills).toContain('- create-agent:')
-    expect(parts.skills).not.toContain('- notes:')
+    expect(parts.skills).not.toContain('- deploy:')
     expect(parts.skills).not.toContain('- orchestrator:')
+    expect(listVixlFiles).toHaveBeenCalledWith('personal', 'skills')
+    expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'skills', projectRoot)
   })
 
   it('omits the inlined orchestrator skill from Available skills but lists others', async () => {
@@ -444,5 +465,147 @@ describe('assemble system prompt parts', () => {
 
     expect(parts.base).not.toContain('Orchestrator mode')
     expect(parts.skills).toContain('- orchestrator:')
+  })
+
+  it('injects personal rules before project rules on project chats', async () => {
+    vi.mocked(listVixlFiles).mockImplementation(async (scope, kind) => {
+      if (kind !== 'rules') {
+        return []
+      }
+      if (scope === 'personal') {
+        return [{ name: 'home.md', path: `${personalDir}/rules/home.md` }]
+      }
+      if (scope === 'project') {
+        return [{ name: 'proj.md', path: `${projectRoot}/.vixl/rules/proj.md` }]
+      }
+      return []
+    })
+    vi.mocked(fsReadFile).mockImplementation(async ({ path }) => {
+      const content = path.endsWith('home.md') ? 'personal rule body' : 'project rule body'
+      return { path, content, totalLines: 1, offset: 0, limit: 1 }
+    })
+
+    const parts = await assembleSystemPromptParts(input('agent', { standalone: false }))
+
+    const personalAt = parts.rules.indexOf('Personal guidance (not a security override):')
+    const projectAt = parts.rules.indexOf('Project guidance (not a security override):')
+    expect(personalAt).toBeGreaterThanOrEqual(0)
+    expect(projectAt).toBeGreaterThan(personalAt)
+    expect(parts.rules.indexOf('personal rule body')).toBeLessThan(
+      parts.rules.indexOf('project rule body'),
+    )
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: personalDir,
+      path: 'rules/home.md',
+    })
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot,
+      path: '.vixl/rules/proj.md',
+    })
+  })
+
+  it('injects personal rules only for standalone home chats', async () => {
+    vi.mocked(listVixlFiles).mockImplementation(async (scope, kind) => {
+      if (kind !== 'rules') {
+        return []
+      }
+      if (scope === 'personal') {
+        return [{ name: 'home.md', path: `${personalDir}/rules/home.md` }]
+      }
+      return [{ name: 'proj.md', path: `${projectRoot}/.vixl/rules/proj.md` }]
+    })
+    vi.mocked(fsReadFile).mockResolvedValue({
+      path: 'rules/home.md',
+      content: 'personal rule body',
+      totalLines: 1,
+      offset: 0,
+      limit: 1,
+    })
+
+    const parts = await assembleSystemPromptParts(input('agent', { standalone: true }))
+
+    expect(parts.rules).toContain('Personal guidance (not a security override):')
+    expect(parts.rules).toContain('personal rule body')
+    expect(parts.rules).not.toContain('Project guidance')
+    expect(parts.rules).not.toContain('project rule body')
+    expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'rules', projectRoot)
+  })
+
+  it('does not append project rules when the project root is the home directory', async () => {
+    getUserHomeDir.mockResolvedValue(projectRoot)
+    vi.mocked(listVixlFiles).mockImplementation(async (scope, kind) => {
+      if (kind !== 'rules') {
+        return []
+      }
+      if (scope === 'personal') {
+        return [{ name: 'home.md', path: `${personalDir}/rules/home.md` }]
+      }
+      return [{ name: 'proj.md', path: `${projectRoot}/.vixl/rules/proj.md` }]
+    })
+    vi.mocked(fsReadFile).mockResolvedValue({
+      path: 'rules/home.md',
+      content: 'personal rule body',
+      totalLines: 1,
+      offset: 0,
+      limit: 1,
+    })
+
+    const parts = await assembleSystemPromptParts(input('agent', { standalone: false }))
+
+    expect(parts.rules).toContain('personal rule body')
+    expect(parts.rules).not.toContain('Project guidance')
+    expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'rules', projectRoot)
+  })
+
+  it('concatenates personal AGENTS.md before project AGENTS.md', async () => {
+    vi.mocked(listVixlFiles).mockImplementation(async (scope, kind) => {
+      if (kind !== 'agents-md') {
+        return []
+      }
+      if (scope === 'personal') {
+        return [{ name: 'AGENTS.md', path: `${personalDir}/AGENTS.md` }]
+      }
+      return [{ name: 'AGENTS.md', path: `${projectRoot}/.vixl/AGENTS.md` }]
+    })
+    vi.mocked(fsReadFile).mockImplementation(async ({ path }) => {
+      const content = path === 'AGENTS.md' ? 'Home agents guidance.' : 'Project agents guidance.'
+      return { path, content, totalLines: 1, offset: 0, limit: 1 }
+    })
+
+    const parts = await assembleSystemPromptParts(input('agent', { standalone: false }))
+
+    expect(parts.agentsMd.indexOf('Personal AGENTS.md guidance:')).toBeGreaterThanOrEqual(0)
+    expect(parts.agentsMd.indexOf('Personal AGENTS.md guidance:')).toBeLessThan(
+      parts.agentsMd.indexOf('Project AGENTS.md guidance:'),
+    )
+    expect(parts.agentsMd.indexOf('Home agents guidance.')).toBeLessThan(
+      parts.agentsMd.indexOf('Project agents guidance.'),
+    )
+  })
+
+  it('keeps standalone AGENTS.md personal only when the root is the home directory', async () => {
+    getUserHomeDir.mockResolvedValue(projectRoot)
+    vi.mocked(listVixlFiles).mockImplementation(async (scope, kind) => {
+      if (scope === 'personal' && kind === 'agents-md') {
+        return [{ name: 'AGENTS.md', path: `${personalDir}/AGENTS.md` }]
+      }
+      if (kind === 'agents-md') {
+        return [{ name: 'AGENTS.md', path: `${projectRoot}/.vixl/AGENTS.md` }]
+      }
+      return []
+    })
+    vi.mocked(fsReadFile).mockResolvedValue({
+      path: 'AGENTS.md',
+      content: 'Home agents guidance.',
+      totalLines: 1,
+      offset: 0,
+      limit: 1,
+    })
+
+    const parts = await assembleSystemPromptParts(input('agent', { standalone: true }))
+
+    expect(parts.agentsMd).toContain('Home agents guidance.')
+    expect(parts.agentsMd).not.toContain('Project AGENTS.md guidance')
+    expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'agents-md', projectRoot)
   })
 })

@@ -5,7 +5,7 @@ description: Register a folder as a Vixl project so chats and the workbench use 
 
 # Adding a project
 
-A project is a folder you register so chats, MCP, plans, and the workbench use that directory as the workspace. You can skip this and send a [home chat](/concepts/projects-and-home-chats) with **No project**.
+A project is a folder you register so chats, MCP, plans, and the workbench use that directory as the workspace. You can skip this and send a [home chat](/concepts/projects-and-home-chats) with **Home**.
 
 ## Add a folder
 

@@ -10,12 +10,12 @@ First launch opens the home screen: a chat input in the main pane. **New Agent**
 ## Send from home
 
 1. Click **New Agent** if you are not already on home.
-2. Select a project, or leave **No project**. The picker defaults to the last active project.
+2. Select a project, or leave **Home**. The picker defaults to the last active project.
 3. Choose a mode. The default is **Agent**.
 4. Choose a model if one is not already filled from your Default role.
 5. Type a message and send. Enter sends. Shift-Enter inserts a new line.
 
-**No project** creates a [home chat](/concepts/projects-and-home-chats) whose workspace is your user home directory. A selected project creates a project chat and opens that thread. New chats are titled **New Agent** until Auto-title fills one in (on by default).
+**Home** creates a [home chat](/concepts/projects-and-home-chats) whose workspace is your user home directory. A selected project creates a project chat and opens that thread. New chats are titled **New Agent** until Auto-title fills one in (on by default).
 
 The plus menu attaches images. The shield under the input is the [permission dial](/concepts/permissions-and-approvals) (default **Allowlist**). On a git workspace, a branch control appears next to it. The MCP control lists configured servers. Skills and custom agents are `/` in the editor.
 

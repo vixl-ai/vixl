@@ -17,10 +17,10 @@ You can also create one from Settings > Skills (personal) or the project Skills 
 
 | Scope | Where you create it | File |
 | --- | --- | --- |
-| Personal | Settings > Skills | `{appData}/.vixl/skills/{slug}/SKILL.md` |
+| Personal | Settings > Skills | `~/.vixl/skills/{slug}/SKILL.md` |
 | Project | Project Skills tab | `<repo>/.vixl/skills/{slug}/SKILL.md` |
 
-On a home chat, `/create-skill` writes `.vixl/skills/{slug}/SKILL.md` under your user home directory. That is the home workspace tree, not the Settings personal tree. Both trees are on [the `.vixl` directory](/concepts/the-vixl-directory).
+On a home chat, `/create-skill` writes `~/.vixl/skills/{slug}/SKILL.md`. That path is the personal tree, the same files Settings > Skills edits. Paths are on [the `.vixl` directory](/concepts/the-vixl-directory).
 
 Name and description are required. The create form writes them as JSON strings. The body is markdown. Loaders strip the frontmatter and inject the body. Bodies over 4000 characters are truncated when loaded.
 
@@ -47,4 +47,4 @@ Reserved names `ask`, `plan`, `agent`, and `orchestrator` cannot run via `/`. Th
 
 ## Discovery and precedence
 
-Same name, case-insensitive: a project skill overlays a personal one. `load_skill` name resolution, `/` merge order, and vendored-command protection are on [SKILL.md format](/reference/skill-md-format). How catalogs land in the prompt, including home-chat `/` versus Available skills, is on [Context](/concepts/context).
+Same name, case-insensitive: a project skill overlays a personal one. Home chats, and a workspace rooted at your user home directory, use personal skills only. `load_skill` name resolution, `/` merge order, and vendored-command protection are on [SKILL.md format](/reference/skill-md-format). How catalogs land in the prompt is on [Context](/concepts/context).

@@ -6,6 +6,10 @@ import mcpRuntime from '@/services/mcp/mcp-runtime'
 import connectionKey from '@/services/mcp/connection-key'
 import { isInternalMcpServer, CODEGRAPH_SERVER_ID } from '@/types/codegraph/managed-codegraph'
 import {
+  HOME_PROJECT_SCOPE_ERROR,
+  isHomeWorkspaceRoot,
+} from '@/services/config/is-home-workspace-root'
+import {
   readMcpConfig,
   writeMcpConfig,
   type McpServerState,
@@ -41,20 +45,22 @@ export const loadPersonalMcpConfig = async (): Promise<McpConfig> => {
   return loaded.config
 }
 
-export const loadProjectConfigForRoot = async (
-  rootPath: string,
-): Promise<McpConfig> => {
+export const loadProjectConfigForRoot = async (rootPath: string): Promise<McpConfig> => {
+  if (await isHomeWorkspaceRoot(rootPath)) {
+    return { servers: {} }
+  }
   const loaded = await loadScopedConfig('project', rootPath)
   return loaded.config
 }
 
 export const loadConfigs = async (rootPath: string | null): Promise<void> => {
   const personalLoaded = await loadScopedConfig('personal', null)
+  const projectRoot = rootPath && !(await isHomeWorkspaceRoot(rootPath)) ? rootPath : null
 
   let project: McpConfig = { servers: {} }
   let projectHadCodegraph = false
-  if (rootPath) {
-    const projectLoaded = await loadScopedConfig('project', rootPath)
+  if (projectRoot) {
+    const projectLoaded = await loadScopedConfig('project', projectRoot)
     project = projectLoaded.config
     projectHadCodegraph = projectLoaded.hadCodegraph
   }
@@ -64,8 +70,8 @@ export const loadConfigs = async (rootPath: string | null): Promise<void> => {
   if (personalLoaded.hadCodegraph) {
     await writeMcpConfig('personal', personalLoaded.config, null)
   }
-  if (rootPath && projectHadCodegraph) {
-    await writeMcpConfig('project', project, rootPath)
+  if (projectRoot && projectHadCodegraph) {
+    await writeMcpConfig('project', project, projectRoot)
   }
 }
 
@@ -75,6 +81,9 @@ export const saveScopedConfig = async (
   rootPath: string | null,
 ): Promise<void> => {
   const scope = tab === 'personal' ? 'personal' : 'project'
+  if (scope === 'project' && (await isHomeWorkspaceRoot(rootPath))) {
+    throw new Error(HOME_PROJECT_SCOPE_ERROR)
+  }
   const cleaned = stripCodegraphMcpServer(config)
   await writeMcpConfig(scope, cleaned, rootPath)
   if (scope === 'personal') {

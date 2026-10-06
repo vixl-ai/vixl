@@ -7,7 +7,7 @@ description: A Vixl plan is a durable PLAN.md. Plan mode researches and writes i
 
 A plan is a `PLAN.md` you keep. Plan mode researches the repo and writes that file. **Build** or **Orchestrate** then implements it, so the next run is grounded in decisions you already paid for, not in a discarded chat turn. Plans persist; that opinion is on [Philosophy](/getting-started/philosophy).
 
-The file lives at `.vixl/plans/<id>/PLAN.md`, where `<id>` is a slug of the title plus a timestamp. Project chats write under the project `.vixl`. Home chats write under the home workspace `.vixl`. Paths are on [The .vixl directory](/concepts/the-vixl-directory).
+The file lives at `.vixl/plans/<id>/PLAN.md`, where `<id>` is a slug of the title plus a timestamp. Project chats write under the project `.vixl`. Home chats write under `~/.vixl/plans`, the personal tree. Paths are on [The .vixl directory](/concepts/the-vixl-directory).
 
 ## What PLAN.md contains
 

@@ -9,6 +9,7 @@ import {
   discoverProjectSkillIndex,
   loadProjectSkill,
 } from '@/services/skills/discover-project-skills'
+import { isHomeWorkspaceRoot } from '@/services/config/is-home-workspace-root'
 import { discoverUserSkillIndex, loadUserSkill } from '@/services/skills/discover-user-skills'
 import isReservedSlashName from '@/services/skills/is-reserved-slash-name'
 import { MAX_SKILL_CONTENT_CHARS } from '@/services/skills/strip-skill-frontmatter'
@@ -31,10 +32,11 @@ export const listUserAndProjectSkillIndex = async (
   projectRoot: string,
 ): Promise<SkillIndexEntry[]> => {
   const user = await discoverUserSkillIndex()
-  const project = await discoverProjectSkillIndex(projectRoot)
   const byName = new Map<string, SkillIndexEntry>()
   overlaySkillIndex(byName, user)
-  overlaySkillIndex(byName, project)
+  if (!(await isHomeWorkspaceRoot(projectRoot))) {
+    overlaySkillIndex(byName, await discoverProjectSkillIndex(projectRoot))
+  }
   return [...byName.values()]
 }
 
@@ -56,10 +58,11 @@ export const listSlashSkillIndex = async (
   const byName = new Map<string, SkillIndexEntry>()
   overlaySkillIndex(byName, commandSkills)
   overlaySkillIndex(byName, await loadSkillIndexSafely(discoverUserSkillIndex), protectedNames)
-  if (projectRoot) {
+  if (projectRoot && !(await isHomeWorkspaceRoot(projectRoot))) {
+    const root = projectRoot
     overlaySkillIndex(
       byName,
-      await loadSkillIndexSafely(() => discoverProjectSkillIndex(projectRoot)),
+      await loadSkillIndexSafely(() => discoverProjectSkillIndex(root)),
       protectedNames,
     )
   }
@@ -68,7 +71,6 @@ export const listSlashSkillIndex = async (
 
 export const listStandaloneSkillIndex = async (
   mode: VixlChatMode,
-  projectRoot: string,
 ): Promise<SkillIndexEntry[]> => {
   const commandSkills = listInternalCommandSkillIndex()
   const protectedNames = new Set(commandSkills.map((skill) => skill.name.toLowerCase()))
@@ -77,7 +79,7 @@ export const listStandaloneSkillIndex = async (
   overlaySkillIndex(byName, listInternalSkillIndex(mode))
   overlaySkillIndex(
     byName,
-    await loadSkillIndexSafely(() => discoverProjectSkillIndex(projectRoot)),
+    await loadSkillIndexSafely(discoverUserSkillIndex),
     protectedNames,
   )
   return [...byName.values()]
@@ -93,11 +95,13 @@ export const listSkillIndex = async (
   overlaySkillIndex(byName, commandSkills)
   overlaySkillIndex(byName, listInternalSkillIndex(mode))
   overlaySkillIndex(byName, await loadSkillIndexSafely(discoverUserSkillIndex), protectedNames)
-  overlaySkillIndex(
-    byName,
-    await loadSkillIndexSafely(() => discoverProjectSkillIndex(projectRoot)),
-    protectedNames,
-  )
+  if (!(await isHomeWorkspaceRoot(projectRoot))) {
+    overlaySkillIndex(
+      byName,
+      await loadSkillIndexSafely(() => discoverProjectSkillIndex(projectRoot)),
+      protectedNames,
+    )
+  }
   return [...byName.values()]
 }
 
@@ -111,7 +115,8 @@ export const loadSkill = async (
   }
 
   const internal = loadInternalSkill(normalized)
-  const project = internal ? null : await loadProjectSkill(projectRoot, normalized)
+  const skipProject = Boolean(internal) || (await isHomeWorkspaceRoot(projectRoot))
+  const project = skipProject ? null : await loadProjectSkill(projectRoot, normalized)
   const user = internal || project ? null : await loadUserSkill(normalized)
   const resolved = internal ?? project ?? user
 

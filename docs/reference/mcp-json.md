@@ -5,7 +5,7 @@ description: Personal and project mcp.json schema for stdio, HTTP, and SSE serve
 
 # mcp.json
 
-MCP ([Model Context Protocol](https://modelcontextprotocol.io/)) server configs live in `mcp.json`. Personal file: `{app data}/.vixl/mcp.json`. Project file: `<repo>/.vixl/mcp.json`. Secrets are not written here. They go in the OS keychain. How to add and trust servers: [MCP servers](/customize/mcp-servers). Paths: [.vixl layout](/reference/vixl-layout).
+MCP ([Model Context Protocol](https://modelcontextprotocol.io/)) server configs live in `mcp.json`. Personal file: `~/.vixl/mcp.json`. Project file: `<repo>/.vixl/mcp.json`. A workspace rooted at your user home directory uses the personal file only. Secrets are not written here. They go in the OS keychain. How to add and trust servers: [MCP servers](/customize/mcp-servers). Paths: [.vixl layout](/reference/vixl-layout).
 
 A missing or empty file is `{ "servers": {} }`. Invalid individual server entries are dropped. If every server fails to parse, load fails with `MCP config servers failed to parse` and migrate falls back to empty.
 

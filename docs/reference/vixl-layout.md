@@ -1,19 +1,15 @@
 ---
 title: ".vixl layout"
-description: Every file and folder in personal and project .vixl trees, with OS paths and commit guidance.
+description: Every file and folder in personal and project .vixl trees, with paths and commit guidance.
 ---
 
 # .vixl layout
 
-Vixl keeps two config trees. API keys are in the OS keychain, not in either tree. The bundle identifier is `app.vixl`. Merge rules: [The .vixl directory](/concepts/the-vixl-directory).
+Vixl keeps two config trees: personal `~/.vixl` and project `<repo>/.vixl`. API keys are in the OS keychain, not in either tree. Merge rules: [The .vixl directory](/concepts/the-vixl-directory).
 
 ## Personal directory
 
-Personal config is `{app data}/.vixl`, created if missing. App data is the OS application data directory for `app.vixl`:
-
-- macOS: `~/Library/Application Support/app.vixl/.vixl`
-- Linux: `$XDG_DATA_HOME/app.vixl/.vixl` (usually `~/.local/share/app.vixl/.vixl`)
-- Windows: `%APPDATA%\app.vixl\.vixl`
+Personal config is `~/.vixl` on every platform (on Windows, `%USERPROFILE%\.vixl`), created if missing.
 
 Do not commit this tree. It is machine-local.
 
@@ -32,10 +28,12 @@ Do not commit this tree. It is machine-local.
 | `agents/` | Personal custom agents (`{slug}.md`) | No |
 | `skills/` | Personal skills (`{slug}/SKILL.md`) | No |
 | `plans/` | Personal plans (`{id}/PLAN.md`). Frontmatter: [Work with plans](/using/work-with-plans) | No |
-| `rules/` | Personal rules (Settings only; not injected into project chats). `.md` or `.mdc` | No |
-| `AGENTS.md` | Personal always-on instructions for home chats (`agents.md` is accepted if uppercase is missing) | No |
+| `rules/` | Personal rules, injected on home chats and before project rules on project chats. `.md` or `.mdc` | No |
+| `AGENTS.md` | Personal always-on instructions. Injected on home chats, and first on project chats (`agents.md` is accepted if uppercase is missing) | No |
 
-Home chats use slug `_home_` and the user home directory as workspace. Chat files for those threads are under `chats/_home_/<chatId>/`.
+Home chats use slug `_home_` and the user home directory as workspace. Chat files for those threads are under `chats/_home_/<chatId>/`. `/create-skill`, `/create-rule`, and `/create-agent` on a home chat write into this personal tree.
+
+A workspace root equal to the user home directory is this same directory. Vixl does not keep a second project tree there: project-scope settings and MCP reads are empty, project-scope writes are refused, project file lists are empty, and that root is not treated as having project config.
 
 JSON writes are allowed only under the personal `.vixl` or any path with a `.vixl` ancestor. Parent `..` is rejected.
 
@@ -43,15 +41,15 @@ JSON writes are allowed only under the personal `.vixl` or any path with a `.vix
 
 Project config is `<repo>/.vixl`. Resolution:
 
-1. Use `{root}/.vixl` if that directory exists (even skills-only, no `settings.json`).
-2. Else walk up to 8 parents.
-3. Stop at `$HOME` / `%USERPROFILE%`.
-4. Never select `{home}/.vixl`.
+1. If the opened root is the user home directory, resolve `{home}/.vixl` and stop. That path is the personal root, and project scope for it stays empty.
+2. Use `{root}/.vixl` if that directory exists (even skills-only, no `settings.json`).
+3. Else walk up to 8 parents.
+4. Stop at `$HOME` / `%USERPROFILE%`. Do not select `{home}/.vixl` while walking from a folder under home.
 5. Fall back to `{root}/.vixl` if no ancestor `.vixl` is found (it may not exist yet).
 
 Adding a project does not create this folder. It appears when config is first written.
 
-Vixl treats a project as having config only when the resolved directory exists and contains `mcp.json` or `settings.json`. A skills-only `.vixl` still resolves as the project dir.
+Vixl treats a project as having config only when the resolved directory exists and contains `mcp.json` or `settings.json`. A skills-only `.vixl` still resolves as the project dir. The user home directory never counts as having project config.
 
 This tree is meant to be committed. Removing a project from the sidebar drops the fleet row only. It does not delete `<repo>/.vixl`, chats, or graph indexes.
 
@@ -62,8 +60,8 @@ This tree is meant to be committed. Removing a project from the sidebar drops th
 | `agents/` | Project custom agents (`{slug}.md`) | Yes |
 | `skills/` | Project skills (`{slug}/SKILL.md`) | Yes |
 | `plans/` | Project plans (`{id}/PLAN.md`). Frontmatter: [Work with plans](/using/work-with-plans) | Yes |
-| `rules/` | Project rules (injected into project chats). `.md` or `.mdc` | Yes |
-| `AGENTS.md` | Project always-on instructions for project chats (`agents.md` fallback) | Yes |
+| `rules/` | Project rules, injected after personal rules on project chats. `.md` or `.mdc` | Yes |
+| `AGENTS.md` | Project always-on instructions, concatenated after personal `AGENTS.md` on project chats (`agents.md` fallback) | Yes |
 
 Plans from `create_plan` write `.vixl/plans/<id>/PLAN.md`. The id is `{slug}-{YYYY-MM-DD-HHMMSS}`.
 

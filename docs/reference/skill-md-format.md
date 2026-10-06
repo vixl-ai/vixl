@@ -11,7 +11,7 @@ A skill is a folder that contains `SKILL.md`. Agents see a short catalog, then l
 
 | Scope | Path |
 | --- | --- |
-| Personal | `{app data}/.vixl/skills/{slug}/SKILL.md` |
+| Personal | `~/.vixl/skills/{slug}/SKILL.md` |
 | Project | `<repo>/.vixl/skills/{slug}/SKILL.md` |
 | Built-in | shipped with the app |
 
@@ -45,7 +45,7 @@ Loaders strip frontmatter and inject the body. If the loaded body is longer than
 
 Load by name (case-insensitive): built-in first, then project, then personal.
 
-`/` and the Available skills list merge in this order: vendored command skills first, then personal, then project overlay (project wins over personal). Vendored command skills cannot be overridden by a same-named user or project skill.
+`/` and the Available skills list merge in this order: vendored command skills first, then personal, then project overlay (project wins over personal). Home chats, and a workspace rooted at your user home directory, skip the project overlay. Vendored command skills cannot be overridden by a same-named user or project skill.
 
 Vendored command skills: `create-agent`, `create-skill`, `create-rule`, `create-plan`. They are listed in `/` and in Available skills, including on home chats. The matching built-in mode skill (`ask`, `plan`, `agent`, `orchestrator`) is inlined for that chat mode and omitted from Available skills.
 

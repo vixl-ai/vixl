@@ -22,8 +22,7 @@ import {
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
 import VixlFileCreateSheet from '@/components/settings/vixl-files/VixlFileCreateSheet.vue'
-import createPlan from '@/services/plans/write-plan'
-import { fsWriteFile, getVixlDir } from '@/services/vixl/vixl-tauri'
+import writePlanFile from '@/services/plans/write-plan-file'
 import type { PlanTodoItem } from '@/types/plans/plan-document'
 
 const planFormSchema = toTypedSchema(
@@ -81,31 +80,13 @@ const onSubmit = handleSubmit(async (values) => {
   saving.value = true
   try {
     const todos = buildTodos()
-    const body = values.description.trim()
-    const plan = createPlan({
+    await writePlanFile({
+      scope: props.scope,
+      projectRoot: props.projectRoot,
       title: values.title,
-      body,
+      body: values.description.trim(),
       todos,
     })
-
-    if (props.scope === 'personal') {
-      const personalDir = await getVixlDir('personal')
-      const path = plan.path.replace(/^\.vixl\//, '')
-      await fsWriteFile({
-        projectRoot: personalDir,
-        path,
-        content: plan.content,
-      })
-    } else {
-      if (!props.projectRoot) {
-        throw new Error('projectRoot is required for project-scoped plans')
-      }
-      await fsWriteFile({
-        projectRoot: props.projectRoot,
-        path: plan.path,
-        content: plan.content,
-      })
-    }
 
     toast.success('Plan created')
     emit('submitted')

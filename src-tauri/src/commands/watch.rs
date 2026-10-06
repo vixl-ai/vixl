@@ -27,14 +27,35 @@ impl WatchState {
     }
 }
 
+#[cfg(test)]
 fn classify_change(
     path: &Path,
     personal_dir: &Path,
     project_dir: Option<&Path>,
     project_root: Option<&str>,
 ) -> Option<VixlFileChange> {
-    let in_personal = path.starts_with(personal_dir);
-    let in_project = project_dir.is_some_and(|dir| path.starts_with(dir));
+    let overlaps_personal = project_dir.is_some_and(|dir| same_watch_dir(personal_dir, dir));
+    classify_scoped_change(
+        path,
+        personal_dir,
+        project_dir,
+        project_root,
+        overlaps_personal,
+    )
+}
+
+fn classify_scoped_change(
+    path: &Path,
+    personal_dir: &Path,
+    project_dir: Option<&Path>,
+    project_root: Option<&str>,
+    overlaps_personal: bool,
+) -> Option<VixlFileChange> {
+    // A home workspace resolves the project tree to the personal tree. Paths
+    // under either spelling of that directory stay personal.
+    let in_personal = path.starts_with(personal_dir)
+        || (overlaps_personal && project_dir.is_some_and(|dir| path.starts_with(dir)));
+    let in_project = !overlaps_personal && project_dir.is_some_and(|dir| path.starts_with(dir));
 
     if !in_personal && !in_project {
         return None;
@@ -86,6 +107,23 @@ fn has_path_segment(path: &Path, segment: &str) -> bool {
         .any(|component| component.as_os_str() == segment)
 }
 
+/// True when `project_dir` is the same directory as `personal_dir`.
+///
+/// Exact path equality matches first. Otherwise both sides are canonicalized,
+/// so a symlink or a `.` / `..` spelling still counts as one watch root.
+fn same_watch_dir(personal_dir: &Path, project_dir: &Path) -> bool {
+    if personal_dir == project_dir {
+        return true;
+    }
+    match (
+        dunce::canonicalize(personal_dir),
+        dunce::canonicalize(project_dir),
+    ) {
+        (Ok(personal), Ok(project)) => personal == project,
+        _ => false,
+    }
+}
+
 #[tauri::command]
 pub fn watch_vixl_paths(app: AppHandle, project_root: Option<String>) -> Result<(), String> {
     let personal_dir = user_vixl_dir(&app)?;
@@ -97,6 +135,9 @@ pub fn watch_vixl_paths(app: AppHandle, project_root: Option<String>) -> Result<
     let mut guard = state.inner.lock().map_err(|e| e.to_string())?;
     *guard = None;
 
+    let overlaps_personal = project_dir
+        .as_ref()
+        .is_some_and(|dir| same_watch_dir(&personal_dir, dir));
     let personal_dir_for_handler = personal_dir.clone();
     let project_dir_for_handler = project_dir.clone();
     let project_root_for_handler = project_root.clone();
@@ -116,11 +157,12 @@ pub fn watch_vixl_paths(app: AppHandle, project_root: Option<String>) -> Result<
             let mut latest_change: Option<VixlFileChange> = None;
 
             for path in event.paths {
-                if let Some(change) = classify_change(
+                if let Some(change) = classify_scoped_change(
                     &path,
                     &personal_dir_for_handler,
                     project_dir_for_handler.as_deref(),
                     project_root_for_handler.as_deref(),
+                    overlaps_personal,
                 ) {
                     latest_change = Some(change);
                 }
@@ -144,8 +186,10 @@ pub fn watch_vixl_paths(app: AppHandle, project_root: Option<String>) -> Result<
         .watch(&personal_dir, RecursiveMode::Recursive)
         .map_err(|e| e.to_string())?;
 
+    // Home as the workspace root resolves the project tree to ~/.vixl.
+    // A second recursive watch on that same directory emits duplicate events.
     if let Some(dir) = project_dir {
-        if dir.exists() {
+        if dir.exists() && !overlaps_personal {
             watcher
                 .watch(&dir, RecursiveMode::Recursive)
                 .map_err(|e| e.to_string())?;
@@ -235,5 +279,61 @@ mod tests {
             Some("/repo"),
         );
         assert!(change.is_none());
+    }
+
+    #[test]
+    fn classifies_home_root_overlap_as_personal() {
+        let personal = personal_dir();
+        let change = classify_change(
+            &personal.join("settings.json"),
+            &personal,
+            Some(&personal),
+            Some("/home/user"),
+        )
+        .expect("classified");
+        assert_eq!(change.kind, "settings");
+        assert_eq!(change.scope, "personal");
+        assert!(change.root_path.is_none());
+    }
+
+    #[test]
+    fn classifies_canonical_home_spelling_as_personal() {
+        let temp = std::env::temp_dir().join(format!("vixl-watch-classify-{}", std::process::id()));
+        let personal = temp.join(".vixl");
+        std::fs::create_dir_all(&personal).expect("mkdir");
+        let via_dot = temp.join(".").join(".vixl");
+        let change = classify_change(
+            &via_dot.join("mcp.json"),
+            &personal,
+            Some(&via_dot),
+            Some(temp.to_str().unwrap_or("/tmp")),
+        );
+        let _ = std::fs::remove_dir_all(&temp);
+        let change = change.expect("classified");
+        assert_eq!(change.kind, "mcp");
+        assert_eq!(change.scope, "personal");
+        assert!(change.root_path.is_none());
+    }
+
+    #[test]
+    fn same_watch_dir_matches_equal_paths() {
+        let personal = personal_dir();
+        assert!(same_watch_dir(&personal, &personal));
+    }
+
+    #[test]
+    fn same_watch_dir_rejects_distinct_project_dir() {
+        assert!(!same_watch_dir(&personal_dir(), &project_vixl_dir()));
+    }
+
+    #[test]
+    fn same_watch_dir_matches_canonical_equivalent() {
+        let temp = std::env::temp_dir().join(format!("vixl-watch-dedup-{}", std::process::id()));
+        let personal = temp.join(".vixl");
+        std::fs::create_dir_all(&personal).expect("mkdir");
+        let via_dot = temp.join(".").join(".vixl");
+        let matches = same_watch_dir(&personal, &via_dot);
+        let _ = std::fs::remove_dir_all(&temp);
+        assert!(matches);
     }
 }

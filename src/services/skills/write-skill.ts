@@ -2,6 +2,10 @@ import {
   createSkillInputSchema,
   type CreateSkillInput,
 } from '@/schemas/skills/skill-document'
+import {
+  HOME_PROJECT_SCOPE_ERROR,
+  isHomeWorkspaceRoot,
+} from '@/services/config/is-home-workspace-root'
 import { fsWriteFile, getVixlDir } from '@/services/vixl/vixl-tauri'
 import slugifyName from '@/utils/slugify-name'
 
@@ -44,6 +48,9 @@ export default async (input: WriteSkillArgs): Promise<WriteSkillResult> => {
   if (input.scope === 'project') {
     if (!input.projectRoot) {
       throw new Error('projectRoot is required for project-scoped skills')
+    }
+    if (await isHomeWorkspaceRoot(input.projectRoot)) {
+      throw new Error(HOME_PROJECT_SCOPE_ERROR)
     }
     const path = `.vixl/skills/${slug}/SKILL.md`
     await fsWriteFile({

@@ -1,6 +1,9 @@
-import { homeDir } from '@tauri-apps/api/path'
 import { lspConfigSchema } from '@/schemas/lsp-config'
-import { call, isTauri } from './helpers'
+import {
+  HOME_PROJECT_SCOPE_ERROR,
+  isHomeWorkspaceRoot,
+} from '@/services/config/is-home-workspace-root'
+import { call } from './helpers'
 import type { ConfigScope, ProjectFileEntry, VixlFilesKind } from './types'
 
 export const getUserVixlDir = (): Promise<string> => call('get_user_vixl_dir')
@@ -11,47 +14,77 @@ export const readJsonFile = (path: string): Promise<unknown> =>
 export const writeJsonFile = (path: string, value: unknown): Promise<void> =>
   call('write_json_file', { path, value })
 
-export const hasProjectVixl = (rootPath: string): Promise<boolean> =>
-  call('has_project_vixl', { rootPath })
-
-export const readSettings = (
+const refuseHomeProjectWrite = async (
   scope: ConfigScope,
   rootPath?: string | null,
-): Promise<Record<string, unknown>> =>
-  call('read_settings', { scope, rootPath: rootPath ?? null })
+): Promise<void> => {
+  if (scope !== 'project') {
+    return
+  }
+  if (await isHomeWorkspaceRoot(rootPath)) {
+    throw new Error(HOME_PROJECT_SCOPE_ERROR)
+  }
+}
 
-export const writeSettings = (
+export const hasProjectVixl = async (rootPath: string): Promise<boolean> => {
+  if (await isHomeWorkspaceRoot(rootPath)) {
+    return false
+  }
+  return call('has_project_vixl', { rootPath })
+}
+
+export const readSettings = async (
+  scope: ConfigScope,
+  rootPath?: string | null,
+): Promise<Record<string, unknown>> => {
+  if (scope === 'project' && (await isHomeWorkspaceRoot(rootPath))) {
+    return { version: 1 }
+  }
+  return call('read_settings', { scope, rootPath: rootPath ?? null })
+}
+
+export const writeSettings = async (
   scope: ConfigScope,
   settings: Record<string, unknown>,
   rootPath?: string | null,
-): Promise<void> =>
-  call('write_settings', { scope, settings, rootPath: rootPath ?? null })
+): Promise<void> => {
+  await refuseHomeProjectWrite(scope, rootPath)
+  return call('write_settings', { scope, settings, rootPath: rootPath ?? null })
+}
 
-export const readMcpConfig = (
+export const readMcpConfig = async (
   scope: ConfigScope,
   rootPath?: string | null,
-): Promise<Record<string, unknown>> =>
-  call('read_mcp_config', { scope, rootPath: rootPath ?? null })
+): Promise<Record<string, unknown>> => {
+  if (scope === 'project' && (await isHomeWorkspaceRoot(rootPath))) {
+    return { servers: {} }
+  }
+  return call('read_mcp_config', { scope, rootPath: rootPath ?? null })
+}
 
-export const writeMcpConfig = (
+export const writeMcpConfig = async (
   scope: ConfigScope,
   config: Record<string, unknown>,
   rootPath?: string | null,
-): Promise<void> =>
-  call('write_mcp_config', { scope, config, rootPath: rootPath ?? null })
+): Promise<void> => {
+  await refuseHomeProjectWrite(scope, rootPath)
+  return call('write_mcp_config', { scope, config, rootPath: rootPath ?? null })
+}
 
-export const setMcpServerEnabled = (
+export const setMcpServerEnabled = async (
   scope: ConfigScope,
   serverId: string,
   enabled: boolean,
   rootPath?: string | null,
-): Promise<boolean> =>
-  call('set_mcp_server_enabled', {
+): Promise<boolean> => {
+  await refuseHomeProjectWrite(scope, rootPath)
+  return call('set_mcp_server_enabled', {
     scope,
     serverId,
     enabled,
     rootPath: rootPath ?? null,
   })
+}
 
 export const readLspConfig = async (): Promise<Record<string, unknown> | boolean> => {
   const raw = await call<unknown>('read_lsp_config')
@@ -139,14 +172,7 @@ export const registryRemoveProject = (projectId: string): Promise<void> =>
 export const getDefaultWorkspaceRoot = (): Promise<string> =>
   call('get_default_workspace_root')
 
-export const getUserHomeDir = (): Promise<string> => {
-  if (!isTauri()) {
-    return Promise.reject(
-      new Error('Vixl desktop APIs are only available in the Tauri app'),
-    )
-  }
-  return homeDir()
-}
+export { getUserHomeDir } from './home-dir'
 
 export const getActiveProjectId = (): Promise<string | null> => call('get_active_project')
 
@@ -155,12 +181,16 @@ export const getVixlDir = (
   rootPath?: string | null,
 ): Promise<string> => call('get_vixl_dir', { scope, rootPath: rootPath ?? null })
 
-export const listVixlFiles = (
+export const listVixlFiles = async (
   scope: ConfigScope,
   kind: VixlFilesKind,
   rootPath?: string | null,
-): Promise<ProjectFileEntry[]> =>
-  call('list_vixl_files', { scope, kind, rootPath: rootPath ?? null })
+): Promise<ProjectFileEntry[]> => {
+  if (scope === 'project' && (await isHomeWorkspaceRoot(rootPath))) {
+    return []
+  }
+  return call('list_vixl_files', { scope, kind, rootPath: rootPath ?? null })
+}
 
 export const listProjectFiles = (
   rootPath: string,

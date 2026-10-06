@@ -15,10 +15,10 @@ Type `/create-agent` in the [chat input](/getting-started/your-first-chat) and s
 
 | Scope | Where you create it | File |
 | --- | --- | --- |
-| Personal | Settings > Agents | `{appData}/.vixl/agents/{slug}.md` |
+| Personal | Settings > Agents | `~/.vixl/agents/{slug}.md` |
 | Project | Project Agents tab | `<repo>/.vixl/agents/{slug}.md` |
 
-On a home chat, `/create-agent` writes under your user home `.vixl/agents/`. Click a row to open the file in the workbench editor.
+On a home chat, `/create-agent` writes `~/.vixl/agents/{slug}.md`, the personal tree. Click a row to open the file in the workbench editor.
 
 ```markdown
 ---
@@ -38,7 +38,7 @@ Reserved names `ask`, `plan`, `agent`, and `orchestrator` are [chat modes](/conc
 
 `/` lists agents next to [skills](/customize/skills). Selecting one inserts an agent mention. That mention does not dump the instructions into the parent prompt. The parent is told to call `spawn_subagent` with `agentName` set to that catalog name.
 
-The catalog also appears as `Available subagents:` in the prompt. On a home chat, that list is personal agents only. `/` on a home chat also lists agents under the home workspace `.vixl`. Project chats merge personal and project; the same name, case-insensitive, uses the project file.
+The catalog also appears as `Available subagents:` in the prompt. On a home chat, that list is personal agents from `~/.vixl`. Project chats merge personal and project; the same name, case-insensitive, uses the project file. A workspace rooted at your user home directory stays personal only.
 
 When `agentName` matches a catalog agent, that definition is used. Any other name spawns a generic helper labeled with that name.
 

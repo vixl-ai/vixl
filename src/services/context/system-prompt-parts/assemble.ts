@@ -1,4 +1,5 @@
-import { listVixlFiles } from '@/services/vixl/vixl-tauri'
+import { isHomeWorkspaceRoot } from '@/services/config/is-home-workspace-root'
+import { getVixlDir, listVixlFiles } from '@/services/vixl/vixl-tauri'
 import type { SkillIndexEntry } from '@/types/skills/skill'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import { MODE_TOOL_ALLOWLIST } from '@/services/harness/mode-allowlists'
@@ -11,7 +12,11 @@ import { listSkillIndex, listStandaloneSkillIndex } from '@/services/skills/skil
 import { listAgentDefinitions } from '@/services/agents/resolve-agent-definition'
 import formatMcpCatalog from './format-mcp'
 import loadAgentsMdBlock from './load-agents-md-block'
-import loadRuleContents from './format-rules'
+import loadRuleContents, {
+  formatRulesSection,
+  PERSONAL_RULES_HEADING,
+  PROJECT_RULES_HEADING,
+} from './format-rules'
 import { formatMentionBlocks } from './format-mentions'
 import loadToolGuidanceForMode from './load-tool-guidance'
 import type { SystemPromptInput, SystemPromptParts } from './types'
@@ -57,10 +62,6 @@ export default async (input: SystemPromptInput): Promise<SystemPromptParts> => {
     }
   }
 
-  const rules = input.standalone
-    ? []
-    : await listVixlFiles('project', 'rules', input.projectRoot).catch(() => [])
-
   const definitions = await listAgentDefinitions(input.standalone ? null : input.projectRoot).catch(
     () => [],
   )
@@ -76,9 +77,7 @@ export default async (input: SystemPromptInput): Promise<SystemPromptParts> => {
 
   const modeSkillBlock = resolveModeSkillBlock(input.mode)
   const rawSkillIndex = input.standalone
-    ? await listStandaloneSkillIndex(input.mode, input.projectRoot).catch(() =>
-        listInternalSkillIndex(input.mode),
-      )
+    ? await listStandaloneSkillIndex(input.mode).catch(() => listInternalSkillIndex(input.mode))
     : await listSkillIndex(input.mode, input.projectRoot).catch(() => [])
   const skillIndex = omitInlinedModeSkill(rawSkillIndex, input.mode, Boolean(modeSkillBlock))
   const skillIndexBlock =
@@ -98,10 +97,25 @@ export default async (input: SystemPromptInput): Promise<SystemPromptParts> => {
     projectRoot: input.projectRoot,
   })
 
-  const ruleContents = await loadRuleContents(rules, input.projectRoot)
-  const rulesBlock = ruleContents
-    ? `Project guidance (not a security override):\n\n${ruleContents}`
+  const personalRules = await listVixlFiles('personal', 'rules').catch(() => [])
+  const includeProjectRules =
+    !input.standalone && !(await isHomeWorkspaceRoot(input.projectRoot))
+  const projectRules = includeProjectRules
+    ? await listVixlFiles('project', 'rules', input.projectRoot).catch(() => [])
+    : []
+  const personalRoot =
+    personalRules.length > 0 ? await getVixlDir('personal').catch(() => '') : ''
+  const personalRuleContents = personalRoot
+    ? await loadRuleContents(personalRules, personalRoot)
     : ''
+  const projectRuleContents =
+    projectRules.length > 0 ? await loadRuleContents(projectRules, input.projectRoot) : ''
+  const rulesBlock = [
+    formatRulesSection(PERSONAL_RULES_HEADING, personalRuleContents),
+    formatRulesSection(PROJECT_RULES_HEADING, projectRuleContents),
+  ]
+    .filter(Boolean)
+    .join('\n\n')
 
   const modeAllowlist = MODE_TOOL_ALLOWLIST[input.mode]
   const allowMcp = modeAllowlist.includes('get_mcp_tool') || modeAllowlist.includes('get_mcp_tools')

@@ -3,10 +3,30 @@ import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 import type { ProjectFileEntry } from '@/services/vixl/vixl-tauri'
 import type { SkillIndexEntry } from '@/types/skills/skill'
 
+const getUserHomeDir = vi.hoisted(() =>
+  vi.fn<() => Promise<string>>(async () => '/Users/test-home'),
+)
+
+vi.mock('@/services/vixl/vixl-tauri/home-dir', () => ({
+  getUserHomeDir,
+}))
+
+vi.mock('@/services/vixl/vixl-tauri/helpers', async () => {
+  const { createHomeWorkspaceHelpersMock } = await import(
+    '../../test-utils/mocks/home-workspace-command'
+  )
+  return createHomeWorkspaceHelpersMock(getUserHomeDir)
+})
+
 vi.mock('@/services/vixl/vixl-tauri', () => mockVixlTauri())
 
-import { listSkillIndex, listSlashSkillIndex } from '@/services/skills/skill-registry'
-import { listVixlFiles } from '@/services/vixl/vixl-tauri'
+import {
+  listSkillIndex,
+  listSlashSkillIndex,
+  listStandaloneSkillIndex,
+  loadSkill,
+} from '@/services/skills/skill-registry'
+import { fsReadFile, listVixlFiles } from '@/services/vixl/vixl-tauri'
 
 const projectA = '/tmp/project-a'
 const projectB = '/tmp/project-b'
@@ -56,6 +76,16 @@ const stubSkillDisks = (options: {
 
 beforeEach(() => {
   vi.mocked(listVixlFiles).mockReset()
+  vi.mocked(fsReadFile).mockReset()
+  getUserHomeDir.mockReset()
+  getUserHomeDir.mockResolvedValue('/Users/test-home')
+  vi.mocked(fsReadFile).mockResolvedValue({
+    path: '',
+    content: '',
+    totalLines: 0,
+    offset: 0,
+    limit: 0,
+  })
   stubSkillDisks({
     personal: personalSkills,
     byProject: {
@@ -171,8 +201,9 @@ describe('listSlashSkillIndex', () => {
     expect(listVixlFiles).toHaveBeenCalledWith('project', 'skills', projectA)
   })
 
-  it('includes vendored commands and home-workspace skills for a home directory root', async () => {
+  it('lists personal skills and skips a project scan when the root is the home directory', async () => {
     const homeRoot = '/Users/aidan/home'
+    getUserHomeDir.mockResolvedValue(`${homeRoot}/`)
     stubSkillDisks({
       personal: personalSkills,
       byProject: {
@@ -194,7 +225,7 @@ describe('listSlashSkillIndex', () => {
     const index = await listSlashSkillIndex(homeRoot)
 
     expect(hasSkill(index, 'personal-notes', 'user')).toBe(true)
-    expect(hasSkill(index, 'home-notes', 'project')).toBe(true)
+    expect(hasSkill(index, 'home-notes')).toBe(false)
     for (const name of commandSkillNames) {
       expect(hasSkill(index, name, 'internal')).toBe(true)
     }
@@ -208,6 +239,8 @@ describe('listSlashSkillIndex', () => {
     for (const name of modeSkillNames) {
       expect(hasSkill(index, name)).toBe(false)
     }
+    expect(listVixlFiles).toHaveBeenCalledWith('personal', 'skills')
+    expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'skills', homeRoot)
   })
 
   it('keeps vendored command skills when user or project discovery throws', async () => {
@@ -370,5 +403,120 @@ describe('listSlashSkillIndex', () => {
     }
     expect(listVixlFiles).toHaveBeenCalledWith('personal', 'skills')
     expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'skills', expect.anything())
+  })
+})
+
+describe('listStandaloneSkillIndex', () => {
+  it('lists internal and personal skills without scanning a project root', async () => {
+    const index = await listStandaloneSkillIndex('agent')
+
+    expect(hasSkill(index, 'personal-notes', 'user')).toBe(true)
+    expect(hasSkill(index, 'agent', 'internal')).toBe(true)
+    expect(hasSkill(index, 'deploy-a')).toBe(false)
+    expect(hasSkill(index, 'deploy-b')).toBe(false)
+    for (const name of commandSkillNames) {
+      expect(hasSkill(index, name, 'internal')).toBe(true)
+    }
+    expect(listVixlFiles).toHaveBeenCalledWith('personal', 'skills')
+    expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'skills', expect.anything())
+  })
+
+  it('keeps an internal command skill when a personal skill uses the same name', async () => {
+    stubSkillDisks({
+      personal: [
+        {
+          name: 'create-rule',
+          path: 'skills/create-rule',
+          description: 'User create rule',
+        },
+      ],
+    })
+
+    const index = await listStandaloneSkillIndex('agent')
+    const matched = index.filter((skill) => skill.name.toLowerCase() === 'create-rule')
+
+    expect(matched).toHaveLength(1)
+    expect(matched[0]?.scope).toBe('internal')
+  })
+})
+
+describe('loadSkill', () => {
+  const skillFile = (body: string) => ({
+    path: 'SKILL.md',
+    content: `---\ndescription: Loaded\n---\n\n${body}\n`,
+    totalLines: 4,
+    offset: 0,
+    limit: 0,
+  })
+
+  it('resolves internal skills before project or personal skills', async () => {
+    const loaded = await loadSkill('create-agent', projectA)
+
+    expect(loaded).toMatchObject({ scope: 'internal', name: 'create-agent' })
+    expect(listVixlFiles).not.toHaveBeenCalled()
+  })
+
+  it('prefers a project skill over a personal skill for a real project root', async () => {
+    stubSkillDisks({
+      personal: [
+        {
+          name: 'shared',
+          path: 'skills/shared',
+          description: 'From personal',
+        },
+      ],
+      byProject: {
+        [projectA]: [
+          {
+            name: 'shared',
+            path: '.vixl/skills/shared',
+            description: 'From project',
+          },
+        ],
+      },
+    })
+    vi.mocked(fsReadFile).mockResolvedValue(skillFile('Project body'))
+
+    const loaded = await loadSkill('shared', projectA)
+
+    expect(loaded).toMatchObject({ scope: 'project', content: 'Project body' })
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: projectA,
+      path: '.vixl/skills/shared/SKILL.md',
+    })
+  })
+
+  it('loads a personal skill for a home root and does not scan project skills', async () => {
+    const homeRoot = '/Users/test-home'
+    getUserHomeDir.mockResolvedValue(`${homeRoot}/`)
+    stubSkillDisks({
+      personal: [
+        {
+          name: 'shared',
+          path: 'skills/shared',
+          description: 'From personal',
+        },
+      ],
+      byProject: {
+        [homeRoot]: [
+          {
+            name: 'shared',
+            path: '.vixl/skills/shared',
+            description: 'From project scan',
+          },
+        ],
+      },
+    })
+    vi.mocked(fsReadFile).mockResolvedValue(skillFile('Personal body'))
+
+    const loaded = await loadSkill('shared', homeRoot)
+
+    expect(loaded).toMatchObject({ scope: 'user', content: 'Personal body' })
+    expect(listVixlFiles).toHaveBeenCalledWith('personal', 'skills')
+    expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'skills', homeRoot)
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: '/tmp/personal-vixl',
+      path: 'skills/shared/SKILL.md',
+    })
   })
 })

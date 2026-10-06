@@ -3,7 +3,9 @@ use std::path::{Component, Path, PathBuf};
 
 use tauri::AppHandle;
 
-use super::paths::{resolve_project_vixl_dir, user_vixl_dir};
+use super::paths::{
+    project_scope_targets_home, refuse_home_project_write, resolve_project_vixl_dir, user_vixl_dir,
+};
 
 mod json_patch;
 mod read_json;
@@ -85,8 +87,9 @@ pub fn read_settings(
     scope: String,
     root_path: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    let path = settings_path(&app, &scope, root_path)?;
-    read_json(&path)
+    read_scoped_json(&scope, root_path.as_deref(), "settings.json", || {
+        user_vixl_dir(&app)
+    })
 }
 
 #[tauri::command]
@@ -96,8 +99,13 @@ pub fn write_settings(
     root_path: Option<String>,
     settings: serde_json::Value,
 ) -> Result<(), String> {
-    let path = settings_path(&app, &scope, root_path)?;
-    write_json(&path, settings)
+    write_scoped_json(
+        &scope,
+        root_path.as_deref(),
+        "settings.json",
+        settings,
+        || user_vixl_dir(&app),
+    )
 }
 
 #[tauri::command]
@@ -106,8 +114,9 @@ pub fn read_mcp_config(
     scope: String,
     root_path: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    let path = mcp_path(&app, &scope, root_path)?;
-    read_json(&path)
+    read_scoped_json(&scope, root_path.as_deref(), "mcp.json", || {
+        user_vixl_dir(&app)
+    })
 }
 
 #[tauri::command]
@@ -117,8 +126,9 @@ pub fn write_mcp_config(
     root_path: Option<String>,
     config: serde_json::Value,
 ) -> Result<(), String> {
-    let path = mcp_path(&app, &scope, root_path)?;
-    write_json(&path, config)
+    write_scoped_json(&scope, root_path.as_deref(), "mcp.json", config, || {
+        user_vixl_dir(&app)
+    })
 }
 
 #[tauri::command]
@@ -143,28 +153,58 @@ pub fn config_exists(
     scope: String,
     root_path: Option<String>,
 ) -> Result<bool, String> {
-    let path = settings_path(&app, &scope, root_path)?;
-    Ok(path.exists())
-}
-
-fn settings_path(
-    app: &AppHandle,
-    scope: &str,
-    root_path: Option<String>,
-) -> Result<PathBuf, String> {
-    base_path(app, scope, root_path).map(|p| p.join("settings.json"))
+    scoped_config_exists(&scope, root_path.as_deref(), || user_vixl_dir(&app))
 }
 
 pub(crate) fn tray_background_enabled(_app: &AppHandle) -> bool {
     true
 }
 
-pub(crate) fn mcp_path(
-    app: &AppHandle,
+pub(crate) fn read_scoped_json(
     scope: &str,
-    root_path: Option<String>,
-) -> Result<PathBuf, String> {
-    base_path(app, scope, root_path).map(|p| p.join("mcp.json"))
+    root_path: Option<&str>,
+    file_name: &str,
+    personal_dir: impl FnOnce() -> Result<PathBuf, String>,
+) -> Result<serde_json::Value, String> {
+    if project_scope_targets_home(scope, root_path) {
+        return Ok(serde_json::json!({}));
+    }
+    let dir = personal_or_project_dir(scope, root_path, personal_dir)?;
+    read_json(&dir.join(file_name))
+}
+
+pub(crate) fn write_scoped_json(
+    scope: &str,
+    root_path: Option<&str>,
+    file_name: &str,
+    value: serde_json::Value,
+    personal_dir: impl FnOnce() -> Result<PathBuf, String>,
+) -> Result<(), String> {
+    let dir = personal_or_project_dir(scope, root_path, personal_dir)?;
+    write_json(&dir.join(file_name), value)
+}
+
+pub(crate) fn scoped_config_exists(
+    scope: &str,
+    root_path: Option<&str>,
+    personal_dir: impl FnOnce() -> Result<PathBuf, String>,
+) -> Result<bool, String> {
+    if project_scope_targets_home(scope, root_path) {
+        return Ok(false);
+    }
+    let dir = personal_or_project_dir(scope, root_path, personal_dir)?;
+    Ok(dir.join("settings.json").exists())
+}
+
+pub(crate) fn set_scoped_mcp_server_enabled(
+    scope: &str,
+    root_path: Option<&str>,
+    server_id: &str,
+    enabled: bool,
+    personal_dir: impl FnOnce() -> Result<PathBuf, String>,
+) -> Result<bool, String> {
+    let dir = personal_or_project_dir(scope, root_path, personal_dir)?;
+    set_mcp_server_enabled_at_path(&dir.join("mcp.json"), server_id, enabled)
 }
 
 fn lsp_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -244,17 +284,23 @@ fn read_settings_internal(
     scope: &str,
     root_path: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    let path = settings_path(app, scope, root_path)?;
-    read_json(&path)
+    read_scoped_json(scope, root_path.as_deref(), "settings.json", || {
+        user_vixl_dir(app)
+    })
 }
 
-fn base_path(app: &AppHandle, scope: &str, root_path: Option<String>) -> Result<PathBuf, String> {
+fn personal_or_project_dir(
+    scope: &str,
+    root_path: Option<&str>,
+    personal_dir: impl FnOnce() -> Result<PathBuf, String>,
+) -> Result<PathBuf, String> {
     match scope {
-        "personal" => user_vixl_dir(app),
+        "personal" => personal_dir(),
         "project" => {
             let root =
                 root_path.ok_or_else(|| "root_path required for project scope".to_string())?;
-            let dir = resolve_project_vixl_dir(&root);
+            refuse_home_project_write(scope, Some(root))?;
+            let dir = resolve_project_vixl_dir(root);
             fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
             Ok(dir)
         }

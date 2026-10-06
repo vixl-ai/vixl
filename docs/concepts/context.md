@@ -11,19 +11,21 @@ The prompt always includes a short workspace identity (project name and root; wo
 
 ## Mentions
 
-`@` searches workspace files. Home chats and a composer still on **No project** have no workspace for that search. A file mention is stored as a path and tagged untrusted context: data, not instructions.
+`@` searches workspace files. Home chats, and a composer still on **Home**, have no workspace for that search. A file mention is stored as a path and tagged untrusted context: data, not instructions.
 
 `/` lists vendored command skills, user and project skills, and custom agents. Reserved names `ask`, `plan`, `agent`, and `orchestrator` stay hidden. A skill mention becomes a name in the prompt. The agent loads the body with `load_skill`. An agent mention does not dump instructions. It adds an explicit invocation: the parent must call `spawn_subagent` with that catalog name. Unresolved agent names are dropped.
 
-On a home chat, `/` lists vendored command skills, personal skills and agents, and skills and agents under that home workspace `.vixl`. A same-named user or project skill cannot override a vendored command. On a project chat, personal plus project, and the project name wins over personal.
+On a home chat, `/` lists vendored command skills plus personal skills and agents from `~/.vixl`. A same-named personal or project skill cannot override a vendored command. On a project chat, personal plus project, and the project name wins over personal. A workspace rooted at your user home directory stays personal only.
 
 ## Rules and AGENTS.md
 
 These are always-on for the chats that inject them. There is no per-rule glob gate. Every listed rule file is included.
 
-Project chats inject project `.vixl/AGENTS.md` (or `agents.md`) and concatenate project `.vixl/rules/*.{md,mdc}`. They do not fall back to personal `AGENTS.md`, and they do not merge personal rules.
+Home chats inject personal `~/.vixl/rules/*.{md,mdc}` and personal `~/.vixl/AGENTS.md` (or `agents.md`).
 
-Home chats inject personal `.vixl/AGENTS.md` only. They do not inject `.vixl/rules`. A rule file written on the home path is not injected. Always-on home guidance is personal `AGENTS.md`. Personal rules still exist in Settings. They are not injected into project chats either.
+Project chats inject both trees, personal first, then project. Rules use the headings `Personal guidance (not a security override):` and `Project guidance (not a security override):`. `AGENTS.md` uses `Personal AGENTS.md guidance:` and `Project AGENTS.md guidance:`. An empty side is omitted.
+
+A workspace whose root is your user home directory injects the personal copies only.
 
 Unreadable files and paths outside the read root are stubbed in the prompt, not silently dropped.
 
@@ -31,11 +33,11 @@ Edit these in [Rules and AGENTS.md](/customize/rules-and-agents-md).
 
 ## Skills
 
-Skills are `SKILL.md` packs under `.vixl/skills/<name>/`. `/create-agent`, `/create-skill`, `/create-rule`, and `/create-plan` are vendored command skills. They are listed in `/` and in Available skills. They work on home chats. The workspace root is the user home directory, and the agent writes the same relative `.vixl/` paths there. Mode skills `ask`, `plan`, `agent`, and `orchestrator` stay hidden from `/` and stay inlined only in their matching chat mode.
+Skills are `SKILL.md` packs under `.vixl/skills/<name>/`. `/create-agent`, `/create-skill`, `/create-rule`, and `/create-plan` are vendored command skills. They are listed in `/` and in Available skills. They work on home chats. On a home chat the workspace root is the user home directory, and those commands write `~/.vixl/`, the personal tree. Mode skills `ask`, `plan`, `agent`, and `orchestrator` stay hidden from `/` and stay inlined only in their matching chat mode.
 
-On a project chat, Available skills lists remaining skills as names and descriptions (vendored commands, then personal, then project overlay). On a home chat, Available skills lists vendored commands and home-workspace skills. It does not add personal skills, even though `/` on a home chat does.
+Available skills lists remaining skills as names and descriptions: vendored commands, then personal, then a project overlay on project chats. Home chats list vendored commands and personal skills. A workspace rooted at your user home directory does not add a project overlay.
 
-`load_skill` loads the body by name (built-in, then project, then personal; bodies over 4000 characters are truncated). The full rules are on [SKILL.md format](/reference/skill-md-format). See also [Skills](/customize/skills).
+`load_skill` loads the body by name (built-in, then project, then personal; bodies over 4000 characters are truncated). The home directory skips the project step. The full rules are on [SKILL.md format](/reference/skill-md-format). See also [Skills](/customize/skills).
 
 ## Progressive tool discovery
 
@@ -43,6 +45,6 @@ The MCP catalog in the prompt is enabled user servers (not CodeGraph), status, a
 
 The same pattern applies to skills: names in the prompt, bodies on `load_skill`.
 
-Sub-agents appear as an available-subagents catalog from `.vixl/agents/*.md`. On a home chat that catalog is personal agents only. See [Custom agents](/customize/custom-agents).
+Sub-agents appear as an available-subagents catalog from `.vixl/agents/*.md`. On a home chat that catalog is personal agents only. Project chats overlay by name, and the project file wins. See [Custom agents](/customize/custom-agents).
 
 Long threads can drop older turns behind a compact summary. That is a chat operation, not a model role. [Compact and hand off long chats](/using/compact-and-hand-off-long-chats) is how you run it.

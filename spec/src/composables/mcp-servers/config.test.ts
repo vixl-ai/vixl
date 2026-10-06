@@ -1,17 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 import type { McpServerState } from '@/services/vixl/vixl-tauri'
+import { HOME_PROJECT_SCOPE_ERROR } from '@/services/config/is-home-workspace-root'
 
-const { readMcpConfig, writeMcpConfig, mcpStop, mcpListStatuses } = vi.hoisted(() => ({
-  readMcpConfig: vi.fn<(scope: string, rootPath?: string | null) => Promise<unknown>>(),
-  writeMcpConfig: vi.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
-  mcpStop: vi.fn<
-    (serverId: string, config?: unknown, scopeKey?: string | null) => Promise<void>
-  >(async () => undefined),
-  mcpListStatuses: vi.fn<
-    (scopeKey?: string | null) => Promise<Record<string, McpServerState>>
-  >(async () => ({})),
+const { readMcpConfig, writeMcpConfig, mcpStop, mcpListStatuses, getUserHomeDir } = vi.hoisted(
+  () => ({
+    readMcpConfig: vi.fn<(scope: string, rootPath?: string | null) => Promise<unknown>>(),
+    writeMcpConfig: vi.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
+    mcpStop: vi.fn<
+      (serverId: string, config?: unknown, scopeKey?: string | null) => Promise<void>
+    >(async () => undefined),
+    mcpListStatuses: vi.fn<
+      (scopeKey?: string | null) => Promise<Record<string, McpServerState>>
+    >(async () => ({})),
+    getUserHomeDir: vi.fn<() => Promise<string>>(async () => '/Users/test-home'),
+  }),
+)
+
+vi.mock('@/services/vixl/vixl-tauri/home-dir', () => ({
+  getUserHomeDir,
 }))
+
+vi.mock('@/services/vixl/vixl-tauri/helpers', async () => {
+  const { createHomeWorkspaceHelpersMock } = await import(
+    '../../test-utils/mocks/home-workspace-command'
+  )
+  return createHomeWorkspaceHelpersMock(getUserHomeDir)
+})
 
 vi.mock('@/services/vixl/vixl-tauri', () =>
   mockVixlTauri({
@@ -39,6 +54,7 @@ import {
   loadConfigs,
   loadProjectConfigForRoot,
   refreshStates,
+  saveScopedConfig,
 } from '@/composables/mcp-servers/config'
 import { personalMcp, projectMcp, serverStates } from '@/composables/mcp-servers/state'
 import connectionKey from '@/services/mcp/connection-key'
@@ -72,6 +88,7 @@ describe('mcp-servers loadConfigs and refreshStates', () => {
     vi.clearAllMocks()
     seedRunningBrave()
     readMcpConfig.mockResolvedValue({ servers: {} })
+    getUserHomeDir.mockResolvedValue('/Users/test-home')
   })
 
   it('does not stop running servers when mcp.json fails to parse', async () => {
@@ -278,12 +295,45 @@ describe('mcp-servers loadConfigs and refreshStates', () => {
     expect(projectMcp.value.servers.github).toBeDefined()
     expect(projectMcp.value.servers.slack).toBeUndefined()
   })
+
+  it('loads personal MCP only when the root is the home directory', async () => {
+    getUserHomeDir.mockResolvedValue('/Users/test-home/')
+    readMcpConfig.mockImplementation(async (scope) => {
+      if (scope === 'project') {
+        return { servers: { leaked: { command: 'nope' } } }
+      }
+      return {
+        servers: {
+          brave: { command: 'npx', args: ['-y', '@brave/brave-search-mcp-server'] },
+        },
+      }
+    })
+
+    await loadConfigs('/Users/test-home')
+
+    expect(readMcpConfig).not.toHaveBeenCalledWith('project', expect.anything())
+    expect(writeMcpConfig).not.toHaveBeenCalledWith('project', expect.anything(), expect.anything())
+    expect(projectMcp.value.servers).toEqual({})
+    expect(personalMcp.value.servers.brave).toBeDefined()
+    expect(personalMcp.value.servers.leaked).toBeUndefined()
+  })
+
+  it('refuses project MCP writes for the home directory', async () => {
+    getUserHomeDir.mockResolvedValue('/Users/test-home')
+
+    await expect(
+      saveScopedConfig('project', { servers: {} }, '/Users/test-home/'),
+    ).rejects.toThrow(HOME_PROJECT_SCOPE_ERROR)
+
+    expect(writeMcpConfig).not.toHaveBeenCalled()
+  })
 })
 
 describe('loadProjectConfigForRoot', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     seedRunningBrave()
+    getUserHomeDir.mockResolvedValue('/Users/test-home')
     readMcpConfig.mockResolvedValue({
       servers: {
         github: { command: 'npx', args: ['-y', 'github-mcp'] },
@@ -302,5 +352,15 @@ describe('loadProjectConfigForRoot', () => {
     expect(projectMcp.value.servers).toEqual({})
     expect(writeMcpConfig).not.toHaveBeenCalled()
     expect(readMcpConfig).toHaveBeenCalledWith('project', '/other/project')
+  })
+
+  it('returns an empty project config for the home directory without reading disk', async () => {
+    getUserHomeDir.mockResolvedValue('/Users/test-home/')
+
+    const loaded = await loadProjectConfigForRoot('/Users/test-home')
+
+    expect(loaded).toEqual({ servers: {} })
+    expect(readMcpConfig).not.toHaveBeenCalled()
+    expect(writeMcpConfig).not.toHaveBeenCalled()
   })
 })

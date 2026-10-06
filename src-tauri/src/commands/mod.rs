@@ -64,7 +64,7 @@ pub use oauth::{
 };
 pub use paths::{
     get_default_workspace_root, get_user_vixl_dir, get_vixl_dir, has_project_vixl,
-    list_project_files, list_vixl_files,
+    is_home_workspace_root, list_project_files, list_vixl_files,
 };
 pub use registry::{
     get_active_project, open_project_at_path, open_project_at_path_command, registry_add_project,

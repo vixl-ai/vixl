@@ -19,7 +19,7 @@ There is no `settings.json` key to disable CodeGraph. It starts again the next t
 
 ## Language servers Vixl installs
 
-Installs go under personal `{app data}/.vixl/lsp/{id}/{version}/`. npm servers also use a portable Node at `{app data}/.vixl/runtime/node/`. State (enabled, disabled, command overrides) is personal `lsp.json`.
+Installs go under personal `~/.vixl/lsp/{id}/{version}/`. npm servers also use a portable Node at `~/.vixl/runtime/node/`. State (enabled, disabled, command overrides) is personal `lsp.json`.
 
 When you activate a project, Vixl prefetches the default set (TypeScript / JavaScript, JSON, YAML, Markdown) if auto-download is on. Settings > LSP, **Install defaults** does the same.
 

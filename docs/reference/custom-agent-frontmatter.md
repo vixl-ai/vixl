@@ -11,10 +11,10 @@ Custom agents are markdown files that spawn as sub-agents. Create them from Sett
 
 | Scope | Path |
 | --- | --- |
-| Personal | `{app data}/.vixl/agents/{slug}.md` |
+| Personal | `~/.vixl/agents/{slug}.md` |
 | Project | `<repo>/.vixl/agents/{slug}.md` |
 
-The id is the filename stem (`reviewer.md` is `reviewer`). Creating from the UI slugifies the name (lowercase, hyphens). Project agents overlay personal agents with the same name (case-insensitive). Home chats see personal agents only.
+The id is the filename stem (`reviewer.md` is `reviewer`). Creating from the UI slugifies the name (lowercase, hyphens). Project agents overlay personal agents with the same name (case-insensitive). Home chats, and a workspace rooted at your user home directory, see personal agents only.
 
 Reserved slash names `ask`, `plan`, `agent`, and `orchestrator` are [chat modes](/concepts/chat-modes), not custom agents. Those names are hidden from `/`. Spawn still accepts any other `agentName`: if it matches a catalog agent, that definition is used; otherwise it is a generic helper labeled with that name.
 

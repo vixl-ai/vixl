@@ -27,7 +27,7 @@ No. [Ollama](https://ollama.com/) and other local OpenAI-compatible hosts work w
 
 ## Where is my data?
 
-Personal config is `{appData}/.vixl` (on macOS, `~/Library/Application Support/app.vixl/.vixl`). Project config is `<repo>/.vixl`. Chats live in `vixl.sqlite` and under `.vixl/chats/`. See [.vixl layout](/reference/vixl-layout).
+Personal config is `~/.vixl` on every platform (on Windows, `%USERPROFILE%\.vixl`). Project config is `<repo>/.vixl`. Chats live in `vixl.sqlite` and under `.vixl/chats/`. See [.vixl layout](/reference/vixl-layout).
 
 ## What happens when I delete a chat?
 

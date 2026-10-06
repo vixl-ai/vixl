@@ -14,6 +14,10 @@ import {
   stripPersonalOnlyProjectOverrides,
 } from '@/services/config/merge-settings'
 import {
+  HOME_PROJECT_SCOPE_ERROR,
+  isHomeWorkspaceRoot,
+} from '@/services/config/is-home-workspace-root'
+import {
   readSettings,
   writeSettings,
   type ConfigScope,
@@ -58,6 +62,9 @@ export const loadPersonalSettings = async (): Promise<VixlSettings> => {
 }
 
 export const loadProjectSettings = async (rootPath: string): Promise<VixlSettings> => {
+  if (await isHomeWorkspaceRoot(rootPath)) {
+    return { version: 1 }
+  }
   const raw = (await readSettings('project', rootPath)) as Record<string, unknown>
   const hadPersonalOnlyKeys = Object.keys(raw).some(
     (key) => key !== 'version' && isPersonalOnlyProjectKey(key),
@@ -73,7 +80,7 @@ export const loadEffectiveSettings = async (
   rootPath: string | null,
 ): Promise<VixlSettings> => {
   const personal = await loadPersonalSettings()
-  if (!rootPath) {
+  if (!rootPath || (await isHomeWorkspaceRoot(rootPath))) {
     return personal
   }
   const project = await loadProjectSettings(rootPath)
@@ -85,6 +92,9 @@ export const saveSettings = async (
   settings: VixlSettings,
   rootPath?: string | null,
 ): Promise<void> => {
+  if (scope === 'project' && (await isHomeWorkspaceRoot(rootPath))) {
+    throw new Error(HOME_PROJECT_SCOPE_ERROR)
+  }
   const toSave =
     scope === 'project' ? stripPersonalOnlyProjectOverrides(settings) : settings
   const validated = validateVixlSettings(toSave)
