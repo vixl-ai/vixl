@@ -82,9 +82,9 @@ const handleCollapseAll = (): void => {
 <template>
   <ContextMenu>
     <ContextMenuTrigger as-child>
-      <div class="flex min-h-full flex-col">
-        <SidebarGroup class="flex-1">
-          <div class="sticky top-0 z-10 bg-sidebar">
+      <div class="flex h-full min-h-0 flex-col">
+        <SidebarGroup class="flex-1 min-h-0">
+          <div class="shrink-0">
             <NavigationAsideLeftProjectsSectionHeader />
             <div
               v-if="searchOpen"
@@ -113,21 +113,23 @@ const handleCollapseAll = (): void => {
               </Tooltip>
             </div>
           </div>
-          <SidebarMenu>
-            <template
-              v-for="item in filteredActivityItems"
-              :key="item.kind === 'project' ? `project-${item.project.slug}` : 'home'"
-            >
-              <NavigationAsideLeftProjectRow
-                v-if="item.kind === 'project'"
-                :project="item.project"
-              />
-              <NavigationAsideLeftHomeFolderRow
-                v-else
-                :chats="item.chats"
-              />
-            </template>
-          </SidebarMenu>
+          <div class="flex-1 min-h-0 overflow-auto">
+            <SidebarMenu>
+              <template
+                v-for="item in filteredActivityItems"
+                :key="item.kind === 'project' ? `project-${item.project.slug}` : 'home'"
+              >
+                <NavigationAsideLeftProjectRow
+                  v-if="item.kind === 'project'"
+                  :project="item.project"
+                />
+                <NavigationAsideLeftHomeFolderRow
+                  v-else
+                  :chats="item.chats"
+                />
+              </template>
+            </SidebarMenu>
+          </div>
         </SidebarGroup>
       </div>
     </ContextMenuTrigger>
