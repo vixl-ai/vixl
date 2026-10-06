@@ -1,21 +1,15 @@
 {
   "servers": {
     "ai-elements-vue": {
-      "args": [
-        "-y",
-        "mcp-remote",
-        "https://registry.ai-elements-vue.com/mcp"
-      ],
-      "command": "npx",
+      "type": "http",
+      "url": "https://registry.ai-elements-vue.com/mcp",
+      "auth": "none",
       "enabled": true
     },
     "shadcn": {
-      "args": [
-        "shadcn-vue@latest",
-        "mcp"
-      ],
       "command": "npx",
-      "enabled": false
+      "args": ["-y", "-p", "node@22", "-p", "shadcn-vue@latest", "shadcn-vue", "mcp"],
+      "enabled": true
     }
   }
 }
