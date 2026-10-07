@@ -38,7 +38,7 @@ pub use state::{
 pub use typescript::{
     compute_vue_in_play, merge_vue_plugin_options, pick_typescript_tsdk,
     should_inject_vue_typescript_plugin, typescript_lsp_argv,
-    typescript_version_supports_native_lsp,
+    typescript_version_supports_native_lsp, with_typescript_tsdk,
 };
 pub use vue_tsserver::{tsserver_request_body, unwrap_tsserver_request_tuple};
 pub use workspace_diagnostics::{

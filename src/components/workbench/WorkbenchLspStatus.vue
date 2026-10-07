@@ -384,19 +384,20 @@ const handleOpenSettings = async (): Promise<void> => {
                     {{ item.elapsed }}
                   </span>
                   <span
-                    class="text-[11px]"
-                    :class="item.meta.className"
+                    class="inline-flex"
+                    role="img"
+                    :title="item.meta.label"
+                    :aria-label="item.meta.label"
                   >
-                    {{ item.meta.label }}
+                    <component
+                      :is="item.meta.icon"
+                      class="h-3.5 w-3.5"
+                      :class="[
+                        item.meta.className,
+                        item.spinning ? 'animate-spin' : '',
+                      ]"
+                    />
                   </span>
-                  <component
-                    :is="item.meta.icon"
-                    class="h-3.5 w-3.5"
-                    :class="[
-                      item.meta.className,
-                      item.spinning ? 'animate-spin' : '',
-                    ]"
-                  />
                 </span>
               </div>
               <p

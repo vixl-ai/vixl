@@ -14,8 +14,8 @@ mod timeout;
 pub use archive::{extract_archive_bytes, extract_tar_xz_bytes, extract_zip_bytes};
 pub use ensure::{
     ensure_server_installed, install_source_label, lsp_install_server, lsp_prefetch_defaults,
-    managed_classic_typescript_lib, managed_typescript_lib, managed_vue_plugin_path,
-    managed_vue_typescript_lib, prefetch_tier_a, remove_managed_install,
+    managed_astro_typescript_lib, managed_classic_typescript_lib, managed_typescript_lib,
+    managed_vue_plugin_path, managed_vue_typescript_lib, prefetch_tier_a, remove_managed_install,
 };
 pub use managed::{is_installed, managed_bin_path};
 pub use named_lock::named_lock_for;

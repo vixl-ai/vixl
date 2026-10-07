@@ -12,7 +12,7 @@ use app_lib::commands::lsp::{
     parse_workspace_diagnostic_report, pick_typescript_tsdk, read_lsp_message, resolve_lsp_servers,
     server_display_label, should_inject_vue_typescript_plugin, start_lock_for,
     tsserver_request_body, typescript_lsp_argv, typescript_version_supports_native_lsp,
-    unwrap_tsserver_request_tuple,
+    unwrap_tsserver_request_tuple, with_typescript_tsdk,
 };
 use app_lib::commands::lsp_install::{
     looks_like_javascript_bin, should_wrap_npm_bin_with_node, with_timeout,
@@ -335,6 +335,73 @@ fn non_vue_tsdk_prefers_workspace_then_managed_ts7_not_vue_ts() {
     assert_eq!(
         pick_typescript_tsdk(None, None, Some("/classic/5.8.2/lib"), false),
         ""
+    );
+}
+
+#[test]
+fn typescript_tsdk_from_null_base() {
+    assert_eq!(
+        with_typescript_tsdk(serde_json::Value::Null, "/managed/astro/lib"),
+        serde_json::json!({
+            "typescript": { "tsdk": "/managed/astro/lib" }
+        })
+    );
+}
+
+#[test]
+fn typescript_tsdk_from_empty_object() {
+    assert_eq!(
+        with_typescript_tsdk(serde_json::json!({}), "/managed/vue/lib"),
+        serde_json::json!({
+            "typescript": { "tsdk": "/managed/vue/lib" }
+        })
+    );
+}
+
+#[test]
+fn typescript_tsdk_preserves_other_top_level_keys() {
+    assert_eq!(
+        with_typescript_tsdk(
+            serde_json::json!({
+                "vue": { "complete": { "codelenses": true } },
+                "contentIntellisense": true
+            }),
+            "/managed/astro/lib"
+        ),
+        serde_json::json!({
+            "vue": { "complete": { "codelenses": true } },
+            "contentIntellisense": true,
+            "typescript": { "tsdk": "/managed/astro/lib" }
+        })
+    );
+}
+
+#[test]
+fn typescript_tsdk_preserves_existing_typescript_keys_and_overwrites_tsdk() {
+    assert_eq!(
+        with_typescript_tsdk(
+            serde_json::json!({
+                "typescript": { "locale": "en", "tsdk": "/old/lib" }
+            }),
+            "/managed/astro/lib"
+        ),
+        serde_json::json!({
+            "typescript": { "locale": "en", "tsdk": "/managed/astro/lib" }
+        })
+    );
+}
+
+#[test]
+fn typescript_tsdk_replaces_non_object_typescript_value() {
+    assert_eq!(
+        with_typescript_tsdk(
+            serde_json::json!({ "other": 1, "typescript": "not-an-object" }),
+            "/managed/astro/lib"
+        ),
+        serde_json::json!({
+            "other": 1,
+            "typescript": { "tsdk": "/managed/astro/lib" }
+        })
     );
 }
 

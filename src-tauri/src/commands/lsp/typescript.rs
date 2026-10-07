@@ -5,8 +5,8 @@ use std::sync::Mutex;
 use tauri::AppHandle;
 
 use super::super::lsp_install::{
-    managed_classic_typescript_lib, managed_typescript_lib, managed_vue_plugin_path,
-    managed_vue_typescript_lib, native_typescript_exe,
+    managed_astro_typescript_lib, managed_classic_typescript_lib, managed_typescript_lib,
+    managed_vue_plugin_path, managed_vue_typescript_lib, native_typescript_exe,
 };
 use super::super::lsp_registry::{builtin_spec_by_id, workspace_is_vue_nuxt, BuiltinLspSpec};
 
@@ -262,6 +262,35 @@ fn vue_plugin_location(app: &AppHandle, workspace_root: &str, trusted: bool) -> 
     managed_vue_plugin_path(app).map(|path| path.to_string_lossy().replace('\\', "/"))
 }
 
+pub fn with_typescript_tsdk(mut base: serde_json::Value, tsdk: &str) -> serde_json::Value {
+    if let Some(obj) = base.as_object_mut() {
+        let typescript = obj
+            .entry("typescript")
+            .or_insert_with(|| serde_json::json!({}));
+        if let Some(ts_obj) = typescript.as_object_mut() {
+            ts_obj.insert("tsdk".to_string(), serde_json::json!(tsdk));
+        } else {
+            *typescript = serde_json::json!({ "tsdk": tsdk });
+        }
+    } else {
+        base = serde_json::json!({
+          "typescript": { "tsdk": tsdk }
+        });
+    }
+    base
+}
+
+fn managed_or_classic_tsdk(
+    app: &AppHandle,
+    managed: Option<PathBuf>,
+    workspace_root: &str,
+    trusted: bool,
+) -> String {
+    managed
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|| typescript_tsdk_path(app, workspace_root, trusted, true))
+}
+
 pub(crate) fn build_initialization_options(
     app: &AppHandle,
     server_id: &str,
@@ -282,24 +311,14 @@ pub(crate) fn build_initialization_options(
         base.clone()
     };
 
-    if server_id == "vue" {
-        let tsdk = managed_vue_typescript_lib(app)
-            .map(|path| path.to_string_lossy().replace('\\', "/"))
-            .unwrap_or_else(|| typescript_tsdk_path(app, workspace_root, trusted, true));
-        if let Some(obj) = base.as_object_mut() {
-            let typescript = obj
-                .entry("typescript")
-                .or_insert_with(|| serde_json::json!({}));
-            if let Some(ts_obj) = typescript.as_object_mut() {
-                ts_obj.insert("tsdk".to_string(), serde_json::json!(tsdk));
-            } else {
-                *typescript = serde_json::json!({ "tsdk": tsdk });
-            }
-        } else {
-            base = serde_json::json!({
-              "typescript": { "tsdk": tsdk }
-            });
-        }
+    let managed = match server_id {
+        "vue" => Some(managed_vue_typescript_lib(app)),
+        "astro" => Some(managed_astro_typescript_lib(app)),
+        _ => None,
+    };
+    if let Some(managed) = managed {
+        let tsdk = managed_or_classic_tsdk(app, managed, workspace_root, trusted);
+        base = with_typescript_tsdk(base, &tsdk);
     }
 
     base
@@ -321,9 +340,12 @@ pub(crate) fn inject_vue_tsdk_arg(
     {
         return;
     }
-    let tsdk = managed_vue_typescript_lib(app)
-        .map(|path| path.to_string_lossy().replace('\\', "/"))
-        .unwrap_or_else(|| typescript_tsdk_path(app, workspace_root, trusted, true));
+    let tsdk = managed_or_classic_tsdk(
+        app,
+        managed_vue_typescript_lib(app),
+        workspace_root,
+        trusted,
+    );
     args.push(format!("--tsdk={tsdk}"));
 }
 

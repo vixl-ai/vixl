@@ -196,15 +196,11 @@ pub fn managed_vue_plugin_path(app: &AppHandle) -> Option<PathBuf> {
 }
 
 pub fn managed_vue_typescript_lib(app: &AppHandle) -> Option<PathBuf> {
-    let spec = builtin_spec_by_id("vue")?;
-    let key = version_key_for_spec(spec);
-    let dir = managed_server_dir(app, "vue", &key).ok()?;
-    let lib = dir.join("node_modules/typescript/lib");
-    if lib.is_dir() {
-        Some(lib)
-    } else {
-        None
-    }
+    managed_spec_typescript_lib(app, "vue")
+}
+
+pub fn managed_astro_typescript_lib(app: &AppHandle) -> Option<PathBuf> {
+    managed_spec_typescript_lib(app, "astro")
 }
 
 pub fn managed_typescript_lib(app: &AppHandle) -> Option<PathBuf> {

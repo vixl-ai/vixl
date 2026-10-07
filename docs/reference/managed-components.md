@@ -40,7 +40,7 @@ Install kinds: npm package, GitHub release (repo / tag / asset), HTTP archive, o
 | `css` | `vscode-langservers-extracted@4.10.0` | [vscode-langservers-extracted](https://www.npmjs.com/package/vscode-langservers-extracted) |
 | `tailwindcss` | `@tailwindcss/language-server@0.0.27` | [@tailwindcss/language-server](https://www.npmjs.com/package/@tailwindcss/language-server) |
 | `svelte` | `svelte-language-server@0.17.10` | [svelte-language-server](https://www.npmjs.com/package/svelte-language-server) |
-| `astro` | `@astrojs/language-server@2.15.4` | [@astrojs/language-server](https://www.npmjs.com/package/@astrojs/language-server) |
+| `astro` | `@astrojs/language-server@2.15.4`, `typescript@5.8.2` | [@astrojs/language-server](https://www.npmjs.com/package/@astrojs/language-server) |
 | `prisma` | `@prisma/language-server@6.5.0` | [@prisma/language-server](https://www.npmjs.com/package/@prisma/language-server) |
 | `graphql` | `graphql-language-service-cli@3.5.0` | [graphql-language-service-cli](https://www.npmjs.com/package/graphql-language-service-cli) |
 | `dockerfile` | `dockerfile-language-server-nodejs@0.13.0` | [dockerfile-language-server-nodejs](https://www.npmjs.com/package/dockerfile-language-server-nodejs) |
@@ -52,7 +52,7 @@ Install kinds: npm package, GitHub release (repo / tag / asset), HTTP archive, o
 
 | Id | Repo | Tag | Asset |
 | --- | --- | --- | --- |
-| `markdown` | [artempyanykh/marksman](https://github.com/artempyanykh/marksman/releases/tag/2024-12-18) | `2024-12-18` | `marksman-{target}` |
+| `markdown` | [artempyanykh/marksman](https://github.com/artempyanykh/marksman/releases/tag/2026-02-08) | `2026-02-08` | `marksman-{target}` |
 | `rust` | [rust-lang/rust-analyzer](https://github.com/rust-lang/rust-analyzer/releases/tag/2025-03-10) | `2025-03-10` | `rust-analyzer-{target}.gz` |
 | `lua` | [LuaLS/lua-language-server](https://github.com/LuaLS/lua-language-server/releases/tag/3.13.6) | `3.13.6` | `lua-language-server-{version}-{target}.tar.gz` |
 | `clangd` | [clangd/clangd](https://github.com/clangd/clangd/releases/tag/19.1.2) | `19.1.2` | `clangd-{target}-{version}.zip` |

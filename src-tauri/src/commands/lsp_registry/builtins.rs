@@ -128,7 +128,7 @@ pub(crate) static BUILTINS: &[BuiltinLspSpec] = &[
     npm: None,
     github: Some(GithubReleaseSpec {
       repo: "artempyanykh/marksman",
-      tag: "2024-12-18",
+      tag: "2026-02-08",
       asset: "marksman-{target}",
       binary_name: "marksman",
       gzip: false,
@@ -264,7 +264,7 @@ pub(crate) static BUILTINS: &[BuiltinLspSpec] = &[
     &[".astro"],
     &["astro"],
     LspTier::B,
-    &["@astrojs/language-server@2.15.4"],
+    &["@astrojs/language-server@2.15.4", "typescript@5.8.2"],
     "node_modules/@astrojs/language-server/bin/nodeServer.js",
     &["package.json", "astro.config.mjs", "astro.config.ts"]
   ),
