@@ -42,7 +42,7 @@
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@lucide/vue": "^1.24.0",
     "@markmend/core": "1.0.1",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@mozilla/readability": "^0.6.0",
     "@rive-app/webgl2": "^2.38.5",
     "@shikijs/monaco": "^4.4.2",
@@ -166,6 +166,11 @@
     "qs": "6.16.0",
     "browserslist": "4.28.7",
     "fast-uri": "3.1.8",
-    "maplibre-gl": "^6.8.0"
+    "maplibre-gl": "^6.8.0",
+    "shell-quote": "1.11.0",
+    "source-map-js": "1.2.2",
+    "proxy-addr": "2.0.8",
+    "postcss-selector-parser": "7.1.6",
+    "tinypool": "2.1.2"
   }
 }
