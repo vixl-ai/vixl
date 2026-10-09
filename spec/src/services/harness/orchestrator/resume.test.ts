@@ -200,6 +200,47 @@ describe('resumeOrchestrator background waves', () => {
     )
   })
 
+  it('keeps pending resume when a sibling finishes during resume awaits', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    register('chat-1', 'sub-2', new AbortController(), {
+      toolCallId: 'tc-2',
+      agentName: 'writer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    setTurnResponseMessages('chat-1', wave1Messages)
+    vi.mocked(persistToolRun).mockImplementationOnce(async () => {
+      resolve('sub-2', {
+        subagentId: 'sub-2',
+        name: 'writer',
+        summary: 'drafted the patch',
+      })
+    })
+
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+
+    expect(hasPendingBackgroundResume('chat-1')).toBe(true)
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual([
+      {
+        toolCallId: 'tc-2',
+        result: {
+          subagentId: 'sub-2',
+          name: 'writer',
+          summary: 'drafted the patch',
+        },
+      },
+    ])
+    expect(runHarnessStream).toHaveBeenCalledTimes(1)
+  })
+
   it('names still-running siblings in the wake nudge and keeps pending resume', async () => {
     register('chat-1', 'sub-1', new AbortController(), {
       toolCallId: 'tc-1',

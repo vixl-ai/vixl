@@ -9,6 +9,7 @@ import {
   hasPendingBackgroundResume,
   hasRunningSubagentsForChat,
   listDeliverableBackgroundResults,
+  markBackgroundResultsDelivered,
   subagentRegistryRevision,
 } from '@/services/harness/subagent/registry'
 import { updateChatMeta } from '@/services/vixl/vixl-tauri'
@@ -107,6 +108,7 @@ export default (
 
   const send = async (args: SendArgs): Promise<void> => {
     await sendImpl(args)
+    handleBecameIdle()
   }
 
   const resumeAfterBackgroundSubagents = async (): Promise<void> => {
@@ -179,7 +181,13 @@ export default (
         await fleetSidebar.refreshSlug(options.projectSlug)
         return
       }
-      clearPendingBackgroundResume(options.chatId)
+      markBackgroundResultsDelivered(
+        options.chatId,
+        completedResults.map((item) => item.toolCallId),
+      )
+      if (!hasRunningSubagentsForChat(options.chatId)) {
+        clearPendingBackgroundResume(options.chatId)
+      }
       clearTurnResponseMessages(options.chatId)
       error.value = err instanceof Error ? err.message : 'Unknown error'
       status.value = 'error'
@@ -192,6 +200,7 @@ export default (
     } finally {
       abortController.value = null
       resumingBackgroundBatch.value = false
+      handleBecameIdle()
     }
   }
 

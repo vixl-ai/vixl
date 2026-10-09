@@ -8,6 +8,8 @@ import {
   clearTurnResponseMessages,
   getSubagent,
   getTurnResponseMessages,
+  hasRunningSubagentsForChat,
+  listDeliverableBackgroundResults,
   listSubagentsForChat,
   markBackgroundResultsDelivered,
 } from '@/services/harness/subagent/registry'
@@ -164,7 +166,10 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
   const modelMessages = [...baseMessages, ...patchedTurnMessages, wakeNudge]
 
   clearTurnResponseMessages(chatId)
-  if (runningAgents.length === 0) {
+  if (
+    !hasRunningSubagentsForChat(chatId) &&
+    listDeliverableBackgroundResults(chatId).length === 0
+  ) {
     clearPendingBackgroundResume(chatId)
   }
 
