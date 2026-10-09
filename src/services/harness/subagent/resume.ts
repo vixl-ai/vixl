@@ -92,6 +92,7 @@ const resumeSubagent = async (
         subagentId,
         error,
         blocking: false,
+        aborted: controller.signal.aborted,
       })
     }
   }
@@ -101,6 +102,7 @@ const resumeSubagent = async (
       subagentId,
       error,
       blocking: false,
+      aborted: controller.signal.aborted,
     })
   })
 

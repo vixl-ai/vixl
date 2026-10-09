@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, nextTick, ref, shallowRef } from 'vue'
+import { computed, effectScope, nextTick, ref, shallowRef } from 'vue'
 import type { AgentHarnessState, AttentionHelpers } from '@/composables/agent-harness/types'
 import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
@@ -55,7 +55,10 @@ vi.mock('@/services/harness/subagent/registry', async (importOriginal) => {
       useRealRegistryQueries.current
         ? actual.hasRunningSubagentsForChat(chatId)
         : false,
-    listDeliverableBackgroundResults: () => listDeliverableBackgroundResults(),
+    listDeliverableBackgroundResults: (chatId: string) =>
+      useRealRegistryQueries.current
+        ? actual.listDeliverableBackgroundResults(chatId)
+        : listDeliverableBackgroundResults(),
   }
 })
 
@@ -83,6 +86,8 @@ import createHelpers from '@/composables/agent-harness/helpers'
 import createTurnLoop from '@/composables/agent-harness/turn-loop'
 import {
   clearPendingBackgroundResume as clearPendingViaRegistry,
+  hasPendingBackgroundResume,
+  listDeliverableBackgroundResults as listDeliverableViaRegistry,
   register as registerSubagent,
   resetSubagentRegistryForTests,
   resolve as resolveSubagent,
@@ -127,6 +132,28 @@ const buildState = (): AgentHarnessState =>
       hydrated: computed(() => true),
     },
   }) as unknown as AgentHarnessState
+
+const flushPolicyFromArgs = (args: unknown): 'resume' | 'clear' | 'noop' => {
+  const typed = args as {
+    parentBusy: boolean
+    hasPending: boolean
+    hasRunning: boolean
+    deliverableCount: number
+  }
+  if (!typed.hasPending) {
+    return 'noop'
+  }
+  if (typed.parentBusy) {
+    return 'noop'
+  }
+  if (typed.deliverableCount > 0) {
+    return 'resume'
+  }
+  if (typed.hasRunning) {
+    return 'noop'
+  }
+  return 'clear'
+}
 
 const queuedItem = {
   id: 'q-1',
@@ -226,28 +253,6 @@ describe('maybeFlushBackgroundSubagentResume', () => {
     result: { subagentId: 'sub-1', name: 'explorer', summary: 'done' },
   }
 
-  const flushPolicyFromArgs = (args: unknown): 'resume' | 'clear' | 'noop' => {
-    const typed = args as {
-      parentBusy: boolean
-      hasPending: boolean
-      hasRunning: boolean
-      deliverableCount: number
-    }
-    if (!typed.hasPending) {
-      return 'noop'
-    }
-    if (typed.parentBusy) {
-      return 'noop'
-    }
-    if (typed.deliverableCount > 0) {
-      return 'resume'
-    }
-    if (typed.hasRunning) {
-      return 'noop'
-    }
-    return 'clear'
-  }
-
   const loopDeps = () => ({
     handleEvent: vi.fn<() => void>(),
     persistPermission: vi
@@ -281,6 +286,9 @@ describe('maybeFlushBackgroundSubagentResume', () => {
   it('resumes after compaction completes', async () => {
     shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
     listDeliverableBackgroundResults.mockReturnValue([deliverableResult])
+    resumeOrchestrator.mockImplementation(async () => {
+      listDeliverableBackgroundResults.mockReturnValue([])
+    })
     const state = buildState()
     state.compacting.value = true
     state.lastRunConfig.value = lastRunConfig
@@ -302,6 +310,9 @@ describe('maybeFlushBackgroundSubagentResume', () => {
   it('resumes on each idle flush when a background result is deliverable', async () => {
     shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
     listDeliverableBackgroundResults.mockReturnValue([deliverableResult])
+    resumeOrchestrator.mockImplementation(async () => {
+      listDeliverableBackgroundResults.mockReturnValue([])
+    })
     const state = buildState()
     state.lastRunConfig.value = lastRunConfig
     const { maybeFlushBackgroundSubagentResume } = createTurnLoop(
@@ -396,6 +407,176 @@ describe('resumeAfterBackgroundSubagents', () => {
     expect(state.status.value).toBe('ready')
     expect(state.messageQueue.take).not.toHaveBeenCalled()
     expect(sendFn).not.toHaveBeenCalled()
+  })
+
+  it('starts another resume for a late completion before the first resume returns', async () => {
+    shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
+    const resultA = {
+      toolCallId: 'tc-1',
+      result: { subagentId: 'sub-1', name: 'explorer', summary: 'done' },
+    }
+    const resultB = {
+      toolCallId: 'tc-2',
+      result: { subagentId: 'sub-2', name: 'writer', summary: 'late' },
+    }
+    const waves = [[resultA], [resultB], []]
+    listDeliverableBackgroundResults.mockImplementation(() => waves[0] ?? [])
+    resumeOrchestrator.mockImplementation(async () => {
+      waves.shift()
+    })
+    const state = buildState()
+    state.lastRunConfig.value = {
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      mentions: [],
+      effectiveSettings: { version: 1 },
+    }
+    const scope = effectScope()
+    const turnLoop = scope.run(() =>
+      createTurnLoop(state, buildAttention(state), {
+        handleEvent: vi.fn<() => void>(),
+        persistPermission: vi
+          .fn<() => Promise<void>>()
+          .mockResolvedValue(undefined),
+      }),
+    )
+    scope.stop()
+    if (!turnLoop) {
+      throw new Error('Turn loop was not created')
+    }
+
+    await turnLoop.resumeAfterBackgroundSubagents()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(resumeOrchestrator).toHaveBeenCalledTimes(2)
+    expect(resumeOrchestrator.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({ completedResults: [resultB] }),
+    )
+  })
+
+  it('keeps pending resume when resume fails while a subagent is still running', async () => {
+    useRealRegistryQueries.current = true
+    shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
+    registerSubagent('chat-2', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    resolveSubagent('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'done',
+    })
+    registerSubagent('chat-2', 'sub-2', new AbortController(), {
+      toolCallId: 'tc-2',
+      agentName: 'writer',
+    })
+    resumeOrchestrator.mockRejectedValue(new Error('stream failed'))
+    const state = buildState()
+    state.options.chatId = 'chat-2'
+    state.lastRunConfig.value = {
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      mentions: [],
+      effectiveSettings: { version: 1 },
+    }
+    const { resumeAfterBackgroundSubagents } = createTurnLoop(
+      state,
+      buildAttention(state),
+      {
+        handleEvent: vi.fn<() => void>(),
+        persistPermission: vi
+          .fn<() => Promise<void>>()
+          .mockResolvedValue(undefined),
+      },
+    )
+
+    await resumeAfterBackgroundSubagents()
+    await nextTick()
+    await Promise.resolve()
+
+    expect(hasPendingBackgroundResume('chat-2')).toBe(true)
+    expect(clearPendingBackgroundResume).not.toHaveBeenCalled()
+    expect(listDeliverableViaRegistry('chat-2')).toEqual([])
+    expect(resumeOrchestrator).toHaveBeenCalledTimes(1)
+    expect(resumeOrchestrator.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        completedResults: [
+          {
+            toolCallId: 'tc-1',
+            result: {
+              subagentId: 'sub-1',
+              name: 'explorer',
+              summary: 'done',
+            },
+          },
+        ],
+      }),
+    )
+
+    resolveSubagent('sub-2', {
+      subagentId: 'sub-2',
+      name: 'writer',
+      summary: 'late',
+    })
+    await nextTick()
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(resumeOrchestrator).toHaveBeenCalledTimes(2)
+    expect(resumeOrchestrator.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        completedResults: [
+          {
+            toolCallId: 'tc-2',
+            result: {
+              subagentId: 'sub-2',
+              name: 'writer',
+              summary: 'late',
+            },
+          },
+        ],
+      }),
+    )
+  })
+
+  it('resumes a deliverable background result when send returns', async () => {
+    shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
+    const delivered = {
+      toolCallId: 'tc-1',
+      result: { subagentId: 'sub-1', name: 'explorer', summary: 'done' },
+    }
+    listDeliverableBackgroundResults.mockReturnValue([delivered])
+    resumeOrchestrator.mockImplementation(async () => {
+      listDeliverableBackgroundResults.mockReturnValue([])
+    })
+    const state = buildState()
+    state.lastRunConfig.value = {
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      mentions: [],
+      effectiveSettings: { version: 1 },
+    }
+    const { send } = createTurnLoop(state, buildAttention(state), {
+      handleEvent: vi.fn<() => void>(),
+      persistPermission: vi
+        .fn<() => Promise<void>>()
+        .mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+    })
+    await nextTick()
+    await Promise.resolve()
+
+    expect(resumeOrchestrator).toHaveBeenCalledTimes(1)
+    expect(resumeOrchestrator.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ completedResults: [delivered] }),
+    )
   })
 })
 

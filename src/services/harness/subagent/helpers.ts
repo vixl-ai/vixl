@@ -34,13 +34,12 @@ export const finishSubagentWithError = (
     subagentId: string
     error: unknown
     blocking: boolean
+    aborted: boolean
   },
 ): void => {
   const message = args.error instanceof Error ? args.error.message : 'Subagent failed'
   const record = getSubagent(args.subagentId)
-  const aborted =
-    record?.status === 'aborted' ||
-    /aborted|stopped/i.test(message)
+  const aborted = record?.status === 'aborted' || args.aborted
 
   if (aborted) {
     if (record?.status === 'running') {

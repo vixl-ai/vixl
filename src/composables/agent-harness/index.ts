@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef } from 'vue'
+import { computed, effectScope, ref, shallowRef } from 'vue'
 import type { ChatStatus } from 'ai'
 import type { AgentHarnessOptions } from '@/types/harness/agent-harness-options'
 import type { SubagentEntry } from '@/types/harness/subagent-entry'
@@ -177,7 +177,23 @@ export default (options: AgentHarnessOptions): AgentHarness => {
   if (existing) {
     return existing
   }
-  const harness = createAgentHarness(options)
+  const scope = effectScope(true)
+  const created = scope.run(() => createAgentHarness(options))
+  if (!created) {
+    throw new Error('Failed to create agent harness')
+  }
+
+  const harness: AgentHarness = {
+    ...created,
+    markDisposed: () => {
+      scope.stop()
+      created.markDisposed()
+    },
+    dispose: async () => {
+      scope.stop()
+      await created.dispose()
+    },
+  }
   setCachedAgentHarness(options.projectSlug, options.chatId, harness)
   return harness
 }

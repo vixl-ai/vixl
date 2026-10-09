@@ -245,6 +245,7 @@ describe('resumeSubagent', () => {
         expect.objectContaining({
           subagentId: 'sub-1',
           blocking: false,
+          aborted: false,
         }),
       )
     })

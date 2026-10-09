@@ -149,6 +149,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
               subagentId,
               error,
               blocking: false,
+              aborted: controller.signal.aborted,
             })
           }
         }
@@ -158,6 +159,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
             subagentId,
             error,
             blocking: false,
+            aborted: controller.signal.aborted,
           })
         })
 
@@ -199,6 +201,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
           subagentId,
           error,
           blocking: true,
+          aborted: controller.signal.aborted,
         })
         throw error
       }
