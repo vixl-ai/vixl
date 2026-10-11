@@ -35,4 +35,4 @@ Open a project from the sidebar to its page. Tabs, in order: Chats, MCP, Graph, 
 
 Activating a project prefetches default [language servers](/customize/language-servers) and starts the [code graph](/concepts/code-graphs). Starting a new Agent-mode chat from the project row needs a Default or Agent model in Settings.
 
-[Use the workbench](/using/use-the-workbench) for the editor, terminals, Changes, and plan tabs. [Manage chats](/using/manage-chats) covers pin, fork, rename, and delete.
+[Use the workbench](/using/use-the-workbench) for the editor, terminals, and plan tabs. [Manage chats](/using/manage-chats) covers pin, fork, rename, and delete.

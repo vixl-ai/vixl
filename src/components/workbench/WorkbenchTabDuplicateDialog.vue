@@ -23,7 +23,6 @@ const tabTypeLabels: Record<
 > = {
   editor: 'Editor',
   terminal: 'Terminal',
-  changes: 'Changes',
 }
 
 const tabLabel = computed(() => tabTypeLabels[workbench.duplicateDialogTabType.value])

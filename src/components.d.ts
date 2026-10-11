@@ -62,7 +62,6 @@ declare module 'vue' {
     ChainOfThoughtSearchResult: typeof import('./components/ai-elements/chain-of-thought/ChainOfThoughtSearchResult.vue')['default']
     ChainOfThoughtSearchResults: typeof import('./components/ai-elements/chain-of-thought/ChainOfThoughtSearchResults.vue')['default']
     ChainOfThoughtStep: typeof import('./components/ai-elements/chain-of-thought/ChainOfThoughtStep.vue')['default']
-    ChangesTab: typeof import('./components/workbench/tabs/ChangesTab.vue')['default']
     ChatAgentTurn: typeof import('./components/chat/ChatAgentTurn.vue')['default']
     ChatAgentTurnUsage: typeof import('./components/chat/ChatAgentTurnUsage.vue')['default']
     ChatApprovalActions: typeof import('./components/chat/ChatApprovalActions.vue')['default']

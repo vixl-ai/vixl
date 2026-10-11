@@ -6,8 +6,6 @@ export default (type: WorkbenchTabType): string => {
       return 'Editor'
     case 'terminal':
       return 'Terminal'
-    case 'changes':
-      return 'Changes'
     case 'plan':
       return 'Plan'
     default:

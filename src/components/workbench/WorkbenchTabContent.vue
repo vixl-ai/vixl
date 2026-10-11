@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import WorkbenchTabsChangesTab from '@/components/workbench/tabs/ChangesTab.vue'
 import WorkbenchTabsEditorTab from '@/components/workbench/tabs/EditorTab.vue'
 import WorkbenchTabsTerminalTab from '@/components/workbench/tabs/TerminalTab.vue'
 import WorkbenchTabsPlanTab from '@/components/workbench/tabs/PlanTab.vue'
@@ -11,7 +10,6 @@ import type { WorkbenchTabType } from '@/types/workbench/workbench-tab'
 const workbench = useWorkbenchStore()
 
 const tabComponentMap: Record<WorkbenchTabType, object> = {
-  changes: WorkbenchTabsChangesTab,
   editor: WorkbenchTabsEditorTab,
   terminal: WorkbenchTabsTerminalTab,
   plan: WorkbenchTabsPlanTab,

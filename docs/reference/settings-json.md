@@ -155,7 +155,7 @@ Custom OpenAI-compatible endpoints use `providers.custom.<id>`:
 
 `lsp.autoDownload` downloads default language support when a project is activated. Disable it for airgapped machines. Server install state lives in personal `lsp.json`, not here. See [Language servers](/customize/language-servers) and [Managed components](/reference/managed-components).
 
-`workbench.duplicateTabBehavior` controls what happens when you open a **Terminal** or **Changes** tab that is already open for that project: ask, reuse the existing tab, or open a new one. Editor tabs do not use this setting: there is one editor tab per project, and opening a file adds it there.
+`workbench.duplicateTabBehavior` controls what happens when you open a **Terminal** tab that is already open for that project: ask, reuse the existing tab, or open a new one. Editor tabs do not use this setting: there is one editor tab per project, and opening a file adds it there.
 
 ## Example
 

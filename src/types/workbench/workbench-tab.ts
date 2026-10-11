@@ -1,5 +1,4 @@
 export type WorkbenchTabType =
-  | 'changes'
   | 'editor'
   | 'terminal'
   | 'plan'
@@ -25,14 +24,11 @@ export type AgentShellPayload = {
   shellId: string
 }
 
-export type ChangesPayload = Record<string, never>
-
 export type WorkbenchTabPayload =
   | EditorPayload
   | TerminalPayload
   | PlanPayload
   | AgentShellPayload
-  | ChangesPayload
 
 export type WorkbenchTab = {
   id: string

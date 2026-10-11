@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import {
   FileCode,
-  GitBranch,
   Terminal,
 } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
@@ -36,15 +35,11 @@ const workbench = useWorkbenchStore()
 const open = ref(false)
 
 const items = [
-  { id: 'editor', label: 'Editor', icon: FileCode, requiresProject: false },
-  { id: 'terminal', label: 'Terminal', icon: Terminal, requiresProject: false },
-  { id: 'changes', label: 'Changes', icon: GitBranch, requiresProject: true },
+  { id: 'editor', label: 'Editor', icon: FileCode },
+  { id: 'terminal', label: 'Terminal', icon: Terminal },
 ] as const
 
 const activeProjectId = computed(() => fleet.activeProjectId.value)
-
-const isItemDisabled = (item: (typeof items)[number]): boolean =>
-  item.requiresProject && !activeProjectId.value
 
 const handleOpen = async (type: (typeof items)[number]['id']): Promise<void> => {
   const projectId = workbench.resolveWorkspaceProjectId()
@@ -59,15 +54,6 @@ const handleOpen = async (type: (typeof items)[number]['id']): Promise<void> => 
         break
       case 'terminal':
         await workbench.openTerminal(projectId)
-        break
-      case 'changes':
-        if (!activeProjectId.value) {
-          toast.error('Select a project', {
-            description: 'Changes requires a project with a git repository.',
-          })
-          return
-        }
-        await workbench.openChanges(projectId)
         break
     }
     open.value = false
@@ -100,7 +86,6 @@ const handleOpen = async (type: (typeof items)[number]['id']): Promise<void> => 
             <DropdownMenuItem
               v-for="item in items"
               :key="item.id"
-              :disabled="isItemDisabled(item)"
               @click="handleOpen(item.id)"
             >
               <component :is="item.icon" class="mr-2 h-4 w-4" />

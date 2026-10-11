@@ -4,7 +4,6 @@ import { Plus } from '@lucide/vue'
 import {
   FileCode,
   FileText,
-  GitBranch,
   Terminal,
   X,
 } from '@lucide/vue'
@@ -32,8 +31,6 @@ const tabIcon = (type: WorkbenchTabType) => {
       return Terminal
     case 'agent-shell':
       return Terminal
-    case 'changes':
-      return GitBranch
     case 'plan':
       return FileText
     default:

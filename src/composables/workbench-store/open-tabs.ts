@@ -1,6 +1,5 @@
 import type {
   AgentShellPayload,
-  ChangesPayload,
   EditorPayload,
   PlanPayload,
   TerminalPayload,
@@ -48,36 +47,6 @@ export const openEditor = async (projectId: string, path = ''): Promise<void> =>
     projectId,
     label: fileName,
     payload: { path: editorPath || '', openPaths } satisfies EditorPayload,
-  }
-  tabs.value.push(tab)
-  focusTab(tab.id)
-}
-
-export const openDiff = async (projectId: string, path: string): Promise<void> => {
-  if (!path) {
-    return
-  }
-
-  if (isHomeChatSlug(projectId)) {
-    await ensureHomeRoot()
-  }
-
-  const predicate = (tab: WorkbenchTab) =>
-    tab.type === 'editor' && tab.projectId === projectId
-  const existing = findTab(predicate)
-
-  if (existing) {
-    addEditorFile(existing.id, path, true)
-    focusTab(existing.id)
-    return
-  }
-
-  const tab: WorkbenchTab = {
-    id: createId(),
-    type: 'editor',
-    projectId,
-    label: path.split('/').pop() ?? path,
-    payload: { path, openPaths: [path], diffView: true } satisfies EditorPayload,
   }
   tabs.value.push(tab)
   focusTab(tab.id)
@@ -179,34 +148,6 @@ export const openAgentShell = (
     projectId,
     label: label ?? 'Agent shell',
     payload: { shellId } satisfies AgentShellPayload,
-  }
-  tabs.value.push(tab)
-  focusTab(tab.id)
-}
-
-export const openChanges = async (projectId: string): Promise<void> => {
-  const predicate = (tab: WorkbenchTab) =>
-    tab.type === 'changes' && tab.projectId === projectId
-  const existing = findTab(predicate)
-
-  if (existing) {
-    const resolution = await resolveWorkbenchTabOpen({
-      projectId,
-      type: 'changes',
-      predicate,
-    })
-    if (resolution === 'existing') {
-      focusTab(existing.id)
-      return
-    }
-  }
-
-  const tab: WorkbenchTab = {
-    id: createId(),
-    type: 'changes',
-    projectId,
-    label: 'Changes',
-    payload: {} satisfies ChangesPayload,
   }
   tabs.value.push(tab)
   focusTab(tab.id)

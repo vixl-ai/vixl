@@ -29,6 +29,6 @@ The thread opens and the first message is sent.
 
 ![A Vixl chat thread with the composer at the bottom and an empty workbench](/features/harness.png)
 
-The agent can read the workspace, call tools the mode allows, and ask before actions the permission dial does not already allow. The [workbench](/using/use-the-workbench) is the right-side panel: editor, terminals, git Changes, and plan tabs. While a reply is running, send becomes **Stop generating**.
+The agent can read the workspace, call tools the mode allows, and ask before actions the permission dial does not already allow. The [workbench](/using/use-the-workbench) is the right-side panel: editor, terminals, and plan tabs. While a reply is running, send becomes **Stop generating**.
 
 To rename, pin, fork, or delete a thread, see [Manage chats](/using/manage-chats). Delete is permanent. See [Philosophy](/getting-started/philosophy).

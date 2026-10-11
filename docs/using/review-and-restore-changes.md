@@ -1,23 +1,13 @@
 ---
 title: Review and restore changes
-description: Review git working-tree diffs in the workbench, or restore files from a per-turn checkpoint on an agent message.
+description: Restore files from a per-turn checkpoint on an agent message.
 ---
 
 # Review and restore changes
 
-Two surfaces show what changed: the workbench **Changes** tab (the git working tree) and the per-turn file list on an agent message (Vixl file checkpoints). They are not the same thing. Use **Changes** to inspect uncommitted git status. Use restore on a turn when you want those paths rolled back to the checkpoint taken before that message.
+After a turn that changed files, the thread shows those paths on the agent message (Vixl file checkpoints). Use restore on a turn when you want those paths rolled back to the checkpoint taken before that message.
 
 Git tools and git neutrality (the agent does not commit unless you ask) are on [Chat modes](/concepts/chat-modes).
-
-## Git Changes tab
-
-Open the workbench plus menu and choose **Changes**. It needs an active [project](/concepts/projects-and-home-chats) with a git repository.
-
-The tab lists **Local** and the current branch. Ignored files are hidden. Search filters paths. Click a row to open a read-only side-by-side diff. The tab refreshes when it is focused and when git HEAD changes.
-
-Status letters on rows and in the file tree: Added, Untracked, Modified, Deleted, Renamed, Conflicted.
-
-See [Use the workbench](/using/use-the-workbench) for how tabs open.
 
 ## Restore files from a turn
 

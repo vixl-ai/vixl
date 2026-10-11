@@ -24,8 +24,6 @@ import {
 } from './helpers'
 import {
   openAgentShell,
-  openChanges,
-  openDiff,
   openEditor,
   openPlan,
   openTerminal,
@@ -81,11 +79,9 @@ const useWorkbenchStore = () => ({
   workspaceFileReloadPaths,
   focusTab,
   openEditor,
-  openDiff,
   openTerminal,
   openPlan,
   openAgentShell,
-  openChanges,
   closeTab,
   closeOthers,
   closeAll,
