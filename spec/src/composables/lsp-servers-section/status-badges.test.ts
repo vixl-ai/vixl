@@ -252,6 +252,25 @@ describe('buildStatusBadges', () => {
     })
     expect(badges.find((badge) => badge.key === 'activity')).toMatchObject({
       label: 'Loading project: scanning 40%',
+      tooltip: 'Loading project: scanning 40%',
+      icon: Loader2,
+      className: 'text-muted-foreground',
+    })
+  })
+
+  it('shows a spinning working badge for the loading-project sentinel', () => {
+    const activity: LspActivity = {
+      token: null,
+      title: 'Loading project',
+      message: null,
+      percentage: null,
+    }
+    const badge = badgesFor({
+      state: serverState({ phase: 'running', activity, source: 'managed' }),
+    }).find((item) => item.key === 'activity')
+    expect(badge).toMatchObject({
+      label: 'Working',
+      tooltip: null,
       icon: Loader2,
       className: 'text-muted-foreground',
     })

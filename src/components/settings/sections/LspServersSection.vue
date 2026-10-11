@@ -118,7 +118,9 @@ const {
                           />
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent>{{ badge.tooltip ?? badge.label }}</TooltipContent>
+                      <TooltipContent v-if="badge.tooltip !== null">
+                        {{ badge.tooltip ?? badge.label }}
+                      </TooltipContent>
                     </Tooltip>
                   </div>
                 </div>

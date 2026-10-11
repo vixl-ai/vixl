@@ -36,6 +36,8 @@ export const phaseLabel: Record<LspServerDisplayState, string> = {
   disabled: 'Disabled',
 }
 
+const LOADING_PROJECT_TITLE = 'Loading project'
+
 export const formatActivityLabel = (activity: LspActivity): string => {
   let text = activity.title
   if (activity.message) {
@@ -46,6 +48,15 @@ export const formatActivityLabel = (activity: LspActivity): string => {
   }
   return text
 }
+
+export const isLoadingProjectSentinel = (activity: LspActivity): boolean =>
+  activity.token === null &&
+  activity.title === LOADING_PROJECT_TITLE &&
+  activity.message === null &&
+  activity.percentage === null
+
+export const activityDisplayLabel = (activity: LspActivity): string | null =>
+  isLoadingProjectSentinel(activity) ? null : formatActivityLabel(activity)
 
 const HIDDEN_DISPLAY_STATES: ReadonlySet<LspServerDisplayState> = new Set([
   'disabled',

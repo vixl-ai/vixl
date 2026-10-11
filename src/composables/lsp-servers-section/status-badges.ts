@@ -11,7 +11,7 @@ import {
   Wrench,
 } from '@lucide/vue'
 import {
-  formatActivityLabel,
+  activityDisplayLabel,
   isTransientPhase,
   phaseLabel,
 } from '@/composables/lsp-status/helpers'
@@ -20,7 +20,7 @@ import type { LspCatalogEntry } from '@/services/vixl/vixl-tauri'
 export type LspStatusBadge = {
   key: string
   label: string
-  tooltip?: string
+  tooltip?: string | null
   icon: Component
   className: string
 }
@@ -116,9 +116,11 @@ export const buildStatusBadges = (
   }
 
   if (state.activity) {
+    const displayLabel = activityDisplayLabel(state.activity)
     badges.push({
       key: 'activity',
-      label: formatActivityLabel(state.activity),
+      label: displayLabel ?? 'Working',
+      tooltip: displayLabel,
       icon: Loader2,
       className: 'text-muted-foreground',
     })

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { LspActivity, LspCatalogEntry, LspPhase, LspServerState } from '@/services/vixl/vixl-tauri'
 import {
+  activityDisplayLabel,
   deriveHealth,
   deriveIsBusy,
   formatActivityLabel,
+  isLoadingProjectSentinel,
   isTransientPhase,
   phaseLabel,
   resolveDisplayState,
@@ -91,6 +93,25 @@ describe('phase labels', () => {
     expect(
       formatActivityLabel(activity({ message: 'scanning', percentage: null })),
     ).toBe('Loading project: scanning')
+  })
+
+  it('hides the loading-project sentinel and keeps real progress labels', () => {
+    const sentinel = activity({ token: null, message: null, percentage: null })
+    expect(isLoadingProjectSentinel(sentinel)).toBe(true)
+    expect(activityDisplayLabel(sentinel)).toBeNull()
+    expect(formatActivityLabel(sentinel)).toBe('Loading project')
+
+    expect(
+      activityDisplayLabel(activity({ token: null, message: 'scanning', percentage: null })),
+    ).toBe('Loading project: scanning')
+    expect(activityDisplayLabel(activity({ token: null, percentage: 40 }))).toBe(
+      'Loading project 40%',
+    )
+    expect(
+      activityDisplayLabel(
+        activity({ token: '1', title: 'Loading project', message: 'scanning', percentage: 40 }),
+      ),
+    ).toBe('Loading project: scanning 40%')
   })
 })
 

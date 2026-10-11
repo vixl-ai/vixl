@@ -31,7 +31,7 @@ import {
 import WorkbenchFileEntryIcon from '@/components/workbench/FileEntryIcon.vue'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import {
-  formatActivityLabel,
+  activityDisplayLabel,
   isTransientPhase,
   phaseLabel,
 } from '@/composables/lsp-status/helpers'
@@ -190,10 +190,16 @@ const statusRows = computed(() => {
   const now = nowMs.value
   return lsp.visibleRows.value.map((row) => {
     const transient = isTransientPhase(row.displayState)
+    const meta = PHASE_META[row.displayState]
+    const activityLabel = row.activity ? activityDisplayLabel(row.activity) : null
+    const hasActivity = row.activity !== null
     return {
       row,
-      meta: PHASE_META[row.displayState],
-      spinning: transient,
+      meta,
+      icon: hasActivity ? Loader2 : meta.icon,
+      spinning: transient || hasActivity,
+      statusTitle: hasActivity ? (activityLabel ?? undefined) : meta.label,
+      statusAriaLabel: hasActivity ? (activityLabel ?? 'Working') : meta.label,
       elapsed:
         transient && row.phaseSinceMs > 0
           ? formatElapsed(row.phaseSinceMs, now)
@@ -386,11 +392,11 @@ const handleOpenSettings = async (): Promise<void> => {
                   <span
                     class="inline-flex"
                     role="img"
-                    :title="item.meta.label"
-                    :aria-label="item.meta.label"
+                    :title="item.statusTitle"
+                    :aria-label="item.statusAriaLabel"
                   >
                     <component
-                      :is="item.meta.icon"
+                      :is="item.icon"
                       class="h-3.5 w-3.5"
                       :class="[
                         item.meta.className,
@@ -406,13 +412,6 @@ const handleOpenSettings = async (): Promise<void> => {
                 :title="item.row.message"
               >
                 {{ item.row.message }}
-              </p>
-              <p
-                v-if="item.row.activity"
-                class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
-              >
-                <Loader2 class="h-3 w-3 shrink-0 animate-spin" />
-                <span class="truncate">{{ formatActivityLabel(item.row.activity) }}</span>
               </p>
               <p
                 v-if="item.row.error"
