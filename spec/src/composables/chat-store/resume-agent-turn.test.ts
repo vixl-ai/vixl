@@ -145,6 +145,22 @@ describe('resumeAgentTurn', () => {
       message: 'provider failed',
     })
   })
+
+  it('clears a stale stop along with the error', async () => {
+    const { default: useChatStore, resetChatSessionsForTests } = await import(
+      '@/composables/use-chat-store'
+    )
+    resetChatSessionsForTests()
+    const store = useChatStore()
+    const session = store.forChat('proj', 'chat-resume-stop')
+    seedErroredTurn(session)
+    session.setAgentTurnStop('turn-1', { reason: 'error', detail: 'provider failed' })
+
+    session.resumeAgentTurn('turn-1')
+
+    expect(turnOf(session, 'turn-1')?.error).toBeUndefined()
+    expect(turnOf(session, 'turn-1')?.stop).toBeUndefined()
+  })
 })
 
 describe('getContinuableTurn', () => {

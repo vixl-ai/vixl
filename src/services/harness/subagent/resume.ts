@@ -3,6 +3,7 @@ import { noPoll, visibleStatus } from '@/services/harness/guidance'
 import {
   emitSubagentResult,
   finishSubagentWithError,
+  subagentStopForFinish,
 } from '@/services/harness/subagent/helpers'
 import {
   getSubagent,
@@ -64,7 +65,7 @@ const resumeSubagent = async (
 
   const completeSubagent = async (): Promise<void> => {
     try {
-      const summary = await runSubagentGenerate({
+      const generated = await runSubagentGenerate({
         ctx,
         subagentId,
         agentName: record.agentName,
@@ -79,13 +80,14 @@ const resumeSubagent = async (
       resolveSubagent(subagentId, {
         subagentId,
         name: record.agentName,
-        summary,
+        summary: generated.text,
       })
       emitSubagentResult(ctx, {
         subagentId,
-        summary,
+        summary: generated.text,
         blocking: false,
         outcome: 'completed',
+        stop: subagentStopForFinish(generated.finishReason),
       })
     } catch (error) {
       finishSubagentWithError(ctx, {

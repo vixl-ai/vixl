@@ -25,6 +25,9 @@ const updateChatMeta = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue(undefined),
 )
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
+const persistTurnEnded = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
+)
 const sendFn = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
 )
@@ -82,6 +85,10 @@ vi.mock('vue-sonner', () => ({
   },
 }))
 
+vi.mock('@/services/harness/orchestrator/persistence', () => ({
+  persistTurnEnded: (...args: unknown[]) => persistTurnEnded(...args),
+}))
+
 import createHelpers from '@/composables/agent-harness/helpers'
 import createTurnLoop from '@/composables/agent-harness/turn-loop'
 import {
@@ -106,6 +113,7 @@ const buildState = (): AgentHarnessState =>
       patchMeta: vi.fn<(patch: unknown) => void>(),
       startAgentTurn: vi.fn<(turnId: string) => void>(),
       finishAgentTurn: vi.fn<() => void>(),
+      setAgentTurnStop: vi.fn<(turnId: string, stop: unknown) => void>(),
       messages: ref([]),
       timeline: ref([]),
     },
@@ -376,6 +384,117 @@ describe('resumeAfterBackgroundSubagents', () => {
     })
     expect(state.status.value).toBe('error')
     expect(state.resumingBackgroundBatch.value).toBe(false)
+    const turnId = vi.mocked(state.session.startAgentTurn).mock.calls[0]?.[0]
+    const stop = {
+      reason: 'error',
+      detail: 'No pending subagent turn to resume',
+    }
+    expect(state.session.setAgentTurnStop).toHaveBeenCalledWith(turnId, stop)
+    expect(persistTurnEnded).toHaveBeenCalledWith('proj', 'chat-1', turnId, stop)
+  })
+
+  it('writes a timeout stop when resume fails with a timeout', async () => {
+    const timeout = new Error('model timeout')
+    timeout.name = 'TimeoutError'
+    resumeOrchestrator.mockRejectedValue(timeout)
+    const state = buildState()
+    state.lastRunConfig.value = {
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      mentions: [],
+      effectiveSettings: { version: 1 },
+    }
+    const { resumeAfterBackgroundSubagents } = createTurnLoop(
+      state,
+      buildAttention(state),
+      {
+        handleEvent: vi.fn<() => void>(),
+        persistPermission: vi
+          .fn<() => Promise<void>>()
+          .mockResolvedValue(undefined),
+      },
+    )
+
+    await resumeAfterBackgroundSubagents()
+
+    const turnId = vi.mocked(state.session.startAgentTurn).mock.calls[0]?.[0]
+    const stop = {
+      reason: 'timeout',
+      detail: 'The model took too long to respond.',
+    }
+    expect(state.session.setAgentTurnStop).toHaveBeenCalledWith(turnId, stop)
+    expect(persistTurnEnded).toHaveBeenCalledWith('proj', 'chat-1', turnId, stop)
+  })
+
+  it('does not write a stop when resume fails after the turn already stopped', async () => {
+    resumeOrchestrator.mockRejectedValue(new Error('stream failed'))
+    const state = buildState()
+    vi.mocked(state.session.startAgentTurn).mockImplementation((turnId: string) => {
+      ;(state.session.timeline as { value: unknown[] }).value = [
+        {
+          type: 'agent-turn',
+          turn: {
+            id: turnId,
+            steps: [],
+            text: '',
+            stop: { reason: 'output-limit', finish: 'length' },
+          },
+        },
+      ]
+    })
+    state.lastRunConfig.value = {
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      mentions: [],
+      effectiveSettings: { version: 1 },
+    }
+    const { resumeAfterBackgroundSubagents } = createTurnLoop(
+      state,
+      buildAttention(state),
+      {
+        handleEvent: vi.fn<() => void>(),
+        persistPermission: vi
+          .fn<() => Promise<void>>()
+          .mockResolvedValue(undefined),
+      },
+    )
+
+    await resumeAfterBackgroundSubagents()
+
+    expect(state.session.setAgentTurnStop).not.toHaveBeenCalled()
+    expect(persistTurnEnded).not.toHaveBeenCalled()
+    expect(state.status.value).toBe('error')
+  })
+
+  it('does not write a stop when resume is aborted', async () => {
+    const state = buildState()
+    resumeOrchestrator.mockImplementation(async () => {
+      state.abortController.value?.abort()
+      throw new Error('aborted')
+    })
+    state.lastRunConfig.value = {
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      mentions: [],
+      effectiveSettings: { version: 1 },
+    }
+    const { resumeAfterBackgroundSubagents } = createTurnLoop(
+      state,
+      buildAttention(state),
+      {
+        handleEvent: vi.fn<() => void>(),
+        persistPermission: vi
+          .fn<() => Promise<void>>()
+          .mockResolvedValue(undefined),
+      },
+    )
+
+    await resumeAfterBackgroundSubagents()
+
+    expect(state.session.setAgentTurnStop).not.toHaveBeenCalled()
+    expect(persistTurnEnded).not.toHaveBeenCalled()
+    expect(state.status.value).toBe('ready')
+    expect(state.session.finishAgentTurn).toHaveBeenCalled()
   })
 
   it('does not drain the queue after a successful resume when stop suppression is set', async () => {

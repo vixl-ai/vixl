@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { UIMessage } from 'ai'
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { ChatTimelineItem, SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { ToolRun } from '@/types/harness/tool-run'
@@ -176,7 +177,83 @@ describe('buildChatTranscript', () => {
     )
   })
 
-  it('appends the turn error line after step content', () => {
+  it('appends the stop line after step content instead of the turn error', () => {
+    const transcript = buildChatTranscript([
+      agentTurn({
+        error: { kind: 'timeout', message: 'The model stalled' },
+        stop: {
+          reason: 'timeout',
+          detail: 'The model took too long to respond.',
+        },
+        steps: [
+          {
+            id: 'step-1',
+            text: 'Checking the file.',
+            reasoning: '',
+            tools: [
+              toolRun({
+                name: 'read_file',
+                args: { path: 'src/foo.ts' },
+              }),
+            ],
+          },
+        ],
+      }),
+    ])
+    expect(transcript).toBe(
+      [
+        'ASSISTANT:',
+        'Checking the file.',
+        'TOOL read_file [done] {"path":"src/foo.ts"}',
+        'stopped: timeout: The model took too long to respond.',
+      ].join('\n'),
+    )
+  })
+
+  it.each<[string, AgentStop, string]>([
+    ['completed', { reason: 'completed', finish: 'stop' }, 'stopped: completed'],
+    [
+      'completed with plan detail',
+      { reason: 'completed', detail: 'plan', finish: 'stop' },
+      'stopped: completed: plan',
+    ],
+    [
+      'completed with a non-redundant finish',
+      { reason: 'completed', finish: 'tool-calls' },
+      'stopped: completed (finish tool-calls)',
+    ],
+    [
+      'completed with finish and detail',
+      { reason: 'completed', finish: 'tool-calls', detail: 'plan' },
+      'stopped: completed (finish tool-calls): plan',
+    ],
+    [
+      'output-limit with the full truncation detail',
+      {
+        reason: 'output-limit',
+        finish: 'length',
+        detail:
+          'The model reached its output limit (8192 tokens) before finishing. read_file was cut off and did not run. Raise max output in model options or ask for a shorter response.',
+      },
+      'stopped: output-limit: The model reached its output limit (8192 tokens) before finishing. read_file was cut off and did not run. Raise max output in model options or ask for a shorter response.',
+    ],
+    ['user-stop', { reason: 'user-stop' }, 'stopped: user-stop'],
+    [
+      'error',
+      { reason: 'error', detail: 'The provider returned 500.' },
+      'stopped: error: The provider returned 500.',
+    ],
+    ['compaction', { reason: 'compaction' }, 'stopped: compaction'],
+    [
+      'content-filter',
+      { reason: 'content-filter', finish: 'content-filter' },
+      'stopped: content-filter',
+    ],
+  ])('prints the assistant %s stop line', (_label, stop, line) => {
+    expect(buildChatTranscript([agentTurn({ stop })])).toBe(`ASSISTANT:\n${line}`)
+  })
+
+  it('prints no terminal line when a turn has an error but no stop', () => {
     const transcript = buildChatTranscript([
       agentTurn({
         error: { kind: 'timeout', message: 'The model stalled' },
@@ -200,7 +277,6 @@ describe('buildChatTranscript', () => {
         'ASSISTANT:',
         'Checking the file.',
         'TOOL read_file [done] {"path":"src/foo.ts"}',
-        'error (timeout): The model stalled',
       ].join('\n'),
     )
   })
@@ -277,6 +353,41 @@ describe('buildChatTranscript', () => {
         'look around',
         'TOOL read_file [done] {"path":"t1.ts"}',
         'summary: found things',
+      ].join('\n'),
+    )
+  })
+
+  it.each<[string, AgentStop, string]>([
+    ['completed', { reason: 'completed', finish: 'stop' }, 'stopped: completed'],
+    [
+      'failed',
+      { reason: 'failed', detail: 'The worker crashed' },
+      'stopped: failed: The worker crashed',
+    ],
+    ['aborted', { reason: 'aborted' }, 'stopped: aborted'],
+    ['incomplete', { reason: 'incomplete' }, 'stopped: incomplete'],
+  ])('appends the subagent %s stop line after the summary', (_label, stop, line) => {
+    const transcript = buildChatTranscript([subagentItem({ stop })])
+    expect(transcript).toBe(
+      [
+        'SUBAGENT explore [done]',
+        'look around',
+        'TOOL read_file [done] {"path":"t1.ts"}',
+        'summary: found things',
+        line,
+      ].join('\n'),
+    )
+  })
+
+  it('prints no stop line when a subagent has no stop', () => {
+    const transcript = buildChatTranscript([
+      subagentItem({ status: 'running', summary: undefined }),
+    ])
+    expect(transcript).toBe(
+      [
+        'SUBAGENT explore [running]',
+        'look around',
+        'TOOL read_file [done] {"path":"t1.ts"}',
       ].join('\n'),
     )
   })

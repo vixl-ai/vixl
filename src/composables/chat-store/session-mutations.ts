@@ -1,5 +1,6 @@
 import { computed } from 'vue'
 import type { UIMessage } from 'ai'
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { AgentTurnError } from '@/types/chat/agent-turn-error'
 import type { ChatMeta } from '@/types/chat/chat-meta'
@@ -25,6 +26,8 @@ import {
   rebuildMessagesFromTimeline,
   updateTimelineTurn,
 } from './message-parsing'
+import applyAgentTurnStop from './apply-agent-turn-stop'
+import closeTurnForCompaction from './close-turn-for-compaction'
 import createSessionAgentOps from './session-agent-ops'
 import createSessionSubagentOps from './session-subagent-ops'
 import type { ChatSession, SessionMutations } from './types'
@@ -134,8 +137,8 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
       session.activeStepId.value = null
       session.pendingStepText.value = ''
       const current = agent.getActiveTurn()
-      if (current?.error) {
-        const { error: _error, ...rest } = current
+      if (current && (current.error || current.stop)) {
+        const { error: _error, stop: _stop, ...rest } = current
         agent.patchActiveTurn(rest)
       }
     },
@@ -159,6 +162,9 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
       if (last?.type === 'agent-turn') {
         updateTimelineTurn(session, { ...last.turn, error: turnError })
       }
+    },
+    setAgentTurnStop: (turnId: string, stop: AgentStop): void => {
+      applyAgentTurnStop(session, agent, turnId, stop)
     },
     appendLocalTodoUpdate: (todos: TodoItem[]): void => {
       if (todos.length === 0) {
@@ -253,21 +259,9 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
       }
       return null
     },
-    appendLocalCompaction: (summary: string, focus: string | null): void => {
-      const closingTurnId = session.activeTurnId.value
-      agent.finishAgentTurn()
-      session.timeline.value = [
-        ...session.timeline.value,
-        { type: 'compaction', summary, focus },
-      ]
-      if (closingTurnId) {
-        const nextTurnId = crypto.randomUUID()
-        session.turnIdRemap.set(closingTurnId, nextTurnId)
-        session.activeTurnId.value = nextTurnId
-        session.activeStepId.value = null
-        session.pendingStepText.value = ''
-      }
-    },
+    appendLocalCompaction: (summary: string, focus: string | null) =>
+      closeTurnForCompaction(session, agent, summary, focus),
+    turnIdRemap: session.turnIdRemap,
     patchMetaActiveContext: (activeContext: {
       checkpointLineId: string
       includeFromCreatedAt: string

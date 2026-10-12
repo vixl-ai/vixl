@@ -12,6 +12,7 @@ import {
   updateTimelineTurn,
   upsertToolInStep,
 } from './message-parsing'
+import resolveTurnId from './resolve-turn-id'
 import { createPendingStreamDeltaBuffer } from './stream-delta-buffer'
 
 type TurnOps = {
@@ -39,23 +40,6 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
         entry.type === 'agent-turn' && entry.turn.id === session.activeTurnId.value,
     )
     return item?.type === 'agent-turn' ? item.turn : null
-  }
-
-  const resolveTurnId = (id: string): string => {
-    const visited = new Set<string>()
-    let current = id
-    while (session.turnIdRemap.has(current)) {
-      if (visited.has(current)) {
-        return current
-      }
-      visited.add(current)
-      const mapped = session.turnIdRemap.get(current)
-      if (!mapped) {
-        return current
-      }
-      current = mapped
-    }
-    return current
   }
 
   const ensureActiveTurn = (): AgentTurn | null => {
@@ -91,7 +75,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     if (!unresolvedId) {
       return
     }
-    const turnId = resolveTurnId(unresolvedId)
+    const turnId = resolveTurnId(unresolvedId, session.turnIdRemap)
     if (turnId !== session.activeTurnId.value) {
       session.activeTurnId.value = turnId
     }
@@ -129,7 +113,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     if (!unresolvedId) {
       return
     }
-    const turnId = resolveTurnId(unresolvedId)
+    const turnId = resolveTurnId(unresolvedId, session.turnIdRemap)
     if (turnId !== session.activeTurnId.value) {
       session.activeTurnId.value = turnId
     }

@@ -65,7 +65,7 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
         turnId: session.activeTurnId.value ?? `session:${options.chatId}`,
         onEvent: deps.handleEvent,
       })
-      session.appendLocalCompaction(result.summary, focus ?? null)
+      await session.appendLocalCompaction(result.summary, focus ?? null)
       session.patchMetaActiveContext({
         checkpointLineId: result.checkpointLineId,
         includeFromCreatedAt: result.includeFromCreatedAt,
@@ -127,7 +127,7 @@ export default (state: AgentHarnessState, deps: SessionOpsDeps) => {
       })
       summary = compactResult.summary
       usedFallback = compactResult.usedFallback
-      session.appendLocalCompaction(compactResult.summary, null)
+      await session.appendLocalCompaction(compactResult.summary, null)
       session.patchMetaActiveContext({
         checkpointLineId: compactResult.checkpointLineId,
         includeFromCreatedAt: compactResult.includeFromCreatedAt,

@@ -4,7 +4,9 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const runSubagentGenerate = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<string>>(),
+  vi.fn<
+    (...args: unknown[]) => Promise<{ text: string; finishReason?: string }>
+  >(),
 )
 const linkAbortSignal = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 const emitSubagentResult = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
@@ -20,12 +22,17 @@ vi.mock('@/utils/link-abort-signal', () => ({
   default: (...args: unknown[]) => linkAbortSignal(...args),
 }))
 
-vi.mock('@/services/harness/subagent/helpers', () => ({
-  emitSubagentResult: (...args: unknown[]) => emitSubagentResult(...args),
-  finishSubagentWithError: (...args: unknown[]) =>
-    finishSubagentWithError(...args),
-  sanitizeSubagentName: (name: string) => name,
-}))
+vi.mock('@/services/harness/subagent/helpers', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('@/services/harness/subagent/helpers')
+  >()
+  return {
+    ...actual,
+    emitSubagentResult: (...args: unknown[]) => emitSubagentResult(...args),
+    finishSubagentWithError: (...args: unknown[]) =>
+      finishSubagentWithError(...args),
+  }
+})
 
 import resumeSubagent from '@/services/harness/subagent/resume'
 import { noPoll, visibleStatus } from '@/services/harness/guidance'
@@ -85,7 +92,10 @@ describe('resumeSubagent', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetSubagentRegistryForTests()
-    runSubagentGenerate.mockResolvedValue('second summary')
+    runSubagentGenerate.mockResolvedValue({
+      text: 'second summary',
+      finishReason: 'stop',
+    })
   })
 
   it('returns running immediately, then completes generate in the background', async () => {
@@ -95,7 +105,9 @@ describe('resumeSubagent', () => {
     ]
     seedCompleted(history)
 
-    let releaseGenerate: ((value: string) => void) | undefined
+    let releaseGenerate:
+      | ((value: { text: string; finishReason?: string }) => void)
+      | undefined
     runSubagentGenerate.mockImplementation(
       () =>
         new Promise((resolveGenerate) => {
@@ -149,7 +161,7 @@ describe('resumeSubagent', () => {
       && event.type === 'pending-subagent',
     )).toBe(false)
 
-    releaseGenerate?.('second summary')
+    releaseGenerate?.({ text: 'second summary', finishReason: 'stop' })
 
     await vi.waitFor(() => {
       expect(getSubagent('sub-1')?.status).toBe('completed')
@@ -161,6 +173,7 @@ describe('resumeSubagent', () => {
         summary: 'second summary',
         blocking: false,
         outcome: 'completed',
+        stop: { reason: 'completed', finish: 'stop' },
       }),
     )
     expect(emitSubagentResult).toHaveBeenCalledTimes(1)
@@ -258,7 +271,9 @@ describe('resumeSubagent', () => {
     markBackgroundResultsDelivered('chat-1', ['tc-1'])
     expect(listDeliverableBackgroundResults('chat-1')).toEqual([])
 
-    let releaseGenerate: ((value: string) => void) | undefined
+    let releaseGenerate:
+      | ((value: { text: string; finishReason?: string }) => void)
+      | undefined
     runSubagentGenerate.mockImplementation(
       () =>
         new Promise((resolveGenerate) => {
@@ -269,7 +284,7 @@ describe('resumeSubagent', () => {
     await resumeSubagent(baseCtx(), 'sub-1', 'keep going')
     expect(listDeliverableBackgroundResults('chat-1')).toEqual([])
 
-    releaseGenerate?.('second summary')
+    releaseGenerate?.({ text: 'second summary', finishReason: 'stop' })
 
     await vi.waitFor(() => {
       expect(listDeliverableBackgroundResults('chat-1')).toEqual([
@@ -284,4 +299,32 @@ describe('resumeSubagent', () => {
       ])
     })
   })
+
+  it.each([
+    ['length', { reason: 'output-limit', finish: 'length' }],
+    ['content-filter', { reason: 'content-filter', finish: 'content-filter' }],
+  ] as const)(
+    'emits a completed stop for finish %s',
+    async (finishReason, stop) => {
+      seedCompleted()
+      runSubagentGenerate.mockResolvedValue({
+        text: 'second summary',
+        finishReason,
+      })
+
+      await resumeSubagent(baseCtx(), 'sub-1', 'keep going')
+
+      await vi.waitFor(() => {
+        expect(emitSubagentResult).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            summary: 'second summary',
+            blocking: false,
+            outcome: 'completed',
+            stop,
+          }),
+        )
+      })
+    },
+  )
 })

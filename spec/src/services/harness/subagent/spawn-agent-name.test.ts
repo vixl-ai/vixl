@@ -18,7 +18,9 @@ const resolveSpawnModel = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<string>>(),
 )
 const runSubagentGenerate = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<string>>(),
+  vi.fn<
+    (...args: unknown[]) => Promise<{ text: string; finishReason?: string }>
+  >(),
 )
 const linkAbortSignal = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 
@@ -36,11 +38,17 @@ vi.mock('@/services/harness/subagent/registry', () => ({
   resolve: (...args: unknown[]) => resolveSubagent(...args),
 }))
 
-vi.mock('@/services/harness/subagent/helpers', () => ({
-  emitSubagentResult: (...args: unknown[]) => emitSubagentResult(...args),
-  finishSubagentWithError: (...args: unknown[]) =>
-    finishSubagentWithError(...args),
-}))
+vi.mock('@/services/harness/subagent/helpers', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('@/services/harness/subagent/helpers')
+  >()
+  return {
+    ...actual,
+    emitSubagentResult: (...args: unknown[]) => emitSubagentResult(...args),
+    finishSubagentWithError: (...args: unknown[]) =>
+      finishSubagentWithError(...args),
+  }
+})
 
 vi.mock('@/services/harness/subagent/resolve-spawn-model', () => ({
   default: (...args: unknown[]) => resolveSpawnModel(...args),
@@ -98,7 +106,10 @@ describe('spawn_subagent agentName', () => {
     resolveAgentDefinition.mockResolvedValue(null)
     getPlanExecutionSession.mockReturnValue({ subagentModel: null })
     resolveSpawnModel.mockResolvedValue('anthropic::claude-sonnet-4')
-    runSubagentGenerate.mockResolvedValue('ok summary')
+    runSubagentGenerate.mockResolvedValue({
+      text: 'ok summary',
+      finishReason: 'stop',
+    })
   })
 
   it.each(['explore', 'shell', 'run-ci', 'review_bugbot', 'Fix 3 Angi review findings'])(
@@ -178,5 +189,63 @@ describe('spawn_subagent agentName', () => {
     expect(schema.shape.agentName.description).toContain('Catalog name')
     expect(schema.shape.agentName.description).toContain('verb phrase')
     expect(schema.shape.agentName.description).not.toMatch(/reject/i)
+  })
+
+  it.each([
+    ['stop', { reason: 'completed', finish: 'stop' }],
+    ['length', { reason: 'output-limit', finish: 'length' }],
+    ['content-filter', { reason: 'content-filter', finish: 'content-filter' }],
+  ] as const)(
+    'emits a blocking completed stop for finish %s',
+    async (finishReason, stop) => {
+      runSubagentGenerate.mockResolvedValue({
+        text: 'ok summary',
+        finishReason,
+      })
+      await execute('explore')
+      expect(emitSubagentResult).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          summary: 'ok summary',
+          blocking: true,
+          outcome: 'completed',
+          stop,
+        }),
+      )
+    },
+  )
+
+  it('emits a background completed stop after generate resolves', async () => {
+    runSubagentGenerate.mockResolvedValue({
+      text: 'bg summary',
+      finishReason: 'length',
+    })
+    const built = spawnSubagent(baseCtx())
+    const runner = built.execute as (
+      value: Record<string, unknown>,
+      options: { toolCallId: string },
+    ) => Promise<unknown>
+    await expect(
+      runner(
+        {
+          agentName: 'explore',
+          prompt: 'Find auth helpers.',
+          mode: 'background',
+        },
+        { toolCallId: 'call-1' },
+      ),
+    ).resolves.toMatchObject({ status: 'running' })
+
+    await vi.waitFor(() => {
+      expect(emitSubagentResult).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          summary: 'bg summary',
+          blocking: false,
+          outcome: 'completed',
+          stop: { reason: 'output-limit', finish: 'length' },
+        }),
+      )
+    })
   })
 })

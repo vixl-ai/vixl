@@ -656,7 +656,10 @@ describe('runSubagentGenerate output-limit truncation', () => {
     })
 
     const notice = `[The model reached its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`
-    await expect(run()).resolves.toBe(`partial summary\n\n${notice}`)
+    await expect(run()).resolves.toEqual({
+      text: `partial summary\n\n${notice}`,
+      finishReason: 'length',
+    })
     expect(captureBillableUsage).toHaveBeenCalledTimes(1)
   })
 
@@ -668,9 +671,10 @@ describe('runSubagentGenerate output-limit truncation', () => {
       response: { messages: [] },
     })
 
-    await expect(run()).resolves.toBe(
-      `[The model reached its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`,
-    )
+    await expect(run()).resolves.toEqual({
+      text: `[The model reached its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`,
+      finishReason: 'length',
+    })
   })
 
   it('returns text when generateText finishes with stop', async () => {
@@ -681,7 +685,24 @@ describe('runSubagentGenerate output-limit truncation', () => {
       response: { messages: [{ role: 'assistant', content: 'summary' }] },
     })
 
-    await expect(run()).resolves.toBe('summary')
+    await expect(run()).resolves.toEqual({
+      text: 'summary',
+      finishReason: 'stop',
+    })
+  })
+
+  it('returns content-filter finish without a truncation notice', async () => {
+    generateText.mockResolvedValue({
+      text: 'blocked',
+      usage: {},
+      finishReason: 'content-filter',
+      response: { messages: [{ role: 'assistant', content: 'blocked' }] },
+    })
+
+    await expect(run()).resolves.toEqual({
+      text: 'blocked',
+      finishReason: 'content-filter',
+    })
   })
 })
 
@@ -818,7 +839,7 @@ describe('runSubagentGenerate transient retry', () => {
 
     const pending = run()
     await vi.advanceTimersByTimeAsync(2_000)
-    await expect(pending).resolves.toBe('recovered')
+    await expect(pending).resolves.toEqual({ text: 'recovered' })
 
     expect(generateText).toHaveBeenCalledTimes(2)
     const second = generateText.mock.calls[1]?.[0] as GenerateConfig

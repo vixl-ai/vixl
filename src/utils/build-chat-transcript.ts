@@ -1,4 +1,5 @@
 import type { UIMessage } from 'ai'
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { ChatTimelineItem, SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { TodoItem } from '@/types/harness/harness-event'
@@ -80,6 +81,25 @@ const serializeUser = (message: UIMessage): string => {
   return `USER:\n${body || '(empty)'}`
 }
 
+const finishAlreadySaidByReason: Partial<Record<AgentStop['reason'], string>> = {
+  completed: 'stop',
+  'output-limit': 'length',
+  'content-filter': 'content-filter',
+}
+
+const formatStopLine = (stop: AgentStop): string => {
+  const finish = stop.finish?.trim() ?? ''
+  const showFinish =
+    finish.length > 0 && finish !== finishAlreadySaidByReason[stop.reason]
+  const head = showFinish
+    ? `stopped: ${stop.reason} (finish ${finish})`
+    : `stopped: ${stop.reason}`
+  if (!stop.detail) {
+    return head
+  }
+  return `${head}: ${stop.detail}`
+}
+
 const serializeAgentTurn = (turn: AgentTurn): string => {
   const parts: string[] = []
   for (const step of turn.steps) {
@@ -99,8 +119,8 @@ const serializeAgentTurn = (turn: AgentTurn): string => {
   if (trailingText.length > 0) {
     parts.push(trailingText)
   }
-  if (turn.error) {
-    parts.push(`error (${turn.error.kind}): ${turn.error.message}`)
+  if (turn.stop) {
+    parts.push(formatStopLine(turn.stop))
   }
   const body = parts.filter((value) => value.length > 0).join('\n')
   return `ASSISTANT:\n${body || '(empty)'}`
@@ -214,6 +234,9 @@ const serializeSubagent = (item: SubagentTimelineItem): string => {
   const summary = item.summary?.trim() ?? ''
   if (summary.length > 0) {
     lines.push(`summary: ${summary}`)
+  }
+  if (item.stop) {
+    lines.push(formatStopLine(item.stop))
   }
   return lines.join('\n')
 }

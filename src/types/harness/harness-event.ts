@@ -1,3 +1,4 @@
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import type { ContextBucket } from '@/types/harness/context-bucket'
 import type { FileDiff } from '@/types/harness/file-diff'
@@ -69,6 +70,7 @@ export type HarnessEvent =
       summary: string
       blocking: boolean
       outcome?: 'completed' | 'failed' | 'aborted'
+      stop?: AgentStop
     }
   | {
       type: 'pending-subagent'
@@ -96,6 +98,11 @@ export type HarnessEvent =
   | { type: 'shell-complete'; shellId: string; exitCode: number }
   | { type: 'chat-status-changed'; projectSlug: string; chatId: string; status: 'idle' | 'running' }
   | { type: 'turn-aborted'; reason: 'user-stop' | 'error'; partialSteps: number }
+  | {
+      type: 'turn-ended'
+      turnId: string
+      stop: AgentStop
+    }
   | { type: 'question-request'; toolCallId: string; question: string; options?: string[] }
   | {
       type: 'workspace-moved'

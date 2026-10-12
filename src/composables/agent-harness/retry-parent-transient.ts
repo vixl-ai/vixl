@@ -1,6 +1,7 @@
 import { toast } from 'vue-sonner'
 import type { ChatStatus } from 'ai'
 import type { Ref } from 'vue'
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import {
@@ -10,6 +11,8 @@ import {
   waitAbortAware,
 } from '@/services/harness/transient-error'
 import type { SendArgs, SendResult } from './send'
+import { writeGuardedTurnStop } from './turn-stop'
+import type { AgentHarnessSession } from './types'
 
 const CHAT_ABORT_MESSAGE = 'Chat aborted'
 
@@ -28,7 +31,9 @@ type RetryParentTransientArgs = {
   abortController: Ref<AbortController | null>
   finishAgentTurn: () => void
   suppressQueueDrainAfterStop: Ref<boolean>
+  session: AgentHarnessSession
   projectSlug: string
+  chatId: string
   refreshSlug: (slug: string) => Promise<void>
   maybeDrainQueue: () => Promise<void>
   send: (args: SendArgs) => Promise<SendResult>
@@ -76,6 +81,20 @@ export default async (
   }
   if (waitAborted) {
     args.status.value = 'ready'
+    if (args.turnId) {
+      const stop: AgentStop = { reason: 'user-stop' }
+      await writeGuardedTurnStop({
+        timeline: args.session.timeline.value,
+        turnId: args.turnId,
+        turnIdRemap: args.session.turnIdRemap,
+        stop,
+        projectSlug: args.projectSlug,
+        chatId: args.chatId,
+        setAgentTurnStop: (turnId, next) => {
+          args.session.setAgentTurnStop(turnId, next)
+        },
+      })
+    }
     args.finishAgentTurn()
     await args.refreshSlug(args.projectSlug)
     return 'aborted'

@@ -16,6 +16,7 @@ import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import parseModelRef from '@/utils/parse-model-ref'
 import shouldFlushBackgroundSubagentResume from '@/utils/should-flush-background-subagent-resume'
 import createSend, { type SendArgs } from './send'
+import { parentFailureStop, writeGuardedTurnStop } from './turn-stop'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
 type TurnLoopDeps = {
@@ -191,6 +192,17 @@ export default (
       clearTurnResponseMessages(options.chatId)
       error.value = err instanceof Error ? err.message : 'Unknown error'
       status.value = 'error'
+      await writeGuardedTurnStop({
+        timeline: session.timeline.value,
+        turnId,
+        turnIdRemap: session.turnIdRemap,
+        stop: parentFailureStop(err),
+        projectSlug: options.projectSlug,
+        chatId: options.chatId,
+        setAgentTurnStop: (id, stop) => {
+          session.setAgentTurnStop(id, stop)
+        },
+      })
       session.finishAgentTurn()
       attention.applyTurnEndAttention('error')
       toast.error('Agent resume failed', {

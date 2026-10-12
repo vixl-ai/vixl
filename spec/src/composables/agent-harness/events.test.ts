@@ -48,6 +48,7 @@ const buildState = (): AgentHarnessState =>
       appendLocalSubagentToolEvent: vi.fn<(...args: unknown[]) => void>(),
       setLocalSubagentPrompt: vi.fn<(...args: unknown[]) => void>(),
       completeLocalSubagent: vi.fn<(...args: unknown[]) => void>(),
+      setAgentTurnStop: vi.fn<(...args: unknown[]) => void>(),
       setPendingQuestion: vi.fn<(...args: unknown[]) => void>(),
       startAgentStep: vi.fn<(...args: unknown[]) => void>(),
       finishAgentStep: vi.fn<(...args: unknown[]) => void>(),
@@ -699,5 +700,48 @@ describe('agent-harness events subagent result flush', () => {
     })
 
     expect(deps.maybeFlushBackgroundSubagentResume).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes stop into completeLocalSubagent', () => {
+    const state = buildState()
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'subagent-result',
+      subagentId: 'sub-1',
+      summary: 'found it',
+      blocking: true,
+      outcome: 'completed',
+      stop: { reason: 'completed', finish: 'stop' },
+    })
+
+    expect(state.session.completeLocalSubagent).toHaveBeenCalledWith(
+      'sub-1',
+      'found it',
+      'done',
+      { reason: 'completed', finish: 'stop' },
+    )
+  })
+})
+
+describe('agent-harness events turn-ended', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('records the parent turn stop', () => {
+    const state = buildState()
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'turn-ended',
+      turnId: 'turn-1',
+      stop: { reason: 'user-stop', detail: 'stopped by user' },
+    })
+
+    expect(state.session.setAgentTurnStop).toHaveBeenCalledWith('turn-1', {
+      reason: 'user-stop',
+      detail: 'stopped by user',
+    })
   })
 })

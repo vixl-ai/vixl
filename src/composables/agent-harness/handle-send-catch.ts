@@ -4,6 +4,7 @@ import type { Ref } from 'vue'
 import describeAgentRunError from '@/utils/describe-agent-run-error'
 import retryParentTransient from './retry-parent-transient'
 import type { SendArgs, SendResult } from './send'
+import { parentFailureStop, writeGuardedTurnStop } from './turn-stop'
 import type { AgentHarnessSession } from './types'
 
 type HandleSendCatchArgs = {
@@ -20,6 +21,7 @@ type HandleSendCatchArgs = {
   suppressQueueDrainAfterStop: Ref<boolean>
   resumeInFlight: Ref<boolean>
   projectSlug: string
+  chatId: string
   refreshSlug: (slug: string) => Promise<void>
   applyTurnEndAttention: (outcome: 'success' | 'error') => void
   maybeDrainQueue: () => Promise<void>
@@ -41,16 +43,16 @@ export default async (input: HandleSendCatchArgs): Promise<SendResult> => {
     suppressQueueDrainAfterStop,
     resumeInFlight,
     projectSlug,
+    chatId,
     refreshSlug,
     applyTurnEndAttention,
     maybeDrainQueue,
     send,
   } = input
 
-  const timedOut =
-    err instanceof Error && (err.name === 'TimeoutError' || /timeout/i.test(err.message))
   const message = err instanceof Error ? err.message : 'Unknown error'
   const runDescription = describeAgentRunError(message)
+  const failureStop = parentFailureStop(err)
 
   if (aborted) {
     status.value = 'ready'
@@ -79,6 +81,8 @@ export default async (input: HandleSendCatchArgs): Promise<SendResult> => {
     },
     suppressQueueDrainAfterStop,
     projectSlug,
+    chatId,
+    session,
     refreshSlug,
     maybeDrainQueue,
     send,
@@ -96,13 +100,22 @@ export default async (input: HandleSendCatchArgs): Promise<SendResult> => {
   }
   if (turnStarted) {
     session.setAgentTurnError({
-      kind: timedOut ? 'timeout' : 'error',
-      message: timedOut
-        ? 'The model took too long to respond.'
-        : message.includes('No output generated')
-          ? 'The model returned an empty response. Check your API key and model ID in Settings.'
-          : runDescription,
+      kind: failureStop.reason === 'timeout' ? 'timeout' : 'error',
+      message: failureStop.detail ?? message,
     })
+    if (turnId) {
+      await writeGuardedTurnStop({
+        timeline: session.timeline.value,
+        turnId,
+        turnIdRemap: session.turnIdRemap,
+        stop: failureStop,
+        projectSlug,
+        chatId,
+        setAgentTurnStop: (id, stop) => {
+          session.setAgentTurnStop(id, stop)
+        },
+      })
+    }
     session.finishAgentTurn()
     applyTurnEndAttention('error')
   }
