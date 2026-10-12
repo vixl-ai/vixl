@@ -899,3 +899,767 @@ describe('hydrate-lines reasoning duration', () => {
     expect(item.turn.steps[0]?.reasoningSeconds).toBe(5)
   })
 })
+
+const turnById = (acc: HydrateAccumulator, turnId: string) => {
+  const item = acc.nextTimeline.find(
+    (entry) => entry.type === 'agent-turn' && entry.turn.id === turnId,
+  )
+  return item?.type === 'agent-turn' ? item.turn : null
+}
+
+describe('hydrate-harness turn-ended', () => {
+  it('attaches stop to the open pending turn and does not flush it', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'tool-run',
+        toolCallId: 'tc-1',
+        name: 'read_file',
+        status: 'done',
+        stepId: 'step-1',
+      },
+      flushTurn,
+    )
+    expect(acc.pendingTurn?.id).toBe('tc-1')
+
+    const consumed = applyHydrateLine(
+      acc,
+      {
+        id: 'assistant-1-ended',
+        role: 'assistant',
+        parts: [],
+        createdAt: '2026-01-01T00:00:02.000Z',
+        harnessEvent: {
+          type: 'turn-ended',
+          turnId: 'assistant-1',
+          stop: { reason: 'completed', finish: 'stop' },
+        },
+      },
+      flushTurn,
+    )
+    expect(consumed).toBeUndefined()
+    expect(acc.pendingTurn?.id).toBe('tc-1')
+    expect(acc.pendingTurn?.stop).toEqual({ reason: 'completed', finish: 'stop' })
+    expect(acc.nextTimeline).toHaveLength(0)
+
+    applyHydrateLine(
+      acc,
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'done' }],
+        createdAt: '2026-01-01T00:00:03.000Z',
+      },
+      flushTurn,
+    )
+    expect(turnById(acc, 'assistant-1')?.stop).toEqual({
+      reason: 'completed',
+      finish: 'stop',
+    })
+    expect(JSON.stringify(acc.nextMessages)).not.toContain('"reason"')
+  })
+
+  it('patches a flushed turn by id when a compaction item is last', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      {
+        id: 'turn-1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'first' }],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      {
+        id: 'turn-2',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'second' }],
+        createdAt: '2026-01-01T00:00:02.000Z',
+      },
+      flushTurn,
+    )
+    applyHydrateHarnessEvent(
+      acc,
+      { type: 'compaction', summary: 'rolled up', focus: null },
+      flushTurn,
+    )
+    expect(acc.pendingTurn).toBeNull()
+    expect(acc.nextTimeline.at(-1)?.type).toBe('compaction')
+    const messageBefore = acc.nextMessages[0]
+
+    const consumed = applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'turn-ended',
+        turnId: 'turn-1',
+        stop: { reason: 'output-limit', finish: 'length', detail: 'cut off' },
+      },
+      flushTurn,
+    )
+
+    expect(consumed).toBe(true)
+    expect(turnById(acc, 'turn-1')?.stop).toEqual({
+      reason: 'output-limit',
+      finish: 'length',
+      detail: 'cut off',
+    })
+    expect(turnById(acc, 'turn-2')?.stop).toBeUndefined()
+    expect(acc.nextTimeline.at(-1)).toEqual({
+      type: 'compaction',
+      summary: 'rolled up',
+      focus: null,
+    })
+    expect(acc.nextMessages[0]).toBe(messageBefore)
+  })
+
+  it('keeps an unmatched failure stop off earlier turns and drops a malformed stop', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      {
+        id: 'turn-1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'kept' }],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      flushTurn,
+    )
+
+    expect(
+      applyHydrateHarnessEvent(
+        acc,
+        {
+          type: 'turn-ended',
+          turnId: 'missing',
+          stop: { reason: 'error', detail: 'gone' },
+        },
+        flushTurn,
+      ),
+    ).toBe(true)
+    expect(turnById(acc, 'turn-1')?.stop).toBeUndefined()
+    expect(turnById(acc, 'missing')).toEqual({
+      id: 'missing',
+      steps: [],
+      text: '',
+      stop: { reason: 'error', detail: 'gone' },
+    })
+    expect(JSON.stringify(acc.nextMessages)).not.toContain('"reason"')
+
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'tool-run',
+        toolCallId: 'tc-open',
+        name: 'read_file',
+        status: 'done',
+        stepId: 'step-open',
+      },
+      flushTurn,
+    )
+    expect(
+      applyHydrateLine(
+        acc,
+        {
+          id: 'bad-ended',
+          role: 'assistant',
+          parts: [],
+          createdAt: '2026-01-01T00:00:04.000Z',
+          harnessEvent: {
+            type: 'turn-ended',
+            stop: { reason: 'not-a-reason' },
+          },
+        },
+        flushTurn,
+      ),
+    ).toBeUndefined()
+    expect(acc.pendingTurn?.id).toBe('tc-open')
+    expect(acc.pendingTurn?.stop).toBeUndefined()
+  })
+
+  it('puts compaction on the closed turn and completed on the continuation', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    const line = (
+      id: string,
+      createdAt: string,
+      harnessEvent: Record<string, unknown>,
+    ) => ({
+      id,
+      role: 'assistant' as const,
+      parts: [] as Array<Record<string, unknown>>,
+      createdAt,
+      harnessEvent,
+    })
+
+    applyHydrateLine(
+      acc,
+      line('tc-pre', '2026-01-01T00:00:01.000Z', {
+        type: 'tool-run',
+        toolCallId: 'tc-pre',
+        name: 'read_file',
+        status: 'done',
+        stepId: 'step-1',
+        args: { path: 'a.ts' },
+        result: { content: 'ok' },
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('step-1-text', '2026-01-01T00:00:02.000Z', {
+        type: 'step-text',
+        stepId: 'step-1',
+        text: 'before',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('compact-1', '2026-01-01T00:00:03.000Z', {
+        type: 'compaction',
+        summary: 'rolled up',
+        focus: 'parent',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('t1-ended-compaction', '2026-01-01T00:00:04.000Z', {
+        type: 'turn-ended',
+        turnId: 't1',
+        stop: { reason: 'compaction' },
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('tc-post', '2026-01-01T00:00:05.000Z', {
+        type: 'tool-run',
+        toolCallId: 'tc-post',
+        name: 'edit_file',
+        status: 'done',
+        stepId: 'step-2',
+        args: { path: 'b.ts' },
+        result: { content: 'later' },
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('step-2-text', '2026-01-01T00:00:06.000Z', {
+        type: 'step-text',
+        stepId: 'step-2',
+        text: 'after',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      {
+        id: 't1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'after' }],
+        createdAt: '2026-01-01T00:00:07.000Z',
+      },
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('t1-ended', '2026-01-01T00:00:08.000Z', {
+        type: 'turn-ended',
+        turnId: 't1',
+        stop: { reason: 'completed', finish: 'stop' },
+      }),
+      flushTurn,
+    )
+
+    expect(acc.nextTimeline.map((item) => item.type)).toEqual([
+      'agent-turn',
+      'compaction',
+      'agent-turn',
+    ])
+    const turns = acc.nextTimeline.flatMap((item) =>
+      item.type === 'agent-turn' ? [item.turn] : [],
+    )
+    expect(turns[0]?.id).toBe('tc-pre')
+    expect(turns[0]?.stop).toEqual({ reason: 'compaction' })
+    expect(turns[1]?.id).toBe('t1')
+    expect(turns[1]?.stop).toEqual({ reason: 'completed', finish: 'stop' })
+  })
+
+  it('keeps a failure stop when that turn never wrote scaffolding', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      {
+        id: 'user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'hello' }],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      {
+        id: 'turn-timeout-ended',
+        role: 'assistant',
+        parts: [],
+        createdAt: '2026-01-01T00:00:01.000Z',
+        harnessEvent: {
+          type: 'turn-ended',
+          turnId: 'turn-timeout',
+          stop: {
+            reason: 'timeout',
+            detail: 'The model took too long to respond.',
+          },
+        },
+      },
+      flushTurn,
+    )
+    flushTurn()
+
+    expect(acc.nextTimeline.map((item) => item.type)).toEqual(['user', 'agent-turn'])
+    expect(turnById(acc, 'turn-timeout')).toEqual({
+      id: 'turn-timeout',
+      steps: [],
+      text: '',
+      stop: {
+        reason: 'timeout',
+        detail: 'The model took too long to respond.',
+      },
+    })
+    expect(JSON.stringify(acc.nextMessages)).not.toContain('timeout')
+
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'turn-ended',
+        turnId: 'turn-timeout',
+        stop: { reason: 'error', detail: 'late' },
+      },
+      flushTurn,
+    )
+    expect(turnById(acc, 'turn-timeout')?.stop).toEqual({
+      reason: 'timeout',
+      detail: 'The model took too long to respond.',
+    })
+  })
+
+  it('attaches an unmatched stop to the tool-id turn compaction flushed', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    const line = (
+      id: string,
+      createdAt: string,
+      harnessEvent: Record<string, unknown>,
+    ) => ({
+      id,
+      role: 'assistant' as const,
+      parts: [] as Array<Record<string, unknown>>,
+      createdAt,
+      harnessEvent,
+    })
+
+    applyHydrateLine(
+      acc,
+      {
+        id: 'turn-old',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'kept' }],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('tc-pre', '2026-01-01T00:00:01.000Z', {
+        type: 'tool-run',
+        toolCallId: 'tc-pre',
+        name: 'read_file',
+        status: 'done',
+        stepId: 'step-1',
+        args: { path: 'a.ts' },
+        result: { content: 'ok' },
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('step-1-text', '2026-01-01T00:00:02.000Z', {
+        type: 'step-text',
+        stepId: 'step-1',
+        text: 'before',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('compact-1', '2026-01-01T00:00:03.000Z', {
+        type: 'compaction',
+        summary: 'rolled up',
+        focus: 'parent',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('live-turn-ended', '2026-01-01T00:00:04.000Z', {
+        type: 'turn-ended',
+        turnId: 'live-turn',
+        stop: {
+          reason: 'timeout',
+          detail: 'The model took too long to respond.',
+        },
+      }),
+      flushTurn,
+    )
+
+    expect(acc.nextTimeline.map((item) => item.type)).toEqual([
+      'agent-turn',
+      'agent-turn',
+      'compaction',
+    ])
+    expect(turnById(acc, 'turn-old')?.stop).toBeUndefined()
+    expect(turnById(acc, 'tc-pre')?.stop).toEqual({
+      reason: 'timeout',
+      detail: 'The model took too long to respond.',
+    })
+    expect(turnById(acc, 'live-turn')).toBeNull()
+  })
+
+  it('keeps a post-compaction failure when the closed turn already has a stop', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    const line = (
+      id: string,
+      createdAt: string,
+      harnessEvent: Record<string, unknown>,
+    ) => ({
+      id,
+      role: 'assistant' as const,
+      parts: [] as Array<Record<string, unknown>>,
+      createdAt,
+      harnessEvent,
+    })
+
+    applyHydrateLine(
+      acc,
+      line('tc-pre', '2026-01-01T00:00:01.000Z', {
+        type: 'tool-run',
+        toolCallId: 'tc-pre',
+        name: 'read_file',
+        status: 'done',
+        stepId: 'step-1',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('compact-1', '2026-01-01T00:00:02.000Z', {
+        type: 'compaction',
+        summary: 'rolled up',
+        focus: null,
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('t1-ended-compaction', '2026-01-01T00:00:03.000Z', {
+        type: 'turn-ended',
+        turnId: 't1',
+        stop: { reason: 'compaction' },
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('t1-ended-error', '2026-01-01T00:00:04.000Z', {
+        type: 'turn-ended',
+        turnId: 't1',
+        stop: { reason: 'error', detail: 'provider exploded' },
+      }),
+      flushTurn,
+    )
+
+    expect(acc.nextTimeline.map((item) => item.type)).toEqual([
+      'agent-turn',
+      'compaction',
+      'agent-turn',
+    ])
+    expect(turnById(acc, 'tc-pre')?.stop).toEqual({ reason: 'compaction' })
+    expect(turnById(acc, 't1')?.stop).toEqual({
+      reason: 'error',
+      detail: 'provider exploded',
+    })
+    expect(turnById(acc, 't1')?.steps).toEqual([])
+    expect(turnById(acc, 't1')?.text).toBe('')
+  })
+
+  it('does not stamp an assistant-id turn next to compaction for an unmatched stop', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      {
+        id: 'turn-1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'kept' }],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      flushTurn,
+    )
+    applyHydrateHarnessEvent(
+      acc,
+      { type: 'compaction', summary: 'rolled up', focus: null },
+      flushTurn,
+    )
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'turn-ended',
+        turnId: 'missing',
+        stop: { reason: 'error', detail: 'provider exploded' },
+      },
+      flushTurn,
+    )
+
+    expect(turnById(acc, 'turn-1')?.stop).toBeUndefined()
+    expect(turnById(acc, 'missing')?.stop).toEqual({
+      reason: 'error',
+      detail: 'provider exploded',
+    })
+  })
+
+  it('attaches an unmatched stop to a continuation flushed under its tool id', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    const line = (
+      id: string,
+      createdAt: string,
+      harnessEvent: Record<string, unknown>,
+    ) => ({
+      id,
+      role: 'assistant' as const,
+      parts: [] as Array<Record<string, unknown>>,
+      createdAt,
+      harnessEvent,
+    })
+
+    applyHydrateLine(
+      acc,
+      line('tc-pre', '2026-01-01T00:00:01.000Z', {
+        type: 'tool-run',
+        toolCallId: 'tc-pre',
+        name: 'read_file',
+        status: 'done',
+        stepId: 'step-1',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('compact-1', '2026-01-01T00:00:02.000Z', {
+        type: 'compaction',
+        summary: 'rolled up',
+        focus: 'parent',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('t1-ended-compaction', '2026-01-01T00:00:03.000Z', {
+        type: 'turn-ended',
+        turnId: 't1',
+        stop: { reason: 'compaction' },
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('tc-post', '2026-01-01T00:00:04.000Z', {
+        type: 'tool-run',
+        toolCallId: 'tc-post',
+        name: 'edit_file',
+        status: 'done',
+        stepId: 'step-2',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('compact-2', '2026-01-01T00:00:05.000Z', {
+        type: 'compaction',
+        summary: 'continued',
+        focus: null,
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('live-continuation-ended', '2026-01-01T00:00:06.000Z', {
+        type: 'turn-ended',
+        turnId: 'live-continuation',
+        stop: { reason: 'error', detail: 'provider exploded' },
+      }),
+      flushTurn,
+    )
+
+    expect(acc.nextTimeline.map((item) => item.type)).toEqual([
+      'agent-turn',
+      'compaction',
+      'agent-turn',
+      'compaction',
+    ])
+    expect(turnById(acc, 'tc-pre')?.stop).toEqual({ reason: 'compaction' })
+    expect(turnById(acc, 'tc-post')?.stop).toEqual({
+      reason: 'error',
+      detail: 'provider exploded',
+    })
+    expect(turnById(acc, 'live-continuation')).toBeNull()
+  })
+
+  it('does not stamp an earlier turn when the stop follows a later user message', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    const line = (
+      id: string,
+      createdAt: string,
+      harnessEvent: Record<string, unknown>,
+    ) => ({
+      id,
+      role: 'assistant' as const,
+      parts: [] as Array<Record<string, unknown>>,
+      createdAt,
+      harnessEvent,
+    })
+
+    applyHydrateLine(
+      acc,
+      line('tc-pre', '2026-01-01T00:00:01.000Z', {
+        type: 'tool-run',
+        toolCallId: 'tc-pre',
+        name: 'read_file',
+        status: 'done',
+        stepId: 'step-1',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('compact-1', '2026-01-01T00:00:02.000Z', {
+        type: 'compaction',
+        summary: 'rolled up',
+        focus: null,
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('t1-ended-compaction', '2026-01-01T00:00:03.000Z', {
+        type: 'turn-ended',
+        turnId: 't1',
+        stop: { reason: 'compaction' },
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('tc-post', '2026-01-01T00:00:04.000Z', {
+        type: 'tool-run',
+        toolCallId: 'tc-post',
+        name: 'edit_file',
+        status: 'done',
+        stepId: 'step-2',
+      }),
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      {
+        id: 'user-2',
+        role: 'user',
+        parts: [{ type: 'text', text: 'next' }],
+        createdAt: '2026-01-01T00:00:05.000Z',
+      },
+      flushTurn,
+    )
+    applyHydrateLine(
+      acc,
+      line('live-continuation-ended', '2026-01-01T00:00:06.000Z', {
+        type: 'turn-ended',
+        turnId: 'live-continuation',
+        stop: { reason: 'user-stop' },
+      }),
+      flushTurn,
+    )
+
+    expect(turnById(acc, 'tc-pre')?.stop).toEqual({ reason: 'compaction' })
+    expect(turnById(acc, 'tc-post')?.stop).toBeUndefined()
+    expect(turnById(acc, 'live-continuation')?.stop).toEqual({ reason: 'user-stop' })
+  })
+})
+
+describe('hydrate-harness subagent-result stop', () => {
+  it('carries stop onto the subagent and keeps it when a later result omits stop', () => {
+    const acc = emptyAcc()
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-start',
+        subagentId: 'sub-1',
+        toolCallId: 'call-1',
+        name: 'explore',
+        blocking: true,
+      },
+      noopFlush,
+    )
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-result',
+        subagentId: 'sub-1',
+        summary: 'found things',
+        blocking: true,
+        outcome: 'completed',
+        stop: { reason: 'completed', finish: 'stop', detail: 'ok' },
+      },
+      noopFlush,
+    )
+    const item = acc.nextTimeline[0]
+    expect(item?.type).toBe('subagent')
+    if (item?.type !== 'subagent') {
+      return
+    }
+    expect(item.status).toBe('done')
+    expect(item.stop).toEqual({ reason: 'completed', finish: 'stop', detail: 'ok' })
+
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-result',
+        subagentId: 'sub-1',
+        summary: 'Stopped',
+        blocking: true,
+        outcome: 'aborted',
+      },
+      noopFlush,
+    )
+    const again = acc.nextTimeline[0]
+    expect(again?.type).toBe('subagent')
+    if (again?.type !== 'subagent') {
+      return
+    }
+    expect(again.status).toBe('stopped')
+    expect(again.summary).toBe('Stopped')
+    expect(again.stop).toEqual({ reason: 'completed', finish: 'stop', detail: 'ok' })
+  })
+})

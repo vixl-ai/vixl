@@ -2,6 +2,7 @@ import type { AgentStep } from '@/types/chat/agent-step'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import mapSubagentResultStatus from '@/utils/map-subagent-result-status'
+import attachTurnEnded, { parseAgentStop } from './attach-turn-ended'
 import { parseChatArtifact, parseChatDiffs, parseTodoItems } from './helpers'
 import hydrateTimelineBuilder, {
   type HydrateAccumulator,
@@ -42,6 +43,11 @@ const applyHydrateHarnessEvent = (
     if (stamp) {
       acc.pendingTurn = { ...acc.pendingTurn, createdAt: stamp }
     }
+  }
+
+  if (type === 'turn-ended') {
+    attachTurnEnded(acc, harnessEvent)
+    return true
   }
 
   if (type === 'todo-update') {
@@ -87,7 +93,13 @@ const applyHydrateHarnessEvent = (
     const summary = String(harnessEvent.summary ?? '')
     const status = mapSubagentResultStatus(harnessEvent.outcome, summary)
     if (subagentId) {
-      hydrateTimelineBuilder.completeSubagent(acc, subagentId, summary, status)
+      hydrateTimelineBuilder.completeSubagent(
+        acc,
+        subagentId,
+        summary,
+        status,
+        parseAgentStop(harnessEvent.stop),
+      )
     }
     return true
   }

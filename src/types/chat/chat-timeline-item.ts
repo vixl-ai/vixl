@@ -1,4 +1,5 @@
 import type { UIMessage } from 'ai'
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { TodoItem } from '@/types/harness/harness-event'
 import type { ToolRun } from '@/types/harness/tool-run'
@@ -21,6 +22,7 @@ export type SubagentTimelineItem = {
   messages?: unknown[]
   steers?: SubagentSteer[]
   pendingSteers?: string[]
+  stop?: AgentStop
 }
 
 export type ChatTimelineItem =

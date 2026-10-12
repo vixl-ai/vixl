@@ -18,6 +18,9 @@ const listConfiguredProviders = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => string[]>(() => ['openai']),
 )
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
+const persistTurnEnded = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
+)
 const toastInfo = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 const normalizeImageDataUrl = vi.hoisted(() =>
   vi.fn<(args: { dataUrl: string; mediaType: string }) => Promise<{
@@ -25,6 +28,10 @@ const normalizeImageDataUrl = vi.hoisted(() =>
     mediaType: string
   }>>(async (args) => args),
 )
+
+vi.mock('@/services/harness/orchestrator/persistence', () => ({
+  persistTurnEnded: (...args: unknown[]) => persistTurnEnded(...args),
+}))
 
 vi.mock('@/services/vixl/vixl-tauri', () =>
   mockVixlTauri({
@@ -120,6 +127,7 @@ const buildState = (): SendTestState => {
   const resumeAgentTurn = vi.fn<(turnId: string) => void>()
   const finishAgentTurn = vi.fn<() => void>()
   const setAgentTurnError = vi.fn<(error: unknown) => void>()
+  const setAgentTurnStop = vi.fn<(turnId: string, stop: unknown) => void>()
   const refreshSlug = vi
     .fn<(slug: string) => Promise<void>>()
     .mockResolvedValue(undefined)
@@ -141,6 +149,7 @@ const buildState = (): SendTestState => {
       resumeAgentTurn,
       finishAgentTurn,
       setAgentTurnError,
+      setAgentTurnStop,
       messages: ref([]),
       timeline: ref([]),
       pendingQuestion,

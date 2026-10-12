@@ -67,16 +67,39 @@ vi.mock('@/services/harness/subagent/registry', () => ({
   setTurnResponseMessages: vi.fn<() => void>(),
 }))
 
+const getPlanExecutionSession = vi.hoisted(() =>
+  vi.fn<() => { createdPlanThisTurn: boolean }>(() => ({
+    createdPlanThisTurn: false,
+  })),
+)
+
 vi.mock('@/services/harness/plan-execution-session', () => ({
-  getPlanExecutionSession: () => ({ createdPlanThisTurn: false }),
+  getPlanExecutionSession: () => getPlanExecutionSession(),
 }))
 
 vi.mock('@/services/models/to-cached-instructions', () => ({
   default: (system: string) => system,
 }))
 
+const persistTurnEnded = vi.hoisted(() =>
+  vi.fn<
+    (
+      projectSlug: string,
+      chatId: string,
+      turnId: string,
+      stop: { reason: string; detail?: string; finish?: string },
+    ) => Promise<void>
+  >(async () => undefined),
+)
+
 vi.mock('@/services/harness/orchestrator/persistence', () => ({
   persistLine: vi.fn<(...args: unknown[]) => Promise<void>>(),
+  persistTurnEnded: (
+    projectSlug: string,
+    chatId: string,
+    turnId: string,
+    stop: { reason: string; detail?: string; finish?: string },
+  ) => persistTurnEnded(projectSlug, chatId, turnId, stop),
 }))
 
 vi.mock('@/services/harness/orchestrator/prepare-compact-step', () => ({
@@ -87,6 +110,7 @@ vi.mock('vue-sonner', () => ({
   toast: { error: vi.fn<() => void>(), success: vi.fn<() => void>() },
 }))
 
+import { toast } from 'vue-sonner'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import consumeStream from '@/services/harness/orchestrator/consume-stream'
 import { persistLine } from '@/services/harness/orchestrator/persistence'
@@ -747,5 +771,141 @@ describe('consumeStream output-limit truncation', () => {
 
     await expect(consumeStream(prepared)).rejects.toThrow('provider exploded')
     expect(persistLine).not.toHaveBeenCalled()
+    expect(persistTurnEnded).not.toHaveBeenCalled()
+  })
+})
+
+const turnEndedEvents = (onEvent: ReturnType<typeof vi.fn>): unknown[] =>
+  onEvent.mock.calls
+    .map((call) => call[0])
+    .filter((event) => Boolean(event) && (event as { type?: string }).type === 'turn-ended')
+
+describe('consumeStream terminal stop', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    persistTurnEnded.mockResolvedValue(undefined)
+    getPlanExecutionSession.mockReturnValue({ createdPlanThisTurn: false })
+    const prepareStep = vi.fn<(options: { messages: unknown[] }) => Promise<unknown>>()
+    prepareParentCompactStep.mockReturnValue(prepareStep)
+  })
+
+  it('emits completed with the last finish reason', async () => {
+    mockPartsStream([
+      { type: 'start-step' },
+      { type: 'finish-step', finishReason: 'tool-calls', usage: { outputTokens: 4 } },
+      { type: 'start-step' },
+      { type: 'finish-step', finishReason: 'stop', usage: { outputTokens: 8 } },
+    ])
+    const prepared = makePrepared()
+
+    await consumeStream(prepared)
+
+    const stop = { reason: 'completed', finish: 'stop' }
+    expect(turnEndedEvents(prepared.onEvent)).toEqual([
+      { type: 'turn-ended', turnId: 'turn-1', stop },
+    ])
+    expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', stop)
+  })
+
+  it('emits completed with plan detail when this turn created a plan', async () => {
+    getPlanExecutionSession.mockReturnValue({ createdPlanThisTurn: true })
+    mockPartsStream([
+      { type: 'finish-step', finishReason: 'stop', usage: { outputTokens: 8 } },
+    ])
+    const prepared = makePrepared()
+
+    await consumeStream(prepared)
+
+    expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', {
+      reason: 'completed',
+      finish: 'stop',
+      detail: 'plan',
+    })
+  })
+
+  it('emits output-limit before throwing the truncation error', async () => {
+    mockPartsStream([
+      { type: 'start-step' },
+      { type: 'tool-input-start', id: 'call-1', toolName: 'create_plan' },
+      { type: 'finish-step', finishReason: 'length', usage: { outputTokens: 4096 } },
+    ])
+    const prepared = makePrepared()
+    prepared.callOptions.maxOutputTokens = 4096
+    prepared.steps.trailingText = 'partial answer'
+    const detail =
+      'The model reached its output limit (4096 tokens) before finishing. create_plan was cut off and did not run. Raise max output in model options or ask for a shorter response.'
+
+    await expect(consumeStream(prepared)).rejects.toThrow(detail)
+
+    const stop = { reason: 'output-limit', detail, finish: 'length' }
+    expect(turnEndedEvents(prepared.onEvent)).toEqual([
+      { type: 'turn-ended', turnId: 'turn-1', stop },
+    ])
+    expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', stop)
+    const assistantOrder = vi.mocked(persistLine).mock.invocationCallOrder[0] ?? 0
+    const stopOrder = persistTurnEnded.mock.invocationCallOrder[0] ?? 0
+    expect(assistantOrder).toBeGreaterThan(0)
+    expect(assistantOrder).toBeLessThan(stopOrder)
+  })
+
+  it('emits content-filter from the finish reason without throwing', async () => {
+    mockPartsStream([
+      { type: 'start-step' },
+      { type: 'text-delta', text: 'blocked' },
+      { type: 'finish-step', finishReason: 'content-filter', usage: { outputTokens: 3 } },
+    ])
+    const prepared = makePrepared()
+    ;(prepared.steps as { stepOpen: boolean }).stepOpen = true
+
+    await expect(consumeStream(prepared)).resolves.toBeUndefined()
+
+    const stop = { reason: 'content-filter', finish: 'content-filter' }
+    expect(turnEndedEvents(prepared.onEvent)).toEqual([
+      { type: 'turn-ended', turnId: 'turn-1', stop },
+    ])
+    expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', stop)
+  })
+
+  it('emits user-stop on abort and still emits turn-aborted', async () => {
+    const controller = new AbortController()
+    streamText.mockImplementation((config) => ({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        controller.abort()
+        await (config as { onAbort?: () => Promise<void> }).onAbort?.()
+      })(),
+      text: Promise.resolve(''),
+      responseMessages: Promise.resolve([]),
+      usage: Promise.resolve(undefined),
+    }))
+    const prepared = makePrepared()
+    ;(prepared as { signal: AbortSignal }).signal = controller.signal
+    ;(prepared.steps as { stepCount: number }).stepCount = 2
+
+    await consumeStream(prepared)
+
+    const stop = { reason: 'user-stop' }
+    expect(turnEndedEvents(prepared.onEvent)).toEqual([
+      { type: 'turn-ended', turnId: 'turn-1', stop },
+    ])
+    expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', stop)
+    expect(prepared.onEvent).toHaveBeenCalledWith({
+      type: 'turn-aborted',
+      reason: 'user-stop',
+      partialSteps: 2,
+    })
+  })
+
+  it('still finishes the stream when saving the turn end fails', async () => {
+    persistTurnEnded.mockRejectedValueOnce(new Error('disk full'))
+    mockPartsStream([
+      { type: 'finish-step', finishReason: 'stop', usage: { outputTokens: 1 } },
+    ])
+    const prepared = makePrepared()
+
+    await expect(consumeStream(prepared)).resolves.toBeUndefined()
+    expect(toast.error).toHaveBeenCalledWith('Failed to save turn end', {
+      description: 'disk full',
+    })
   })
 })

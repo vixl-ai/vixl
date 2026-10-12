@@ -1,5 +1,4 @@
 import { isLoopFinished, smoothStream, streamText } from 'ai'
-import { toast } from 'vue-sonner'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import { rejectPendingForChat } from '@/services/harness/permission/approval-gate'
 import { rejectPendingQuestionsForChat } from '@/services/harness/permission/question-gate'
@@ -7,20 +6,16 @@ import { rejectPendingMcpAuthForChat } from '@/services/mcp/mcp-auth-gate'
 import enrichToolError from '@/services/harness/enrich-tool-error'
 import { clearStagedImages } from '@/services/harness/image-stage'
 import { killShellsForChat } from '@/services/harness/shell/registry'
-import {
-  abortBlocking,
-  getTurnResponseMessages,
-  hasPendingBackgroundResume,
-  setTurnResponseMessages,
-} from '@/services/harness/subagent/registry'
+import { abortBlocking } from '@/services/harness/subagent/registry'
 import { getPlanExecutionSession } from '@/services/harness/plan-execution-session'
 import toCachedInstructions from '@/services/models/to-cached-instructions'
-import describeOutputLimitTruncation from './describe-output-limit-truncation'
+import type { AgentStop } from '@/types/chat/agent-stop'
 import emitContextUsage from './emit-context-usage'
 import extractPartialToolFields from './extract-partial-tool-fields'
 import { resolveStreamError, resolveToolErrorMessage } from './helpers'
 import persistAssistantLine from './persist-assistant-line'
 import prepareParentCompactStep from './prepare-compact-step'
+import { publishTurnEnded, settleConsumedStream } from './settle-consumed-stream'
 import prepareImageStep from './prepare-image-step'
 import repairToolCall from './repair-tool-call'
 import type { PreparedHarnessStream } from './prepare-stream'
@@ -47,6 +42,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
 
   let streamError: Error | null = null
   let hitOutputLimit = false
+  let lastFinishReason: string | undefined
   let lastStepHadTokens = false
   const toolInputBuffers = new Map<string, string>()
   const toolInputNames = new Map<string, string>()
@@ -82,6 +78,15 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
       ...(aborted ? { aborted: true } : {}),
     })
   }
+
+  const emitTurnEnded = (stop: AgentStop): Promise<void> =>
+    publishTurnEnded({
+      projectSlug: workspace.projectSlug,
+      chatId,
+      turnId: assistantId,
+      stop,
+      onEvent,
+    })
 
   const result = streamText({
     model,
@@ -132,6 +137,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
       abortBlocking(chatId)
       steps.sealReasoningDuration()
       await persistCollectedAssistant(true)
+      await emitTurnEnded({ reason: 'user-stop' })
       onEvent({
         type: 'turn-aborted',
         reason: 'user-stop',
@@ -151,6 +157,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     }
 
     if (part.type === 'finish-step') {
+      lastFinishReason = part.finishReason
       hitOutputLimit ||= part.finishReason === 'length'
       const usage = part.usage
       lastStepHadTokens = emitContextUsage(usage, modelId, onEvent)
@@ -263,62 +270,26 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     await steps.finishStep()
   }
 
-  if (!lastStepHadTokens && !signal.aborted && !streamError) {
-    try {
-      const totalUsage = await result.usage
-      if (emitContextUsage(totalUsage, modelId, onEvent)) {
-        await captureStepUsage(totalUsage)
-      }
-    } catch (error) {
-      toast.error('Failed to read model usage', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-      })
-    }
-  }
-
-  // Prefer text already streamed into steps. Only fall back to result.text when
-  // nothing was collected, and never re-emit it as a live delta (that duplicates
-  // step text in the timeline UI).
-  if (!steps.trailingText && !signal.aborted && !streamError) {
-    if (steps.collectedStepText.trim()) {
-      steps.trailingText = steps.collectedStepText
-    } else {
-      try {
-        const finalText = await result.text
-        if (finalText) {
-          steps.trailingText = finalText
-          onEvent({ type: 'text-delta', delta: finalText })
-        }
-      } catch (error) {
-        streamError = resolveStreamError(error)
-      }
-    }
-  }
-
-  if (
-    captureTurnMessages &&
-    hasPendingBackgroundResume(chatId) &&
-    !getTurnResponseMessages(chatId)
-  ) {
-    const responseMessages = await result.responseMessages
-    setTurnResponseMessages(chatId, responseMessages)
-  }
-
   try {
-    if (streamError && !signal.aborted) {
-      throw streamError
-    }
-
-    if (!signal.aborted) {
-      await persistCollectedAssistant()
-    }
-
-    if (hitOutputLimit && !signal.aborted) {
-      throw new Error(describeOutputLimitTruncation({
-        maxOutputTokens: callOptions.maxOutputTokens,
-        cutOffToolNames: toolInputNames.values(),
-      }))
-    }
+    await settleConsumedStream({
+      signal,
+      streamError,
+      result,
+      steps,
+      lastStepHadTokens,
+      modelId,
+      captureUsage: (usage) => captureStepUsage(usage),
+      onEvent,
+      captureTurnMessages,
+      chatId,
+      persistAssistant: () => persistCollectedAssistant(),
+      hitOutputLimit,
+      maxOutputTokens: callOptions.maxOutputTokens,
+      cutOffToolNames: toolInputNames.values(),
+      lastFinishReason,
+      projectSlug: workspace.projectSlug,
+      emitTurnEnded,
+    })
   } finally {
     clearStagedImages({ chatId, turnId: assistantId })
   }

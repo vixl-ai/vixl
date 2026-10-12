@@ -21,7 +21,9 @@ const resolveSpawnModel = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<string>>(),
 )
 const runSubagentGenerate = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<string>>(),
+  vi.fn<
+    (...args: unknown[]) => Promise<{ text: string; finishReason?: string }>
+  >(),
 )
 const linkAbortSignal = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 
@@ -40,11 +42,17 @@ vi.mock('@/services/harness/subagent/registry', () => ({
   resolve: (...args: unknown[]) => resolveSubagent(...args),
 }))
 
-vi.mock('@/services/harness/subagent/helpers', () => ({
-  emitSubagentResult: (...args: unknown[]) => emitSubagentResult(...args),
-  finishSubagentWithError: (...args: unknown[]) =>
-    finishSubagentWithError(...args),
-}))
+vi.mock('@/services/harness/subagent/helpers', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('@/services/harness/subagent/helpers')
+  >()
+  return {
+    ...actual,
+    emitSubagentResult: (...args: unknown[]) => emitSubagentResult(...args),
+    finishSubagentWithError: (...args: unknown[]) =>
+      finishSubagentWithError(...args),
+  }
+})
 
 vi.mock('@/services/harness/subagent/resolve-spawn-model', () => ({
   default: (...args: unknown[]) => resolveSpawnModel(...args),
@@ -99,7 +107,10 @@ describe('spawn_subagent parent abort link', () => {
     listAgentIndex.mockResolvedValue([])
     getPlanExecutionSession.mockReturnValue({ subagentModel: null })
     resolveSpawnModel.mockResolvedValue('anthropic::claude-sonnet-4')
-    runSubagentGenerate.mockResolvedValue('ok summary')
+    runSubagentGenerate.mockResolvedValue({
+      text: 'ok summary',
+      finishReason: 'stop',
+    })
   })
 
   it('links blocking subagents to the parent turn signal', async () => {

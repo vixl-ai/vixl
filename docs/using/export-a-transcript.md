@@ -12,10 +12,12 @@ Vixl builds a plain-text dump of the current timeline and opens a native save di
 Turns are labeled:
 
 - `USER`
-- `ASSISTANT` (reasoning, text, tool runs, trailing text, errors)
+- `ASSISTANT` (reasoning, text, tool runs, trailing text). A finished turn ends with `stopped: <reason>`, plus an optional detail.
 - `TODO` (in-chat task list)
-- `SUBAGENT` (name, status, prompt, nested tools, steers, summary)
+- `SUBAGENT` (name, status, prompt, nested tools, steers, summary). A finished sub-agent ends with `stopped: <reason>` after `summary:` when that line is present, plus an optional detail.
 - `COMPACTION` (summary, optional focus)
+
+Reasons are `completed`, `output-limit`, `content-filter`, `user-stop`, `timeout`, `error`, `failed`, `aborted`, `compaction`, and `incomplete`. A run still in progress, and an older chat saved before this feature, has no line.
 
 An empty thread exports `(empty conversation)`.
 

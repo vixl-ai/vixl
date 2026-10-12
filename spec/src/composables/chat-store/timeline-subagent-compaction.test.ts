@@ -5,6 +5,7 @@ import {
   appendSubagentToolEvent,
   clearQueuedSubagentSteers,
   completeSubagentTimelineItem,
+  finalizeHydratedSubagents,
   queueSubagentSteer,
   rollbackQueuedSubagentSteer,
   upsertSubagentStart,
@@ -404,5 +405,80 @@ describe('upsertSubagentStart existing item', () => {
     }
     expect(item.status).toBe('running')
     expect(item.summary).toBe('first pass')
+  })
+})
+
+describe('finalizeHydratedSubagents stop', () => {
+  it('stamps incomplete only when a running subagent has no stop', () => {
+    const running = started()
+    const withStop = completeSubagentTimelineItem(
+      started(),
+      'sub-1',
+      'still open',
+      'done',
+      { reason: 'completed', finish: 'stop' },
+    )
+    const reopened = withStop.map((item) =>
+      item.type === 'subagent' ? { ...item, status: 'running' as const } : item,
+    )
+    const done = completeSubagentTimelineItem(started(), 'sub-1', 'finished', 'done')
+
+    const finalized = finalizeHydratedSubagents([...running, ...reopened, ...done])
+
+    const incomplete = finalized[0]
+    const kept = finalized[1]
+    const untouched = finalized[2]
+    expect(incomplete?.type).toBe('subagent')
+    expect(kept?.type).toBe('subagent')
+    expect(untouched?.type).toBe('subagent')
+    if (
+      incomplete?.type !== 'subagent' ||
+      kept?.type !== 'subagent' ||
+      untouched?.type !== 'subagent'
+    ) {
+      return
+    }
+    expect(incomplete.status).toBe('error')
+    expect(incomplete.stop).toEqual({ reason: 'incomplete' })
+    expect(kept.status).toBe('error')
+    expect(kept.stop).toEqual({ reason: 'completed', finish: 'stop' })
+    expect(untouched.status).toBe('done')
+    expect(untouched.stop).toBeUndefined()
+  })
+})
+
+describe('completeSubagentTimelineItem stop', () => {
+  it('does not regress an existing stop on a later result', () => {
+    const first = completeSubagentTimelineItem(started(), 'sub-1', 'found it', 'done', {
+      reason: 'completed',
+      finish: 'stop',
+    })
+    const stopped = completeSubagentTimelineItem(first, 'sub-1', 'Stopped', 'stopped')
+    const replaced = completeSubagentTimelineItem(stopped, 'sub-1', 'failed later', 'error', {
+      reason: 'error',
+      detail: 'boom',
+    })
+    const item = replaced[0]
+    expect(item?.type).toBe('subagent')
+    if (item?.type !== 'subagent') {
+      return
+    }
+    expect(item.status).toBe('error')
+    expect(item.summary).toBe('failed later')
+    expect(item.stop).toEqual({ reason: 'completed', finish: 'stop' })
+  })
+
+  it('sets stop when the item does not have one yet', () => {
+    const bare = completeSubagentTimelineItem(started(), 'sub-1', 'found it', 'done')
+    const stamped = completeSubagentTimelineItem(bare, 'sub-1', 'found it', 'done', {
+      reason: 'completed',
+      finish: 'tool-calls',
+    })
+    const item = stamped[0]
+    expect(item?.type).toBe('subagent')
+    if (item?.type !== 'subagent') {
+      return
+    }
+    expect(item.stop).toEqual({ reason: 'completed', finish: 'tool-calls' })
   })
 })

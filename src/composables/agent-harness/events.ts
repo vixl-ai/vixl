@@ -183,7 +183,12 @@ export default (
           ? { ...item, status: resultStatus, summary: event.summary }
           : item,
       )
-      session.completeLocalSubagent(event.subagentId, event.summary, resultStatus)
+      session.completeLocalSubagent(
+        event.subagentId,
+        event.summary,
+        resultStatus,
+        event.stop,
+      )
       deps.maybeFlushBackgroundSubagentResume()
     }
     if (event.type === 'question-request') {
@@ -252,8 +257,12 @@ export default (
       compacting.value = false
     }
     if (event.type === 'compaction') {
-      session.appendLocalCompaction(event.summary, event.focus)
+      const saved = session.appendLocalCompaction(event.summary, event.focus)
       compacting.value = false
+      return saved
+    }
+    if (event.type === 'turn-ended') {
+      session.setAgentTurnStop(event.turnId, event.stop)
     }
     if (event.type === 'turn-aborted') {
       status.value = 'ready'

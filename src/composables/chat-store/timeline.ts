@@ -1,3 +1,4 @@
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { ChatTimelineItem, SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { TodoItem, HarnessEvent } from '@/types/harness/harness-event'
 import applySubagentToolEvent from '@/utils/apply-subagent-tool-event'
@@ -71,6 +72,7 @@ export const completeSubagentTimelineItem = (
   subagentId: string,
   summary: string,
   status: Exclude<SubagentTimelineItem['status'], 'running'> = 'done',
+  stop?: AgentStop,
 ): ChatTimelineItem[] => {
   const index = items.findIndex(
     (item) => item.type === 'subagent' && item.subagentId === subagentId,
@@ -86,6 +88,7 @@ export const completeSubagentTimelineItem = (
         compacting: false,
         compactions: existing.compactions ?? [],
         tools: closeIncompleteSubagentTools(existing.tools),
+        ...((existing.stop ?? stop) ? { stop: existing.stop ?? stop } : {}),
       }
     }
     return next
@@ -102,6 +105,7 @@ export const completeSubagentTimelineItem = (
       tools: [],
       compacting: false,
       compactions: [],
+      ...(stop ? { stop } : {}),
     },
   ]
 }
@@ -118,6 +122,7 @@ export const finalizeHydratedSubagents = (
       status: 'error',
       compacting: false,
       tools: closeIncompleteSubagentTools(item.tools),
+      ...(item.stop ? {} : { stop: { reason: 'incomplete' as const } }),
     }
   })
 

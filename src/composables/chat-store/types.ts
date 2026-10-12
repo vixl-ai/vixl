@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai'
 import type { ComputedRef, Ref } from 'vue'
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { AgentTurnError } from '@/types/chat/agent-turn-error'
 import type { ChatMeta } from '@/types/chat/chat-meta'
@@ -50,6 +51,7 @@ export type SessionMutations = {
   flushPendingStreamDeltas: () => void
   disposePendingStreamDeltas: () => void
   setAgentTurnError: (turnError: AgentTurnError) => void
+  setAgentTurnStop: (turnId: string, stop: AgentStop) => void
   appendLocalTodoUpdate: (todos: TodoItem[]) => void
   upsertLocalSubagentStart: (subagent: {
     subagentId: string
@@ -72,6 +74,7 @@ export type SessionMutations = {
     subagentId: string,
     summary: string,
     status?: Exclude<SubagentTimelineItem['status'], 'running'>,
+    stop?: AgentStop,
   ) => void
   getSubagent: (subagentId: string) => SubagentTimelineItem | null
   setPendingQuestion: (question: PendingQuestionState) => void
@@ -93,7 +96,8 @@ export type SessionMutations = {
   ) => Promise<void>
   getLastUserMessage: () => UIMessage | null
   getContinuableTurn: () => AgentTurn | null
-  appendLocalCompaction: (summary: string, focus: string | null) => void
+  appendLocalCompaction: (summary: string, focus: string | null) => Promise<void>
+  turnIdRemap: Map<string, string>
   patchMetaActiveContext: (activeContext: {
     checkpointLineId: string
     includeFromCreatedAt: string

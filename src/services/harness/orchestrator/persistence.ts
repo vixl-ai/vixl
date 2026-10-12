@@ -1,3 +1,4 @@
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type { HarnessEvent, TodoItem } from '@/types/harness/harness-event'
@@ -75,6 +76,25 @@ export const persistTodoUpdate = async (
     harnessEvent: {
       type: 'todo-update',
       todos,
+    },
+  })
+}
+
+export const persistTurnEnded = async (
+  projectSlug: string,
+  chatId: string,
+  turnId: string,
+  stop: AgentStop,
+): Promise<void> => {
+  await persistLine(projectSlug, chatId, {
+    id: `${turnId}-ended`,
+    role: 'assistant',
+    parts: [],
+    createdAt: nowIso(),
+    harnessEvent: {
+      type: 'turn-ended',
+      turnId,
+      stop,
     },
   })
 }

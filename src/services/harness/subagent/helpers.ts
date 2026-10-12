@@ -3,11 +3,27 @@ import {
   fail as failSubagent,
   getSubagent,
 } from '@/services/harness/subagent/registry'
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 export const sanitizeSubagentName = (name: string): string => {
   const cleaned = name.trim().replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')
   return cleaned.slice(0, 64) || 'subagent'
+}
+
+export const subagentStopForFinish = (
+  finishReason: string | undefined,
+): AgentStop => {
+  if (finishReason === 'length') {
+    return { reason: 'output-limit', finish: 'length' }
+  }
+  if (finishReason === 'content-filter') {
+    return { reason: 'content-filter', finish: 'content-filter' }
+  }
+  if (finishReason) {
+    return { reason: 'completed', finish: finishReason }
+  }
+  return { reason: 'completed' }
 }
 
 export const emitSubagentResult = (
@@ -17,6 +33,7 @@ export const emitSubagentResult = (
     summary: string
     blocking: boolean
     outcome: 'completed' | 'failed' | 'aborted'
+    stop?: AgentStop
   },
 ): void => {
   ctx.onHarnessEvent?.({
@@ -25,6 +42,7 @@ export const emitSubagentResult = (
     summary: args.summary,
     blocking: args.blocking,
     outcome: args.outcome,
+    ...(args.stop ? { stop: args.stop } : {}),
   })
 }
 
@@ -51,6 +69,7 @@ export const finishSubagentWithError = (
       summary: stopped?.result?.summary ?? 'Stopped',
       blocking: args.blocking,
       outcome: 'aborted',
+      stop: { reason: 'aborted' },
     })
     return
   }
@@ -61,5 +80,6 @@ export const finishSubagentWithError = (
     summary: message,
     blocking: args.blocking,
     outcome: 'failed',
+    stop: { reason: 'failed', detail: message },
   })
 }

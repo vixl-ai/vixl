@@ -1,4 +1,5 @@
 import type { UIMessage } from 'ai'
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type {
   ChatTimelineItem,
@@ -122,11 +123,13 @@ const completeSubagentInList = (
   subagentId: string,
   summary: string,
   status: Exclude<SubagentTimelineItem['status'], 'running'>,
+  stop?: AgentStop,
 ): void => {
   const index = indexMap.get(subagentId)
   if (index !== undefined) {
     const existing = items[index]
     if (existing?.type === 'subagent') {
+      const resolvedStop = stop ?? existing.stop
       items[index] = {
         ...existing,
         status,
@@ -134,6 +137,7 @@ const completeSubagentInList = (
         compacting: false,
         compactions: existing.compactions ?? [],
         tools: closeIncompleteSubagentTools(existing.tools),
+        ...(resolvedStop ? { stop: resolvedStop } : {}),
       }
     }
     return
@@ -149,6 +153,7 @@ const completeSubagentInList = (
     tools: [],
     compacting: false,
     compactions: [],
+    ...(stop ? { stop } : {}),
   })
 }
 
@@ -162,9 +167,17 @@ const completeSubagent = (
   subagentId: string,
   summary: string,
   status: Exclude<SubagentTimelineItem['status'], 'running'>,
+  stop?: AgentStop,
 ): void => {
   const target = locatedSubagent(acc, subagentId)
-  completeSubagentInList(target.items, target.indexMap, subagentId, summary, status)
+  completeSubagentInList(
+    target.items,
+    target.indexMap,
+    subagentId,
+    summary,
+    status,
+    stop,
+  )
 }
 
 const appendSubagentEvent = (

@@ -1,4 +1,5 @@
 import type { UIMessage } from 'ai'
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { AgentTurnError } from '@/types/chat/agent-turn-error'
 import type { ChatMeta } from '@/types/chat/chat-meta'
@@ -111,6 +112,12 @@ const createActiveSessionFacade = () => {
     })
   }
 
+  const setAgentTurnStop = (turnId: string, stop: AgentStop): void => {
+    withActiveSession(undefined, (_session, api) => {
+      api.setAgentTurnStop(turnId, stop)
+    })
+  }
+
   const appendLocalTodoUpdate = (todosValue: TodoItem[]): void => {
     withActiveSession(undefined, (_session, api) => {
       api.appendLocalTodoUpdate(todosValue)
@@ -171,9 +178,10 @@ const createActiveSessionFacade = () => {
     subagentId: string,
     summary: string,
     status?: Exclude<SubagentTimelineItem['status'], 'running'>,
+    stop?: AgentStop,
   ): void => {
     withActiveSession(undefined, (_session, api) => {
-      api.completeLocalSubagent(subagentId, summary, status)
+      api.completeLocalSubagent(subagentId, summary, status, stop)
     })
   }
 
@@ -269,11 +277,13 @@ const createActiveSessionFacade = () => {
   const getContinuableTurn = (): AgentTurn | null =>
     withActiveSession(null, (_session, api) => api.getContinuableTurn())
 
-  const appendLocalCompaction = (summary: string, focus: string | null): void => {
-    withActiveSession(undefined, (_session, api) => {
-      api.appendLocalCompaction(summary, focus)
-    })
-  }
+  const appendLocalCompaction = (
+    summary: string,
+    focus: string | null,
+  ): Promise<void> =>
+    withActiveSession(Promise.resolve(), (_session, api) =>
+      api.appendLocalCompaction(summary, focus),
+    )
 
   const patchMetaActiveContext = (activeContext: {
     checkpointLineId: string
@@ -301,6 +311,7 @@ const createActiveSessionFacade = () => {
     flushPendingStreamDeltas,
     disposePendingStreamDeltas,
     setAgentTurnError,
+    setAgentTurnStop,
     appendLocalTodoUpdate,
     upsertLocalSubagentStart,
     appendLocalSubagentToolEvent,

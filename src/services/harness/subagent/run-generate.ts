@@ -52,6 +52,11 @@ const SUBAGENT_READ_ONLY_CONSTRAINT =
 const formatSubagentUserPrompt = (safeName: string, prompt: string): string =>
   `Subagent label: ${safeName}\n\nUntrusted task:\n${prompt}`
 
+export type SubagentGenerateResult = {
+  text: string
+  finishReason?: string
+}
+
 const runSubagentGenerate = async (args: {
   ctx: HarnessToolContext
   subagentId: string
@@ -62,7 +67,7 @@ const runSubagentGenerate = async (args: {
   model: string
   capabilities: 'read-only' | 'write'
   messages?: ModelMessage[]
-}): Promise<string> => {
+}): Promise<SubagentGenerateResult> => {
   const { ctx, subagentId, agentName, prompt, toolCallId, signal, model: serializedModel } =
     args
 
@@ -252,17 +257,23 @@ const runSubagentGenerate = async (args: {
     historyAfterGenerate(subagentId, inputMessages, result),
   )
 
-  if (result.finishReason !== 'length') {
-    return result.text
+  const finishReason = result.finishReason
+  const withFinish = (text: string): SubagentGenerateResult => ({
+    text,
+    ...(finishReason ? { finishReason } : {}),
+  })
+
+  if (finishReason !== 'length') {
+    return withFinish(result.text)
   }
 
   const notice = `[${describeOutputLimitTruncation({
     maxOutputTokens: callOptions.maxOutputTokens,
   })}]`
   if (!result.text.trim()) {
-    return notice
+    return withFinish(notice)
   }
-  return `${result.text}\n\n${notice}`
+  return withFinish(`${result.text}\n\n${notice}`)
 }
 
 export default runSubagentGenerate

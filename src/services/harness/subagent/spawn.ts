@@ -9,6 +9,7 @@ import {
 import {
   emitSubagentResult,
   finishSubagentWithError,
+  subagentStopForFinish,
 } from '@/services/harness/subagent/helpers'
 import resolveSpawnModel from '@/services/harness/subagent/resolve-spawn-model'
 import runSubagentGenerate from '@/services/harness/subagent/run-generate'
@@ -122,7 +123,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
 
         const completeSubagent = async (): Promise<void> => {
           try {
-            const summary = await runSubagentGenerate({
+            const generated = await runSubagentGenerate({
               ctx,
               subagentId,
               agentName,
@@ -136,13 +137,14 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
             resolveSubagent(subagentId, {
               subagentId,
               name: agentName,
-              summary,
+              summary: generated.text,
             })
             emitSubagentResult(ctx, {
               subagentId,
-              summary,
+              summary: generated.text,
               blocking: false,
               outcome: 'completed',
+              stop: subagentStopForFinish(generated.finishReason),
             })
           } catch (error) {
             finishSubagentWithError(ctx, {
@@ -172,7 +174,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
       }
 
       try {
-        const summary = await runSubagentGenerate({
+        const generated = await runSubagentGenerate({
           ctx,
           subagentId,
           agentName,
@@ -186,16 +188,17 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         resolveSubagent(subagentId, {
           subagentId,
           name: agentName,
-          summary,
+          summary: generated.text,
         })
         emitSubagentResult(ctx, {
           subagentId,
-          summary,
+          summary: generated.text,
           blocking: true,
           outcome: 'completed',
+          stop: subagentStopForFinish(generated.finishReason),
         })
 
-        return { subagentId, name: agentName, summary }
+        return { subagentId, name: agentName, summary: generated.text }
       } catch (error) {
         finishSubagentWithError(ctx, {
           subagentId,

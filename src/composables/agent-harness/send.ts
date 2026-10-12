@@ -299,6 +299,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         suppressQueueDrainAfterStop,
         resumeInFlight: resumingBackgroundBatch,
         projectSlug: options.projectSlug,
+        chatId: options.chatId,
         refreshSlug: (slug) => fleetSidebar.refreshSlug(slug),
         applyTurnEndAttention: (outcome) => {
           attention.applyTurnEndAttention(outcome)

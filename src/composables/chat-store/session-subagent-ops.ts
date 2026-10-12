@@ -1,3 +1,4 @@
+import type { AgentStop } from '@/types/chat/agent-stop'
 import type { SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import {
@@ -76,12 +77,14 @@ export default (session: ChatSession): Pick<
     subagentId: string,
     summary: string,
     status: Exclude<SubagentTimelineItem['status'], 'running'> = 'done',
+    stop?: AgentStop,
   ): void => {
     session.timeline.value = completeSubagentTimelineItem(
       session.timeline.value,
       subagentId,
       summary,
       status,
+      stop,
     )
   },
   getSubagent: (subagentId: string): SubagentTimelineItem | null => {

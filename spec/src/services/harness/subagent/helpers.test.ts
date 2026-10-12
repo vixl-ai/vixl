@@ -85,16 +85,65 @@ describe('finishSubagentWithError', () => {
     const controller = new AbortController()
     registerBackground(controller)
     controller.abort()
+    const events: unknown[] = []
 
-    finishSubagentWithError(ctx(), {
-      subagentId: 'sub-1',
-      error: new Error('generate failed'),
-      blocking: false,
-      aborted: controller.signal.aborted,
-    })
+    finishSubagentWithError(
+      {
+        ...ctx(),
+        onHarnessEvent: (event) => {
+          events.push(event)
+        },
+      },
+      {
+        subagentId: 'sub-1',
+        error: new Error('generate failed'),
+        blocking: false,
+        aborted: controller.signal.aborted,
+      },
+    )
 
     expect(getSubagent('sub-1')?.status).toBe('aborted')
     expect(getSubagent('sub-1')?.result?.summary).toBe('Stopped')
     expect(listDeliverableBackgroundResults('chat-1')).toEqual([])
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'subagent-result',
+        outcome: 'aborted',
+        summary: 'Stopped',
+        stop: { reason: 'aborted' },
+      }),
+    ])
+  })
+
+  it('emits a failed stop with the error message', () => {
+    const controller = new AbortController()
+    registerBackground(controller)
+    const events: unknown[] = []
+
+    finishSubagentWithError(
+      {
+        ...ctx(),
+        onHarnessEvent: (event) => {
+          events.push(event)
+        },
+      },
+      {
+        subagentId: 'sub-1',
+        error: new Error('generate failed'),
+        blocking: true,
+        aborted: false,
+      },
+    )
+
+    expect(getSubagent('sub-1')?.status).toBe('failed')
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'subagent-result',
+        outcome: 'failed',
+        summary: 'generate failed',
+        blocking: true,
+        stop: { reason: 'failed', detail: 'generate failed' },
+      }),
+    ])
   })
 })
