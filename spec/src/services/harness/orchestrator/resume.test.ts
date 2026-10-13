@@ -53,12 +53,15 @@ vi.mock('@/services/harness/orchestrator/stream', () => ({
 }))
 
 import { persistToolRun } from '@/services/harness/orchestrator/persistence'
+import { finalizeBackgroundSpawnResults } from '@/services/harness/orchestrator/finalize-background-spawns'
 import resumeOrchestrator from '@/services/harness/orchestrator/resume'
+import { isBackgroundResultDelivered } from '@/services/harness/subagent/background-result-sets'
 import {
   abortOne,
   fail,
   getTurnResponseMessages,
   hasPendingBackgroundResume,
+  isBackgroundResultFinalized,
   listDeliverableBackgroundResults,
   register,
   reopen,
@@ -370,7 +373,16 @@ describe('resumeOrchestrator background waves', () => {
       summary: 'mapped the repo',
     })
 
-    expect(listDeliverableBackgroundResults('chat-1')).toEqual([])
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual([
+      {
+        toolCallId: 'tc-1',
+        result: {
+          subagentId: 'sub-1',
+          name: 'explorer',
+          summary: 'mapped the repo',
+        },
+      },
+    ])
     expect(getTurnResponseMessages('chat-1')).toEqual(wave2Messages)
 
     resolve('sub-2', {
@@ -728,5 +740,216 @@ describe('resumeOrchestrator background waves', () => {
         summary: 'mapped the repo',
       },
     )
+  })
+
+  it('finalizes a steered result after a stale user-turn snapshot is skipped', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    fail('sub-1', 'explorer timed out')
+    const snapshot = listDeliverableBackgroundResults('chat-1')
+    const stale = snapshot[0]
+    if (!stale) {
+      throw new Error('expected a deliverable failed result')
+    }
+
+    expect(reopen('sub-1', new AbortController())?.status).toBe('running')
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'steered rewrite',
+    })
+    const steered = listDeliverableBackgroundResults('chat-1')
+    const steeredItem = steered[0]
+    if (!steeredItem) {
+      throw new Error('expected a deliverable steered result')
+    }
+
+    const priorOnEvent = vi.fn<() => void>()
+    await finalizeBackgroundSpawnResults(
+      'proj',
+      'chat-1',
+      snapshot,
+      priorOnEvent,
+      null,
+    )
+    expect(priorOnEvent).not.toHaveBeenCalled()
+    expect(persistToolRun).not.toHaveBeenCalled()
+    expect(isBackgroundResultFinalized('chat-1', 'tc-1')).toBe(false)
+
+    const input = buildInput(steered)
+    await resumeOrchestrator(input)
+
+    expect(input.onEvent).toHaveBeenCalledWith({
+      type: 'tool-result',
+      toolCallId: 'tc-1',
+      result: steeredItem.result,
+      isError: false,
+    })
+    expect(persistToolRun).toHaveBeenCalledTimes(1)
+    expect(persistToolRun).toHaveBeenCalledWith(
+      'proj',
+      'chat-1',
+      'tc-1',
+      'spawn_subagent',
+      'done',
+      '',
+      {
+        agentName: 'explorer',
+        blocking: false,
+      },
+      steeredItem.result,
+    )
+    expect(isBackgroundResultFinalized('chat-1', 'tc-1')).toBe(true)
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: string
+    }>
+    const wakeNudge = modelMessages[modelMessages.length - 1]
+    expect(wakeNudge?.content).toContain(
+      '- explorer (sub-1, completed): steered rewrite',
+    )
+  })
+
+  it('does not mark a steered snapshot delivered on resume', async () => {
+    register('chat-1', 'sub-stale', new AbortController(), {
+      toolCallId: 'tc-stale',
+      agentName: 'explorer',
+    })
+    register('chat-1', 'sub-live', new AbortController(), {
+      toolCallId: 'tc-live',
+      agentName: 'writer',
+    })
+    fail('sub-stale', 'explorer timed out')
+    resolve('sub-live', {
+      subagentId: 'sub-live',
+      name: 'writer',
+      summary: 'drafted the patch',
+    })
+    const snapshot = listDeliverableBackgroundResults('chat-1')
+    const stale = snapshot.find((item) => item.toolCallId === 'tc-stale')
+    const live = snapshot.find((item) => item.toolCallId === 'tc-live')
+    if (!stale || !live) {
+      throw new Error('expected both deliverable results')
+    }
+
+    expect(reopen('sub-stale', new AbortController())?.status).toBe('running')
+    resolve('sub-stale', {
+      subagentId: 'sub-stale',
+      name: 'explorer',
+      summary: 'steered rewrite',
+    })
+
+    await resumeOrchestrator(buildInput([stale, live]))
+
+    expect(isBackgroundResultDelivered('chat-1', 'tc-stale')).toBe(false)
+    expect(isBackgroundResultDelivered('chat-1', 'tc-live')).toBe(true)
+    expect(isBackgroundResultFinalized('chat-1', 'tc-stale')).toBe(false)
+    expect(isBackgroundResultFinalized('chat-1', 'tc-live')).toBe(true)
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual([
+      {
+        toolCallId: 'tc-stale',
+        result: {
+          subagentId: 'sub-stale',
+          name: 'explorer',
+          summary: 'steered rewrite',
+        },
+      },
+    ])
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: string
+    }>
+    const wakeNudge = modelMessages[modelMessages.length - 1]
+    expect(wakeNudge?.content).toContain(
+      '- writer (sub-live, completed): drafted the patch',
+    )
+    expect(wakeNudge?.content).not.toContain('explorer timed out')
+    expect(wakeNudge?.content).not.toContain('steered rewrite')
+  })
+
+  it('omits the wake nudge when every resume snapshot was steered away', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    fail('sub-1', 'explorer timed out')
+    const snapshot = listDeliverableBackgroundResults('chat-1')
+    const stale = snapshot[0]
+    if (!stale) {
+      throw new Error('expected a deliverable failed result')
+    }
+
+    expect(reopen('sub-1', new AbortController())?.status).toBe('running')
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'steered rewrite',
+    })
+
+    await resumeOrchestrator(buildInput(snapshot))
+
+    expect(isBackgroundResultDelivered('chat-1', 'tc-1')).toBe(false)
+    expect(isBackgroundResultFinalized('chat-1', 'tc-1')).toBe(false)
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: unknown
+    }>
+    expect(
+      modelMessages.some(
+        (message) =>
+          typeof message.content === 'string' &&
+          message.content.includes('[harness: background subagent results]'),
+      ),
+    ).toBe(false)
+  })
+
+  it('does not re-emit spawn results already finalized on a failed user turn', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    const completedResults = listDeliverableBackgroundResults('chat-1')
+    const priorOnEvent = vi.fn<() => void>()
+
+    await finalizeBackgroundSpawnResults(
+      'proj',
+      'chat-1',
+      completedResults,
+      priorOnEvent,
+      null,
+    )
+    expect(persistToolRun).toHaveBeenCalledTimes(1)
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual(completedResults)
+
+    const input = buildInput(completedResults)
+    await resumeOrchestrator(input)
+
+    expect(priorOnEvent).toHaveBeenCalledTimes(1)
+    expect(input.onEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool-result',
+        toolCallId: 'tc-1',
+      }),
+    )
+    expect(persistToolRun).toHaveBeenCalledTimes(1)
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual([])
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: string
+    }>
+    const wakeNudge = modelMessages[modelMessages.length - 1]
+    expect(wakeNudge?.content).toContain('- explorer (sub-1, completed): mapped the repo')
   })
 })

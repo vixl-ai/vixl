@@ -1,7 +1,18 @@
 import type { ModelMessage } from 'ai'
 import { ref } from 'vue'
 import type { SubagentRecord, SubagentResult, SubagentStatus } from '@/types/harness/subagent-record'
+import {
+  forgetBackgroundResultTracking,
+  isBackgroundResultDelivered,
+  resetBackgroundResultSetsForTests,
+} from '@/services/harness/subagent/background-result-sets'
 import { clearSteers, resetInboxForTests } from '@/services/harness/subagent/inbox'
+
+export {
+  isBackgroundResultFinalized,
+  markBackgroundResultsDelivered,
+  markBackgroundResultsFinalized,
+} from '@/services/harness/subagent/background-result-sets'
 
 type CompletionWaiter = (result: SubagentResult) => void
 
@@ -11,8 +22,8 @@ const controllers = new Map<string, AbortController>()
 const completionWaiters = new Map<string, CompletionWaiter[]>()
 const turnResponseMessages = new Map<string, ModelMessage[]>()
 const pendingBackgroundResume = new Set<string>()
-const deliveredBackgroundResults = new Map<string, Set<string>>()
 const blockingSubagents = new Set<string>()
+const backgroundSubagents = new Set<string>()
 
 export const subagentRegistryRevision = ref(0)
 
@@ -76,6 +87,7 @@ export const register = (
   // pendingResume: false at register marks a blocking subagent.
   if (options?.pendingResume !== false) {
     pendingBackgroundResume.add(chatId)
+    backgroundSubagents.add(subagentId)
   } else {
     blockingSubagents.add(subagentId)
   }
@@ -157,6 +169,9 @@ export const isRunningBackgroundSubagent = (subagentId: string): boolean =>
 export const getRunningSubagentForChat = (chatId: string): SubagentRecord | null =>
   listSubagentsForChat(chatId).find((record) => record.status === 'running') ?? null
 
+export const isBackgroundSubagent = (subagentId: string): boolean =>
+  backgroundSubagents.has(subagentId)
+
 export const hasPendingBackgroundResume = (chatId: string): boolean =>
   pendingBackgroundResume.has(chatId)
 
@@ -170,31 +185,17 @@ export const clearPendingBackgroundResume = (chatId: string): void => {
 export const listDeliverableBackgroundResults = (
   chatId: string,
 ): Array<{ toolCallId: string; result: SubagentResult }> => {
-  const delivered = deliveredBackgroundResults.get(chatId)
   return listSubagentsForChat(chatId).flatMap((record) => {
     if (
+      !isBackgroundSubagent(record.subagentId) ||
       (record.status !== 'completed' && record.status !== 'failed') ||
       !record.result ||
-      delivered?.has(record.toolCallId)
+      isBackgroundResultDelivered(chatId, record.toolCallId)
     ) {
       return []
     }
     return [{ toolCallId: record.toolCallId, result: record.result }]
   })
-}
-
-export const markBackgroundResultsDelivered = (
-  chatId: string,
-  toolCallIds: string[],
-): void => {
-  if (toolCallIds.length === 0) {
-    return
-  }
-  const existing = deliveredBackgroundResults.get(chatId) ?? new Set<string>()
-  for (const toolCallId of toolCallIds) {
-    existing.add(toolCallId)
-  }
-  deliveredBackgroundResults.set(chatId, existing)
 }
 
 export const setTurnResponseMessages = (chatId: string, messages: ModelMessage[]): void => {
@@ -236,7 +237,7 @@ export const reopen = (
     return null
   }
 
-  deliveredBackgroundResults.get(record.chatId)?.delete(record.toolCallId)
+  forgetBackgroundResultTracking(record.chatId, record.toolCallId)
   pendingBackgroundResume.add(record.chatId)
   record.status = 'running'
   record.result = undefined
@@ -300,12 +301,13 @@ export const abort = (chatId: string): void => {
 
   for (const subagentId of ids) {
     abortRunning(subagentId, 'Subagent aborted')
+    backgroundSubagents.delete(subagentId)
   }
 
   chatSubagents.delete(chatId)
   turnResponseMessages.delete(chatId)
   pendingBackgroundResume.delete(chatId)
-  deliveredBackgroundResults.delete(chatId)
+  forgetBackgroundResultTracking(chatId)
   bumpRevision()
 }
 
@@ -316,8 +318,9 @@ export const resetSubagentRegistryForTests = (): void => {
   completionWaiters.clear()
   turnResponseMessages.clear()
   pendingBackgroundResume.clear()
-  deliveredBackgroundResults.clear()
+  resetBackgroundResultSetsForTests()
   blockingSubagents.clear()
+  backgroundSubagents.clear()
   resetInboxForTests()
   bumpRevision()
 }

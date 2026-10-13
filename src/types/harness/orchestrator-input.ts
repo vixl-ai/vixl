@@ -37,6 +37,9 @@ export type OrchestratorInput = {
   ) => Promise<void>
   sessionAllows: Set<string>
   sessionDenies: Set<string>
+  // Finished, undelivered background results snapped before a user-turn flush.
+  // The user turn includes them via the same wake nudge as resumeOrchestrator.
+  prefinishedBackgroundResults?: Array<{ toolCallId: string; result: SubagentResult }>
 }
 
 export type ResumeOrchestratorInput = Omit<

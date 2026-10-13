@@ -6,9 +6,15 @@ import createModel from '@/services/providers/create-model'
 import { readChatMeta } from '@/services/vixl/vixl-tauri'
 import filterMessagesForActiveContext from '@/services/context/filter-messages-for-active-context'
 import runSideTask from '@/services/harness/run-side-task'
+import {
+  getTurnResponseMessages,
+  listSubagentsForChat,
+} from '@/services/harness/subagent/registry'
 import { isDefaultChatTitle } from '@/utils/derive-chat-title'
 import resolveModelVision from '@/services/harness/resolve-model-vision'
 import prepareMessagesForModelVision from '@/utils/prepare-messages-for-model-vision'
+import buildWakeNudge from './build-wake-nudge'
+import { finalizeBackgroundSpawnResults } from './finalize-background-spawns'
 import { nowIso } from './helpers'
 import { persistLine } from './persistence'
 import resolveLiveWorkspace from './resolve-workspace'
@@ -23,6 +29,7 @@ export default async (input: OrchestratorInput): Promise<void> => {
     appendedUserMessageId,
     skipUserPersist = false,
     assistantId: inputAssistantId,
+    prefinishedBackgroundResults,
     ...streamInput
   } = input
 
@@ -137,13 +144,51 @@ export default async (input: OrchestratorInput): Promise<void> => {
       ]
     : recentModelMessages
 
+  let modelMessages = effectiveModelMessages
+  if (prefinishedBackgroundResults && prefinishedBackgroundResults.length > 0) {
+    const finalizedResults = await finalizeBackgroundSpawnResults(
+      workspace.projectSlug,
+      chatId,
+      prefinishedBackgroundResults,
+      input.onEvent,
+      getTurnResponseMessages(chatId),
+    )
+    if (finalizedResults.length > 0) {
+      const chatSubagents = listSubagentsForChat(chatId)
+      const runningAgents = chatSubagents
+        .filter((record) => record.status === 'running')
+        .map((record) => ({
+          name: record.agentName.trim() || record.subagentId,
+          subagentId: record.subagentId,
+        }))
+      const wakeNudge: ModelMessage = {
+        role: 'user',
+        content: buildWakeNudge(
+          finalizedResults.map((item) => ({
+            ...item,
+            status:
+              chatSubagents.find(
+                (record) => record.subagentId === item.result.subagentId,
+              )?.status ?? 'completed',
+          })),
+          runningAgents,
+          chatSubagents,
+          {
+            summariesInline: true,
+          },
+        ),
+      }
+      modelMessages = [...effectiveModelMessages, wakeNudge]
+    }
+  }
+
   await runHarnessStream({
     ...streamInput,
     workspace,
     projectSlug: workspace.projectSlug,
     chatId,
     messages,
-    modelMessages: effectiveModelMessages,
+    modelMessages,
     userMessageId: userLine.id,
     assistantId,
     captureTurnMessages: true,

@@ -74,8 +74,34 @@ const hasPendingBackgroundResume = vi.hoisted(() =>
 const hasRunningSubagentsForChat = vi.hoisted(() =>
   vi.fn<(chatId: string) => boolean>(() => false),
 )
+const listDeliverableBackgroundResults = vi.hoisted(() =>
+  vi.fn<
+    (chatId: string) => Array<{
+      toolCallId: string
+      result: { subagentId: string; name: string; summary: string }
+    }>
+  >(() => []),
+)
 const flushPendingBackgroundResume = vi.hoisted(() =>
+  vi.fn<(chatId: string, options?: { markDelivered?: boolean }) => void>(),
+)
+const markBackgroundResultsDelivered = vi.hoisted(() =>
+  vi.fn<(chatId: string, toolCallIds: string[]) => void>(),
+)
+const clearPendingBackgroundResume = vi.hoisted(() =>
   vi.fn<(chatId: string) => void>(),
+)
+const getSubagent = vi.hoisted(() =>
+  vi.fn<(subagentId: string) => { toolCallId: string; result?: unknown } | null>(
+    (subagentId) => {
+      const found = listDeliverableBackgroundResults('').find(
+        (item) => item.result.subagentId === subagentId,
+      )
+      return found
+        ? { toolCallId: found.toolCallId, result: found.result }
+        : null
+    },
+  ),
 )
 
 vi.mock('@/services/harness/subagent/registry', () => ({
@@ -83,10 +109,18 @@ vi.mock('@/services/harness/subagent/registry', () => ({
     hasPendingBackgroundResume(chatId),
   hasRunningSubagentsForChat: (chatId: string) =>
     hasRunningSubagentsForChat(chatId),
+  listDeliverableBackgroundResults: (chatId: string) =>
+    listDeliverableBackgroundResults(chatId),
+  markBackgroundResultsDelivered: (chatId: string, toolCallIds: string[]) =>
+    markBackgroundResultsDelivered(chatId, toolCallIds),
+  clearPendingBackgroundResume: (chatId: string) =>
+    clearPendingBackgroundResume(chatId),
+  getSubagent: (subagentId: string) => getSubagent(subagentId),
 }))
 
 vi.mock('@/services/harness/subagent/flush-pending-resume', () => ({
-  default: (chatId: string) => flushPendingBackgroundResume(chatId),
+  default: (chatId: string, options?: { markDelivered?: boolean }) =>
+    flushPendingBackgroundResume(chatId, options),
 }))
 
 const loadEffectiveSettings = vi.hoisted(() =>
@@ -212,6 +246,7 @@ describe('agent-harness send persist model/mode', () => {
     loadEffectiveSettings.mockResolvedValue({ version: 1 })
     hasPendingBackgroundResume.mockReturnValue(false)
     hasRunningSubagentsForChat.mockReturnValue(false)
+    listDeliverableBackgroundResults.mockReturnValue([])
   })
 
   it('persists model and mode via updateChatMeta before the turn', async () => {
@@ -1232,7 +1267,9 @@ describe('agent-harness send persist model/mode', () => {
     })
 
     expect(state.session.startAgentTurn).toHaveBeenCalledTimes(1)
-    expect(flushPendingBackgroundResume).toHaveBeenCalledWith('chat-1')
+    expect(flushPendingBackgroundResume).toHaveBeenCalledWith('chat-1', {
+      markDelivered: false,
+    })
     expect(flushPendingBackgroundResume.mock.invocationCallOrder[0]).toBeGreaterThan(
       vi.mocked(state.session.startAgentTurn).mock.invocationCallOrder[0] ?? 0,
     )
@@ -1244,6 +1281,136 @@ describe('agent-harness send persist model/mode', () => {
         status: 'running',
       }),
     ])
+    const flushTurnInput = runOrchestrator.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(flushTurnInput).not.toHaveProperty('prefinishedBackgroundResults')
+  })
+
+  it('snapshots already-finished background results before flush and passes them into the user turn', async () => {
+    const failedResult = {
+      toolCallId: 'tc-fail',
+      result: {
+        subagentId: 'sub-fail',
+        name: 'explorer',
+        summary: 'explorer timed out',
+      },
+    }
+    hasPendingBackgroundResume.mockReturnValue(true)
+    listDeliverableBackgroundResults.mockReturnValue([failedResult])
+    const state = buildState()
+    const { send } = createSend(state, buildAttention(), {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+    })
+
+    expect(flushPendingBackgroundResume).toHaveBeenCalledWith('chat-1', {
+      markDelivered: false,
+    })
+    expect(listDeliverableBackgroundResults.mock.invocationCallOrder[0]).toBeLessThan(
+      flushPendingBackgroundResume.mock.invocationCallOrder[0] ?? 0,
+    )
+    expect(runOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prefinishedBackgroundResults: [failedResult],
+      }),
+    )
+    expect(markBackgroundResultsDelivered).toHaveBeenCalledWith('chat-1', [
+      'tc-fail',
+    ])
+    expect(runOrchestrator.mock.invocationCallOrder[0]).toBeLessThan(
+      markBackgroundResultsDelivered.mock.invocationCallOrder[0] ?? 0,
+    )
+  })
+
+  it('does not pass a running sibling as a prefinished result on user send', async () => {
+    const failedResult = {
+      toolCallId: 'tc-fail',
+      result: {
+        subagentId: 'sub-fail',
+        name: 'explorer',
+        summary: 'explorer timed out',
+      },
+    }
+    hasPendingBackgroundResume.mockReturnValue(true)
+    listDeliverableBackgroundResults.mockReturnValue([failedResult])
+    const state = buildState()
+    state.subagents.value = [
+      {
+        subagentId: 'sub-run',
+        name: 'writer',
+        blocking: false,
+        status: 'running',
+        events: [],
+      },
+    ]
+    const { send } = createSend(state, buildAttention(), {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+    })
+
+    const input = runOrchestrator.mock.calls[0]?.[0] as {
+      prefinishedBackgroundResults: Array<{ toolCallId: string }>
+    }
+    expect(input.prefinishedBackgroundResults).toEqual([failedResult])
+    expect(input.prefinishedBackgroundResults.map((item) => item.toolCallId)).not.toContain(
+      'tc-run',
+    )
+    expect(markBackgroundResultsDelivered).toHaveBeenCalledWith('chat-1', [
+      'tc-fail',
+    ])
+  })
+
+  it('leaves prefinished results deliverable when the user send fails', async () => {
+    const failedResult = {
+      toolCallId: 'tc-fail',
+      result: {
+        subagentId: 'sub-fail',
+        name: 'explorer',
+        summary: 'explorer timed out',
+      },
+    }
+    hasPendingBackgroundResume.mockReturnValue(true)
+    listDeliverableBackgroundResults.mockReturnValue([failedResult])
+    runOrchestrator.mockRejectedValueOnce(new Error('provider down'))
+    const state = buildState()
+    const { send } = createSend(state, buildAttention(), {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+      maybeDrainQueue: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+      appendedUserMessageId: 'user-1',
+    })
+
+    expect(runOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prefinishedBackgroundResults: [failedResult],
+      }),
+    )
+    expect(markBackgroundResultsDelivered).not.toHaveBeenCalled()
+    expect(clearPendingBackgroundResume).not.toHaveBeenCalled()
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual([failedResult])
+    expect(state.status.value).toBe('error')
   })
 
   it('leaves pending background resume intact when attachment normalize fails after submitted', async () => {
@@ -1987,6 +2154,7 @@ describe('agent-harness send transient auto-retry', () => {
     loadEffectiveSettings.mockResolvedValue({ version: 1 })
     hasPendingBackgroundResume.mockReturnValue(false)
     hasRunningSubagentsForChat.mockReturnValue(false)
+    listDeliverableBackgroundResults.mockReturnValue([])
   })
 
   afterEach(() => {
@@ -2040,6 +2208,56 @@ describe('agent-harness send transient auto-retry', () => {
     )
     expect(state.status.value).toBe('ready')
     expect(maybeDrainQueue).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not mark prefinished results delivered when a transient retry skips collect', async () => {
+    const failedResult = {
+      toolCallId: 'tc-fail',
+      result: {
+        subagentId: 'sub-fail',
+        name: 'explorer',
+        summary: 'explorer timed out',
+      },
+    }
+    hasPendingBackgroundResume.mockReturnValue(true)
+    listDeliverableBackgroundResults.mockReturnValue([failedResult])
+    runOrchestrator.mockRejectedValueOnce(transientError())
+    continueOrchestrator.mockResolvedValueOnce(undefined)
+    const state = buildState()
+    const attention = buildAttention()
+    const { send } = createSend(state, attention, {
+      handleEvent: vi.fn<(...args: unknown[]) => void>(),
+      persistPermission: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+      maybeDrainQueue: vi
+        .fn<(...args: unknown[]) => Promise<void>>()
+        .mockResolvedValue(undefined),
+    })
+
+    const pending = send({
+      text: 'hello',
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      skipUserMessage: true,
+      appendedUserMessageId: 'user-1',
+    })
+    await vi.advanceTimersByTimeAsync(2_000)
+    await pending
+
+    expect(runOrchestrator).toHaveBeenCalledTimes(1)
+    expect(runOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prefinishedBackgroundResults: [failedResult],
+      }),
+    )
+    expect(continueOrchestrator).toHaveBeenCalledTimes(1)
+    expect(continueOrchestrator.mock.calls[0]?.[0]).not.toHaveProperty(
+      'prefinishedBackgroundResults',
+    )
+    expect(flushPendingBackgroundResume).toHaveBeenCalledTimes(1)
+    expect(markBackgroundResultsDelivered).not.toHaveBeenCalled()
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual([failedResult])
   })
 
   it('aborts during backoff without setting a turn error or continuing', async () => {

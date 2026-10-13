@@ -270,6 +270,70 @@ describe('subagent-registry', () => {
     expect(listDeliverableBackgroundResults('chat-1')).toHaveLength(3)
   })
 
+  it('omits completed and failed blocking results from deliverable wake results', async () => {
+    const {
+      fail,
+      listDeliverableBackgroundResults,
+      register,
+      resolve,
+    } = await import('@/services/harness/subagent/registry')
+
+    register(
+      'chat-1',
+      'block-ok',
+      new AbortController(),
+      { toolCallId: 'tc-block-ok', agentName: 'blocking' },
+      { pendingResume: false },
+    )
+    register(
+      'chat-1',
+      'block-fail',
+      new AbortController(),
+      { toolCallId: 'tc-block-fail', agentName: 'blocking' },
+      { pendingResume: false },
+    )
+    register('chat-1', 'bg-ok', new AbortController(), {
+      toolCallId: 'tc-bg-ok',
+      agentName: 'background',
+    })
+    register('chat-1', 'bg-fail', new AbortController(), {
+      toolCallId: 'tc-bg-fail',
+      agentName: 'background',
+    })
+
+    resolve('block-ok', {
+      subagentId: 'block-ok',
+      name: 'blocking',
+      summary: 'inline done',
+    })
+    fail('block-fail', 'inline failed')
+    resolve('bg-ok', {
+      subagentId: 'bg-ok',
+      name: 'background',
+      summary: 'mapped the repo',
+    })
+    fail('bg-fail', 'explorer timed out')
+
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual([
+      {
+        toolCallId: 'tc-bg-ok',
+        result: {
+          subagentId: 'bg-ok',
+          name: 'background',
+          summary: 'mapped the repo',
+        },
+      },
+      {
+        toolCallId: 'tc-bg-fail',
+        result: {
+          subagentId: 'bg-fail',
+          name: 'background',
+          summary: 'explorer timed out',
+        },
+      },
+    ])
+  })
+
   it('omits delivered results while keeping running subagents', async () => {
     const {
       register,
@@ -374,6 +438,64 @@ describe('subagent-registry', () => {
     expect(reopen('sub-1', controller)?.status).toBe('running')
     expect(getSubagent('sub-1')?.result).toBeUndefined()
     expect(reopen('sub-1', new AbortController())).toBeNull()
+  })
+
+  it('tracks finalized toolCallIds without hiding undelivered results', async () => {
+    const {
+      abort,
+      fail,
+      isBackgroundResultFinalized,
+      listDeliverableBackgroundResults,
+      markBackgroundResultsFinalized,
+      register,
+      reopen,
+      resetSubagentRegistryForTests,
+      resolve,
+    } = await import('@/services/harness/subagent/registry')
+
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'first',
+    })
+
+    markBackgroundResultsFinalized('chat-1', ['tc-1'])
+    expect(isBackgroundResultFinalized('chat-1', 'tc-1')).toBe(true)
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual([
+      {
+        toolCallId: 'tc-1',
+        result: {
+          subagentId: 'sub-1',
+          name: 'explorer',
+          summary: 'first',
+        },
+      },
+    ])
+
+    expect(reopen('sub-1', new AbortController())?.status).toBe('running')
+    expect(isBackgroundResultFinalized('chat-1', 'tc-1')).toBe(false)
+
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'rewritten',
+    })
+    markBackgroundResultsFinalized('chat-1', ['tc-1'])
+    abort('chat-1')
+    expect(isBackgroundResultFinalized('chat-1', 'tc-1')).toBe(false)
+
+    register('chat-2', 'sub-2', new AbortController(), {
+      toolCallId: 'tc-2',
+      agentName: 'writer',
+    })
+    fail('sub-2', 'boom')
+    markBackgroundResultsFinalized('chat-2', ['tc-2'])
+    resetSubagentRegistryForTests()
+    expect(isBackgroundResultFinalized('chat-2', 'tc-2')).toBe(false)
   })
 
   it('makes a previously delivered result deliverable again after reopen', async () => {

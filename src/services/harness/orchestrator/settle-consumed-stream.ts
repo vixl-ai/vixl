@@ -8,6 +8,7 @@ import {
   hasPendingBackgroundResume,
   setTurnResponseMessages,
 } from '@/services/harness/subagent/registry'
+import { turnSpawnedBackgroundSubagents } from '@/services/harness/subagent/turn-spawned-background'
 import describeOutputLimitTruncation from './describe-output-limit-truncation'
 import emitContextUsage from './emit-context-usage'
 import { resolveStreamError } from './helpers'
@@ -120,7 +121,9 @@ export const settleConsumedStream = async (input: {
     !getTurnResponseMessages(input.chatId)
   ) {
     const responseMessages = await input.result.responseMessages
-    setTurnResponseMessages(input.chatId, responseMessages)
+    if (turnSpawnedBackgroundSubagents(input.chatId, responseMessages)) {
+      setTurnResponseMessages(input.chatId, responseMessages)
+    }
   }
 
   if (streamError && !input.signal.aborted) {

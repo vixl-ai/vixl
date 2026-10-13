@@ -13,6 +13,7 @@ export default async (input: ParentOrchestratorInput): Promise<void> => {
     skipUserPersist,
     appendedUserMessageId,
     assistantId,
+    prefinishedBackgroundResults,
     ...shared
   } = input
 
@@ -35,5 +36,8 @@ export default async (input: ParentOrchestratorInput): Promise<void> => {
     appendedUserMessageId,
     skipUserPersist,
     assistantId,
+    ...(prefinishedBackgroundResults
+      ? { prefinishedBackgroundResults }
+      : {}),
   })
 }

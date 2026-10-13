@@ -1,17 +1,32 @@
 import {
   clearPendingBackgroundResume,
   clearTurnResponseMessages,
-  listSubagentsForChat,
+  hasRunningSubagentsForChat,
+  listDeliverableBackgroundResults,
   markBackgroundResultsDelivered,
 } from '@/services/harness/subagent/registry'
 
-const flushPendingBackgroundResume = (chatId: string): void => {
-  markBackgroundResultsDelivered(
-    chatId,
-    listSubagentsForChat(chatId).map((record) => record.toolCallId),
-  )
+export type FlushPendingBackgroundResumeOptions = {
+  markDelivered?: boolean
+}
+
+const flushPendingBackgroundResume = (
+  chatId: string,
+  options?: FlushPendingBackgroundResumeOptions,
+): void => {
+  if (options?.markDelivered !== false) {
+    markBackgroundResultsDelivered(
+      chatId,
+      listDeliverableBackgroundResults(chatId).map((item) => item.toolCallId),
+    )
+  }
   clearTurnResponseMessages(chatId)
-  clearPendingBackgroundResume(chatId)
+  if (
+    !hasRunningSubagentsForChat(chatId) &&
+    listDeliverableBackgroundResults(chatId).length === 0
+  ) {
+    clearPendingBackgroundResume(chatId)
+  }
 }
 
 export default flushPendingBackgroundResume
