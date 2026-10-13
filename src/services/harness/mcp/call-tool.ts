@@ -1,5 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
+import liftMcpToolImages from '@/services/mcp/lift-mcp-tool-images'
 import { requestMcpAuth } from '@/services/mcp/mcp-auth-gate'
 import { setMcpElicitationHandler } from '@/services/mcp/mcp-http-client'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
@@ -16,6 +17,56 @@ import resolveTrustedMcpServer from '@/services/harness/mcp/resolve-trusted-serv
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import { getMcpAuthMode } from '@/types/vixl/mcp-config'
+
+const CANNOT_VIEW_IMAGES =
+  'This MCP tool result includes an image, but this agent cannot receive tool images.'
+const COULD_NOT_LOAD_IMAGE =
+  'An image in the tool result could not be loaded into context.'
+
+const withResultFields = (
+  result: unknown,
+  extra: Record<string, unknown>,
+): Record<string, unknown> => {
+  if (typeof result === 'object' && result !== null && !Array.isArray(result)) {
+    return { ...(result as Record<string, unknown>), ...extra }
+  }
+  return { result, ...extra }
+}
+
+const drainMcpToolImages = async (
+  ctx: HarnessToolContext,
+  result: unknown,
+  source: string,
+): Promise<unknown> => {
+  const { images, result: lifted, redacted } = liftMcpToolImages({
+    result,
+    source,
+  })
+  if (redacted === 0) {
+    return lifted
+  }
+
+  if (!ctx.stageImage) {
+    return withResultFields(lifted, { note: CANNOT_VIEW_IMAGES })
+  }
+
+  try {
+    for (const image of images) {
+      await ctx.stageImage(image)
+    }
+    if (images.length < redacted) {
+      return withResultFields(lifted, { note: COULD_NOT_LOAD_IMAGE })
+    }
+    return lifted
+  } catch (error) {
+    return withResultFields(lifted, {
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to load image into context',
+    })
+  }
+}
 
 const callMcpTool = (ctx: HarnessToolContext) =>
   tool({
@@ -106,8 +157,10 @@ const callMcpTool = (ctx: HarnessToolContext) =>
         }
       }
 
+      const source = `${serverId}/${toolName}`
+
       try {
-        return await invokeTool()
+        return await drainMcpToolImages(ctx, await invokeTool(), source)
       } catch (error) {
         if (!isMcpAuthError(error)) {
           throw error
@@ -136,7 +189,7 @@ const callMcpTool = (ctx: HarnessToolContext) =>
         }
 
         try {
-          return await invokeTool()
+          return await drainMcpToolImages(ctx, await invokeTool(), source)
         } catch (retryError) {
           if (isMcpAuthError(retryError)) {
             return { error: 'auth_required', serverId }

@@ -311,5 +311,112 @@ describe('build-tools call_mcp_tool args normalization', () => {
     })
     expect(mcpCallTool).not.toHaveBeenCalled()
   })
+
+  it('stages MCP image blocks and returns placeholders instead of base64', async () => {
+    mcpCallTool.mockResolvedValue({
+      content: [{ type: 'image', data: 'QUJD', mimeType: 'image/png' }],
+    })
+    const stageImage = vi.fn<(image: {
+      dataUrl: string
+      mediaType: string
+      source: string
+    }) => Promise<void>>().mockResolvedValue()
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({ ...ctx, supportsVision: true, stageImage })
+    const result = await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'brave',
+        tool: 'brave_web_search',
+        args: { query: 'search' },
+      },
+      'tc-mcp-image-stage',
+    )
+
+    expect(stageImage).toHaveBeenCalledWith({
+      dataUrl: 'data:image/png;base64,QUJD',
+      mediaType: 'image/png',
+      source: 'brave/brave_web_search',
+    })
+    const serialized = JSON.stringify(result)
+    expect(serialized).toContain('[image loaded into context]')
+    expect(serialized).not.toContain('QUJD')
+  })
+
+  it('strips MCP image bytes when the agent cannot view images', async () => {
+    mcpCallTool.mockResolvedValue({
+      content: [{ type: 'image', data: 'QUJD', mimeType: 'image/png' }],
+    })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'brave',
+        tool: 'brave_web_search',
+        args: { query: 'search' },
+      },
+      'tc-mcp-image-no-vision',
+    )
+
+    const serialized = JSON.stringify(result)
+    expect(serialized).toContain('[image loaded into context]')
+    expect(serialized).not.toContain('QUJD')
+    expect(serialized).toContain(
+      'This MCP tool result includes an image, but this agent cannot receive tool images.',
+    )
+  })
+
+  it('notes when an image block cannot be staged because mimeType is missing', async () => {
+    mcpCallTool.mockResolvedValue({
+      content: [{ type: 'image', data: 'QUJD' }],
+    })
+    const stageImage = vi.fn<(image: {
+      dataUrl: string
+      mediaType: string
+      source: string
+    }) => Promise<void>>().mockResolvedValue()
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({ ...ctx, supportsVision: true, stageImage })
+    const result = await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'brave',
+        tool: 'brave_web_search',
+        args: { query: 'search' },
+      },
+      'tc-mcp-image-missing-mime',
+    )
+
+    expect(stageImage).not.toHaveBeenCalled()
+    const serialized = JSON.stringify(result)
+    expect(serialized).toContain('[image loaded into context]')
+    expect(serialized).not.toContain('QUJD')
+    expect(serialized).toContain(
+      'An image in the tool result could not be loaded into context.',
+    )
+  })
+
+  it('passes text-only MCP results through without staging', async () => {
+    const stageImage = vi.fn<(image: {
+      dataUrl: string
+      mediaType: string
+      source: string
+    }) => Promise<void>>().mockResolvedValue()
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({ ...ctx, supportsVision: true, stageImage })
+    const result = await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'brave',
+        tool: 'brave_web_search',
+        args: { query: 'search' },
+      },
+      'tc-mcp-text-only',
+    )
+
+    expect(stageImage).not.toHaveBeenCalled()
+    expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] })
+  })
 })
 
