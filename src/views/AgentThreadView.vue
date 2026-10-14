@@ -68,12 +68,16 @@ const {
   handlePermissionLevelChange,
 } = useAgentThreadView()
 
+const countedTodos = computed(() =>
+  todos.value.filter((todo) => todo.status !== 'cancelled'),
+)
+
 const { visiblePills, openStack, toggleStack } = useChatStackPills({
   subagents: computed(() => runningSubagents.value.length),
   approvals: computed(() => harnessPendingApprovals.value.length),
   terminals: computed(() => runningShells.value.length),
   queue: computed(() => queuedMessages.value.length),
-  todos: computed(() => todos.value.length),
+  todos: computed(() => countedTodos.value.length),
   resetKey: threadKey,
 })
 
@@ -83,7 +87,7 @@ const pills = computed(() => {
     approvals: harnessPendingApprovals.value.length,
     terminals: runningShells.value.length,
     queue: queuedMessages.value.length,
-    todos: todos.value.length,
+    todos: countedTodos.value.length,
   }
   const todosCompleted = todos.value.filter(
     (todo) => todo.status === 'completed',

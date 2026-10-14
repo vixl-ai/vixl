@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 import { shallowMount, type VueWrapper } from '@vue/test-utils'
+import type { TodoItem } from '@/types/harness/harness-event'
 
 vi.hoisted(() => {
   Object.defineProperty(document, 'queryCommandSupported', {
@@ -11,6 +12,7 @@ vi.hoisted(() => {
 
 const viewState = vi.hoisted(() => ({
   isSubagentView: true,
+  todos: [{ id: 't1', content: 'todo', status: 'pending' }] as TodoItem[],
 }))
 
 vi.mock('@/components/chat/ChatPromptInput.vue', () => ({
@@ -62,7 +64,7 @@ vi.mock('@/composables/agent-thread-view', () => ({
     })),
     compacting: computed(() => false),
     timeline: computed(() => []),
-    todos: computed(() => [{ id: 't1', content: 'todo', status: 'pending' }]),
+    todos: computed(() => viewState.todos),
     runningShells: computed(() => []),
     activePermissionLevel: computed(() => 'ask'),
     filePolicyOpen: ref(false),
@@ -171,5 +173,45 @@ describe('AgentThreadView subagent composer', () => {
     expect(prompt.props('hideModel')).toBe(false)
     expect(prompt.props('hideStop')).toBe(false)
     wrapper.unmount()
+  })
+})
+
+describe('AgentThreadView todos stack pill', () => {
+  it('excludes cancelled todos from the Tasks pill count', () => {
+    viewState.isSubagentView = false
+    viewState.todos = [
+      { id: 't1', content: 'done', status: 'completed' },
+      { id: 't2', content: 'todo', status: 'pending' },
+      { id: 't3', content: 'skipped', status: 'cancelled' },
+    ]
+    const wrapper = mountView()
+
+    const bar = wrapper.findComponent({ name: 'ChatStackPillBar' })
+    expect(bar.exists()).toBe(true)
+    expect(bar.props('pills')).toContainEqual({
+      id: 'todos',
+      label: 'Tasks 1/2',
+    })
+    wrapper.unmount()
+    viewState.todos = [{ id: 't1', content: 'todo', status: 'pending' }]
+    viewState.isSubagentView = true
+  })
+
+  it('hides the Tasks pill when every todo is cancelled', () => {
+    viewState.isSubagentView = false
+    viewState.todos = [
+      { id: 't1', content: 'skipped', status: 'cancelled' },
+      { id: 't2', content: 'also skipped', status: 'cancelled' },
+    ]
+    const wrapper = mountView()
+
+    const bar = wrapper.findComponent({ name: 'ChatStackPillBar' })
+    expect(bar.exists()).toBe(true)
+    expect(
+      (bar.props('pills') as { id: string }[]).some((pill) => pill.id === 'todos'),
+    ).toBe(false)
+    wrapper.unmount()
+    viewState.todos = [{ id: 't1', content: 'todo', status: 'pending' }]
+    viewState.isSubagentView = true
   })
 })
