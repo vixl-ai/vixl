@@ -45,6 +45,14 @@ export type HarnessEvent =
     }
   | { type: 'step-start'; stepId: string }
   | { type: 'step-finish'; stepId: string }
+  | {
+      type: 'step-content'
+      stepId: string
+      reasoning: string
+      reasoningSeconds: number
+      text: string
+    }
+  | { type: 'step-drop-unsealed'; stepIds: string[] }
   | { type: 'tool-rejected'; toolCallId: string; reason: string }
   | { type: 'todo-update'; todos: TodoItem[] }
   | { type: 'plan-write'; planPath: string }

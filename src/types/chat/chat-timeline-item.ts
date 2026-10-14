@@ -1,4 +1,5 @@
 import type { UIMessage } from 'ai'
+import type { AgentStep } from '@/types/chat/agent-step'
 import type { AgentStop } from '@/types/chat/agent-stop'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { TodoItem } from '@/types/harness/harness-event'
@@ -17,6 +18,7 @@ export type SubagentTimelineItem = {
   prompt?: string
   model?: string
   tools: ToolRun[]
+  steps?: AgentStep[]
   compacting?: boolean
   compactions: Array<{ summary: string; focus: string | null; toolBoundary: number }>
   messages?: unknown[]

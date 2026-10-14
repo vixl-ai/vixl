@@ -1,4 +1,4 @@
-import { generateText, isLoopFinished, type ModelMessage } from 'ai'
+import { isLoopFinished, streamText, type ModelMessage } from 'ai'
 import createModel from '@/services/providers/create-model'
 import {
   DEFAULT_MAX_OUTPUT_TOKENS,
@@ -34,6 +34,8 @@ import {
   throwIfAborted,
 } from '@/services/harness/subagent/generate-support'
 import { generateTextWithTransientRetry } from '@/services/harness/subagent/retry-transient'
+import { consumeSubagentStream } from '@/services/harness/subagent/consume-subagent-stream'
+import { createNestedStepEmitter } from '@/services/harness/subagent/nested-step-emitter'
 import describeOutputLimitTruncation from '@/services/harness/orchestrator/describe-output-limit-truncation'
 import repairToolCall from '@/services/harness/orchestrator/repair-tool-call'
 import type { HarnessEvent } from '@/types/harness/harness-event'
@@ -118,7 +120,7 @@ const runSubagentGenerate = async (args: {
   const nestedCtx: HarnessToolContext = {
     ...ctx,
     supportsVision,
-    // Subagents opt out of image staging: generateText has no stage drain.
+    // Subagents opt out of image staging: nested runs have no stage drain.
     stageImage: undefined,
     onHarnessEvent: emitNestedEvent,
     onPendingApproval: (entry) => {
@@ -210,36 +212,82 @@ const runSubagentGenerate = async (args: {
   const { onToolExecutionStart, onToolExecutionEnd } =
     createSubagentToolExecutionHooks({ emitNestedEvent })
 
-  const result = await generateTextWithTransientRetry({
-    signal,
-    subagentId,
-    generate: (resumeMessages) =>
-      generateText({
-        model,
-        system: toCachedInstructions(system, callOptions.providerOptions),
-        ...(resumeMessages
-          ? { messages: resumeMessages }
-          : args.messages
-            ? { messages: args.messages }
-            : { prompt: formattedPrompt }),
-        tools: cappedTools,
-        repairToolCall,
-        stopWhen: [isLoopFinished()],
-        prepareStep,
-        maxOutputTokens: callOptions.maxOutputTokens,
-        temperature: callOptions.temperature,
-        topP: callOptions.topP,
-        topK: callOptions.topK,
-        frequencyPenalty: callOptions.frequencyPenalty,
-        presencePenalty: callOptions.presencePenalty,
-        seed: callOptions.seed,
-        reasoning: callOptions.reasoning,
-        providerOptions: callOptions.providerOptions,
-        abortSignal: signal,
-        onToolExecutionStart,
-        onToolExecutionEnd,
-      }),
-  })
+  const steps = createNestedStepEmitter(emitNestedEvent)
+  let generateAttempt = 0
+  let result
+  try {
+    result = await generateTextWithTransientRetry({
+      signal,
+      subagentId,
+      generate: async (resumeMessages) => {
+        if (generateAttempt > 0) {
+          steps.dropUnsealed()
+        }
+        generateAttempt += 1
+        const streamed = streamText({
+          model,
+          system: toCachedInstructions(system, callOptions.providerOptions),
+          ...(resumeMessages
+            ? { messages: resumeMessages }
+            : args.messages
+              ? { messages: args.messages }
+              : { prompt: formattedPrompt }),
+          tools: cappedTools,
+          repairToolCall,
+          stopWhen: [isLoopFinished()],
+          prepareStep,
+          maxOutputTokens: callOptions.maxOutputTokens,
+          temperature: callOptions.temperature,
+          topP: callOptions.topP,
+          topK: callOptions.topK,
+          frequencyPenalty: callOptions.frequencyPenalty,
+          presencePenalty: callOptions.presencePenalty,
+          seed: callOptions.seed,
+          reasoning: callOptions.reasoning,
+          providerOptions: callOptions.providerOptions,
+          abortSignal: signal,
+          onToolExecutionStart: (event) => {
+            steps.ensureStepOpen()
+            steps.sealReasoningDuration()
+            onToolExecutionStart(event)
+          },
+          onToolExecutionEnd,
+        })
+
+        await consumeSubagentStream({
+          fullStream: streamed.fullStream,
+          signal,
+          steps,
+          emitNestedEvent,
+        })
+
+        const [text, finishReason, usage, providerMetadata, response, responseMessages, generatedSteps] =
+          await Promise.all([
+            streamed.text,
+            streamed.finishReason,
+            streamed.usage,
+            streamed.providerMetadata,
+            streamed.response,
+            streamed.responseMessages,
+            streamed.steps,
+          ])
+        return {
+          text,
+          finishReason,
+          usage,
+          providerMetadata,
+          response,
+          responseMessages,
+          steps: generatedSteps,
+        }
+      },
+    })
+  } catch (error) {
+    // Terminal throw only. Retries stay unsealed so step-drop-unsealed still works.
+    // Abort already sealed in consume; finishStep is a no-op when stepOpen is false.
+    steps.finishStep()
+    throw error
+  }
 
   throwIfAborted(signal)
   await billSubagentUsage({

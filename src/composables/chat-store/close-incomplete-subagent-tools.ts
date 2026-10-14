@@ -1,3 +1,4 @@
+import type { AgentStep } from '@/types/chat/agent-step'
 import type { ToolRun } from '@/types/harness/tool-run'
 
 const closeIncompleteSubagentTools = (tools: ToolRun[]): ToolRun[] =>
@@ -10,5 +11,11 @@ const closeIncompleteSubagentTools = (tools: ToolRun[]): ToolRun[] =>
         }
       : tool,
   )
+
+export const closeIncompleteSubagentSteps = (steps: AgentStep[]): AgentStep[] =>
+  steps.map((step) => ({
+    ...step,
+    tools: closeIncompleteSubagentTools(step.tools),
+  }))
 
 export default closeIncompleteSubagentTools

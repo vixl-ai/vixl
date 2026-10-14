@@ -36,6 +36,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     assistantId,
     signal,
     onEvent,
+    flushSubagentPersistence,
     captureTurnMessages,
     messages,
   } = prepared
@@ -79,14 +80,16 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     })
   }
 
-  const emitTurnEnded = (stop: AgentStop): Promise<void> =>
-    publishTurnEnded({
+  const emitTurnEnded = async (stop: AgentStop): Promise<void> => {
+    await flushSubagentPersistence()
+    await publishTurnEnded({
       projectSlug: workspace.projectSlug,
       chatId,
       turnId: assistantId,
       stop,
       onEvent,
     })
+  }
 
   const result = streamText({
     model,

@@ -1,6 +1,6 @@
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { HarnessEvent } from '@/types/harness/harness-event'
-import applySubagentToolEvent from '@/utils/apply-subagent-tool-event'
+import { applySubagentItemEvent } from '@/utils/apply-subagent-step-event'
 
 const applyHydrateSubagentEvent = (
   items: ChatTimelineItem[],
@@ -67,11 +67,7 @@ const applyHydrateSubagentEvent = (
     }
     return
   }
-  items[index] = {
-    ...existing,
-    tools: applySubagentToolEvent(existing.tools, event),
-    compactions: existing.compactions ?? [],
-  }
+  items[index] = applySubagentItemEvent(existing, event)
 }
 
 export default applyHydrateSubagentEvent

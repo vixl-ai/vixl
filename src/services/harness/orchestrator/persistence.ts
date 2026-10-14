@@ -110,7 +110,10 @@ export const persistSubagentHarnessEvent = async (
   if (
     event.type === 'subagent-event' &&
     (event.event.type === 'compaction-started' ||
-      event.event.type === 'compaction-ended')
+      event.event.type === 'compaction-ended' ||
+      event.event.type === 'reasoning-delta' ||
+      event.event.type === 'text-delta' ||
+      event.event.type === 'reasoning-duration')
   ) {
     return
   }

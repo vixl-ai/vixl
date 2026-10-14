@@ -72,6 +72,16 @@ vi.mock('@/services/harness/orchestrator/stream-steps', () => ({
   default: () => ({ stepCount: 0 }),
 }))
 
+const persistSubagentHarnessEvent = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+)
+
+vi.mock('@/services/harness/orchestrator/persistence', () => ({
+  persistSubagentHarnessEvent: (...args: unknown[]) =>
+    persistSubagentHarnessEvent(...args),
+  persistPendingSubagent: vi.fn<(...args: unknown[]) => Promise<void>>(),
+}))
+
 vi.mock('vue-sonner', () => ({
   toast: { error: vi.fn<() => void>(), success: vi.fn<() => void>() },
 }))
@@ -159,6 +169,7 @@ type BuildToolsCtx = {
   sessionDenies: Set<string>
   projectRoot: string
   projectSlug: string
+  onHarnessEvent?: (event: unknown) => void | Promise<void>
 }
 
 describe('prepare-stream prefix freeze vs rebuild', () => {
@@ -403,5 +414,42 @@ describe('prepare-stream session permission sets', () => {
     ctx.projectSlug = 'dest'
     expect(workspace.projectRoot).toBe('/tmp/dest')
     expect(workspace.projectSlug).toBe('dest')
+  })
+
+  it('serializes nested subagent persists and flushes them on the prepared stream', async () => {
+    const started: string[] = []
+    let releaseFirst = (): void => undefined
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    persistSubagentHarnessEvent.mockImplementationOnce(async () => {
+      started.push('start')
+      await firstGate
+    })
+    persistSubagentHarnessEvent.mockImplementationOnce(async () => {
+      started.push('event')
+    })
+
+    const prepared = await prepareStream(buildInput('agent'))
+    const ctx = buildTools.mock.calls.at(-1)?.[0] as BuildToolsCtx
+    ctx.onHarnessEvent?.({
+      type: 'subagent-start',
+      subagentId: 'sub-1',
+      toolCallId: 'call-1',
+      name: 'explore',
+      blocking: true,
+    })
+    ctx.onHarnessEvent?.({
+      type: 'subagent-event',
+      subagentId: 'sub-1',
+      parentToolCallId: 'call-1',
+      event: { type: 'step-start', stepId: 's1' },
+    })
+
+    await Promise.resolve()
+    expect(started).toEqual(['start'])
+    releaseFirst()
+    await prepared.flushSubagentPersistence()
+    expect(started).toEqual(['start', 'event'])
   })
 })

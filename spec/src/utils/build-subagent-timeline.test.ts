@@ -330,4 +330,332 @@ describe('buildSubagentTimeline', () => {
       { type: 'text', text: 'and also check types' },
     ])
   })
+
+  it('renders step reasoning and in-step text without repeating the summary', () => {
+    const items = buildSubagentTimeline(
+      subagent({
+        steps: [
+          {
+            id: 's1',
+            text: 'found things',
+            reasoning: 'Need to look around',
+            reasoningSeconds: 3,
+            tools: [tool('t1')],
+          },
+        ],
+      }),
+    )
+    expect(items.map((item) => item.type)).toEqual(['user', 'agent-turn'])
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.id).toBe('sub-1-turn')
+    expect(turnItem.turn.text).toBe('')
+    expect(turnItem.turn.steps).toEqual([
+      {
+        id: 's1',
+        text: 'found things',
+        reasoning: 'Need to look around',
+        reasoningSeconds: 3,
+        tools: [tool('t1')],
+      },
+    ])
+  })
+
+  it('keeps each step reasoning with its own tools across a compaction boundary', () => {
+    const items = buildSubagentTimeline(
+      subagent({
+        tools: [tool('t1'), tool('t2', 'grep')],
+        steps: [
+          {
+            id: 's1',
+            text: '',
+            reasoning: 'Read first',
+            tools: [tool('t1')],
+          },
+          {
+            id: 's2',
+            text: 'found things',
+            reasoning: 'Then search',
+            tools: [tool('t2', 'grep')],
+          },
+        ],
+        compactions: [
+          { summary: 'Kept the file reads', focus: 'auth', toolBoundary: 1 },
+        ],
+      }),
+    )
+
+    expect(items.map((item) => item.type)).toEqual([
+      'user',
+      'agent-turn',
+      'compaction',
+      'agent-turn',
+    ])
+    const preTurn = items[1]
+    expect(preTurn?.type).toBe('agent-turn')
+    if (preTurn?.type !== 'agent-turn') {
+      return
+    }
+    expect(preTurn.turn.id).toBe('sub-1-turn-0')
+    expect(preTurn.turn.text).toBe('')
+    expect(preTurn.turn.steps).toEqual([
+      {
+        id: 's1',
+        text: '',
+        reasoning: 'Read first',
+        tools: [tool('t1')],
+      },
+    ])
+
+    const postTurn = items[3]
+    expect(postTurn?.type).toBe('agent-turn')
+    if (postTurn?.type !== 'agent-turn') {
+      return
+    }
+    expect(postTurn.turn.id).toBe('sub-1-turn-1')
+    expect(postTurn.turn.text).toBe('')
+    expect(postTurn.turn.steps).toEqual([
+      {
+        id: 's2',
+        text: 'found things',
+        reasoning: 'Then search',
+        tools: [tool('t2', 'grep')],
+      },
+    ])
+  })
+
+  it('splits a mid-step boundary and keeps reasoning and text on the earlier side', () => {
+    const items = buildSubagentTimeline(
+      subagent({
+        tools: [tool('t1'), tool('t2', 'grep')],
+        steps: [
+          {
+            id: 's1',
+            text: 'found things',
+            reasoning: 'Need both files',
+            reasoningSeconds: 4,
+            tools: [tool('t1'), tool('t2', 'grep')],
+          },
+        ],
+        compactions: [
+          { summary: 'Kept the file reads', focus: 'auth', toolBoundary: 1 },
+        ],
+      }),
+    )
+
+    expect(items.map((item) => item.type)).toEqual([
+      'user',
+      'agent-turn',
+      'compaction',
+      'agent-turn',
+    ])
+    const preTurn = items[1]
+    expect(preTurn?.type).toBe('agent-turn')
+    if (preTurn?.type !== 'agent-turn') {
+      return
+    }
+    expect(preTurn.turn.steps).toEqual([
+      {
+        id: 's1',
+        text: 'found things',
+        reasoning: 'Need both files',
+        reasoningSeconds: 4,
+        tools: [tool('t1')],
+      },
+    ])
+
+    const postTurn = items[3]
+    expect(postTurn?.type).toBe('agent-turn')
+    if (postTurn?.type !== 'agent-turn') {
+      return
+    }
+    expect(postTurn.turn.text).toBe('')
+    expect(postTurn.turn.steps).toEqual([
+      {
+        id: 's1-rest-1',
+        text: '',
+        reasoning: '',
+        tools: [tool('t2', 'grep')],
+      },
+    ])
+  })
+
+  it('renders a legacy item with only tools and summary as before', () => {
+    const items = buildSubagentTimeline(subagent())
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.id).toBe('sub-1-turn')
+    expect(turnItem.turn.text).toBe('found things')
+    expect(turnItem.turn.steps).toEqual([
+      {
+        id: 'sub-1-step',
+        text: '',
+        reasoning: '',
+        tools: [tool('t1')],
+      },
+    ])
+  })
+
+  it('suppresses a summary that equals step text', () => {
+    const items = buildSubagentTimeline(
+      subagent({
+        summary: 'found things',
+        steps: [
+          {
+            id: 's1',
+            text: 'found things',
+            reasoning: '',
+            tools: [tool('t1')],
+          },
+        ],
+      }),
+    )
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.text).toBe('')
+  })
+
+  it('renders only the truncation notice when the summary suffixes step text', () => {
+    const notice =
+      '[The model reached its output limit (8192 tokens) before finishing. Raise max output in model options or ask for a shorter response.]'
+    const items = buildSubagentTimeline(
+      subagent({
+        summary: `found things\n\n${notice}`,
+        steps: [
+          {
+            id: 's1',
+            text: 'found things',
+            reasoning: '',
+            tools: [tool('t1')],
+          },
+        ],
+      }),
+    )
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.text).toBe(notice)
+  })
+
+  it('renders a notice-only summary when steps have no text', () => {
+    const notice =
+      '[The model reached its output limit (8192 tokens) before finishing. Raise max output in model options or ask for a shorter response.]'
+    const items = buildSubagentTimeline(
+      subagent({
+        summary: notice,
+        steps: [
+          {
+            id: 's1',
+            text: '',
+            reasoning: 'Need to look around',
+            tools: [tool('t1')],
+          },
+        ],
+      }),
+    )
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.text).toBe(notice)
+  })
+
+  it('suppresses a last-step summary when earlier steps also have text', () => {
+    const items = buildSubagentTimeline(
+      subagent({
+        summary: 'later findings',
+        steps: [
+          {
+            id: 's1',
+            text: 'first findings',
+            reasoning: '',
+            tools: [tool('t1')],
+          },
+          {
+            id: 's2',
+            text: 'later findings',
+            reasoning: '',
+            tools: [],
+          },
+        ],
+      }),
+    )
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.text).toBe('')
+  })
+
+  it('keeps an unmatched summary as trailing turn text', () => {
+    const items = buildSubagentTimeline(
+      subagent({
+        summary: 'parent wrap-up',
+        steps: [
+          {
+            id: 's1',
+            text: 'found things',
+            reasoning: '',
+            tools: [tool('t1')],
+          },
+        ],
+      }),
+    )
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.text).toBe('parent wrap-up')
+  })
+
+  it('backfills steps from subagent-history messages when tools exist and steps do not', () => {
+    const items = buildSubagentTimeline(
+      subagent({
+        messages: [
+          { role: 'user', content: 'look around' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'reasoning', text: 'Need the file first.' },
+              {
+                type: 'tool-call',
+                toolCallId: 't1',
+                toolName: 'read_file',
+                input: { path: 't1.ts' },
+              },
+              { type: 'text', text: 'found things' },
+            ],
+          },
+        ],
+      }),
+    )
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.text).toBe('')
+    expect(turnItem.turn.steps).toEqual([
+      {
+        id: 'sub-1-step-0',
+        text: 'found things',
+        reasoning: 'Need the file first.',
+        tools: [tool('t1')],
+      },
+    ])
+  })
 })

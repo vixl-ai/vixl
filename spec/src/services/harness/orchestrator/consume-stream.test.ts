@@ -192,6 +192,7 @@ const makePrepared = (): PreparedHarnessStream & {
     assistantId: 'turn-1',
     signal: new AbortController().signal,
     onEvent: vi.fn<(...args: unknown[]) => void>(),
+    flushSubagentPersistence: vi.fn<() => Promise<void>>(async () => undefined),
     captureTurnMessages: false,
     messages: [],
   }) as unknown as PreparedHarnessStream & { onEvent: ReturnType<typeof vi.fn> }
@@ -805,6 +806,12 @@ describe('consumeStream terminal stop', () => {
       { type: 'turn-ended', turnId: 'turn-1', stop },
     ])
     expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', stop)
+    const flush = prepared.flushSubagentPersistence as ReturnType<typeof vi.fn>
+    expect(flush).toHaveBeenCalled()
+    const flushOrder = flush.mock.invocationCallOrder[0] ?? 0
+    const stopOrder = persistTurnEnded.mock.invocationCallOrder[0] ?? 0
+    expect(flushOrder).toBeGreaterThan(0)
+    expect(flushOrder).toBeLessThan(stopOrder)
   })
 
   it('emits completed with plan detail when this turn created a plan', async () => {

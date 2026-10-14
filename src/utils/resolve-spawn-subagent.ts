@@ -50,6 +50,7 @@ export default (
     status,
     summary,
     tools: [],
+    steps: [],
     compactions: [],
   }
 }

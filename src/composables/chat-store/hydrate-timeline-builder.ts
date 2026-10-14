@@ -7,7 +7,9 @@ import type {
 } from '@/types/chat/chat-timeline-item'
 import type { TodoItem, HarnessEvent } from '@/types/harness/harness-event'
 import type { ToolRun } from '@/types/harness/tool-run'
-import closeIncompleteSubagentTools from './close-incomplete-subagent-tools'
+import closeIncompleteSubagentTools, {
+  closeIncompleteSubagentSteps,
+} from './close-incomplete-subagent-tools'
 import applyHydrateSubagentEvent from './hydrate-apply-subagent-event'
 import {
   buildAssistantMessage,
@@ -95,6 +97,7 @@ const upsertSubagentStart = (
         model: subagent.model ?? existing.model,
         status: 'running',
         tools: subagent.tools ?? existing.tools,
+        steps: subagent.steps ?? existing.steps ?? [],
         compacting: subagent.compacting ?? existing.compacting,
         compactions: subagent.compactions ?? existing.compactions ?? [],
       }
@@ -112,6 +115,7 @@ const upsertSubagentStart = (
     model: subagent.model,
     status: 'running',
     tools: subagent.tools ?? [],
+    steps: subagent.steps ?? [],
     compacting: subagent.compacting,
     compactions: subagent.compactions ?? [],
   })
@@ -137,6 +141,7 @@ const completeSubagentInList = (
         compacting: false,
         compactions: existing.compactions ?? [],
         tools: closeIncompleteSubagentTools(existing.tools),
+        steps: closeIncompleteSubagentSteps(existing.steps ?? []),
         ...(resolvedStop ? { stop: resolvedStop } : {}),
       }
     }
@@ -151,6 +156,7 @@ const completeSubagentInList = (
     status,
     summary,
     tools: [],
+    steps: [],
     compacting: false,
     compactions: [],
     ...(stop ? { stop } : {}),

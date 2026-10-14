@@ -40,10 +40,7 @@ import {
   filterToolsForMode,
   injectContextIntoLastUserMessage,
 } from './helpers'
-import {
-  persistPendingSubagent,
-  persistSubagentHarnessEvent,
-} from './persistence'
+import { createSubagentPersistQueue } from './queue-subagent-persist'
 import bindLiveToolContext from './live-tool-context'
 import resolveLiveWorkspace from './resolve-workspace'
 import createStreamSteps from './stream-steps'
@@ -65,6 +62,7 @@ export type PreparedHarnessStream = {
   assistantId: string
   signal: AbortSignal
   onEvent: (event: HarnessEvent) => void | Promise<void>
+  flushSubagentPersistence: () => Promise<void>
   captureTurnMessages: boolean
   messages: UIMessage[]
 }
@@ -214,27 +212,9 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     ]),
   })
 
-  const handleHarnessEvent = (event: HarnessEvent): void | Promise<void> => {
-    if (
-      event.type === 'subagent-start' ||
-      event.type === 'subagent-result' ||
-      event.type === 'subagent-event'
-    ) {
-      persistSubagentHarnessEvent(workspace.projectSlug, chatId, event).catch((error) => {
-        toast.error('Failed to save subagent event', {
-          description: error instanceof Error ? error.message : 'Unknown error',
-        })
-      })
-    }
-    if (event.type === 'pending-subagent') {
-      persistPendingSubagent(workspace.projectSlug, chatId, event).catch((error) => {
-        toast.error('Failed to save pending subagent', {
-          description: error instanceof Error ? error.message : 'Unknown error',
-        })
-      })
-    }
-    return onEvent(event)
-  }
+  const subagentPersist = createSubagentPersistQueue(workspace.projectSlug, chatId)
+  const handleHarnessEvent = (event: HarnessEvent): void | Promise<void> =>
+    subagentPersist.handle(event, onEvent)
 
   const sessionAllows = input.sessionAllows
   const sessionDenies = input.sessionDenies
@@ -302,6 +282,7 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     assistantId,
     signal,
     onEvent,
+    flushSubagentPersistence: subagentPersist.flush,
     captureTurnMessages,
     messages,
   }

@@ -1,8 +1,16 @@
 import type { AgentStop } from '@/types/chat/agent-stop'
 import type { ChatTimelineItem, SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { TodoItem, HarnessEvent } from '@/types/harness/harness-event'
-import applySubagentToolEvent from '@/utils/apply-subagent-tool-event'
-import closeIncompleteSubagentTools from './close-incomplete-subagent-tools'
+import { applySubagentItemEvent } from '@/utils/apply-subagent-step-event'
+import closeIncompleteSubagentTools, {
+  closeIncompleteSubagentSteps,
+} from './close-incomplete-subagent-tools'
+
+export {
+  queueSubagentSteer,
+  rollbackQueuedSubagentSteer,
+  clearQueuedSubagentSteers,
+} from './subagent-steer-queue'
 
 export const upsertTodoTimelineItem = (
   items: ChatTimelineItem[],
@@ -43,6 +51,7 @@ export const upsertSubagentStart = (
         model: subagent.model ?? existing.model,
         status: 'running',
         tools: subagent.tools ?? existing.tools,
+        steps: subagent.steps ?? existing.steps ?? [],
         compacting: subagent.compacting ?? existing.compacting,
         compactions: subagent.compactions ?? existing.compactions ?? [],
       }
@@ -61,6 +70,7 @@ export const upsertSubagentStart = (
       model: subagent.model,
       status: 'running',
       tools: subagent.tools ?? [],
+      steps: subagent.steps ?? [],
       compacting: subagent.compacting,
       compactions: subagent.compactions ?? [],
     },
@@ -88,6 +98,7 @@ export const completeSubagentTimelineItem = (
         compacting: false,
         compactions: existing.compactions ?? [],
         tools: closeIncompleteSubagentTools(existing.tools),
+        steps: closeIncompleteSubagentSteps(existing.steps ?? []),
         ...((existing.stop ?? stop) ? { stop: existing.stop ?? stop } : {}),
       }
     }
@@ -103,6 +114,7 @@ export const completeSubagentTimelineItem = (
       status,
       summary,
       tools: [],
+      steps: [],
       compacting: false,
       compactions: [],
       ...(stop ? { stop } : {}),
@@ -122,6 +134,7 @@ export const finalizeHydratedSubagents = (
       status: 'error',
       compacting: false,
       tools: closeIncompleteSubagentTools(item.tools),
+      steps: closeIncompleteSubagentSteps(item.steps ?? []),
       ...(item.stop ? {} : { stop: { reason: 'incomplete' as const } }),
     }
   })
@@ -198,11 +211,7 @@ export const appendSubagentToolEvent = (
     }
     return next
   }
-  next[index] = {
-    ...existing,
-    tools: applySubagentToolEvent(existing.tools, event),
-    compactions: existing.compactions ?? [],
-  }
+  next[index] = applySubagentItemEvent(existing, event)
   return next
 }
 
@@ -225,85 +234,6 @@ export const setSubagentPrompt = (
   next[index] = {
     ...existing,
     prompt,
-  }
-  return next
-}
-
-export const queueSubagentSteer = (
-  items: ChatTimelineItem[],
-  subagentId: string,
-  message: string,
-): ChatTimelineItem[] => {
-  const index = items.findIndex(
-    (item) => item.type === 'subagent' && item.subagentId === subagentId,
-  )
-  if (index < 0) {
-    return items
-  }
-  const existing = items[index]
-  if (existing?.type !== 'subagent') {
-    return items
-  }
-  const next = [...items]
-  next[index] = {
-    ...existing,
-    status: 'running',
-    pendingSteers: [...(existing.pendingSteers ?? []), message],
-  }
-  return next
-}
-
-export const rollbackQueuedSubagentSteer = (
-  items: ChatTimelineItem[],
-  subagentId: string,
-  message: string,
-  status: SubagentTimelineItem['status'],
-): ChatTimelineItem[] => {
-  const index = items.findIndex(
-    (item) => item.type === 'subagent' && item.subagentId === subagentId,
-  )
-  if (index < 0) {
-    return items
-  }
-  const existing = items[index]
-  if (existing?.type !== 'subagent') {
-    return items
-  }
-  const pending = [...(existing.pendingSteers ?? [])]
-  const lastIndex = pending.lastIndexOf(message)
-  if (lastIndex >= 0) {
-    pending.splice(lastIndex, 1)
-  }
-  const next = [...items]
-  next[index] = {
-    ...existing,
-    pendingSteers: pending,
-    status: pending.length > 0 ? 'running' : status,
-  }
-  return next
-}
-
-export const clearQueuedSubagentSteers = (
-  items: ChatTimelineItem[],
-  subagentId: string,
-): ChatTimelineItem[] => {
-  const index = items.findIndex(
-    (item) => item.type === 'subagent' && item.subagentId === subagentId,
-  )
-  if (index < 0) {
-    return items
-  }
-  const existing = items[index]
-  if (existing?.type !== 'subagent') {
-    return items
-  }
-  if ((existing.pendingSteers ?? []).length === 0) {
-    return items
-  }
-  const next = [...items]
-  next[index] = {
-    ...existing,
-    pendingSteers: [],
   }
   return next
 }

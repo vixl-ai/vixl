@@ -1,18 +1,58 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { StagedImage } from '@/types/harness/staged-image'
 import estimateTextTokens from '@/utils/estimate-text-tokens'
 
-const generateText = vi.hoisted(() =>
-  vi.fn<(...args: unknown[]) => Promise<{
-    text: string
-    usage?: unknown
-    finishReason?: string
-    response?: { id?: string; messages?: unknown[] }
-    responseMessages?: unknown[]
-  }>>(),
+type StreamGenerateResult = {
+  text: string
+  usage?: unknown
+  finishReason?: string
+  providerMetadata?: unknown
+  response?: { id?: string; messages?: unknown[] }
+  responseMessages?: unknown[]
+  steps?: unknown[]
+}
+
+type StreamPart = {
+  type: string
+  text?: string
+  error?: unknown
+}
+
+type StreamTextResult = {
+  fullStream: AsyncIterable<StreamPart>
+  text: string | PromiseLike<string>
+  finishReason?: string | PromiseLike<string | undefined>
+  usage?: unknown | PromiseLike<unknown>
+  providerMetadata?: unknown | PromiseLike<unknown>
+  response?:
+    | { id?: string; messages?: unknown[] }
+    | PromiseLike<{ id?: string; messages?: unknown[] } | undefined>
+  responseMessages?: unknown[] | PromiseLike<unknown[] | undefined>
+  steps?: unknown[] | PromiseLike<unknown[] | undefined>
+}
+
+const streamText = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => StreamTextResult>(),
 )
+
+const resolvedStream = (value: StreamGenerateResult & { parts?: StreamPart[] }): StreamTextResult => ({
+  ...value,
+  fullStream: (async function* () {
+    for (const part of value.parts ?? []) {
+      yield part
+    }
+  })(),
+  text: value.text,
+  finishReason: value.finishReason,
+  usage: value.usage,
+  providerMetadata: value.providerMetadata,
+  response: value.response,
+  responseMessages: value.responseMessages,
+  steps: value.steps,
+})
 const createModel = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 )
@@ -58,7 +98,7 @@ const resolveModelVision = vi.hoisted(() =>
 )
 
 vi.mock('ai', () => ({
-  generateText: (...args: unknown[]) => generateText(...args),
+  streamText: (...args: unknown[]) => streamText(...args),
   isLoopFinished: () => () => false,
 }))
 
@@ -95,12 +135,18 @@ import {
   resetSubagentRegistryForTests,
 } from '@/services/harness/subagent/registry'
 import repairToolCall from '@/services/harness/orchestrator/repair-tool-call'
+import { applySubagentItemEvent } from '@/utils/apply-subagent-step-event'
+import type { SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 
 type ToolExecutionEndEvent = {
   toolCall: { toolCallId: string; toolName: string; input: unknown }
   toolOutput:
     | { type: 'tool-result'; output: unknown }
     | { type: 'tool-error'; error: unknown }
+}
+
+type ToolExecutionStartEvent = {
+  toolCall: { toolCallId: string; toolName: string; input: unknown }
 }
 
 type GenerateConfig = {
@@ -111,7 +157,54 @@ type GenerateConfig = {
   messages?: unknown[]
   prompt?: string
   maxOutputTokens?: number
+  onToolExecutionStart?: (event: ToolExecutionStartEvent) => void
   onToolExecutionEnd?: (event: ToolExecutionEndEvent) => void
+}
+
+const streamFromWork = (
+  work: (config: GenerateConfig) => Promise<StreamGenerateResult>,
+): ((config: unknown) => StreamTextResult) => {
+  return (config) => {
+    const pending = work(config as GenerateConfig)
+    return {
+      fullStream: {
+        [Symbol.asyncIterator]() {
+          let settled = false
+          return {
+            async next() {
+              if (settled) {
+                return { done: true as const, value: undefined }
+              }
+              settled = true
+              await pending
+              return { done: true as const, value: undefined }
+            },
+          }
+        },
+      },
+      get text() {
+        return pending.then((result) => result.text)
+      },
+      get finishReason() {
+        return pending.then((result) => result.finishReason)
+      },
+      get usage() {
+        return pending.then((result) => result.usage)
+      },
+      get providerMetadata() {
+        return pending.then((result) => result.providerMetadata)
+      },
+      get response() {
+        return pending.then((result) => result.response)
+      },
+      get responseMessages() {
+        return pending.then((result) => result.responseMessages)
+      },
+      get steps() {
+        return pending.then((result) => result.steps)
+      },
+    }
+  }
 }
 
 const TOKEN_CAP = 8000
@@ -138,15 +231,15 @@ describe('runSubagentGenerate compaction wiring', () => {
     createModel.mockResolvedValue({ id: 'stub-model' })
     captureBillableUsage.mockResolvedValue(undefined)
     resolveAgentDefinition.mockResolvedValue(null)
-    generateText.mockResolvedValue({
+    streamText.mockReturnValue(resolvedStream({
       text: 'summary',
       usage: {},
       response: { messages: [{ role: 'assistant', content: 'summary' }] },
-    })
+    }))
     compactStep.mockResolvedValue(undefined)
   })
 
-  it('wraps nested tools and passes prepareStep to generateText', async () => {
+  it('wraps nested tools and passes prepareStep to streamText', async () => {
     await runSubagentGenerate({
       ctx: baseCtx(),
       subagentId: 'sub-1',
@@ -158,8 +251,8 @@ describe('runSubagentGenerate compaction wiring', () => {
       capabilities: 'read-only',
     })
 
-    expect(generateText).toHaveBeenCalledTimes(1)
-    const config = generateText.mock.calls[0]?.[0] as GenerateConfig
+    expect(streamText).toHaveBeenCalledTimes(1)
+    const config = streamText.mock.calls[0]?.[0] as GenerateConfig
     expect(config.prepareStep).toBeTypeOf('function')
 
     const grep = config.tools?.grep
@@ -192,7 +285,7 @@ describe('runSubagentGenerate compaction wiring', () => {
       capabilities: 'read-only',
     })
 
-    const config = generateText.mock.calls[0]?.[0] as GenerateConfig
+    const config = streamText.mock.calls[0]?.[0] as GenerateConfig
     expect(config.maxOutputTokens).toBe(DEFAULT_MAX_OUTPUT_TOKENS)
     expect(DEFAULT_MAX_OUTPUT_TOKENS).toBe(32_768)
   })
@@ -205,7 +298,7 @@ describe('runSubagentGenerate capabilities', () => {
     createModel.mockResolvedValue({ id: 'stub-model' })
     captureBillableUsage.mockResolvedValue(undefined)
     resolveAgentDefinition.mockResolvedValue(null)
-    generateText.mockResolvedValue({ text: 'summary', usage: {} })
+    streamText.mockReturnValue(resolvedStream({ text: 'summary', usage: {} }))
   })
 
   const runWithCapabilities = async (
@@ -221,7 +314,7 @@ describe('runSubagentGenerate capabilities', () => {
       model: 'local::qwen',
       capabilities,
     })
-    return generateText.mock.calls[0]?.[0] as GenerateConfig
+    return streamText.mock.calls[0]?.[0] as GenerateConfig
   }
 
   it('keeps only read-only tools and a read-only system prompt', async () => {
@@ -290,7 +383,7 @@ describe('runSubagentGenerate pending approval tagging', () => {
     createModel.mockResolvedValue({ id: 'stub-model' })
     captureBillableUsage.mockResolvedValue(undefined)
     resolveAgentDefinition.mockResolvedValue(null)
-    generateText.mockResolvedValue({ text: 'summary', usage: {} })
+    streamText.mockReturnValue(resolvedStream({ text: 'summary', usage: {} }))
   })
 
   it('attaches subagentId and subagentLabel before forwarding onPendingApproval', async () => {
@@ -371,7 +464,7 @@ describe('runSubagentGenerate agent definition', () => {
     createModel.mockResolvedValue({ id: 'stub-model' })
     captureBillableUsage.mockResolvedValue(undefined)
     resolveAgentDefinition.mockResolvedValue(null)
-    generateText.mockResolvedValue({ text: 'summary', usage: {} })
+    streamText.mockReturnValue(resolvedStream({ text: 'summary', usage: {} }))
   })
 
   it('puts Agent definition and body into nested system when resolved', async () => {
@@ -396,7 +489,7 @@ describe('runSubagentGenerate agent definition', () => {
     })
 
     expect(resolveAgentDefinition).toHaveBeenCalledWith('/tmp/project', 'reviewer')
-    const config = generateText.mock.calls[0]?.[0] as GenerateConfig
+    const config = streamText.mock.calls[0]?.[0] as GenerateConfig
     expect(config.system).toContain('Agent definition:')
     expect(config.system).toContain('Review the diff carefully and report risks.')
   })
@@ -409,11 +502,11 @@ describe('runSubagentGenerate steer prepareStep', () => {
     createModel.mockResolvedValue({ id: 'stub-model' })
     captureBillableUsage.mockResolvedValue(undefined)
     resolveAgentDefinition.mockResolvedValue(null)
-    generateText.mockResolvedValue({
+    streamText.mockReturnValue(resolvedStream({
       text: 'summary',
       usage: {},
       responseMessages: [{ role: 'assistant', content: 'summary' }],
-    })
+    }))
     compactStep.mockResolvedValue(undefined)
   })
 
@@ -440,7 +533,7 @@ describe('runSubagentGenerate steer prepareStep', () => {
       model: 'local::qwen',
       capabilities: 'read-only',
     })
-    const config = generateText.mock.calls[0]?.[0] as GenerateConfig
+    const config = streamText.mock.calls[0]?.[0] as GenerateConfig
     const prepareStep = config.prepareStep as (options: {
       messages: { role: string; content: string }[]
     }) => Promise<{ messages?: unknown[] } | undefined>
@@ -543,8 +636,8 @@ describe('runSubagentGenerate steer prepareStep', () => {
     compactStep
       .mockResolvedValueOnce({ messages: firstCompacted })
       .mockResolvedValueOnce({ messages: secondCompacted })
-    generateText.mockImplementation(async (config) => {
-      const prepareStep = (config as GenerateConfig).prepareStep as (options: {
+    streamText.mockImplementation(streamFromWork(async (config) => {
+      const prepareStep = config.prepareStep as (options: {
         messages: { role: string; content: string }[]
       }) => Promise<{ messages?: unknown[] } | undefined>
       await prepareStep({
@@ -560,7 +653,7 @@ describe('runSubagentGenerate steer prepareStep', () => {
         usage: {},
         response: { messages: [{ role: 'assistant', content: 'summary' }] },
       }
-    })
+    }))
 
     await runSubagentGenerate({
       ctx: baseCtx(),
@@ -601,11 +694,11 @@ describe('runSubagentGenerate summary validation', () => {
     captureBillableUsage.mockResolvedValue(undefined)
     resolveAgentDefinition.mockResolvedValue(null)
     compactStep.mockResolvedValue(undefined)
-    generateText.mockResolvedValue({
+    streamText.mockReturnValue(resolvedStream({
       text: 'summary',
       usage: {},
       finishReason: 'stop',
-    })
+    }))
     register('chat-1', 'sub-1', new AbortController(), {
       toolCallId: 'call-1',
       agentName: 'explore',
@@ -613,9 +706,9 @@ describe('runSubagentGenerate summary validation', () => {
     })
   })
 
-  it('passes the parent repairToolCall into the main generateText call', async () => {
+  it('passes the parent repairToolCall into the main streamText call', async () => {
     await run()
-    const config = generateText.mock.calls[0]?.[0] as GenerateConfig
+    const config = streamText.mock.calls[0]?.[0] as GenerateConfig
     expect(config.repairToolCall).toBe(repairToolCall)
   })
 })
@@ -647,13 +740,13 @@ describe('runSubagentGenerate output-limit truncation', () => {
     })
   })
 
-  it('returns partial text plus a truncation notice when generateText reaches the output limit', async () => {
-    generateText.mockResolvedValue({
+  it('returns partial text plus a truncation notice when streamText reaches the output limit', async () => {
+    streamText.mockReturnValue(resolvedStream({
       text: 'partial summary',
       usage: {},
       finishReason: 'length',
       response: { messages: [{ role: 'assistant', content: 'partial summary' }] },
-    })
+    }))
 
     const notice = `[The model reached its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`
     await expect(run()).resolves.toEqual({
@@ -663,13 +756,13 @@ describe('runSubagentGenerate output-limit truncation', () => {
     expect(captureBillableUsage).toHaveBeenCalledTimes(1)
   })
 
-  it('returns only the truncation notice when generateText reaches the limit with no text', async () => {
-    generateText.mockResolvedValue({
+  it('returns only the truncation notice when streamText reaches the limit with no text', async () => {
+    streamText.mockReturnValue(resolvedStream({
       text: '',
       usage: {},
       finishReason: 'length',
       response: { messages: [] },
-    })
+    }))
 
     await expect(run()).resolves.toEqual({
       text: `[The model reached its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`,
@@ -677,13 +770,13 @@ describe('runSubagentGenerate output-limit truncation', () => {
     })
   })
 
-  it('returns text when generateText finishes with stop', async () => {
-    generateText.mockResolvedValue({
+  it('returns text when streamText finishes with stop', async () => {
+    streamText.mockReturnValue(resolvedStream({
       text: 'summary',
       usage: {},
       finishReason: 'stop',
       response: { messages: [{ role: 'assistant', content: 'summary' }] },
-    })
+    }))
 
     await expect(run()).resolves.toEqual({
       text: 'summary',
@@ -692,12 +785,12 @@ describe('runSubagentGenerate output-limit truncation', () => {
   })
 
   it('returns content-filter finish without a truncation notice', async () => {
-    generateText.mockResolvedValue({
+    streamText.mockReturnValue(resolvedStream({
       text: 'blocked',
       usage: {},
       finishReason: 'content-filter',
       response: { messages: [{ role: 'assistant', content: 'blocked' }] },
-    })
+    }))
 
     await expect(run()).resolves.toEqual({
       text: 'blocked',
@@ -714,11 +807,11 @@ describe('runSubagentGenerate per-step snapshot', () => {
     captureBillableUsage.mockResolvedValue(undefined)
     resolveAgentDefinition.mockResolvedValue(null)
     compactStep.mockResolvedValue(undefined)
-    generateText.mockResolvedValue({
+    streamText.mockReturnValue(resolvedStream({
       text: 'summary',
       usage: {},
       response: { messages: [{ role: 'assistant', content: 'summary' }] },
-    })
+    }))
     register('chat-1', 'sub-1', new AbortController(), {
       toolCallId: 'call-1',
       agentName: 'explore',
@@ -733,8 +826,8 @@ describe('runSubagentGenerate per-step snapshot', () => {
       { role: 'assistant' as const, content: 'mid-run' },
     ]
     let historyDuringStep = 0
-    generateText.mockImplementation(async (config) => {
-      const prepareStep = (config as GenerateConfig).prepareStep as (options: {
+    streamText.mockImplementation(streamFromWork(async (config) => {
+      const prepareStep = config.prepareStep as (options: {
         messages: { role: string; content: string }[]
       }) => Promise<{ messages?: unknown[] } | undefined>
       await prepareStep({ messages: snapshot })
@@ -754,7 +847,7 @@ describe('runSubagentGenerate per-step snapshot', () => {
         usage: {},
         response: { messages: [{ role: 'assistant', content: 'summary' }] },
       }
-    })
+    }))
 
     await runSubagentGenerate({
       ctx: {
@@ -824,48 +917,54 @@ describe('runSubagentGenerate transient retry', () => {
       { role: 'user' as const, content: 'task' },
       { role: 'assistant' as const, content: 'wrote src/a.ts' },
     ]
-    generateText.mockImplementationOnce(async (config) => {
-      const prepareStep = (config as GenerateConfig).prepareStep as (options: {
+    streamText.mockImplementationOnce(streamFromWork(async (config) => {
+      const prepareStep = config.prepareStep as (options: {
         messages: { role: string; content: string }[]
       }) => Promise<{ messages?: unknown[] } | undefined>
       await prepareStep({ messages: snapshot })
       throw transientError()
-    })
-    generateText.mockResolvedValueOnce({
+    }))
+    streamText.mockReturnValueOnce(resolvedStream({
       text: 'recovered',
       usage: { inputTokens: 4 },
       response: { messages: [{ role: 'assistant', content: 'recovered' }] },
-    })
+    }))
 
     const pending = run()
     await vi.advanceTimersByTimeAsync(2_000)
     await expect(pending).resolves.toEqual({ text: 'recovered' })
 
-    expect(generateText).toHaveBeenCalledTimes(2)
-    const second = generateText.mock.calls[1]?.[0] as GenerateConfig
+    expect(streamText).toHaveBeenCalledTimes(2)
+    const second = streamText.mock.calls[1]?.[0] as GenerateConfig
     expect(second.messages).toEqual(snapshot)
     expect(second.prompt).toBeUndefined()
     expect(captureBillableUsage).toHaveBeenCalledTimes(1)
   })
 
   it('fails immediately on a non-transient error', async () => {
-    generateText.mockRejectedValueOnce(new Error('Invalid tool arguments'))
+    streamText.mockImplementationOnce(() => {
+      throw new Error('Invalid tool arguments')
+    })
     await expect(run()).rejects.toThrow('Invalid tool arguments')
-    expect(generateText).toHaveBeenCalledTimes(1)
+    expect(streamText).toHaveBeenCalledTimes(1)
     expect(captureBillableUsage).not.toHaveBeenCalled()
   })
 
   it('does not retry abort errors', async () => {
     const abortError = new Error('The operation was aborted.')
     abortError.name = 'AbortError'
-    generateText.mockRejectedValueOnce(abortError)
+    streamText.mockImplementationOnce(() => {
+      throw abortError
+    })
     await expect(run()).rejects.toThrow('The operation was aborted.')
-    expect(generateText).toHaveBeenCalledTimes(1)
+    expect(streamText).toHaveBeenCalledTimes(1)
   })
 
-  it('aborts during backoff without a second generateText call', async () => {
+  it('aborts during backoff without a second streamText call', async () => {
     const controller = new AbortController()
-    generateText.mockRejectedValueOnce(transientError())
+    streamText.mockImplementationOnce(() => {
+      throw transientError()
+    })
 
     const pending = runSubagentGenerate({
       ctx: baseCtx(),
@@ -880,7 +979,7 @@ describe('runSubagentGenerate transient retry', () => {
     await vi.advanceTimersByTimeAsync(0)
     controller.abort()
     await expect(pending).rejects.toThrow('Subagent aborted')
-    expect(generateText).toHaveBeenCalledTimes(1)
+    expect(streamText).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -975,8 +1074,8 @@ describe('runSubagentGenerate multi-step history', () => {
   })
 
   it('persists a 3-step run without duplicating assistant or tool messages', async () => {
-    generateText.mockImplementation(async (config) =>
-      threeStepSdkResult(config as GenerateConfig),
+    streamText.mockImplementation(
+      streamFromWork((config) => threeStepSdkResult(config)),
     )
 
     await run()
@@ -1002,15 +1101,15 @@ describe('runSubagentGenerate multi-step history', () => {
 
   it('does not duplicate steps after one transient retry', async () => {
     vi.useFakeTimers()
-    generateText.mockImplementationOnce(async (config) => {
-      const prepareStep = (config as GenerateConfig).prepareStep as PrepareStepFn
-      await prepareStep({ messages: inputFromConfig(config as GenerateConfig) })
+    streamText.mockImplementationOnce(streamFromWork(async (config) => {
+      const prepareStep = config.prepareStep as PrepareStepFn
+      await prepareStep({ messages: inputFromConfig(config) })
       throw new Error(
         'Failed after 3 attempts GatewayResponseError error sending request',
       )
-    })
-    generateText.mockImplementationOnce(async (config) =>
-      threeStepSdkResult(config as GenerateConfig),
+    }))
+    streamText.mockImplementationOnce(
+      streamFromWork((config) => threeStepSdkResult(config)),
     )
 
     const pending = run()
@@ -1022,8 +1121,8 @@ describe('runSubagentGenerate multi-step history', () => {
     }
 
     const stored = getSubagent('sub-1')?.messages
-    expect(generateText).toHaveBeenCalledTimes(2)
-    const second = generateText.mock.calls[1]?.[0] as GenerateConfig
+    expect(streamText).toHaveBeenCalledTimes(2)
+    const second = streamText.mock.calls[1]?.[0] as GenerateConfig
     expect(second.messages).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1040,12 +1139,14 @@ describe('runSubagentGenerate multi-step history', () => {
   })
 
   it('keeps a mid-run steer once and does not duplicate prior steps', async () => {
-    generateText.mockImplementation(async (config) =>
-      threeStepSdkResult(config as GenerateConfig, {
-        afterStep1: () => {
-          pushSteer('sub-1', 'also check tests')
-        },
-      }),
+    streamText.mockImplementation(
+      streamFromWork((config) =>
+        threeStepSdkResult(config, {
+          afterStep1: () => {
+            pushSteer('sub-1', 'also check tests')
+          },
+        }),
+      ),
     )
 
     await run()
@@ -1074,4 +1175,605 @@ describe('runSubagentGenerate multi-step history', () => {
     expect(steerIndex).toBeGreaterThan(grepIndex ?? -1)
   })
 })
+
+const nestedFrom = (events: unknown[]): HarnessEvent[] =>
+  events.flatMap((event) => {
+    if (
+      event &&
+      typeof event === 'object' &&
+      'type' in event &&
+      (event as { type?: unknown }).type === 'subagent-event' &&
+      'event' in event
+    ) {
+      return [(event as { event: HarnessEvent }).event]
+    }
+    return []
+  })
+
+describe('runSubagentGenerate nested step stream', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetSubagentRegistryForTests()
+    createModel.mockResolvedValue({ id: 'stub-model' })
+    captureBillableUsage.mockResolvedValue(undefined)
+    resolveAgentDefinition.mockResolvedValue(null)
+    compactStep.mockResolvedValue(undefined)
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'call-1',
+      agentName: 'explore',
+      model: 'local::qwen',
+    })
+  })
+
+  const runWithEvents = async () => {
+    const events: unknown[] = []
+    const result = await runSubagentGenerate({
+      ctx: {
+        ...baseCtx(),
+        onHarnessEvent: (event) => {
+          events.push(event)
+        },
+      },
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+    return { events: nestedFrom(events), result }
+  }
+
+  it('emits reasoning-delta with stepId before tool events', async () => {
+    streamText.mockImplementation((config) => {
+      const typed = config as GenerateConfig
+      return {
+        fullStream: (async function* () {
+          yield { type: 'start-step' }
+          yield { type: 'reasoning-delta', text: 'looking at auth' }
+          typed.onToolExecutionStart?.({
+            toolCall: {
+              toolCallId: 'tc-grep',
+              toolName: 'grep',
+              input: { query: 'auth' },
+            },
+          })
+          typed.onToolExecutionEnd?.({
+            toolCall: {
+              toolCallId: 'tc-grep',
+              toolName: 'grep',
+              input: { query: 'auth' },
+            },
+            toolOutput: { type: 'tool-result', output: { matches: ['login.ts'] } },
+          })
+          yield { type: 'text-delta', text: 'found it' }
+          yield { type: 'finish-step' }
+        })(),
+        text: 'found it',
+        finishReason: 'stop',
+        usage: {},
+        response: { messages: [{ role: 'assistant', content: 'found it' }] },
+      }
+    })
+
+    const { events, result } = await runWithEvents()
+    const types = events.map((event) => event.type)
+    const reasoningIndex = types.indexOf('reasoning-delta')
+    const toolIndex = types.indexOf('tool-start')
+    const reasoning = events.find((event) => event.type === 'reasoning-delta')
+    const stepStart = events.find((event) => event.type === 'step-start')
+
+    expect(reasoningIndex).toBeGreaterThanOrEqual(0)
+    expect(toolIndex).toBeGreaterThan(reasoningIndex)
+    expect(reasoning).toEqual({
+      type: 'reasoning-delta',
+      delta: 'looking at auth',
+      stepId: expect.any(String),
+    })
+    expect(stepStart && reasoning && 'stepId' in reasoning).toBe(true)
+    const reasoningMatchesStep =
+      stepStart?.type === 'step-start' &&
+      reasoning?.type === 'reasoning-delta' &&
+      reasoning.stepId === stepStart.stepId
+    expect(reasoningMatchesStep).toBe(true)
+    expect(result).toEqual({ text: 'found it', finishReason: 'stop' })
+  })
+
+  it('emits exactly one step-content snapshot per step with full replaced fields', async () => {
+    streamText.mockReturnValue({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        yield { type: 'reasoning-delta', text: 'think-' }
+        yield { type: 'reasoning-delta', text: '1' }
+        yield { type: 'text-delta', text: 'hello' }
+        yield { type: 'text-delta', text: ' world' }
+        yield { type: 'finish-step' }
+        yield { type: 'start-step' }
+        yield { type: 'text-delta', text: 'second' }
+        yield { type: 'finish-step' }
+      })(),
+      text: 'second',
+      finishReason: 'stop',
+      usage: {},
+      response: { messages: [{ role: 'assistant', content: 'second' }] },
+    })
+
+    const { events } = await runWithEvents()
+    const contents = events.filter((event) => event.type === 'step-content')
+    const starts = events.filter((event) => event.type === 'step-start')
+    expect(contents).toHaveLength(2)
+    expect(starts).toHaveLength(2)
+    expect(contents[0]).toEqual({
+      type: 'step-content',
+      stepId: starts[0] && starts[0].type === 'step-start' ? starts[0].stepId : '',
+      reasoning: 'think-1',
+      reasoningSeconds: expect.any(Number),
+      text: 'hello world',
+    })
+    expect(contents[1]).toEqual({
+      type: 'step-content',
+      stepId: starts[1] && starts[1].type === 'step-start' ? starts[1].stepId : '',
+      reasoning: '',
+      reasoningSeconds: 0,
+      text: 'second',
+    })
+    expect(contents[0]?.type === 'step-content' && contents[1]?.type === 'step-content').toBe(
+      true,
+    )
+    const distinctStepIds =
+      contents[0]?.type === 'step-content' &&
+      contents[1]?.type === 'step-content' &&
+      contents[0].stepId !== contents[1].stepId
+    expect(distinctStepIds).toBe(true)
+    expect(events.filter((event) => event.type === 'step-drop-unsealed')).toEqual([])
+  })
+
+  it('keeps truncation notice on the parent tool result after a streamed length finish', async () => {
+    streamText.mockReturnValue(resolvedStream({
+      text: 'partial summary',
+      usage: {},
+      finishReason: 'length',
+      response: { messages: [{ role: 'assistant', content: 'partial summary' }] },
+      parts: [
+        { type: 'start-step' },
+        { type: 'text-delta', text: 'partial summary' },
+        { type: 'finish-step' },
+      ],
+    }))
+
+    const { result, events } = await runWithEvents()
+    const notice = `[The model reached its output limit (${DEFAULT_MAX_OUTPUT_TOKENS} tokens) before finishing. Raise max output in model options or ask for a shorter response.]`
+    expect(result).toEqual({
+      text: `partial summary\n\n${notice}`,
+      finishReason: 'length',
+    })
+    expect(events.filter((event) => event.type === 'step-content')).toHaveLength(1)
+  })
+
+  it('seals partial step content then stops without billing when aborted', async () => {
+    const controller = new AbortController()
+    const events: unknown[] = []
+    streamText.mockReturnValue({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        yield { type: 'reasoning-delta', text: 'partial think' }
+        yield { type: 'text-delta', text: 'partial text' }
+        controller.abort()
+        yield { type: 'text-delta', text: 'after abort' }
+      })(),
+      text: 'partial text',
+      finishReason: 'stop',
+      usage: {},
+      response: { messages: [] },
+    })
+
+    await expect(
+      runSubagentGenerate({
+        ctx: {
+          ...baseCtx(),
+          onHarnessEvent: (event) => {
+            events.push(event)
+          },
+        },
+        subagentId: 'sub-1',
+        agentName: 'explore',
+        prompt: 'find the auth bug',
+        toolCallId: 'call-1',
+        signal: controller.signal,
+        model: 'local::qwen',
+        capabilities: 'read-only',
+      }),
+    ).rejects.toThrow('Subagent aborted')
+    expect(captureBillableUsage).not.toHaveBeenCalled()
+
+    const nested = nestedFrom(events)
+    const starts = nested.filter((event) => event.type === 'step-start')
+    const contents = nested.filter((event) => event.type === 'step-content')
+    const finishes = nested.filter((event) => event.type === 'step-finish')
+    const stepId = starts[0]?.type === 'step-start' ? starts[0].stepId : ''
+    expect(contents).toHaveLength(1)
+    expect(contents[0]).toEqual({
+      type: 'step-content',
+      stepId,
+      reasoning: 'partial think',
+      reasoningSeconds: expect.any(Number),
+      text: 'partial text',
+    })
+    expect(finishes).toEqual([{ type: 'step-finish', stepId }])
+    expect(nested.filter((event) => event.type === 'step-drop-unsealed')).toEqual([])
+    expect(
+      nested.filter(
+        (event) => event.type === 'text-delta' && event.delta === 'after abort',
+      ),
+    ).toEqual([])
+    const contentIndex = nested.findIndex((event) => event.type === 'step-content')
+    const finishIndex = nested.findIndex((event) => event.type === 'step-finish')
+    expect(contentIndex).toBeGreaterThanOrEqual(0)
+    expect(finishIndex).toBeGreaterThan(contentIndex)
+  })
+
+  it('drops unsealed orphan steps after a mid-stream transient retry', async () => {
+    vi.useFakeTimers()
+    const events: unknown[] = []
+    const transient = new Error(
+      'Failed after 3 attempts GatewayResponseError error sending request',
+    )
+    streamText.mockImplementationOnce((config) => {
+      const typed = config as GenerateConfig
+      return {
+        fullStream: (async function* () {
+          yield { type: 'start-step' }
+          typed.onToolExecutionStart?.({
+            toolCall: {
+              toolCallId: 'tc-sealed',
+              toolName: 'grep',
+              input: { query: 'auth' },
+            },
+          })
+          typed.onToolExecutionEnd?.({
+            toolCall: {
+              toolCallId: 'tc-sealed',
+              toolName: 'grep',
+              input: { query: 'auth' },
+            },
+            toolOutput: { type: 'tool-result', output: { matches: ['login.ts'] } },
+          })
+          yield { type: 'text-delta', text: 'sealed text' }
+          yield { type: 'finish-step' }
+          yield { type: 'start-step' }
+          typed.onToolExecutionStart?.({
+            toolCall: {
+              toolCallId: 'tc-orphan',
+              toolName: 'read_file',
+              input: { path: 'login.ts' },
+            },
+          })
+          yield { type: 'text-delta', text: 'orphan text' }
+          yield { type: 'error', error: transient }
+        })(),
+        text: 'orphan text',
+        finishReason: 'error',
+        usage: {},
+        response: { messages: [] },
+      }
+    })
+    streamText.mockImplementationOnce(() => ({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        yield { type: 'text-delta', text: 'retry text' }
+        yield { type: 'finish-step' }
+      })(),
+      text: 'retry text',
+      finishReason: 'stop',
+      usage: {},
+      response: { messages: [{ role: 'assistant', content: 'retry text' }] },
+    }))
+
+    const pending = runSubagentGenerate({
+      ctx: {
+        ...baseCtx(),
+        onHarnessEvent: (event) => {
+          events.push(event)
+        },
+      },
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+    try {
+      await vi.advanceTimersByTimeAsync(2_000)
+      await expect(pending).resolves.toEqual({
+        text: 'retry text',
+        finishReason: 'stop',
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const nested = nestedFrom(events)
+    const starts = nested.filter((event) => event.type === 'step-start')
+    const contents = nested.filter((event) => event.type === 'step-content')
+    const drops = nested.filter((event) => event.type === 'step-drop-unsealed')
+    const sealedId =
+      starts[0]?.type === 'step-start' ? starts[0].stepId : ''
+    const orphanId =
+      starts[1]?.type === 'step-start' ? starts[1].stepId : ''
+    const retryId =
+      starts[2]?.type === 'step-start' ? starts[2].stepId : ''
+
+    expect(starts).toHaveLength(3)
+    expect(drops).toEqual([{ type: 'step-drop-unsealed', stepIds: [orphanId] }])
+    expect(
+      contents.some(
+        (event) => event.type === 'step-content' && event.stepId === orphanId,
+      ),
+    ).toBe(false)
+    expect(contents.map((event) => event.type === 'step-content' && event.stepId)).toEqual([
+      sealedId,
+      retryId,
+    ])
+    const dropIndex = nested.findIndex((event) => event.type === 'step-drop-unsealed')
+    const retryStartIndex = nested.findIndex(
+      (event, index) => index > dropIndex && event.type === 'step-start',
+    )
+    expect(dropIndex).toBeGreaterThan(0)
+    expect(retryStartIndex).toBeGreaterThan(dropIndex)
+
+    let item: SubagentTimelineItem = {
+      type: 'subagent',
+      subagentId: 'sub-1',
+      name: 'explore',
+      blocking: false,
+      status: 'running',
+      tools: [],
+      steps: [],
+      compactions: [],
+    }
+    for (const event of nested) {
+      item = applySubagentItemEvent(item, event)
+    }
+    expect(item.steps?.map((step) => step.id)).toEqual([sealedId, retryId])
+    expect(item.tools.map((tool) => tool.toolCallId)).toEqual(['tc-sealed'])
+    expect(item.tools[0]?.status).toBe('done')
+  })
+
+  it('seals partial step content on terminal non-transient failure', async () => {
+    const events: unknown[] = []
+    streamText.mockReturnValue({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        yield { type: 'reasoning-delta', text: 'partial think' }
+        yield { type: 'text-delta', text: 'partial text' }
+        yield { type: 'error', error: new Error('Invalid tool arguments') }
+      })(),
+      text: 'partial text',
+      finishReason: 'error',
+      usage: {},
+      response: { messages: [] },
+    })
+
+    await expect(
+      runSubagentGenerate({
+        ctx: {
+          ...baseCtx(),
+          onHarnessEvent: (event) => {
+            events.push(event)
+          },
+        },
+        subagentId: 'sub-1',
+        agentName: 'explore',
+        prompt: 'find the auth bug',
+        toolCallId: 'call-1',
+        signal: new AbortController().signal,
+        model: 'local::qwen',
+        capabilities: 'read-only',
+      }),
+    ).rejects.toThrow('Invalid tool arguments')
+    expect(captureBillableUsage).not.toHaveBeenCalled()
+    expect(streamText).toHaveBeenCalledTimes(1)
+
+    const nested = nestedFrom(events)
+    const starts = nested.filter((event) => event.type === 'step-start')
+    const contents = nested.filter((event) => event.type === 'step-content')
+    const finishes = nested.filter((event) => event.type === 'step-finish')
+    const stepId = starts[0]?.type === 'step-start' ? starts[0].stepId : ''
+    expect(contents).toHaveLength(1)
+    expect(contents[0]).toEqual({
+      type: 'step-content',
+      stepId,
+      reasoning: 'partial think',
+      reasoningSeconds: expect.any(Number),
+      text: 'partial text',
+    })
+    expect(finishes).toEqual([{ type: 'step-finish', stepId }])
+    expect(nested.filter((event) => event.type === 'step-drop-unsealed')).toEqual([])
+    const contentIndex = nested.findIndex((event) => event.type === 'step-content')
+    const finishIndex = nested.findIndex((event) => event.type === 'step-finish')
+    expect(contentIndex).toBeGreaterThanOrEqual(0)
+    expect(finishIndex).toBeGreaterThan(contentIndex)
+  })
+
+  it('seals the last open step once when transient retries are exhausted', async () => {
+    vi.useFakeTimers()
+    const events: unknown[] = []
+    const transient = () =>
+      new Error(
+        'Failed after 3 attempts GatewayResponseError error sending request',
+      )
+    const failingStream = (label: string) => ({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        yield { type: 'reasoning-delta', text: `${label} think` }
+        yield { type: 'text-delta', text: `${label} text` }
+        yield { type: 'error', error: transient() }
+      })(),
+      text: `${label} text`,
+      finishReason: 'error',
+      usage: {},
+      response: { messages: [] },
+    })
+    streamText
+      .mockImplementationOnce(() => failingStream('first'))
+      .mockImplementationOnce(() => failingStream('second'))
+      .mockImplementationOnce(() => failingStream('third'))
+
+    const pending = runSubagentGenerate({
+      ctx: {
+        ...baseCtx(),
+        onHarnessEvent: (event) => {
+          events.push(event)
+        },
+      },
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+    const outcome = pending.then(
+      () => {
+        throw new Error('expected generate to fail')
+      },
+      (error: unknown) => error,
+    )
+    try {
+      await vi.advanceTimersByTimeAsync(2_000)
+      await vi.advanceTimersByTimeAsync(6_000)
+      await expect(outcome).resolves.toEqual(
+        expect.objectContaining({
+          message:
+            'Failed after 3 attempts GatewayResponseError error sending request',
+        }),
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+
+    expect(streamText).toHaveBeenCalledTimes(3)
+    expect(captureBillableUsage).not.toHaveBeenCalled()
+
+    const nested = nestedFrom(events)
+    const starts = nested.filter((event) => event.type === 'step-start')
+    const contents = nested.filter((event) => event.type === 'step-content')
+    const finishes = nested.filter((event) => event.type === 'step-finish')
+    const drops = nested.filter((event) => event.type === 'step-drop-unsealed')
+    const firstId = starts[0]?.type === 'step-start' ? starts[0].stepId : ''
+    const secondId = starts[1]?.type === 'step-start' ? starts[1].stepId : ''
+    const lastId = starts[2]?.type === 'step-start' ? starts[2].stepId : ''
+
+    expect(starts).toHaveLength(3)
+    expect(contents).toHaveLength(1)
+    expect(finishes).toHaveLength(1)
+    expect(contents[0]).toEqual({
+      type: 'step-content',
+      stepId: lastId,
+      reasoning: 'third think',
+      reasoningSeconds: expect.any(Number),
+      text: 'third text',
+    })
+    expect(finishes).toEqual([{ type: 'step-finish', stepId: lastId }])
+    expect(drops).toEqual([
+      { type: 'step-drop-unsealed', stepIds: [firstId] },
+      { type: 'step-drop-unsealed', stepIds: [secondId] },
+    ])
+  })
+
+  it('drops the failed attempt and seals only the retry on success', async () => {
+    vi.useFakeTimers()
+    const events: unknown[] = []
+    const transient = new Error(
+      'Failed after 3 attempts GatewayResponseError error sending request',
+    )
+    streamText.mockImplementationOnce(() => ({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        yield { type: 'reasoning-delta', text: 'orphan think' }
+        yield { type: 'text-delta', text: 'orphan text' }
+        yield { type: 'error', error: transient }
+      })(),
+      text: 'orphan text',
+      finishReason: 'error',
+      usage: {},
+      response: { messages: [] },
+    }))
+    streamText.mockImplementationOnce(() => ({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        yield { type: 'text-delta', text: 'retry text' }
+        yield { type: 'finish-step' }
+      })(),
+      text: 'retry text',
+      finishReason: 'stop',
+      usage: {},
+      response: { messages: [{ role: 'assistant', content: 'retry text' }] },
+    }))
+
+    const pending = runSubagentGenerate({
+      ctx: {
+        ...baseCtx(),
+        onHarnessEvent: (event) => {
+          events.push(event)
+        },
+      },
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+    try {
+      await vi.advanceTimersByTimeAsync(2_000)
+      await expect(pending).resolves.toEqual({
+        text: 'retry text',
+        finishReason: 'stop',
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const nested = nestedFrom(events)
+    const starts = nested.filter((event) => event.type === 'step-start')
+    const contents = nested.filter((event) => event.type === 'step-content')
+    const finishes = nested.filter((event) => event.type === 'step-finish')
+    const drops = nested.filter((event) => event.type === 'step-drop-unsealed')
+    const orphanId = starts[0]?.type === 'step-start' ? starts[0].stepId : ''
+    const retryId = starts[1]?.type === 'step-start' ? starts[1].stepId : ''
+
+    expect(starts).toHaveLength(2)
+    expect(drops).toEqual([{ type: 'step-drop-unsealed', stepIds: [orphanId] }])
+    expect(contents).toHaveLength(1)
+    expect(finishes).toHaveLength(1)
+    expect(contents[0]).toEqual({
+      type: 'step-content',
+      stepId: retryId,
+      reasoning: '',
+      reasoningSeconds: 0,
+      text: 'retry text',
+    })
+    expect(finishes).toEqual([{ type: 'step-finish', stepId: retryId }])
+    expect(
+      contents.some(
+        (event) => event.type === 'step-content' && event.stepId === orphanId,
+      ),
+    ).toBe(false)
+    const dropIndex = nested.findIndex((event) => event.type === 'step-drop-unsealed')
+    const retryStartIndex = nested.findIndex(
+      (event, index) => index > dropIndex && event.type === 'step-start',
+    )
+    const contentIndex = nested.findIndex((event) => event.type === 'step-content')
+    expect(dropIndex).toBeGreaterThan(0)
+    expect(retryStartIndex).toBeGreaterThan(dropIndex)
+    expect(contentIndex).toBeGreaterThan(retryStartIndex)
+  })
+})
+
 
