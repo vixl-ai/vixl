@@ -102,6 +102,7 @@ jobs:
       - run: npm ci
 
       - name: Clear stale bundles
+        shell: bash
         run: rm -rf src-tauri/target/release/bundle src-tauri/target/*/release/bundle
 
       - name: Extract linuxdeploy without FUSE
