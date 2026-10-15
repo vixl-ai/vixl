@@ -165,12 +165,15 @@ export default (
         [...subagents.value].reverse().find((item) => item.status === 'running')
           ?.subagentId
       if (targetId) {
-        subagents.value = subagents.value.map((item) =>
-          item.subagentId === targetId
-            ? { ...item, events: [...item.events, event.event] }
-            : item,
-        )
-        session.appendLocalSubagentToolEvent(targetId, event.event)
+        const nested = event.event
+        if (nested.type !== 'reasoning-delta' && nested.type !== 'text-delta') {
+          subagents.value = subagents.value.map((item) =>
+            item.subagentId === targetId
+              ? { ...item, events: [...item.events, nested] }
+              : item,
+          )
+        }
+        session.appendLocalSubagentToolEvent(targetId, nested)
       }
     }
     if (event.type === 'pending-subagent') {

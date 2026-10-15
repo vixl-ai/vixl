@@ -117,11 +117,13 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
           || hasSpawnSubagent
         "
         :persist-key="chatTurnOpenKeys.reasoning(turn.id, step.id)"
+        :content-streaming="isStepStreaming(index)"
         class="mb-0 w-full max-w-prose"
       >
         <AiElementsReasoningReasoningTrigger />
         <AiElementsReasoningReasoningContent
           :content="step.reasoning"
+          :streaming="isStepStreaming(index)"
           class="max-w-prose"
         />
       </AiElementsReasoningReasoning>

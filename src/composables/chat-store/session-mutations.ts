@@ -150,7 +150,10 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
     upsertLocalToolRun: agent.upsertLocalToolRun,
     finishAgentTurn: agent.finishAgentTurn,
     flushPendingStreamDeltas: agent.flushPendingStreamDeltas,
-    disposePendingStreamDeltas: agent.disposePendingStreamDeltas,
+    disposePendingStreamDeltas: (): void => {
+      subagent.disposePendingSubagentStreamDeltas()
+      agent.disposePendingStreamDeltas()
+    },
     setAgentTurnError: (turnError: AgentTurnError): void => {
       agent.flushPendingStreamDeltas()
       const current = agent.getActiveTurn()

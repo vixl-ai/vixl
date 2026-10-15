@@ -7,6 +7,7 @@ export type NestedStepEmitter = {
   finishStep: () => void
   ensureStepOpen: () => void
   sealReasoningDuration: () => void
+  noteModelRequested: () => void
   noteReasoningDelta: () => void
   appendReasoning: (delta: string) => void
   appendText: (delta: string) => void
@@ -21,6 +22,7 @@ export const createNestedStepEmitter = (
   let currentReasoning = ''
   let currentText = ''
   let currentReasoningSeconds = 0
+  let modelRequestedAt: number | null = null
   let reasoningStartedAt: number | null = null
   let reasoningSealed = false
   let openedStepIds: string[] = []
@@ -68,6 +70,7 @@ export const createNestedStepEmitter = (
     currentReasoning = ''
     currentText = ''
     currentReasoningSeconds = 0
+    modelRequestedAt = null
     resetReasoningClock()
   }
 
@@ -115,10 +118,18 @@ export const createNestedStepEmitter = (
     ensureStepOpen,
     sealReasoningDuration,
     dropUnsealed,
+    noteModelRequested: (): void => {
+      modelRequestedAt = Date.now()
+    },
     noteReasoningDelta: (): void => {
-      if (reasoningStartedAt === null && !reasoningSealed) {
-        reasoningStartedAt = Date.now()
+      if (reasoningStartedAt !== null || reasoningSealed) {
+        return
       }
+      const now = Date.now()
+      reasoningStartedAt =
+        modelRequestedAt !== null && modelRequestedAt < now
+          ? modelRequestedAt
+          : now
     },
     appendReasoning: (delta: string): void => {
       currentReasoning += delta

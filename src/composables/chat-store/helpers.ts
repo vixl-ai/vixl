@@ -16,6 +16,7 @@ import {
   clearPendingStreamDeltasForSession,
   disposeAllPendingStreamDeltas,
 } from './stream-delta-buffer'
+import { disposeAllPendingSubagentStreamDeltas } from './subagent-stream-delta-buffer'
 import type { ChatSession } from './types'
 
 export const sessions = new Map<string, ChatSession>()
@@ -213,6 +214,7 @@ export const clearCompletedOrErrorAttention = async (
 
 export const resetChatSessionsForTests = (): void => {
   disposeAllPendingStreamDeltas()
+  disposeAllPendingSubagentStreamDeltas()
   sessions.clear()
   activeKey.value = null
 }

@@ -10,6 +10,7 @@ import { ReasoningKey } from './context'
 interface Props {
   class?: HTMLAttributes['class']
   isStreaming?: boolean
+  contentStreaming?: boolean
   open?: boolean
   defaultOpen?: boolean
   duration?: number
@@ -18,6 +19,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   isStreaming: false,
+  contentStreaming: false,
   defaultOpen: true,
   duration: undefined,
 })
@@ -29,8 +31,9 @@ const emit = defineEmits<{
 
 const persistStore = useChatTurnOpenState()
 const persistKey = computed(() => props.persistKey)
+const persistLive = (): boolean => props.isStreaming || props.contentStreaming
 const persistedInitial =
-  !props.isStreaming && persistKey.value
+  !persistLive() && persistKey.value
     ? persistStore?.get(persistKey.value)
     : undefined
 
@@ -44,7 +47,7 @@ if (persistedInitial !== undefined) {
 }
 
 const { setProgrammatic } = bindPersistedOpen(isOpen, persistKey, {
-  write: () => !props.isStreaming,
+  write: () => !persistLive(),
 })
 
 const internalDuration = ref<number | undefined>(props.duration)
@@ -64,38 +67,47 @@ watch(() => props.duration, (newVal) => {
   internalDuration.value = newVal
 })
 
-watch(() => props.isStreaming, (streaming, _prev, onCleanup) => {
-  if (streaming) {
-    wasStreaming.value = true
-    setProgrammatic(true)
+watch(
+  () => [props.isStreaming, props.contentStreaming] as const,
+  ([streaming, revealing], previous, onCleanup) => {
+    if (streaming) {
+      wasStreaming.value = true
+      setProgrammatic(true)
 
-    if (startTime.value === null && props.duration === undefined) {
-      startTime.value = Date.now()
+      if (startTime.value === null && props.duration === undefined) {
+        startTime.value = Date.now()
+      }
+      return
     }
-    return
-  }
 
-  if (!wasStreaming.value) {
-    return
-  }
-
-  if (startTime.value !== null) {
-    if (props.duration === undefined) {
-      const calculatedDuration = Math.ceil((Date.now() - startTime.value) / MS_IN_S)
-      updateDuration(calculatedDuration)
+    const wasIsStreaming = previous?.[0] === true
+    if (wasIsStreaming && startTime.value !== null) {
+      if (props.duration === undefined) {
+        const calculatedDuration = Math.ceil((Date.now() - startTime.value) / MS_IN_S)
+        updateDuration(calculatedDuration)
+      }
+      startTime.value = null
     }
-    startTime.value = null
-  }
 
-  if (!hasAutoClosed.value && isOpen.value) {
-    const timer = setTimeout(() => {
-      setProgrammatic(false)
-      hasAutoClosed.value = true
-    }, AUTO_CLOSE_DELAY)
+    if (revealing) {
+      return
+    }
 
-    onCleanup(() => clearTimeout(timer))
-  }
-}, { immediate: true })
+    if (!wasStreaming.value) {
+      return
+    }
+
+    if (!hasAutoClosed.value && isOpen.value) {
+      const timer = setTimeout(() => {
+        setProgrammatic(false)
+        hasAutoClosed.value = true
+      }, AUTO_CLOSE_DELAY)
+
+      onCleanup(() => clearTimeout(timer))
+    }
+  },
+  { immediate: true },
+)
 
 provide(ReasoningKey, {
   isStreaming: computed(() => props.isStreaming),

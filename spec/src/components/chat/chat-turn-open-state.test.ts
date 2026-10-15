@@ -322,6 +322,119 @@ describe('Reasoning duration', () => {
     expect(mounted.text()).toContain('Thought for 4 seconds')
     expect(mounted.emitted('update:duration')).toBeUndefined()
   })
+
+  it('holds auto-close while content is still revealing, then closes without persisting', async () => {
+    vi.useFakeTimers()
+    const store = createChatTurnOpenState()
+    const key = chatTurnOpenKeys.reasoning('turn-1', 'step-1')
+
+    const mounted = mount(Reasoning, {
+      props: {
+        persistKey: key,
+        isStreaming: true,
+        contentStreaming: true,
+        defaultOpen: false,
+        duration: 4,
+      },
+      slots: {
+        default: ReasoningTrigger,
+      },
+      global: {
+        provide: provideStore(store),
+        stubs: reasoningDurationStubs,
+      },
+    })
+    wrapper = mounted
+
+    expect(collapsibleOpen(mounted)).toBe(true)
+    expect(mounted.text()).toContain('Thinking...')
+
+    await mounted.setProps({ isStreaming: false })
+    await vi.advanceTimersByTimeAsync(1100)
+    await flushPromises()
+
+    expect(collapsibleOpen(mounted)).toBe(true)
+    expect(mounted.text()).toContain('Thought for 4 seconds')
+    expect(mounted.text()).not.toContain('Thinking...')
+    expect(store.size()).toBe(0)
+
+    await mounted.setProps({ contentStreaming: false })
+    await vi.advanceTimersByTimeAsync(1100)
+    await flushPromises()
+
+    expect(collapsibleOpen(mounted)).toBe(false)
+    expect(mounted.text()).toContain('Thought for 4 seconds')
+    expect(store.size()).toBe(0)
+  })
+
+  it('does not reopen a user-collapsed panel while content is still revealing', async () => {
+    vi.useFakeTimers()
+    const store = createChatTurnOpenState()
+    const key = chatTurnOpenKeys.reasoning('turn-1', 'step-1')
+
+    const mounted = mount(Reasoning, {
+      props: {
+        persistKey: key,
+        isStreaming: true,
+        contentStreaming: true,
+        defaultOpen: false,
+        duration: 4,
+      },
+      slots: {
+        default: ReasoningTrigger,
+      },
+      global: {
+        provide: provideStore(store),
+        stubs: reasoningDurationStubs,
+      },
+    })
+    wrapper = mounted
+
+    expect(collapsibleOpen(mounted)).toBe(true)
+    await emitOpen(mounted, false)
+    expect(collapsibleOpen(mounted)).toBe(false)
+
+    await mounted.setProps({ isStreaming: false })
+    await flushPromises()
+
+    expect(collapsibleOpen(mounted)).toBe(false)
+    expect(mounted.text()).toContain('Thought for 4 seconds')
+    expect(store.size()).toBe(0)
+  })
+
+  it('stays closed when mounted revealing with defaultOpen false', async () => {
+    vi.useFakeTimers()
+    const store = createChatTurnOpenState()
+    const key = chatTurnOpenKeys.reasoning('turn-1', 'step-1')
+
+    const mounted = mount(Reasoning, {
+      props: {
+        persistKey: key,
+        isStreaming: false,
+        contentStreaming: true,
+        defaultOpen: false,
+        duration: 4,
+      },
+      slots: {
+        default: ReasoningTrigger,
+      },
+      global: {
+        provide: provideStore(store),
+        stubs: reasoningDurationStubs,
+      },
+    })
+    wrapper = mounted
+
+    expect(collapsibleOpen(mounted)).toBe(false)
+    expect(mounted.text()).toContain('Thought for 4 seconds')
+
+    await mounted.setProps({ contentStreaming: false })
+    await vi.advanceTimersByTimeAsync(1100)
+    await flushPromises()
+
+    expect(collapsibleOpen(mounted)).toBe(false)
+    expect(store.size()).toBe(0)
+  })
 })
 
 describe('ChainOfThought live streaming persist', () => {

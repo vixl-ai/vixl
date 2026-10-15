@@ -181,6 +181,8 @@ const runSubagentGenerate = async (args: {
     fast: callModel.fast,
   })
 
+  const steps = createNestedStepEmitter(emitNestedEvent)
+
   const prepareStep = async (options: {
     messages: ModelMessage[]
   }): Promise<{ messages?: ModelMessage[] } | undefined> => {
@@ -200,6 +202,7 @@ const runSubagentGenerate = async (args: {
     const snapshot = compacted?.messages ?? messages
     // Registry only per step; subagent-history consumers replace the full UI list.
     setMessages(subagentId, snapshot)
+    steps.noteModelRequested()
     if (compacted?.messages) {
       return compacted
     }
@@ -212,7 +215,6 @@ const runSubagentGenerate = async (args: {
   const { onToolExecutionStart, onToolExecutionEnd } =
     createSubagentToolExecutionHooks({ emitNestedEvent })
 
-  const steps = createNestedStepEmitter(emitNestedEvent)
   let generateAttempt = 0
   let result
   try {
@@ -224,6 +226,7 @@ const runSubagentGenerate = async (args: {
           steps.dropUnsealed()
         }
         generateAttempt += 1
+        steps.noteModelRequested()
         const streamed = streamText({
           model,
           system: toCachedInstructions(system, callOptions.providerOptions),

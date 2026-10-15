@@ -21,6 +21,7 @@ import {
 import hydrateSessionFromDisk from './hydrate'
 import { bindSessionMutations } from './session-mutations'
 import { clearPendingStreamDeltasForSession } from './stream-delta-buffer'
+import { clearPendingSubagentStreamDeltasForSession } from './subagent-stream-delta-buffer'
 import createActiveSessionFacade from './active-session-facade'
 import rekeyChatSession from './rekey'
 import type { SessionMutations } from './types'
@@ -155,6 +156,7 @@ const useChatStore = () => {
     const record = await createChat(args)
     const session = getOrCreateSession(record.projectSlug, record.id)
     clearPendingStreamDeltasForSession(session)
+    clearPendingSubagentStreamDeltasForSession(session)
     session.meta.value = mapMeta(record)
     session.messages.value = []
     session.timeline.value = []

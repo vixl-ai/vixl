@@ -587,6 +587,80 @@ describe('agent-harness events reasoning-duration', () => {
   })
 })
 
+describe('agent-harness events subagent nested deltas', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('forwards reasoning-delta without replacing the subagents array', () => {
+    const state = buildState()
+    const events: AgentHarnessState['subagents']['value'][number]['events'] = []
+    state.subagents.value = [
+      {
+        subagentId: 'sub-1',
+        name: 'explorer',
+        blocking: false,
+        status: 'running',
+        events,
+      },
+    ]
+    const subagentsRef = state.subagents.value
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+    const nested = { type: 'reasoning-delta' as const, delta: 'think', stepId: 's1' }
+
+    handleEvent({
+      type: 'subagent-event',
+      subagentId: 'sub-1',
+      parentToolCallId: 'call-1',
+      event: nested,
+    })
+
+    expect(state.subagents.value).toBe(subagentsRef)
+    expect(state.subagents.value[0]?.events).toBe(events)
+    expect(state.subagents.value[0]?.events).toEqual([])
+    expect(state.session.appendLocalSubagentToolEvent).toHaveBeenCalledTimes(1)
+    expect(state.session.appendLocalSubagentToolEvent).toHaveBeenCalledWith(
+      'sub-1',
+      nested,
+    )
+  })
+
+  it('still appends non-delta nested events onto the subagents log', () => {
+    const state = buildState()
+    state.subagents.value = [
+      {
+        subagentId: 'sub-1',
+        name: 'explorer',
+        blocking: false,
+        status: 'running',
+        events: [],
+      },
+    ]
+    const subagentsRef = state.subagents.value
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+    const nested = {
+      type: 'tool-start' as const,
+      toolCallId: 'tc-1',
+      name: 'read_file',
+      args: { path: 'a.ts' },
+    }
+
+    handleEvent({
+      type: 'subagent-event',
+      subagentId: 'sub-1',
+      parentToolCallId: 'call-1',
+      event: nested,
+    })
+
+    expect(state.subagents.value).not.toBe(subagentsRef)
+    expect(state.subagents.value[0]?.events).toEqual([nested])
+    expect(state.session.appendLocalSubagentToolEvent).toHaveBeenCalledWith(
+      'sub-1',
+      nested,
+    )
+  })
+})
+
 describe('agent-harness events subagent start', () => {
   beforeEach(() => {
     vi.clearAllMocks()

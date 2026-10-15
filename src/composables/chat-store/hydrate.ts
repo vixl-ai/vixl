@@ -5,6 +5,7 @@ import { applyHydrateLine, createFlushTurn } from './hydrate-lines'
 import hydrateTimelineBuilder from './hydrate-timeline-builder'
 import { finalizeHydratedSubagents } from './timeline'
 import { clearPendingStreamDeltasForSession } from './stream-delta-buffer'
+import { clearPendingSubagentStreamDeltasForSession } from './subagent-stream-delta-buffer'
 import type { ChatSession } from './types'
 
 const backfillSubagentPrompts = (nextTimeline: ChatTimelineItem[]): void => {
@@ -50,6 +51,7 @@ const backfillSubagentPrompts = (nextTimeline: ChatTimelineItem[]): void => {
 
 const hydrateSessionFromDisk = async (session: ChatSession): Promise<void> => {
   clearPendingStreamDeltasForSession(session)
+  clearPendingSubagentStreamDeltasForSession(session)
   const metaRecord = await readChatMeta(session.projectSlug, session.chatId)
   session.meta.value = mapMeta(metaRecord)
   const lines = await readChatMessages(session.projectSlug, session.chatId)

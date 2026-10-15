@@ -18,19 +18,38 @@ export type ConsumeSubagentStreamArgs = {
 export const asStreamError = (error: unknown): Error =>
   error instanceof Error ? error : new Error('Model stream failed')
 
+const SUBAGENT_STREAM_YIELD_MS = 50
+
 export const consumeSubagentStream = async (
   args: ConsumeSubagentStreamArgs,
 ): Promise<void> => {
   const { fullStream, signal, steps, emitNestedEvent } = args
+  let deltaBurstAt: number | null = null
+  const yieldIfDeltaBurstElapsed = async (): Promise<void> => {
+    const now = Date.now()
+    if (deltaBurstAt === null) {
+      deltaBurstAt = now
+      return
+    }
+    if (now - deltaBurstAt < SUBAGENT_STREAM_YIELD_MS) {
+      return
+    }
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0)
+    })
+    deltaBurstAt = Date.now()
+  }
   for await (const part of fullStream) {
     if (signal.aborted) {
       break
     }
     if (part.type === 'start-step') {
+      deltaBurstAt = null
       steps.beginStep()
       continue
     }
     if (part.type === 'finish-step') {
+      deltaBurstAt = null
       steps.finishStep()
       continue
     }
@@ -44,6 +63,7 @@ export const consumeSubagentStream = async (
         delta,
         stepId: steps.currentStepId,
       })
+      await yieldIfDeltaBurstElapsed()
       continue
     }
     if (part.type === 'text-delta') {
@@ -56,8 +76,10 @@ export const consumeSubagentStream = async (
         delta,
         stepId: steps.currentStepId,
       })
+      await yieldIfDeltaBurstElapsed()
       continue
     }
+    deltaBurstAt = null
     if (part.type === 'error') {
       if (signal.aborted) {
         break

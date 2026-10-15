@@ -222,6 +222,28 @@ describe('ChatAgentTurn reasoning duration', () => {
     expect(reasoningBlock(mounted).props('duration')).toBe(4)
   })
 
+  it('keeps contentStreaming on the last live step while isStreaming stays strict', () => {
+    const mounted = mountTurn({
+      status: 'streaming',
+      turn: {
+        id: 't1',
+        text: 'hello',
+        steps: [
+          {
+            id: 't1-step',
+            text: 'hello',
+            reasoning: 'the plan',
+            reasoningSeconds: 4,
+            tools: [],
+          },
+        ],
+      },
+    })
+    const block = reasoningBlock(mounted)
+    expect(block.props('isStreaming')).toBe(false)
+    expect(block.props('contentStreaming')).toBe(true)
+  })
+
   it('leaves duration undefined when the step has no reasoningSeconds', () => {
     const mounted = mountTurn({
       status: 'ready',
