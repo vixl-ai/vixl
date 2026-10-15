@@ -22,4 +22,6 @@ Left-click a project to expand its chats. Right-click it and choose **Open Proje
 
 Right-click the project, then **Remove from sidebar**. That unregisters the folder. It does not delete the folder, its `.vixl` directory, chats, or graph indexes. Graph stores can be deleted later in Settings, Graphs.
 
+To span more than one folder in a single chat, [create a project group](/getting-started/create-a-project-group).
+
 Next, [send a first chat](/getting-started/your-first-chat).

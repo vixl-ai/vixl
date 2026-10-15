@@ -12,7 +12,7 @@ import ChatPromptEditor from '@/components/chat/prompt-editor/ChatPromptEditor.v
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import ModelOptionsRow from '@/components/models/options/ModelOptionsRow.vue'
 import { Button } from '@/components/shadcn/ui/button'
-import { DropdownMenuItem } from '@/components/shadcn/ui/dropdown-menu'
+import { DropdownMenuCheckboxItem, DropdownMenuItem } from '@/components/shadcn/ui/dropdown-menu'
 
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 const normalizeAttachmentFiles = vi.hoisted(
@@ -58,7 +58,15 @@ const defaultFleetProject = (): FleetProject => ({
 
 const fleetState = vi.hoisted(() => ({
   projects: {
-    value: [] as Array<{ id: string, name: string, rootPath: string }>,
+    value: [] as Array<{ id: string, name: string, slug?: string, rootPath: string }>,
+  },
+  groups: {
+    value: [] as Array<{
+      id: string
+      name: string
+      slug: string
+      memberSlugs: string[]
+    }>,
   },
   activeProject: {
     value: {
@@ -74,6 +82,7 @@ const fleetState = vi.hoisted(() => ({
 vi.mock('@/composables/use-fleet-registry', () => ({
   default: () => ({
     projects: fleetState.projects,
+    groups: fleetState.groups,
     activeProject: fleetState.activeProject,
     loaded: fleetState.loaded,
     setActiveProject: fleetState.setActiveProject,
@@ -163,6 +172,7 @@ const promptInputContextMenuStub = {
 beforeEach(() => {
   chatMeta.value = null
   fleetState.projects.value = []
+  fleetState.groups.value = []
   fleetState.activeProject.value = defaultFleetProject()
   fleetState.loaded.value = true
   fleetState.setActiveProject.mockClear()
@@ -401,3 +411,100 @@ describe('ChatPromptInput subagent composer props', () => {
     wrapper.unmount()
   })
 })
+
+describe('ChatPromptInput project multiselect', () => {
+  beforeEach(() => {
+    fleetState.projects.value = [
+      { id: 'p1', name: 'api', slug: 'api', rootPath: '/tmp/api' },
+      { id: 'p2', name: 'web', slug: 'web', rootPath: '/tmp/web' },
+    ]
+    fleetState.groups.value = [
+      {
+        id: 'g1',
+        name: 'api, web',
+        slug: 'api-web',
+        memberSlugs: ['api', 'web'],
+      },
+    ]
+    fleetState.activeProject.value = {
+      id: 'p1',
+      name: 'api',
+      rootPath: '/tmp/api',
+    }
+  })
+
+  it('emits a single project workspace when one project is selected', async () => {
+    const wrapper = mountPromptInput({ showProjectSelect: true })
+    await flushPromises()
+
+    await wrapper.findComponent(PromptInput).vm.$emit('submit', {
+      text: 'hello',
+      files: [],
+    })
+    await flushPromises()
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual(
+      expect.objectContaining({
+        text: 'hello',
+        workspace: { kind: 'project', projectId: 'p1' },
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it('shows a csv label and emits project ids when two projects are checked', async () => {
+    const wrapper = mountPromptInput({ showProjectSelect: true })
+    await flushPromises()
+
+    const webItem = wrapper
+      .findAllComponents(DropdownMenuCheckboxItem)
+      .find((item) => item.text().includes('web'))
+    expect(webItem).toBeDefined()
+    await webItem!.vm.$emit('update:modelValue', true)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('api, web')
+
+    await wrapper.findComponent(PromptInput).vm.$emit('submit', {
+      text: 'multi',
+      files: [],
+    })
+    await flushPromises()
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual(
+      expect.objectContaining({
+        workspace: { kind: 'projects', projectIds: ['p1', 'p2'] },
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it('selecting a group emits a group workspace', async () => {
+    const wrapper = mountPromptInput({ showProjectSelect: true })
+    await flushPromises()
+
+    const groupItem = wrapper
+      .findAllComponents(DropdownMenuItem)
+      .find((item) => item.text().includes('Group'))
+    expect(groupItem).toBeDefined()
+    await groupItem!.vm.$emit('select')
+    await flushPromises()
+
+    await wrapper.findComponent(PromptInput).vm.$emit('submit', {
+      text: 'grouped',
+      files: [],
+    })
+    await flushPromises()
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual(
+      expect.objectContaining({
+        workspace: { kind: 'group', groupId: 'g1' },
+      }),
+    )
+
+    wrapper.unmount()
+  })
+})
+

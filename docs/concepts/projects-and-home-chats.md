@@ -29,6 +29,18 @@ Project chats use that folder as the workspace. They merge personal and project 
 
 The sidebar lists collapsible project rows plus a **Home** folder when home chats exist. **New Agent** goes to `/` and does not pick a project for you. The home picker does.
 
+## Project groups
+
+A project group is a named set of two or more registered projects. The group lives in personal `~/.vixl/project-groups.json`. It does not replace the member projects. Each member keeps its own folder, `.vixl` tree, and git repo.
+
+Chats on a group bind to the group slug, not to one member. Routes look like `/group/<slug>` and `/group/<slug>/chat/<id>`. Chat files live under `chats/<groupSlug>/<chatId>/`. The workspace for that thread spans every member root.
+
+The **primary member** is the first project in the group's member list. New group chats use that folder as the default workspace root for tools that need one (git `repo`, `run_terminal` cwd, and similar). File and search tools still see every member.
+
+Agent paths must use a member slug prefix when more than one root is in play, for example `api/src/index.ts`. Unprefixed relative paths are rejected and the error lists the valid slugs. One git commit stays inside one repo. Never stage files across projects.
+
+[Create a project group](/getting-started/create-a-project-group) from the home composer. Adding the same member set again reopens that group instead of inserting a second row. Group slugs share the uniqueness pool with project slugs and never use `_home_`.
+
 ## Project page
 
 Open a project from the sidebar to its page. Tabs, in order: Chats, MCP, Graph, Plans, Skills, Agents, Rules. These reuse the Settings section components with project scope. Personal copies of the same surfaces live under Settings.

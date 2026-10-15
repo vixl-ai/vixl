@@ -1,6 +1,7 @@
 mod documents;
 mod ensure_running;
 mod helpers;
+mod instance;
 mod install_progress;
 mod io;
 mod progress;
@@ -69,10 +70,12 @@ use helpers::{
     LspDiagnosticsEvent,
 };
 pub(crate) use install_progress::{finish_standalone_install, mark_server_installing};
-use resolve::{load_effective_servers, server_binary_available};
+use instance::{lsp_logical_id};
+use resolve::{active_project_root, load_effective_servers, server_binary_available};
 use rpc::{
-    cancel_pending_requests, handle_process_exit, json_rpc_request, respond_to_server_request,
-    send_notification, LspProcess, LSP_SERVERS,
+    cancel_pending_requests, handle_process_exit, has_logical_server, json_rpc_request,
+    keys_for_logical_id, lookup_managed, respond_to_server_request, send_notification, LspProcess,
+    LSP_SERVERS,
 };
 pub(crate) use state::current_generation;
 use state::{all_states, fallback_server_state, now_ms, transition, transition_with};
@@ -150,8 +153,8 @@ pub(crate) fn spawn_reader(
                     guard.workspace_root.clone()
                 };
                 let trusted = workspace_is_trusted(&app, Some(workspace_root.as_str()));
-                let vue_running =
-                    server_id == "vue" || LSP_SERVERS.lock().await.contains_key("vue");
+                let vue_running = lsp_logical_id(&server_id) == "vue"
+                    || has_logical_server(&*LSP_SERVERS.lock().await, "vue");
                 let vue_in_play = vue_in_play_for(&workspace_root, None, vue_running);
                 let result = match method {
                     "window/workDoneProgress/create" => serde_json::json!(null),
@@ -199,7 +202,7 @@ pub(crate) fn spawn_reader(
                         continue;
                     }
 
-                    if method == "tsserver/request" && server_id == "vue" {
+                    if method == "tsserver/request" && lsp_logical_id(&server_id) == "vue" {
                         let params = message
                             .get("params")
                             .cloned()
@@ -235,7 +238,7 @@ pub(crate) fn spawn_reader(
                         let payload = LspDiagnosticsEvent {
                             uri,
                             diagnostics,
-                            server_id: server_id.clone(),
+                            server_id: lsp_logical_id(&server_id).to_string(),
                         };
                         let _ = app.emit("lsp://diagnostics", payload);
                         let loading_done = {
@@ -279,12 +282,16 @@ pub(crate) fn spawn_reader(
 }
 
 pub(crate) async fn stop_server_internal(app: &AppHandle, server_id: &str) -> Result<(), String> {
-    let managed = {
+    let keys = {
         let servers = LSP_SERVERS.lock().await;
-        servers.get(server_id).cloned()
+        if servers.contains_key(server_id) {
+            vec![server_id.to_string()]
+        } else {
+            keys_for_logical_id(&servers, server_id)
+        }
     };
 
-    let Some(managed) = managed else {
+    if keys.is_empty() {
         let generation = current_generation(server_id).await;
         log::info!("stopped {server_id}");
         transition(
@@ -295,6 +302,22 @@ pub(crate) async fn stop_server_internal(app: &AppHandle, server_id: &str) -> Re
             LspStatePatch::terminal(None),
         )
         .await;
+        return Ok(());
+    }
+
+    for key in keys {
+        stop_one_instance(app, &key).await?;
+    }
+    Ok(())
+}
+
+async fn stop_one_instance(app: &AppHandle, server_id: &str) -> Result<(), String> {
+    let managed = {
+        let servers = LSP_SERVERS.lock().await;
+        servers.get(server_id).cloned()
+    };
+
+    let Some(managed) = managed else {
         return Ok(());
     };
 
@@ -391,16 +414,18 @@ pub async fn lsp_status() -> Result<Vec<LspServerState>, String> {
 
 #[tauri::command]
 pub async fn lsp_request(
-    _app: AppHandle,
+    app: AppHandle,
     server_id: String,
     method: String,
     params: serde_json::Value,
+    project_root: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let method = normalize_lsp_method(&method)?.to_string();
+    let workspace_hint = project_root.or_else(|| active_project_root(&app));
 
     let managed = {
         let servers = LSP_SERVERS.lock().await;
-        servers.get(&server_id).cloned()
+        lookup_managed(&servers, &server_id, workspace_hint.as_deref())
     };
 
     let Some(managed) = managed else {
@@ -420,8 +445,8 @@ pub async fn lsp_request(
             .ok_or_else(|| "path required for textDocument/didOpen".to_string())?;
         let content = params.get("content").and_then(|value| value.as_str());
         let uri = ensure_document_open(&process, &workspace_root, path, content).await?;
-        if server_id == "vue" {
-            mirror_vue_document_to_typescript(&_app, &workspace_root, path, content, "open").await;
+        if lsp_logical_id(&server_id) == "vue" {
+            mirror_vue_document_to_typescript(&app, &workspace_root, path, content, "open").await;
         }
         return Ok(serde_json::json!({ "uri": uri }));
     }
@@ -434,9 +459,9 @@ pub async fn lsp_request(
         let uri = if let Some(content) = params.get("content").and_then(|value| value.as_str()) {
             let uri =
                 sync_document_change_with_content(&process, &workspace_root, path, content).await?;
-            if server_id == "vue" {
+            if lsp_logical_id(&server_id) == "vue" {
                 mirror_vue_document_to_typescript(
-                    &_app,
+                    &app,
                     &workspace_root,
                     path,
                     Some(content),
@@ -447,8 +472,8 @@ pub async fn lsp_request(
             uri
         } else {
             let uri = sync_document_change(&process, &workspace_root, path).await?;
-            if server_id == "vue" {
-                mirror_vue_document_to_typescript(&_app, &workspace_root, path, None, "change")
+            if lsp_logical_id(&server_id) == "vue" {
+                mirror_vue_document_to_typescript(&app, &workspace_root, path, None, "change")
                     .await;
             }
             uri
@@ -464,8 +489,8 @@ pub async fn lsp_request(
         let absolute = resolve_workspace_path(&workspace_root, path)?;
         let uri = path_to_uri(&absolute);
         close_document(&process, &uri).await?;
-        if server_id == "vue" {
-            mirror_vue_document_to_typescript(&_app, &workspace_root, path, None, "close").await;
+        if lsp_logical_id(&server_id) == "vue" {
+            mirror_vue_document_to_typescript(&app, &workspace_root, path, None, "close").await;
         }
         return Ok(serde_json::json!({ "uri": uri }));
     }
@@ -576,11 +601,25 @@ pub async fn lsp_workspace_profile(project_root: String) -> Result<LspWorkspaceP
 #[tauri::command]
 pub async fn lsp_catalog(app: AppHandle) -> Result<Vec<LspCatalogEntry>, String> {
     let effective = load_effective_servers(&app).await.unwrap_or_default();
-    let states: HashMap<String, LspServerState> = all_states()
-        .await
-        .into_iter()
-        .map(|state| (state.id.clone(), state))
-        .collect();
+    let active_root = active_project_root(&app);
+    let mut states: HashMap<String, LspServerState> = HashMap::new();
+    for state in all_states().await {
+        let replace = match states.get(&state.id) {
+            None => true,
+            Some(existing) => {
+                let existing_active = active_root
+                    .as_deref()
+                    .is_some_and(|root| existing.workspace_root.as_deref() == Some(root));
+                let incoming_active = active_root
+                    .as_deref()
+                    .is_some_and(|root| state.workspace_root.as_deref() == Some(root));
+                incoming_active && !existing_active
+            }
+        };
+        if replace {
+            states.insert(state.id.clone(), state);
+        }
+    }
     let mut entries: Vec<LspCatalogEntry> = Vec::new();
     let mut seen = std::collections::HashSet::new();
 

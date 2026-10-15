@@ -10,7 +10,7 @@ import prepareStream, { type PreparedHarnessStream } from './prepare-stream'
 import resolveLiveWorkspace from './resolve-workspace'
 
 export default async (input: HarnessStreamInput): Promise<void> => {
-  const workspace = resolveLiveWorkspace(input)
+  const workspace = await resolveLiveWorkspace(input)
   const { chatId, signal, onEvent } = input
 
   setAgentShellEventEmitter(chatId, onEvent)

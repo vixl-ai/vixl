@@ -5,24 +5,38 @@ import { gateToolPermission } from '@/services/harness/permission/gate'
 import { fsDeleteCapability } from '@/services/harness/permission/policy'
 import captureBaselinesBeforeMutate from '@/services/harness/capture-baselines-before-mutate'
 import mapDiffs from '@/services/harness/shared/map-diffs'
-import { notifyWorkspaceFsMutation } from '@/services/harness/shared/notify-fs-mutation'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
+import {
+  notifyWorkspaceMutations,
+  permissionPath,
+  sensitiveCheckPaths,
+  withMultiRootPathHint,
+  withProjectRoots,
+} from '@/services/harness/tool-roots'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const deleteFile = (ctx: HarnessToolContext) =>
   tool({
-    description: 'Delete a file from the workspace (requires approval)',
+    description: withMultiRootPathHint(
+      'Delete a file from the workspace (requires approval)',
+      ctx,
+    ),
     inputSchema: z.object({
-      path: z.string().describe('File to delete'),
+      path: z.string().describe(withMultiRootPathHint('File to delete', ctx)),
       recursive: z.boolean().optional().describe('Delete directories recursively'),
     }),
     execute: async ({ path, recursive }, { toolCallId }) => {
+      const gatedPath = permissionPath(ctx.members, path)
       let diffs: FileDiff[]
       try {
-        diffs = mapDiffs(await fsStagePreviewDelete({ projectRoot: ctx.projectRoot, path }))
+        diffs = mapDiffs(
+          await fsStagePreviewDelete(
+            withProjectRoots({ projectRoot: ctx.projectRoot, path }, ctx),
+          ),
+        )
       } catch {
-        diffs = [{ path, operation: 'delete', hunks: [] }]
+        diffs = [{ path: gatedPath, operation: 'delete', hunks: [] }]
       }
 
       const allowed = await gateToolPermission({
@@ -31,9 +45,9 @@ const deleteFile = (ctx: HarnessToolContext) =>
         name: 'delete_file',
         kind: 'fs',
         action: 'fs.delete',
-        capability: fsDeleteCapability(path),
-        title: `Delete ${path}`,
-        paths: [path],
+        capability: fsDeleteCapability(gatedPath),
+        title: `Delete ${gatedPath}`,
+        paths: sensitiveCheckPaths(ctx.members, [path]),
         diff: diffs,
       })
       if (!allowed) {
@@ -41,9 +55,12 @@ const deleteFile = (ctx: HarnessToolContext) =>
       }
 
       await captureBaselinesBeforeMutate(ctx, [path], toolCallId)
-      await fsDelete({ projectRoot: ctx.projectRoot, path, recursive })
-      notifyWorkspaceFsMutation(ctx.projectRoot, [path])
-      return { ok: true, path, diffs }
+      await fsDelete(
+        withProjectRoots({ projectRoot: ctx.projectRoot, path, recursive }, ctx),
+      )
+      notifyWorkspaceMutations(ctx, [gatedPath])
+      const resultPath = diffs[0]?.path ?? gatedPath
+      return { ok: true, path: resultPath, diffs }
     },
   })
 

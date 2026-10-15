@@ -1,6 +1,10 @@
 import type { FleetProject } from '@/types/fleet/fleet-project'
 import type { WorkbenchTab } from '@/types/workbench/workbench-tab'
-import useFleetRegistry from '@/composables/use-fleet-registry'
+import useFleetRegistry, {
+  getFleetGroups,
+  getFleetProjects,
+} from '@/composables/use-fleet-registry'
+import { primaryProjectForSlug } from '@/utils/primary-project-for-slug'
 import { getUserHomeDir } from '@/services/vixl/vixl-tauri'
 import { HOME_WORKSPACE_ID, isHomeChatSlug } from '@/constants/home-chat'
 import {
@@ -70,8 +74,48 @@ export const resolveProjectIdBySlug = (slug: string): string | null => {
     return HOME_WORKSPACE_ID
   }
   const fleet = useFleetRegistry()
-  return fleet.projects.value.find((p) => p.slug === slug)?.id ?? null
+  return primaryProjectForSlug(slug, fleet.projects.value, fleet.groups?.value ?? [])?.id ?? null
 }
+
+export const listGroupMemberProjects = (groupSlug: string): FleetProject[] => {
+  const group = getFleetGroups().find((entry) => entry.slug === groupSlug)
+  if (!group) {
+    return []
+  }
+  const bySlug = new Map(getFleetProjects().map((project) => [project.slug, project]))
+  const members: FleetProject[] = []
+  for (const memberSlug of group.memberSlugs) {
+    const project = bySlug.get(memberSlug)
+    if (project) {
+      members.push(project)
+    }
+  }
+  return members
+}
+
+export const listWorkspaceProjects = (contextSlug?: string | null): FleetProject[] => {
+  const slug = contextSlug?.trim() ?? ''
+  if (slug) {
+    const members = listGroupMemberProjects(slug)
+    if (members.length > 0) {
+      return members
+    }
+    if (isHomeChatSlug(slug)) {
+      const home = getProject(HOME_WORKSPACE_ID)
+      return home ? [home] : []
+    }
+    const direct = getFleetProjects().find((project) => project.slug === slug)
+    if (direct) {
+      return [direct]
+    }
+  }
+  const project = getProject(resolveWorkspaceProjectId())
+  return project ? [project] : []
+}
+
+export const resolvePrimaryWorkspaceProjectId = (
+  contextSlug?: string | null,
+): string => listWorkspaceProjects(contextSlug)[0]?.id ?? resolveWorkspaceProjectId()
 
 export const ensureSidebarOpen = (): void => {
   rightSidebarOpen.value = true

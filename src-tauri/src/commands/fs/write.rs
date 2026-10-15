@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 use super::diff::build_file_diff;
 use super::path::{
-    canonical_project_root, reject_sensitive_path_unless_allowed, relative_path,
-    resolve_workspace_path,
+    reject_resolved_sensitive_path_unless_allowed, reject_sensitive_path_unless_allowed,
+    resolve_command_path, WorkspaceRootArg,
 };
 use super::types::{FileDiff, WriteTempHandoffResult};
 
@@ -14,10 +14,11 @@ pub fn fs_write_file(
     path: String,
     content: String,
     allow_sensitive: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<FileDiff, String> {
-    reject_sensitive_path_unless_allowed(&path, allow_sensitive)?;
-    let root = canonical_project_root(&project_root)?;
-    let absolute = resolve_workspace_path(&project_root, &path)?;
+    let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
+    reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
+    let absolute = resolved.path.clone();
     let old_content = if absolute.exists() {
         Some(fs::read_to_string(&absolute).map_err(|error| error.to_string())?)
     } else {
@@ -33,7 +34,7 @@ pub fn fs_write_file(
         "create"
     };
     Ok(build_file_diff(
-        relative_path(&root, &absolute),
+        resolved.reported_path(),
         operation,
         old_content,
         Some(content),
@@ -75,11 +76,15 @@ pub fn fs_rename(
     from: String,
     to: String,
     allow_sensitive: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<(), String> {
-    reject_sensitive_path_unless_allowed(&from, allow_sensitive)?;
-    reject_sensitive_path_unless_allowed(&to, allow_sensitive)?;
-    let absolute_from = resolve_workspace_path(&project_root, &from)?;
-    let absolute_to = resolve_workspace_path(&project_root, &to)?;
+    let roots = project_roots.as_deref();
+    let resolved_from = resolve_command_path(&project_root, roots, &from)?;
+    let resolved_to = resolve_command_path(&project_root, roots, &to)?;
+    reject_resolved_sensitive_path_unless_allowed(&resolved_from, allow_sensitive)?;
+    reject_resolved_sensitive_path_unless_allowed(&resolved_to, allow_sensitive)?;
+    let absolute_from = resolved_from.path;
+    let absolute_to = resolved_to.path;
     if !absolute_from.exists() {
         return Err("Source path does not exist".to_string());
     }
@@ -98,9 +103,11 @@ pub fn fs_delete(
     path: String,
     recursive: Option<bool>,
     allow_sensitive: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<(), String> {
-    reject_sensitive_path_unless_allowed(&path, allow_sensitive)?;
-    let absolute = resolve_workspace_path(&project_root, &path)?;
+    let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
+    reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
+    let absolute = resolved.path;
     if !absolute.exists() {
         return Err("Path does not exist".to_string());
     }
@@ -123,11 +130,15 @@ pub fn fs_copy(
     from: String,
     to: String,
     allow_sensitive: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<(), String> {
-    reject_sensitive_path_unless_allowed(&from, allow_sensitive)?;
-    reject_sensitive_path_unless_allowed(&to, allow_sensitive)?;
-    let absolute_from = resolve_workspace_path(&project_root, &from)?;
-    let absolute_to = resolve_workspace_path(&project_root, &to)?;
+    let roots = project_roots.as_deref();
+    let resolved_from = resolve_command_path(&project_root, roots, &from)?;
+    let resolved_to = resolve_command_path(&project_root, roots, &to)?;
+    reject_resolved_sensitive_path_unless_allowed(&resolved_from, allow_sensitive)?;
+    reject_resolved_sensitive_path_unless_allowed(&resolved_to, allow_sensitive)?;
+    let absolute_from = resolved_from.path;
+    let absolute_to = resolved_to.path;
     if !absolute_from.exists() {
         return Err("Source path does not exist".to_string());
     }
@@ -149,11 +160,15 @@ pub fn fs_move(
     from: String,
     to: String,
     allow_sensitive: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<(), String> {
-    reject_sensitive_path_unless_allowed(&from, allow_sensitive)?;
-    reject_sensitive_path_unless_allowed(&to, allow_sensitive)?;
-    let absolute_from = resolve_workspace_path(&project_root, &from)?;
-    let absolute_to = resolve_workspace_path(&project_root, &to)?;
+    let roots = project_roots.as_deref();
+    let resolved_from = resolve_command_path(&project_root, roots, &from)?;
+    let resolved_to = resolve_command_path(&project_root, roots, &to)?;
+    reject_resolved_sensitive_path_unless_allowed(&resolved_from, allow_sensitive)?;
+    reject_resolved_sensitive_path_unless_allowed(&resolved_to, allow_sensitive)?;
+    let absolute_from = resolved_from.path;
+    let absolute_to = resolved_to.path;
     if !absolute_from.exists() {
         return Err("Source path does not exist".to_string());
     }
@@ -184,8 +199,12 @@ pub fn fs_move(
 }
 
 #[tauri::command]
-pub fn fs_mkdir(project_root: String, path: String) -> Result<(), String> {
-    let absolute = resolve_workspace_path(&project_root, &path)?;
+pub fn fs_mkdir(
+    project_root: String,
+    path: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<(), String> {
+    let absolute = resolve_command_path(&project_root, project_roots.as_deref(), &path)?.path;
     fs::create_dir_all(&absolute).map_err(|error| error.to_string())
 }
 

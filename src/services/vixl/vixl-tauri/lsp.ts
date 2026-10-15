@@ -15,7 +15,14 @@ export const lspRequest = (
   serverId: string,
   method: string,
   params: Record<string, unknown>,
-): Promise<unknown> => call('lsp_request', { serverId, method, params })
+  projectRoot?: string | null,
+): Promise<unknown> =>
+  call('lsp_request', {
+    serverId,
+    method,
+    params,
+    projectRoot: projectRoot ?? null,
+  })
 
 export const lspEnsureServer = (
   extension: string,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import {
   Bot,
@@ -34,8 +34,10 @@ import projectRouteFor from '@/utils/project-route-for'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 
 const router = useRouter()
+const route = useRoute()
 const fleet = useFleetRegistry()
 const workbench = useWorkbenchStore()
+const contextSlug = computed(() => String(route.params.slug ?? ''))
 const { open, items, closePalette } = useCommandPalette()
 
 const activeTab = ref<CommandPaletteTab>('All')
@@ -95,7 +97,9 @@ const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
 
     if (item.action === 'open-terminal') {
       try {
-        await workbench.openTerminal(workbench.resolveWorkspaceProjectId())
+        await workbench.openTerminal(
+          workbench.resolvePrimaryWorkspaceProjectId(contextSlug.value),
+        )
       } catch (error) {
         toast.error('Could not open terminal', {
           description: error instanceof Error ? error.message : 'Unknown error',
@@ -106,7 +110,9 @@ const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
 
     if (item.action === 'open-editor') {
       try {
-        const projectId = workbench.resolveWorkspaceProjectId()
+        const projectId = workbench.resolvePrimaryWorkspaceProjectId(
+          contextSlug.value,
+        )
         await workbench.openEditor(
           projectId,
           fleet.activeProjectId.value ? 'README.md' : '',
@@ -136,11 +142,14 @@ const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
       const project = fleet.projects.value.find(
         (entry) => entry.slug === item.projectSlug,
       )
-      if (!project) {
+      const group = (fleet.groups?.value ?? []).find(
+        (entry) => entry.slug === item.projectSlug,
+      )
+      if (!project && !group) {
         toast.error('Project not found')
         return
       }
-      await router.push(projectRouteFor(project.slug))
+      await router.push(projectRouteFor(item.projectSlug))
     }
   } catch (error) {
     toast.error('Action failed', {

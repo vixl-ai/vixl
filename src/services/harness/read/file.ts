@@ -1,6 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { fsReadFile } from '@/services/vixl/vixl-tauri'
+import { withMultiRootPathHint, withProjectRoots } from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const imageReadResult = (args: {
@@ -23,19 +24,26 @@ const readFile = (ctx: HarnessToolContext) =>
     description:
       'Read a workspace file. Images load into context for vision models; otherwise they return metadata and optional base64.',
     inputSchema: z.object({
-      path: z.string().describe('Workspace-relative file path'),
+      path: z
+        .string()
+        .describe(withMultiRootPathHint('Workspace-relative file path', ctx)),
       offset: z.number().optional().describe('1-based start line'),
       limit: z.number().optional().describe('Max lines to return'),
       include_base64: z.boolean().optional().describe('Include base64 for images'),
     }),
     execute: async ({ path, offset, limit, include_base64 }) => {
-      const result = await fsReadFile({
-        projectRoot: ctx.projectRoot,
-        path,
-        offset,
-        limit,
-        includeBase64: include_base64,
-      })
+      const result = await fsReadFile(
+        withProjectRoots(
+          {
+            projectRoot: ctx.projectRoot,
+            path,
+            offset,
+            limit,
+            includeBase64: include_base64,
+          },
+          ctx,
+        ),
+      )
 
       if (!result.isImage) {
         return result
@@ -57,11 +65,16 @@ const readFile = (ctx: HarnessToolContext) =>
       let resolvedPath = result.path
 
       if (!base64) {
-        const withBase64 = await fsReadFile({
-          projectRoot: ctx.projectRoot,
-          path,
-          includeBase64: true,
-        })
+        const withBase64 = await fsReadFile(
+          withProjectRoots(
+            {
+              projectRoot: ctx.projectRoot,
+              path,
+              includeBase64: true,
+            },
+            ctx,
+          ),
+        )
         base64 = withBase64.base64
         mimeType = withBase64.mimeType ?? mimeType
         sizeBytes = withBase64.sizeBytes ?? sizeBytes

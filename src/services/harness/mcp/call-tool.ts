@@ -86,13 +86,17 @@ const callMcpTool = (ctx: HarnessToolContext) =>
       if (!trust.trusted) {
         if (trust.reason === 'missing') {
           return {
-            error: `MCP server "${serverId}" was not found in any mcp.json config. It may have been removed, or the config failed to load.`,
+            error:
+              trust.error && trust.error.includes('multiple projects')
+                ? trust.error
+                : `MCP server "${serverId}" was not found in any mcp.json config. It may have been removed, or the config failed to load.`,
           }
         }
         return {
           error: `MCP server "${serverId}" is not trusted yet. Starting it in Settings, MCP grants trust.`,
         }
       }
+      const runtimeId = trust.id
       const allowed = await gateToolPermission({
         ctx: toPermCtx(ctx),
         toolCallId,
@@ -109,7 +113,7 @@ const callMcpTool = (ctx: HarnessToolContext) =>
         return { rejected: true, error: 'MCP call denied' }
       }
 
-      const status = await mcpRuntime.getStatus(serverId, trust.config, trust.scopeKey)
+      const status = await mcpRuntime.getStatus(runtimeId, trust.config, trust.scopeKey)
       const toolInfo = status.tools.find((item) => item.name === toolName)
       const normalized = normalizeMcpToolArgs(
         (args ?? {}) as Record<string, unknown>,
@@ -146,7 +150,7 @@ const callMcpTool = (ctx: HarnessToolContext) =>
         })
         try {
           return await mcpRuntime.callTool(
-            serverId,
+            runtimeId,
             toolName,
             toolArgs,
             undefined,

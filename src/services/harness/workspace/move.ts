@@ -86,6 +86,7 @@ const moveWorkspace = (ctx: HarnessToolContext) =>
 
       ctx.projectRoot = moved.chat.projectRoot
       ctx.projectSlug = moved.chat.projectSlug
+      ctx.members = undefined
 
       try {
         await updateChatMeta(moved.chat.projectSlug, ctx.chatId, {

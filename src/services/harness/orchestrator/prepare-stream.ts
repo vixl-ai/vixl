@@ -68,7 +68,7 @@ export type PreparedHarnessStream = {
 }
 
 export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream> => {
-  const workspace = resolveLiveWorkspace(input)
+  const workspace = await resolveLiveWorkspace(input)
   const {
     chatId,
     mode,
@@ -128,6 +128,7 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     mentions: [],
     agentCatalog: [],
     standalone: workspace.standalone,
+    members: workspace.members,
   })
   // Mentions are injected into the last user message, not the frozen prefix.
   const prefixParts: SystemPromptParts = { ...freshParts, mentions: '' }
@@ -187,6 +188,7 @@ export default async (input: HarnessStreamInput): Promise<PreparedHarnessStream>
     messages,
     timeline,
     standalone: workspace.standalone,
+    members: workspace.members,
     parts,
     frozenSnapshot,
     activeContext: input.activeContext,

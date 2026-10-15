@@ -515,6 +515,7 @@ declare module 'vue' {
     WindowResizeHandles: typeof import('./components/navigation/header/WindowResizeHandles.vue')['default']
     WorkbenchFileTree: typeof import('./components/workbench/WorkbenchFileTree.vue')['default']
     WorkbenchFileTreeFolder: typeof import('./components/workbench/WorkbenchFileTreeFolder.vue')['default']
+    WorkbenchGroupFileTree: typeof import('./components/workbench/WorkbenchGroupFileTree.vue')['default']
     WorkbenchHeader: typeof import('./components/workbench/WorkbenchHeader.vue')['default']
     WorkbenchLspStatus: typeof import('./components/workbench/WorkbenchLspStatus.vue')['default']
     WorkbenchShell: typeof import('./components/workbench/WorkbenchShell.vue')['default']

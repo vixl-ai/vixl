@@ -23,12 +23,6 @@ pub fn generate_seatbelt_profile_with(
     home: &str,
     project_root: &str,
 ) -> String {
-    let network_rule = if allow_network {
-        "(allow network*)\n"
-    } else {
-        ""
-    };
-
     let ancestor_rules = format_ancestor_read_rules(home, project_root);
     let project_write_rules = if project_writable {
         r#"
@@ -56,6 +50,20 @@ pub fn generate_seatbelt_profile_with(
 ; Project root: read-only (TMPDIR and tool caches stay writable)
 (allow file-read*  (subpath (param "PROJECT_ROOT")))
 "#
+    };
+
+    render_seatbelt_profile(allow_network, &ancestor_rules, &project_write_rules)
+}
+
+fn render_seatbelt_profile(
+    allow_network: bool,
+    ancestor_rules: &str,
+    project_write_rules: &str,
+) -> String {
+    let network_rule = if allow_network {
+        "(allow network*)\n"
+    } else {
+        ""
     };
 
     format!(
@@ -134,6 +142,65 @@ pub fn generate_seatbelt_profile_with(
     )
 }
 
+/// Multi-root Seatbelt profile. A single root keeps the existing PROJECT_ROOT
+/// parameter profile unchanged. Multiple roots bind every member RW (or RO)
+/// using canonical literal paths, then re-protect `.git` and `.env` writes.
+pub fn generate_seatbelt_profile_for_roots(
+    allow_network: bool,
+    project_writable: bool,
+    home: &str,
+    project_roots: &[&str],
+) -> String {
+    if project_roots.len() <= 1 {
+        let root = project_roots.first().copied().unwrap_or("");
+        return generate_seatbelt_profile_with(allow_network, project_writable, home, root);
+    }
+
+    use crate::commands::sandbox_protect::{
+        canonicalize_sandbox_path, collect_env_protection_paths, resolve_git_protection_paths,
+    };
+    use std::path::Path;
+
+    let canonical_roots: Vec<String> = project_roots
+        .iter()
+        .map(|root| canonicalize_sandbox_path(root))
+        .collect();
+
+    let ancestor_rules = format_ancestor_read_rules_many(home, &canonical_roots);
+    let mut project_write_rules = String::new();
+    for root in &canonical_roots {
+        project_write_rules.push_str(&format!(
+            "\n; Project root: {root}\n(allow file-read*  (subpath \"{root}\"))\n"
+        ));
+        if !project_writable {
+            continue;
+        }
+        project_write_rules.push_str(&format!("(allow file-write* (subpath \"{root}\"))\n"));
+        for git_path in resolve_git_protection_paths(Path::new(root)) {
+            let git = git_path.to_string_lossy();
+            project_write_rules.push_str(&format!("(deny file-write* (subpath \"{git}\"))\n"));
+        }
+        project_write_rules.push_str(&format!(
+            r#"
+(deny file-write*
+  (require-all
+    (subpath "{root}")
+    (regex #"/\.env(\.[^/]*)?$")))
+(allow file-write*
+  (require-all
+    (subpath "{root}")
+    (regex #"/\.env\.(example|sample|template)$")))
+"#
+        ));
+        for env_path in collect_env_protection_paths(Path::new(root)) {
+            let env = env_path.to_string_lossy();
+            project_write_rules.push_str(&format!("(deny file-write* (literal \"{env}\"))\n"));
+        }
+    }
+
+    render_seatbelt_profile(allow_network, &ancestor_rules, &project_write_rules)
+}
+
 /// Ancestor directories of `path` from the parent up to (but not including) `/`.
 /// Empty or relative paths yield no ancestors.
 pub fn path_ancestors(path: &str) -> Vec<String> {
@@ -159,8 +226,15 @@ pub fn path_ancestors(path: &str) -> Vec<String> {
 }
 
 fn format_ancestor_read_rules(home: &str, project_root: &str) -> String {
+    format_ancestor_read_rules_many(home, &[project_root.to_string()])
+}
+
+fn format_ancestor_read_rules_many(home: &str, project_roots: &[String]) -> String {
     let mut seen = std::collections::BTreeSet::new();
-    for path in [home, project_root] {
+    for ancestor in path_ancestors(home) {
+        seen.insert(ancestor);
+    }
+    for path in project_roots {
         for ancestor in path_ancestors(path) {
             seen.insert(ancestor);
         }

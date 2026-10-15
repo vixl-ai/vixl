@@ -9,9 +9,51 @@ use tokio::sync::{oneshot, Mutex};
 use tokio::time::{sleep, Duration};
 
 use super::super::lsp_install::{with_timeout, LSP_WRITE_TIMEOUT};
+use super::instance::{lookup_managed_key as lookup_key_among, lsp_logical_id};
 use super::io::{append_stderr_snippet, lsp_request_timeout_error};
 use super::progress::ActiveProgress;
 use super::state::{transition_with, LspPhase, LspStatePatch};
+
+pub(crate) fn has_logical_server(
+    servers: &HashMap<String, Arc<ManagedLspServer>>,
+    server_id: &str,
+) -> bool {
+    servers
+        .keys()
+        .any(|key| key.as_str() == server_id || lsp_logical_id(key) == server_id)
+}
+
+pub(crate) fn lookup_managed_key(
+    servers: &HashMap<String, Arc<ManagedLspServer>>,
+    server_id: &str,
+    workspace_root: Option<&str>,
+) -> Option<String> {
+    lookup_key_among(
+        servers.keys().map(String::as_str),
+        server_id,
+        workspace_root,
+    )
+}
+
+pub(crate) fn lookup_managed(
+    servers: &HashMap<String, Arc<ManagedLspServer>>,
+    server_id: &str,
+    workspace_root: Option<&str>,
+) -> Option<Arc<ManagedLspServer>> {
+    lookup_managed_key(servers, server_id, workspace_root)
+        .and_then(|key| servers.get(&key).cloned())
+}
+
+pub(crate) fn keys_for_logical_id(
+    servers: &HashMap<String, Arc<ManagedLspServer>>,
+    server_id: &str,
+) -> Vec<String> {
+    servers
+        .keys()
+        .filter(|key| key.as_str() == server_id || lsp_logical_id(key) == server_id)
+        .cloned()
+        .collect()
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LspDiagnosticProvider {

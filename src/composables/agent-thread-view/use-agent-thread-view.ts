@@ -13,6 +13,7 @@ import useVixlConfig from '@/composables/use-vixl-config'
 import useMcpServers from '@/composables/use-mcp-servers'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { HOME_CHAT_SLUG, isHomeChatSlug } from '@/constants/home-chat'
+import { primaryProjectForSlug } from '@/utils/primary-project-for-slug'
 import {
   agentShellRevision,
   listShellsForChat,
@@ -62,8 +63,12 @@ export default () => {
   const threadKey = computed(() =>
     chatId.value ? `${projectSlug.value}:${chatId.value}` : '',
   )
-  const project = computed(
-    () => fleet.projects.value.find((item) => item.slug === projectSlug.value) ?? null,
+  const project = computed(() =>
+    primaryProjectForSlug(
+      projectSlug.value,
+      fleet.projects.value,
+      fleet.groups?.value ?? [],
+    ),
   )
   const chatSettingsRoot = computed((): string | null => {
     if (isStandalone.value) {

@@ -2,6 +2,7 @@ use std::process::Command;
 
 use serde::Serialize;
 
+use super::fs::{relative_path, resolve_command_path, WorkspaceRootArg};
 use super::git_binary::git_binary;
 
 #[derive(Debug, Serialize)]
@@ -45,8 +46,31 @@ fn is_git_repo(root_path: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn git_repo_cwd(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+    user_path: Option<&str>,
+) -> Result<(String, Option<String>), String> {
+    match user_path {
+        Some(path) if project_roots.is_some_and(|roots| !roots.is_empty()) => {
+            let resolved = resolve_command_path(project_root, project_roots, path)?;
+            let rel = relative_path(&resolved.root, &resolved.path);
+            Ok((
+                resolved.root.to_string_lossy().to_string(),
+                Some(rel),
+            ))
+        }
+        Some(path) => Ok((project_root.to_string(), Some(path.to_string()))),
+        None => Ok((project_root.to_string(), None)),
+    }
+}
+
 #[tauri::command]
-pub fn git_repo_info(root_path: String) -> Result<GitRepoInfo, String> {
+pub fn git_repo_info(
+    root_path: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<GitRepoInfo, String> {
+    let _ = project_roots;
     if !is_git_repo(&root_path) {
         return Ok(GitRepoInfo {
             is_repo: false,
@@ -65,7 +89,11 @@ pub fn git_repo_info(root_path: String) -> Result<GitRepoInfo, String> {
 }
 
 #[tauri::command]
-pub fn git_list_branches(root_path: String) -> Result<Vec<String>, String> {
+pub fn git_list_branches(
+    root_path: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<Vec<String>, String> {
+    let _ = project_roots;
     if !is_git_repo(&root_path) {
         return Ok(vec![]);
     }
@@ -86,7 +114,12 @@ pub fn git_list_branches(root_path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub fn git_checkout_branch(root_path: String, branch: String) -> Result<(), String> {
+pub fn git_checkout_branch(
+    root_path: String,
+    branch: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<(), String> {
+    let _ = project_roots;
     if branch.trim().is_empty() {
         return Err("Branch name is required".to_string());
     }
@@ -104,7 +137,9 @@ pub fn git_branch_create(
     project_root: String,
     name: String,
     checkout: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<(), String> {
+    let _ = project_roots;
     let branch = name.trim();
     if branch.is_empty() {
         return Err("Branch name is required".to_string());
@@ -136,6 +171,7 @@ pub async fn git_commit(
     project_root: String,
     message: String,
     paths: Vec<String>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<GitCommitResult, String> {
     let commit_message = message.trim();
     if commit_message.is_empty() {
@@ -144,24 +180,39 @@ pub async fn git_commit(
 
     if paths.is_empty() {
         return Err(
-      "At least one path is required — use git_status to identify changed files before committing. Staging all files with git add -A is not permitted.".to_string(),
+      "At least one path is required. Use git_status to identify changed files before committing. Staging all files with git add -A is not permitted.".to_string(),
     );
     }
 
-    if !is_git_repo(&project_root) {
-        return Err("Not a git repository".to_string());
-    }
-
+    let mut resolved_paths = Vec::new();
+    let mut repo: Option<String> = None;
     for path in paths {
         let trimmed = path.trim();
         if trimmed.is_empty() {
             continue;
         }
-        run_git_async(&project_root, &["add", "--", trimmed]).await?;
+        let (cwd, rel) = git_repo_cwd(&project_root, project_roots.as_deref(), Some(trimmed))?;
+        if let Some(existing) = &repo {
+            if existing != &cwd {
+                return Err("Commit paths must belong to a single project member".to_string());
+            }
+        } else {
+            repo = Some(cwd);
+        }
+        resolved_paths.push(rel.unwrap_or_else(|| trimmed.to_string()));
     }
 
-    let output = run_git_async(&project_root, &["commit", "-m", commit_message]).await?;
-    let hash = run_git_async(&project_root, &["rev-parse", "HEAD"]).await?;
+    let git_root = repo.unwrap_or(project_root);
+    if !is_git_repo(&git_root) {
+        return Err("Not a git repository".to_string());
+    }
+
+    for path in resolved_paths {
+        run_git_async(&git_root, &["add", "--", &path]).await?;
+    }
+
+    let output = run_git_async(&git_root, &["commit", "-m", commit_message]).await?;
+    let hash = run_git_async(&git_root, &["rev-parse", "HEAD"]).await?;
 
     Ok(GitCommitResult {
         hash,
@@ -304,7 +355,11 @@ pub fn parse_porcelain_status(line: &str) -> Option<GitStatusEntry> {
 }
 
 #[tauri::command]
-pub async fn git_status(project_root: String) -> Result<GitStatusResult, String> {
+pub async fn git_status(
+    project_root: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<GitStatusResult, String> {
+    let _ = project_roots;
     if !is_git_repo(&project_root) {
         return Err("Not a git repository".to_string());
     }
@@ -359,13 +414,16 @@ pub async fn git_diff(
     path: Option<String>,
     staged: Option<bool>,
     base: Option<String>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<GitDiffResult, String> {
-    if !is_git_repo(&project_root) {
+    let (git_root, rel_path) =
+        git_repo_cwd(&project_root, project_roots.as_deref(), path.as_deref())?;
+    if !is_git_repo(&git_root) {
         return Err("Not a git repository".to_string());
     }
 
-    let args = git_diff_args(path.as_deref(), staged.unwrap_or(false), base.as_deref())?;
-    let diff = run_git_async(&project_root, &args).await?;
+    let args = git_diff_args(rel_path.as_deref(), staged.unwrap_or(false), base.as_deref())?;
+    let diff = run_git_async(&git_root, &args).await?;
     Ok(GitDiffResult { diff })
 }
 
@@ -373,12 +431,15 @@ pub async fn git_diff(
 pub async fn git_show_file(
     project_root: String,
     path: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<GitShowFileResult, String> {
-    if !is_git_repo(&project_root) {
+    let (git_root, rel_path) =
+        git_repo_cwd(&project_root, project_roots.as_deref(), Some(path.trim()))?;
+    if !is_git_repo(&git_root) {
         return Err("Not a git repository".to_string());
     }
 
-    let trimmed = path.trim();
+    let trimmed = rel_path.unwrap_or_else(|| path.trim().to_string());
     if trimmed.is_empty() {
         return Err("Path is required".to_string());
     }
@@ -391,7 +452,7 @@ pub async fn git_show_file(
     let git = git_binary()?;
     let output = AsyncCommand::new(&git)
         .arg("-C")
-        .arg(&project_root)
+        .arg(&git_root)
         .args(["show", &spec])
         .output()
         .await
@@ -425,7 +486,12 @@ pub async fn git_show_file(
 }
 
 #[tauri::command]
-pub async fn git_log(project_root: String, limit: Option<u32>) -> Result<GitLogResult, String> {
+pub async fn git_log(
+    project_root: String,
+    limit: Option<u32>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<GitLogResult, String> {
+    let _ = project_roots;
     if !is_git_repo(&project_root) {
         return Err("Not a git repository".to_string());
     }

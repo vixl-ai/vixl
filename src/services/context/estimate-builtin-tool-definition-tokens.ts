@@ -1,4 +1,4 @@
-import { asSchema } from 'ai'
+import { asSchema, type FlexibleSchema } from 'ai'
 import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 import { MODE_TOOL_ALLOWLIST } from '@/services/harness/mode-allowlists'
 import buildTools, { type HarnessToolContext } from '@/services/harness/build-tools'
@@ -31,7 +31,7 @@ export default (mode: VixlChatMode, settings?: VixlSettings): number => {
 
     const description =
       typeof definition.description === 'string' ? definition.description : name
-    const schema = asSchema(definition.inputSchema)
+    const schema = asSchema(definition.inputSchema as FlexibleSchema<unknown>)
     const json = JSON.stringify(schema.jsonSchema)
 
     total +=

@@ -1,5 +1,4 @@
 import * as monaco from 'monaco-editor'
-import { lspRequest } from '@/services/vixl/vixl-tauri'
 import {
   parseLspCompletionItems,
   parseLspHoverContents,
@@ -50,7 +49,7 @@ export const createLspProviders = (ctx: MonacoEditorContext, lsp: MonacoLsp) => 
                 }
                 for (const serverId of lsp.serversForLspFeature(path, primaryId)) {
                   try {
-                    const candidate = await lspRequest(serverId, 'hover', {
+                    const candidate = await lsp.request(serverId, 'hover', {
                       path,
                       position: positionPayload,
                     })
@@ -110,7 +109,7 @@ export const createLspProviders = (ctx: MonacoEditorContext, lsp: MonacoLsp) => 
             let locations: ReturnType<typeof parseLspLocations> = []
             for (const serverId of lsp.serversForLspFeature(path, primaryId)) {
               try {
-                const result = await lspRequest(serverId, 'goToDefinition', {
+                const result = await lsp.request(serverId, 'goToDefinition', {
                   path,
                   position: positionPayload,
                 })
@@ -164,7 +163,7 @@ export const createLspProviders = (ctx: MonacoEditorContext, lsp: MonacoLsp) => 
             }
             for (const serverId of lsp.serversForLspFeature(path, primaryId)) {
               try {
-                const result = await lspRequest(serverId, 'textDocument/completion', {
+                const result = await lsp.request(serverId, 'textDocument/completion', {
                   path,
                   position: positionPayload,
                 })

@@ -2,15 +2,57 @@ use std::process::Stdio;
 
 use tokio::process::Command;
 
+use crate::commands::fs::{workspace_roots_from_args, WorkspaceRootArg};
 use crate::commands::mcp::merged_shell_path;
+#[cfg(target_os = "linux")]
+use crate::commands::sandbox_protect::{
+    canonicalize_sandbox_path, collect_env_protection_paths, resolve_git_protection_paths,
+};
 
 #[cfg(target_os = "macos")]
-use super::super::sandbox::generate_seatbelt_profile_with;
+use super::super::sandbox::{generate_seatbelt_profile_for_roots, generate_seatbelt_profile_with};
+
+fn writable_root_paths(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+) -> Result<Vec<String>, String> {
+    if let Some(args) = project_roots.filter(|roots| !roots.is_empty()) {
+        let roots = workspace_roots_from_args(args)?;
+        return Ok(roots
+            .into_iter()
+            .map(|root| root.path.to_string_lossy().to_string())
+            .collect());
+    }
+    Ok(vec![project_root.to_string()])
+}
+
+#[cfg(target_os = "linux")]
+fn apply_ro_protections(cmd: &mut Command, roots: &[String], project_writable: bool) {
+    if !project_writable {
+        return;
+    }
+    for root in roots {
+        let root_path = std::path::Path::new(root);
+        for git_path in resolve_git_protection_paths(root_path) {
+            let path = git_path.to_string_lossy().to_string();
+            cmd.arg("--ro-bind").arg(&path).arg(&path);
+        }
+        for env_path in collect_env_protection_paths(root_path) {
+            let path = env_path.to_string_lossy().to_string();
+            cmd.arg("--ro-bind").arg(&path).arg(&path);
+        }
+    }
+}
 
 fn apply_merged_shell_path(cmd: &mut Command) {
     if let Some(merged) = merged_shell_path() {
         cmd.env("PATH", merged);
     }
+}
+
+fn strip_inherited_git_env(cmd: &mut Command) {
+    cmd.env_remove("GIT_DIR");
+    cmd.env_remove("GIT_WORK_TREE");
 }
 
 /// Resolve bash for `pipefail` honest pipeline exit codes.
@@ -76,6 +118,7 @@ fn build_tracked_command(project_root: &str, command: &str) -> Command {
         .stderr(Stdio::piped())
         .kill_on_drop(true);
     apply_merged_shell_path(&mut cmd);
+    strip_inherited_git_env(&mut cmd);
 
     unsafe {
         cmd.pre_exec(|| {
@@ -97,6 +140,7 @@ fn build_tracked_command(project_root: &str, command: &str) -> Command {
         .stderr(Stdio::piped())
         .kill_on_drop(true);
     apply_merged_shell_path(&mut cmd);
+    strip_inherited_git_env(&mut cmd);
     cmd
 }
 
@@ -106,6 +150,7 @@ fn build_tracked_command(project_root: &str, command: &str) -> Command {
 #[cfg(target_os = "macos")]
 fn build_sandboxed_command(
     project_root: &str,
+    writable_roots: &[String],
     command: &str,
     allow_network: bool,
     project_writable: bool,
@@ -118,8 +163,16 @@ fn build_sandboxed_command(
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or(tmpdir_raw);
     let project_root_clean = project_root.trim_end_matches('/').to_string();
-    let profile =
-        generate_seatbelt_profile_with(allow_network, project_writable, &home, &project_root_clean);
+    let root_refs: Vec<&str> = writable_roots.iter().map(String::as_str).collect();
+    let profile = if writable_roots.len() <= 1 {
+        let root = writable_roots
+            .first()
+            .map(|root| root.trim_end_matches('/').to_string())
+            .unwrap_or_else(|| project_root_clean.clone());
+        generate_seatbelt_profile_with(allow_network, project_writable, &home, &root)
+    } else {
+        generate_seatbelt_profile_for_roots(allow_network, project_writable, &home, &root_refs)
+    };
 
     let mut cmd = Command::new("/usr/bin/sandbox-exec");
     cmd.arg("-D")
@@ -136,6 +189,7 @@ fn build_sandboxed_command(
         .stderr(Stdio::piped())
         .kill_on_drop(true);
     apply_merged_shell_path(&mut cmd);
+    strip_inherited_git_env(&mut cmd);
     cmd.env("TMPDIR", &tmpdir);
 
     #[cfg(unix)]
@@ -181,6 +235,7 @@ fn find_bwrap() -> Option<String> {
 fn build_bubblewrap_command(
     bwrap: &str,
     project_root: &str,
+    writable_roots: &[String],
     command: &str,
     allow_network: bool,
     project_writable: bool,
@@ -208,16 +263,30 @@ fn build_bubblewrap_command(
     // tmpfs for /tmp
     cmd.arg("--tmpfs").arg("/tmp");
 
-    // Project root: RW unless the caller requested a read-only project jail
-    if project_writable {
-        cmd.arg("--bind").arg(project_root).arg(project_root);
+    // Project roots: RW unless the caller requested a read-only project jail.
+    // A single root keeps the existing bind of the raw project_root path.
+    let roots: Vec<String> = if writable_roots.len() <= 1 {
+        vec![project_root.to_string()]
     } else {
-        cmd.arg("--ro-bind").arg(project_root).arg(project_root);
+        writable_roots
+            .iter()
+            .map(|root| canonicalize_sandbox_path(root))
+            .collect()
+    };
+    for root in &roots {
+        if project_writable {
+            cmd.arg("--bind").arg(root).arg(root);
+        } else {
+            cmd.arg("--ro-bind").arg(root).arg(root);
+        }
+    }
+    if writable_roots.len() > 1 {
+        apply_ro_protections(&mut cmd, &roots, project_writable);
     }
 
-    // HOME: read-write so tool caches work, but only if it differs from project root
+    // HOME: read-write so tool caches work, but only if it differs from every root
     if let Ok(home) = std::env::var("HOME") {
-        if !home.is_empty() && home != project_root {
+        if !home.is_empty() && roots.iter().all(|root| root != &home) {
             cmd.arg("--bind").arg(&home).arg(&home);
         }
     }
@@ -238,6 +307,7 @@ fn build_bubblewrap_command(
         .stderr(Stdio::piped())
         .kill_on_drop(true);
     apply_merged_shell_path(&mut cmd);
+    strip_inherited_git_env(&mut cmd);
     cmd.env("TMPDIR", "/tmp");
 
     #[cfg(unix)]
@@ -268,17 +338,25 @@ pub(crate) fn spawn_child(
     sandboxed: Option<bool>,
     allow_network: Option<bool>,
     project_writable: Option<bool>,
+    project_roots: Option<&[WorkspaceRootArg]>,
 ) -> Result<tokio::process::Child, String> {
     let want_sandbox = sandboxed.unwrap_or(true);
     let allow_network = allow_network.unwrap_or(false);
     let project_writable = project_writable.unwrap_or(true);
+    let writable_roots = writable_root_paths(project_root, project_roots)?;
 
     #[cfg(target_os = "macos")]
     {
         if want_sandbox {
-            return build_sandboxed_command(project_root, command, allow_network, project_writable)
-                .spawn()
-                .map_err(|e| format!("SANDBOX_FAILED: {e}"));
+            return build_sandboxed_command(
+                project_root,
+                &writable_roots,
+                command,
+                allow_network,
+                project_writable,
+            )
+            .spawn()
+            .map_err(|e| format!("SANDBOX_FAILED: {e}"));
         }
     }
 
@@ -290,6 +368,7 @@ pub(crate) fn spawn_child(
                     return build_bubblewrap_command(
                         &bwrap,
                         project_root,
+                        &writable_roots,
                         command,
                         allow_network,
                         project_writable,
@@ -314,7 +393,7 @@ pub(crate) fn spawn_child(
         }
     }
 
-    let _ = (allow_network, project_writable);
+    let _ = (allow_network, project_writable, writable_roots);
 
     build_tracked_command(project_root, command)
         .spawn()

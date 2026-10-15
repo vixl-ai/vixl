@@ -10,7 +10,9 @@ use super::super::fs::relative_path;
 use super::super::lsp_registry::workspace_warm_plan;
 use super::ensure_running::ensure_running_server;
 use super::helpers::{is_lsp_method_not_found, uri_to_path, LspDiagnosticsEvent};
-use super::rpc::{json_rpc_request, LspDiagnosticProvider, LspProcess, LSP_SERVERS};
+use super::rpc::{
+    json_rpc_request, lookup_managed, LspDiagnosticProvider, LspProcess, LSP_SERVERS,
+};
 use super::state::LspServerState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -339,7 +341,7 @@ async fn report_for_status(
 
     let managed = {
         let servers = LSP_SERVERS.lock().await;
-        servers.get(&status.id).cloned()
+        lookup_managed(&servers, &status.id, Some(workspace_root))
     };
     let Some(managed) = managed else {
         return unavailable_from_status(status);

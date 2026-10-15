@@ -11,13 +11,16 @@ import {
 } from '@/components/shadcn/ui/alert-dialog'
 import useWorkspaceSearch from '@/composables/workspace-search'
 import type { GrepMatch } from '@/services/vixl/vixl-tauri'
+import type { WorkspaceSearchMember } from '@/types/workbench/search-member'
 
 const props = defineProps<{
   projectId: string
   projectRoot: string | null
+  members?: WorkspaceSearchMember[] | null
 }>()
 
 const projectRootRef = toRef(props, 'projectRoot')
+const membersRef = computed(() => props.members ?? null)
 
 const {
   findQuery,
@@ -31,6 +34,7 @@ const {
   pending,
   replacing,
   groups,
+  memberSections,
   resultCount,
   fileCount,
   summaryLabel,
@@ -42,7 +46,7 @@ const {
   replaceMatch,
   replaceFile,
   replaceAll,
-} = useWorkspaceSearch(projectRootRef)
+} = useWorkspaceSearch(projectRootRef, membersRef)
 
 const formRef = ref<{
   focusFind: () => void
@@ -90,8 +94,11 @@ const handleReplaceHit = async (hit: GrepMatch): Promise<void> => {
   await replaceMatch(hit)
 }
 
-const handleReplaceFile = async (path: string): Promise<void> => {
-  await replaceFile(path)
+const handleReplaceFile = async (
+  path: string,
+  memberSlug?: string,
+): Promise<void> => {
+  await replaceFile(path, memberSlug)
 }
 
 defineExpose({
@@ -119,6 +126,7 @@ defineExpose({
     <WorkspaceSearchResults
       :project-id="projectId"
       :groups="groups"
+      :member-sections="memberSections"
       :pending="pending"
       :replacing="replacing"
       :replace-expanded="replaceExpanded"

@@ -31,6 +31,7 @@ import {
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
 import { FileTree } from '@/components/ai-elements/file-tree'
+import WorkbenchFileTreeFolder from '@/components/workbench/WorkbenchFileTreeFolder.vue'
 import WorkbenchFileTreeNode from '@/components/workbench/FileTreeNode.vue'
 import useFileTreeView from '@/composables/file-tree-view'
 
@@ -39,9 +40,15 @@ const props = withDefaults(
     projectId: string
     selectedPath?: string | null
     showToolbar?: boolean
+    hideChrome?: boolean
+    embedded?: boolean
+    rootNodeName?: string | null
   }>(),
   {
     showToolbar: true,
+    hideChrome: false,
+    embedded: false,
+    rootNodeName: null,
   },
 )
 
@@ -85,14 +92,23 @@ defineExpose({
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-hidden font-sans text-[13px]">
+  <div
+    :class="
+      embedded
+        ? 'font-sans text-[13px]'
+        : 'flex h-full min-h-0 flex-col overflow-hidden font-sans text-[13px]'
+    "
+  >
     <div
       v-if="showToolbar"
       class="flex h-7 shrink-0 items-center justify-end border-b border-border/20 px-2"
     >
       <slot name="toolbar" />
     </div>
-    <div class="flex items-center justify-between px-2 py-1">
+    <div
+      v-if="!hideChrome"
+      class="flex items-center justify-between px-2 py-1"
+    >
       <span class="truncate text-[13px] font-medium text-foreground">
         {{ projectLabel }}
       </span>
@@ -147,7 +163,13 @@ defineExpose({
     </div>
     <ContextMenu>
       <ContextMenuTrigger as-child>
-        <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        <div
+          :class="
+            embedded
+              ? 'px-0'
+              : 'min-h-0 flex-1 overflow-y-auto px-2 pb-2'
+          "
+        >
           <FileTree
             v-if="tree?.children"
             unstyled
@@ -158,14 +180,30 @@ defineExpose({
             @update:selected-path="handleSelect"
             @expanded-change="handleExpandedChange"
           >
-            <WorkbenchFileTreeNode
-              v-for="child in tree.children"
-              :key="child.path"
-              :node="child"
-              :renaming-path="renamingPath"
-              @rename-confirm="handleRenameConfirm"
-              @rename-cancel="handleRenameCancel"
-            />
+            <WorkbenchFileTreeFolder
+              v-if="rootNodeName"
+              path="."
+              :name="rootNodeName"
+            >
+              <WorkbenchFileTreeNode
+                v-for="child in tree.children"
+                :key="child.path"
+                :node="child"
+                :renaming-path="renamingPath"
+                @rename-confirm="handleRenameConfirm"
+                @rename-cancel="handleRenameCancel"
+              />
+            </WorkbenchFileTreeFolder>
+            <template v-else>
+              <WorkbenchFileTreeNode
+                v-for="child in tree.children"
+                :key="child.path"
+                :node="child"
+                :renaming-path="renamingPath"
+                @rename-confirm="handleRenameConfirm"
+                @rename-cancel="handleRenameCancel"
+              />
+            </template>
           </FileTree>
         </div>
       </ContextMenuTrigger>

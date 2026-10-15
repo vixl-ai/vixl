@@ -2,6 +2,7 @@ import { computed, type ComputedRef } from 'vue'
 import { useRoute } from 'vue-router'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import { HOME_WORKSPACE_ID, isHomeChatSlug } from '@/constants/home-chat'
+import { primaryProjectForSlug } from '@/utils/primary-project-for-slug'
 
 const useChatProjectId = (): ComputedRef<string | null> => {
   const route = useRoute()
@@ -16,7 +17,11 @@ const useChatProjectId = (): ComputedRef<string | null> => {
     if (standalone) {
       return HOME_WORKSPACE_ID
     }
-    const project = fleet.projects.value.find((item) => item.slug === slug)
+    const project = primaryProjectForSlug(
+      slug,
+      fleet.projects.value,
+      fleet.groups?.value ?? [],
+    )
     return project?.id ?? fleet.activeProjectId.value
   })
 }

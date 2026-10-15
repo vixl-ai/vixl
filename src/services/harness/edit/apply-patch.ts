@@ -5,22 +5,34 @@ import { gateToolPermission } from '@/services/harness/permission/gate'
 import { fsWriteCapability } from '@/services/harness/permission/policy'
 import captureBaselinesBeforeMutate from '@/services/harness/capture-baselines-before-mutate'
 import mapDiffs from '@/services/harness/shared/map-diffs'
-import { notifyWorkspaceFsMutation } from '@/services/harness/shared/notify-fs-mutation'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
+import {
+  notifyWorkspaceMutations,
+  permissionPaths,
+  sensitiveCheckPaths,
+  withMultiRootPathHint,
+  withProjectRoots,
+} from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const applyPatch = (ctx: HarnessToolContext) =>
   tool({
-    description:
+    description: withMultiRootPathHint(
       'Apply an OpenCode-style patch (not git diff). Format: *** Update File: path, then @@ hunks with +/- lines.',
+      ctx,
+    ),
     inputSchema: z.object({
       patch: z.string().describe('OpenCode patch text'),
     }),
     execute: async ({ patch }, { toolCallId }) => {
       const diffs = mapDiffs(
-        await fsStagePreviewApplyPatch({ projectRoot: ctx.projectRoot, patch }),
+        await fsStagePreviewApplyPatch(
+          withProjectRoots({ projectRoot: ctx.projectRoot, patch }, ctx),
+        ),
       )
       const paths = diffs.map((diff) => diff.path)
+      const gatedPaths = permissionPaths(ctx.members, paths.length > 0 ? paths : ['**'])
+      const checkPaths = paths.length > 0 ? paths : ['**']
       const allowed = await gateToolPermission({
         ctx: toPermCtx(ctx),
         toolCallId,
@@ -29,7 +41,7 @@ const applyPatch = (ctx: HarnessToolContext) =>
         action: 'fs.write',
         capability: fsWriteCapability('*'),
         title: `Apply patch (${paths.length} file${paths.length !== 1 ? 's' : ''})`,
-        paths: paths.length > 0 ? paths : ['**'],
+        paths: sensitiveCheckPaths(ctx.members, checkPaths),
         diff: diffs,
       })
       if (!allowed) {
@@ -38,8 +50,8 @@ const applyPatch = (ctx: HarnessToolContext) =>
       if (paths.length > 0) {
         await captureBaselinesBeforeMutate(ctx, paths, toolCallId)
       }
-      await fsApplyPatch({ projectRoot: ctx.projectRoot, patch })
-      notifyWorkspaceFsMutation(ctx.projectRoot, paths)
+      await fsApplyPatch(withProjectRoots({ projectRoot: ctx.projectRoot, patch }, ctx))
+      notifyWorkspaceMutations(ctx, gatedPaths)
       return { ok: true, paths, diffs }
     },
   })

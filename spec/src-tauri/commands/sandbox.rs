@@ -1,7 +1,8 @@
 #![cfg(target_os = "macos")]
 
 use app_lib::commands::sandbox::{
-    generate_seatbelt_profile, generate_seatbelt_profile_with, path_ancestors,
+    generate_seatbelt_profile, generate_seatbelt_profile_for_roots, generate_seatbelt_profile_with,
+    path_ancestors,
 };
 
 #[test]
@@ -414,4 +415,13 @@ fn profile_omits_project_write_when_read_only() {
         !read_only.contains(env_template_allow),
         "read-only profile must not re-allow env template writes"
     );
+}
+
+#[test]
+fn single_root_profile_matches_existing_generator() {
+    let home = "/Users/aidanhibbard";
+    let project_root = "/Users/aidanhibbard/proj";
+    let existing = generate_seatbelt_profile_with(false, true, home, project_root);
+    let from_roots = generate_seatbelt_profile_for_roots(false, true, home, &[project_root]);
+    assert_eq!(existing, from_roots);
 }

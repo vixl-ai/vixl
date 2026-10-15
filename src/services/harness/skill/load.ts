@@ -1,6 +1,6 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { loadSkill } from '@/services/skills/skill-registry'
+import { loadSkillForWorkspace } from '@/services/harness/skill/resolve-member-skill'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const loadSkillTool = (ctx: HarnessToolContext) =>
@@ -8,7 +8,7 @@ const loadSkillTool = (ctx: HarnessToolContext) =>
     description: 'Load the full instructions for a skill by name',
     inputSchema: z.object({ name: z.string().describe('Skill name') }),
     execute: async ({ name }) => {
-      const result = await loadSkill(name, ctx.projectRoot)
+      const result = await loadSkillForWorkspace(name, ctx.projectRoot, ctx.members)
       if ('error' in result) {
         return result
       }

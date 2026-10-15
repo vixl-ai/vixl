@@ -23,6 +23,7 @@ Do not commit this tree. It is machine-local.
 | `vixl.sqlite` | Chats, messages, usage, pins, workbench tabs and prefs, editor view state | No |
 | `chats/<projectSlug>/<chatId>/` | Per-chat directory. File checkpoints live under `file-checkpoints/` | No |
 | `projects.json` | Fleet registry | No |
+| `project-groups.json` | Fleet project groups (member slugs, CSV default names) | No |
 | `active-project.json` | Last active project id | No |
 | `graphs/<sha256>/` | Per-project CodeGraph store (`codegraph.db`, `meta.json`, `_preload.cjs`). The folder name is the SHA-256 hex of the canonical project root | No |
 | `agents/` | Personal custom agents (`{slug}.md`) | No |

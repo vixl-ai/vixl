@@ -1,19 +1,28 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import callManagedCodegraphTool from '@/services/harness/codebase/call-managed'
+import { describeRepoTool, repoSlugFields } from '@/services/harness/codebase/repo'
 import normalizeCodegraphResult from '@/services/codegraph/normalize-codegraph-result'
+import { resolveWorkspaceSlug, slugArg } from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const codebaseStatus = (ctx: HarnessToolContext) =>
   tool({
-    description: 'Check CodeGraph index health (ready, pending sync, errors).',
-    inputSchema: z.object({}),
+    description: describeRepoTool(
+      'Check CodeGraph index health (ready, pending sync, errors).',
+      ctx,
+    ),
+    inputSchema: z.object({
+      ...repoSlugFields(ctx),
+    }),
     execute: async (input, { toolCallId }) => {
+      const resolved = resolveWorkspaceSlug(ctx, slugArg(input, 'repo'))
       const called = await callManagedCodegraphTool(ctx, {
         toolCallId,
         firstPartyName: 'codebase_status',
         mcpToolName: 'codegraph_status',
-        toolArgs: input,
+        toolArgs: {},
+        projectRoot: resolved.projectRoot,
       })
       if (!called.ok) {
         if ('rejected' in called.payload) {

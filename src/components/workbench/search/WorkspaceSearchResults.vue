@@ -8,7 +8,10 @@ import {
 } from '@/components/shadcn/ui/collapsible'
 import { ScrollArea } from '@/components/shadcn/ui/scroll-area'
 import type { GrepMatch } from '@/services/vixl/vixl-tauri'
-import type { SearchFileGroup } from '@/types/workbench/search-file-group'
+import type {
+  SearchFileGroup,
+  SearchMemberSection,
+} from '@/types/workbench/search-file-group'
 import openAtLine from '@/utils/open-at-line'
 
 type LinePart = {
@@ -19,6 +22,7 @@ type LinePart = {
 const props = defineProps<{
   projectId: string
   groups: SearchFileGroup[]
+  memberSections?: SearchMemberSection[]
   pending: boolean
   replacing: boolean
   replaceExpanded: boolean
@@ -30,8 +34,29 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'replace-hit': [hit: GrepMatch]
-  'replace-file': [path: string]
+  'replace-file': [path: string, memberSlug?: string]
 }>()
+
+const hasMemberSections = computed(
+  () => (props.memberSections?.length ?? 0) > 0,
+)
+
+const fileGroupKey = (group: SearchFileGroup): string =>
+  group.memberSlug ? `${group.memberSlug}::${group.path}` : group.path
+
+const displaySections = computed((): SearchMemberSection[] => {
+  if (hasMemberSections.value && props.memberSections) {
+    return props.memberSections
+  }
+  return [
+    {
+      slug: '',
+      projectId: props.projectId,
+      truncated: false,
+      groups: props.groups,
+    },
+  ]
+})
 
 const fileName = (path: string): string => path.split('/').pop() ?? path
 
@@ -67,9 +92,12 @@ const lineParts = (hit: GrepMatch): LinePart[] => {
   ].filter((part) => part.text.length > 0)
 }
 
-const handleOpenHit = async (hit: GrepMatch): Promise<void> => {
+const projectIdForGroup = (group: SearchFileGroup): string =>
+  group.projectId ?? props.projectId
+
+const handleOpenHit = async (hit: GrepMatch, group: SearchFileGroup): Promise<void> => {
   try {
-    await openAtLine(props.projectId, hit.path, hit.lineNumber)
+    await openAtLine(projectIdForGroup(group), hit.path, hit.lineNumber)
   } catch (error) {
     toast.error('Failed to open match', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -81,8 +109,8 @@ const handleReplaceHit = async (hit: GrepMatch): Promise<void> => {
   emit('replace-hit', hit)
 }
 
-const handleReplaceFile = async (path: string): Promise<void> => {
-  emit('replace-file', path)
+const handleReplaceFile = async (group: SearchFileGroup): Promise<void> => {
+  emit('replace-file', group.path, group.memberSlug)
 }
 </script>
 
@@ -111,11 +139,27 @@ const handleReplaceFile = async (path: string): Promise<void> => {
           No results found.
         </p>
 
+        <template
+          v-for="section in displaySections"
+          :key="section.slug || 'workspace'"
+        >
+          <div
+            v-if="section.slug"
+            class="flex items-center justify-between px-1.5 py-1 text-[11px] font-medium text-muted-foreground"
+          >
+            <span class="truncate">{{ section.slug }}</span>
+            <span
+              v-if="section.truncated"
+              class="shrink-0 text-[11px] text-amber-600 dark:text-amber-400"
+            >
+              truncated
+            </span>
+          </div>
         <Collapsible
-          v-for="group in groups"
-          :key="group.path"
-          :open="isGroupOpen(group.path)"
-          @update:open="setGroupOpen(group.path, $event)"
+          v-for="group in section.groups"
+          :key="fileGroupKey(group)"
+          :open="isGroupOpen(fileGroupKey(group))"
+          @update:open="setGroupOpen(fileGroupKey(group), $event)"
         >
           <div class="group flex w-full items-center gap-1 rounded px-1.5 py-1 hover:bg-muted/50">
             <CollapsibleTrigger as-child>
@@ -124,7 +168,7 @@ const handleReplaceFile = async (path: string): Promise<void> => {
                 class="flex min-w-0 flex-1 items-center gap-1 text-left"
               >
                 <ChevronDown
-                  v-if="isGroupOpen(group.path)"
+                  v-if="isGroupOpen(fileGroupKey(group))"
                   class="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                 />
                 <ChevronRight
@@ -149,7 +193,7 @@ const handleReplaceFile = async (path: string): Promise<void> => {
               v-if="replaceExpanded"
               :path="group.path"
               :replacing="replacing"
-              @replace="handleReplaceFile"
+              @replace="handleReplaceFile(group)"
             />
           </div>
           <CollapsibleContent>
@@ -158,7 +202,7 @@ const handleReplaceFile = async (path: string): Promise<void> => {
               :key="hitKey(hit, index)"
               type="button"
               class="group flex w-full items-start gap-2 rounded px-1.5 py-0.5 pl-6 text-left hover:bg-muted/50"
-              @click="handleOpenHit(hit)"
+              @click="handleOpenHit(hit, group)"
             >
               <span class="w-8 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
                 {{ hit.lineNumber }}
@@ -184,6 +228,7 @@ const handleReplaceFile = async (path: string): Promise<void> => {
             </button>
           </CollapsibleContent>
         </Collapsible>
+        </template>
       </div>
     </ScrollArea>
   </div>

@@ -54,6 +54,7 @@ fn request(root: &Path, pattern: &str) -> WorkspaceGrepRequest {
         regex: None,
         whole_word: None,
         exclude_glob: None,
+        project_roots: None,
     }
 }
 

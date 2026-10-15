@@ -7,7 +7,7 @@ use uuid::Uuid;
 use super::meta::ChatMeta;
 use super::project_id::{resolve_project_id, HOME_PROJECT_ID};
 use super::store;
-use crate::commands::registry::FleetProject;
+use crate::commands::registry::{FleetProject, FleetProjectGroup};
 use crate::db::{migrate, open_at};
 
 struct TempDbDir {
@@ -209,15 +209,27 @@ fn resolve_project_id_home_and_registry() {
         last_opened: "now".to_string(),
     }];
     assert_eq!(
-        resolve_project_id(HOME_PROJECT_ID, "/anywhere", &projects),
+        resolve_project_id(HOME_PROJECT_ID, "/anywhere", &projects, &[]),
         HOME_PROJECT_ID
     );
     assert_eq!(
-        resolve_project_id("demo", "/tmp/demo", &projects),
+        resolve_project_id("demo", "/tmp/demo", &projects, &[]),
         "fleet-1"
     );
-    let unmatched = resolve_project_id("other", "/tmp/other", &projects);
+    let unmatched = resolve_project_id("other", "/tmp/other", &projects, &[]);
     assert!(unmatched.starts_with("unmatched-"));
+
+    let groups = vec![FleetProjectGroup {
+        id: "group-1".to_string(),
+        name: "api, web".to_string(),
+        slug: "api-web".to_string(),
+        member_slugs: vec!["api".to_string(), "web".to_string()],
+        last_opened: "now".to_string(),
+    }];
+    assert_eq!(
+        resolve_project_id("api-web", "/tmp/demo", &projects, &groups),
+        "group:api-web"
+    );
 }
 
 #[test]

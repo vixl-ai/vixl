@@ -7,7 +7,10 @@ use super::super::fs::resolve_workspace_path;
 use super::documents::{close_document, ensure_document_open, sync_document_change_with_content};
 use super::ensure_running::ensure_running_server;
 use super::helpers::path_to_uri;
-use super::rpc::{json_rpc_request, send_notification, LspProcess, LSP_SERVERS};
+use super::instance::lsp_instance_key;
+use super::rpc::{
+    json_rpc_request, lookup_managed, send_notification, LspProcess, LSP_SERVERS,
+};
 use super::stop_server_internal;
 
 pub fn tsserver_request_body(result: serde_json::Value) -> serde_json::Value {
@@ -92,7 +95,7 @@ pub(crate) async fn forward_vue_tsserver_request_inner(
 
     let ts_managed = {
         let servers = LSP_SERVERS.lock().await;
-        servers.get("typescript").cloned()
+        lookup_managed(&servers, "typescript", Some(workspace_root.as_str()))
     }
     .ok_or_else(|| "TypeScript language server is not running".to_string())?;
 
@@ -101,11 +104,11 @@ pub(crate) async fn forward_vue_tsserver_request_inner(
         guard.uses_classic_typescript
     };
     if !uses_classic {
-        stop_server_internal(app, "typescript").await.ok();
+        stop_server_internal(app, &lsp_instance_key("typescript", &workspace_root)).await.ok();
         let _ = ensure_running_server(app, "ts", Some(workspace_root.clone())).await?;
         let ts_managed = {
             let servers = LSP_SERVERS.lock().await;
-            servers.get("typescript").cloned()
+            lookup_managed(&servers, "typescript", Some(workspace_root.as_str()))
         }
         .ok_or_else(|| "TypeScript language server is not running".to_string())?;
         return execute(ts_managed.process.clone(), command.to_string(), args).await;
@@ -129,11 +132,11 @@ pub(crate) async fn forward_vue_tsserver_request_inner(
             }
 
             // Old typescript-language-server builds lack typescript.tsserverRequest.
-            stop_server_internal(app, "typescript").await.ok();
-            let _ = ensure_running_server(app, "ts", Some(workspace_root)).await?;
+            stop_server_internal(app, &lsp_instance_key("typescript", &workspace_root)).await.ok();
+            let _ = ensure_running_server(app, "ts", Some(workspace_root.clone())).await?;
             let ts_managed = {
                 let servers = LSP_SERVERS.lock().await;
-                servers.get("typescript").cloned()
+                lookup_managed(&servers, "typescript", Some(workspace_root.as_str()))
             }
             .ok_or_else(|| "TypeScript language server is not running".to_string())?;
             execute(ts_managed.process.clone(), command.to_string(), args).await
@@ -155,7 +158,7 @@ pub(crate) async fn mirror_vue_document_to_typescript(
 
     let Some(ts_managed) = ({
         let servers = LSP_SERVERS.lock().await;
-        servers.get("typescript").cloned()
+        lookup_managed(&servers, "typescript", Some(workspace_root))
     }) else {
         return;
     };

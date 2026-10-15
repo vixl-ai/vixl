@@ -317,3 +317,62 @@ describe('diagnostics tool', () => {
     })
   })
 })
+
+describe('diagnostics tool repo resolution', () => {
+  const members = [
+    { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+    { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+  ]
+  const groupCtx: HarnessToolContext = {
+    ...ctx,
+    projectRoot: '/tmp/api',
+    projectSlug: 'stack',
+    members,
+  }
+
+  const runGroup = async (input: Record<string, unknown>): Promise<unknown> => {
+    const built = diagnostics(groupCtx)
+    const runner = built.execute as (
+      value: Record<string, unknown>,
+      options: { toolCallId: string },
+    ) => Promise<unknown>
+    return runner(input, { toolCallId: 'tc-diag-group' })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    lspEnsureServer.mockResolvedValue(serverState())
+    lspRequest.mockResolvedValue({ items: [] })
+    lspWorkspaceDiagnostics.mockResolvedValue({ servers: [] })
+  })
+
+  it('defaults workspace diagnostics to the primary member root', async () => {
+    await runGroup({})
+    expect(lspWorkspaceDiagnostics).toHaveBeenCalledWith('/tmp/api')
+  })
+
+  it('resolves workspace diagnostics repo to that member root', async () => {
+    await runGroup({ repo: 'web' })
+    expect(lspWorkspaceDiagnostics).toHaveBeenCalledWith('/tmp/web')
+  })
+
+  it('rejects an unknown diagnostics repo slug', async () => {
+    await expect(runGroup({ repo: 'mobile' })).rejects.toThrow(
+      'Unknown project slug. Valid slugs: api, web',
+    )
+  })
+
+  it('resolves a slug-prefixed file path to that member root', async () => {
+    await runGroup({ path: 'web/src/main.ts' })
+
+    expect(lspEnsureServer).toHaveBeenCalledWith('ts', '/tmp/web')
+    expect(lspRequest).toHaveBeenCalledWith(
+      'typescript',
+      'diagnostics',
+      { path: 'src/main.ts' },
+      '/tmp/web',
+    )
+    expect(lspWorkspaceDiagnostics).not.toHaveBeenCalled()
+  })
+})
+

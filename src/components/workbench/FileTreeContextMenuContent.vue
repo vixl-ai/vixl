@@ -51,6 +51,10 @@ const createParentDir = computed(() =>
   props.isDirectory ? props.path : parentPath(props.path),
 )
 
+const isMemberRoot = computed(
+  () => props.path === '.' || props.path === '',
+)
+
 const handleCopyRelativePath = async (): Promise<void> => {
   await copyRelativePath(props.path)
 }
@@ -127,13 +131,19 @@ const handleNewFolderSelect = (): void => {
       <FolderPlus />
       New Folder
     </ContextMenuItem>
-    <ContextMenuSeparator />
-    <ContextMenuItem @select="handleRenameSelect">
+    <ContextMenuSeparator v-if="!isMemberRoot" />
+    <ContextMenuItem
+      v-if="!isMemberRoot"
+      @select="handleRenameSelect"
+    >
       <Pencil />
       Rename
     </ContextMenuItem>
     <ContextMenuSeparator />
-    <ContextMenuItem @select="handleCutSelect">
+    <ContextMenuItem
+      v-if="!isMemberRoot"
+      @select="handleCutSelect"
+    >
       <Scissors />
       Cut
     </ContextMenuItem>
@@ -192,8 +202,9 @@ const handleNewFolderSelect = (): void => {
       <ExternalLink />
       Open in editor
     </ContextMenuItem>
-    <ContextMenuSeparator />
+    <ContextMenuSeparator v-if="!isMemberRoot" />
     <ContextMenuItem
+      v-if="!isMemberRoot"
       variant="destructive"
       @select="handleDeleteSelect"
     >

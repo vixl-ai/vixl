@@ -31,15 +31,18 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
+import type { FleetProject } from '@/types/fleet/fleet-project'
+import type { WorkspaceSearchMember } from '@/types/workbench/search-member'
 
 export type EditorSidePaneMode = 'explorer' | 'search'
 
 const open = defineModel<boolean>('open', { required: true })
 const mode = defineModel<EditorSidePaneMode>('mode', { required: true })
 
-defineProps<{
+const props = defineProps<{
   projectId: string
   projectRoot: string | null
+  workspaceProjects?: FleetProject[]
   selectedPath: string
   diffView: boolean
   lineNumbers: boolean
@@ -49,7 +52,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  select: [path: string]
+  select: [path: string, projectId?: string]
   'tree-changed': []
   save: []
   'reveal-in-finder': []
@@ -105,8 +108,23 @@ const handleNewFolderClick = (): void => {
   fileTreeRef.value?.handleNewFolder()
 }
 
-const handleSelect = (path: string): void => {
-  emit('select', path)
+const isGroupWorkspace = computed(
+  () => (props.workspaceProjects?.length ?? 0) > 1,
+)
+
+const searchMembers = computed((): WorkspaceSearchMember[] | null => {
+  if (!isGroupWorkspace.value || !props.workspaceProjects) {
+    return null
+  }
+  return props.workspaceProjects.map((project) => ({
+    slug: project.slug,
+    projectId: project.id,
+    rootPath: project.rootPath,
+  }))
+})
+
+const handleSelect = (path: string, projectId?: string): void => {
+  emit('select', path, projectId)
 }
 
 const handleTreeChanged = (): void => {
@@ -247,7 +265,19 @@ defineExpose({
     </div>
 
     <div class="min-h-0 flex-1 overflow-hidden">
+      <WorkbenchGroupFileTree
+        v-if="isGroupWorkspace"
+        v-show="mode === 'explorer'"
+        ref="fileTreeRef"
+        class="h-full"
+        :members="workspaceProjects ?? []"
+        :selected-project-id="projectId"
+        :selected-path="selectedPath"
+        @select="handleSelect"
+        @tree-changed="handleTreeChanged"
+      />
       <WorkbenchFileTree
+        v-else
         v-show="mode === 'explorer'"
         ref="fileTreeRef"
         class="h-full"
@@ -263,6 +293,7 @@ defineExpose({
         class="h-full"
         :project-id="projectId"
         :project-root="projectRoot"
+        :members="searchMembers"
       />
     </div>
   </div>

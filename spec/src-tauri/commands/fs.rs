@@ -1,5 +1,6 @@
 use app_lib::commands::fs::{
     build_hunks, fs_copy, fs_delete, fs_move, fs_rename, fs_write_file, is_sensitive_relative_path,
+    WorkspaceRootArg,
 };
 use std::fs;
 
@@ -107,16 +108,22 @@ fn write_permits_env_templates_without_allow_sensitive() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path().to_string_lossy().to_string();
 
-    fs_write_file(root.clone(), ".env.example".into(), "KEY=\n".into(), None)
-        .expect("write .env.example");
+    fs_write_file(
+        root.clone(),
+        ".env.example".into(),
+        "KEY=\n".into(),
+        None,
+        None,
+    )
+    .expect("write .env.example");
     assert_eq!(
         fs::read_to_string(dir.path().join(".env.example")).expect("read .env.example"),
         "KEY=\n"
     );
 
-    fs_write_file(root.clone(), ".env.sample".into(), "KEY=\n".into(), None)
+    fs_write_file(root.clone(), ".env.sample".into(), "KEY=\n".into(), None, None)
         .expect("write .env.sample");
-    fs_write_file(root, ".env.template".into(), "KEY=\n".into(), None)
+    fs_write_file(root, ".env.template".into(), "KEY=\n".into(), None, None)
         .expect("write .env.template");
 }
 
@@ -125,16 +132,16 @@ fn write_rename_delete_block_env_when_allow_sensitive_is_none() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path().to_string_lossy().to_string();
 
-    let write_err = fs_write_file(root.clone(), ".env".into(), "SECRET=1\n".into(), None)
+    let write_err = fs_write_file(root.clone(), ".env".into(), "SECRET=1\n".into(), None, None)
         .expect_err("write .env should be blocked");
     assert_eq!(write_err, "Sensitive path blocked");
 
-    let rename_err = fs_rename(root.clone(), ".env".into(), "env.bak".into(), None)
+    let rename_err = fs_rename(root.clone(), ".env".into(), "env.bak".into(), None, None)
         .expect_err("rename .env should be blocked");
     assert_eq!(rename_err, "Sensitive path blocked");
 
     let delete_err =
-        fs_delete(root, ".env".into(), None, None).expect_err("delete .env should be blocked");
+        fs_delete(root, ".env".into(), None, None, None).expect_err("delete .env should be blocked");
     assert_eq!(delete_err, "Sensitive path blocked");
 }
 
@@ -143,14 +150,20 @@ fn write_rename_delete_permit_env_when_allow_sensitive_is_true() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path().to_string_lossy().to_string();
 
-    fs_write_file(root.clone(), ".env".into(), "SECRET=1\n".into(), Some(true))
-        .expect("write .env with allow_sensitive");
+    fs_write_file(
+        root.clone(),
+        ".env".into(),
+        "SECRET=1\n".into(),
+        Some(true),
+        None,
+    )
+    .expect("write .env with allow_sensitive");
     assert_eq!(
         fs::read_to_string(dir.path().join(".env")).expect("read .env"),
         "SECRET=1\n"
     );
 
-    fs_rename(root.clone(), ".env".into(), "env.bak".into(), Some(true))
+    fs_rename(root.clone(), ".env".into(), "env.bak".into(), Some(true), None)
         .expect("rename .env with allow_sensitive");
     assert!(!dir.path().join(".env").exists());
     assert_eq!(
@@ -158,9 +171,10 @@ fn write_rename_delete_permit_env_when_allow_sensitive_is_true() {
         "SECRET=1\n"
     );
 
-    fs_write_file(root.clone(), ".env".into(), "SECRET=2\n".into(), Some(true))
+    fs_write_file(root.clone(), ".env".into(), "SECRET=2\n".into(), Some(true), None)
         .expect("rewrite .env with allow_sensitive");
-    fs_delete(root, ".env".into(), None, Some(true)).expect("delete .env with allow_sensitive");
+    fs_delete(root, ".env".into(), None, Some(true), None)
+        .expect("delete .env with allow_sensitive");
     assert!(!dir.path().join(".env").exists());
 }
 
@@ -169,20 +183,20 @@ fn copy_move_block_env_when_allow_sensitive_is_none() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path().to_string_lossy().to_string();
 
-    let copy_source_err = fs_copy(root.clone(), ".env".into(), "env.bak".into(), None)
+    let copy_source_err = fs_copy(root.clone(), ".env".into(), "env.bak".into(), None, None)
         .expect_err("copy .env should be blocked");
     assert_eq!(copy_source_err, "Sensitive path blocked");
 
-    let move_source_err = fs_move(root.clone(), ".env".into(), "env.bak".into(), None)
+    let move_source_err = fs_move(root.clone(), ".env".into(), "env.bak".into(), None, None)
         .expect_err("move .env should be blocked");
     assert_eq!(move_source_err, "Sensitive path blocked");
 
     fs::write(dir.path().join("notes.txt"), "hello\n").expect("write notes.txt");
-    let copy_dest_err = fs_copy(root.clone(), "notes.txt".into(), ".env".into(), None)
+    let copy_dest_err = fs_copy(root.clone(), "notes.txt".into(), ".env".into(), None, None)
         .expect_err("copy into .env should be blocked");
     assert_eq!(copy_dest_err, "Sensitive path blocked");
 
-    let move_dest_err = fs_move(root, "notes.txt".into(), ".env".into(), None)
+    let move_dest_err = fs_move(root, "notes.txt".into(), ".env".into(), None, None)
         .expect_err("move into .env should be blocked");
     assert_eq!(move_dest_err, "Sensitive path blocked");
 }
@@ -192,10 +206,16 @@ fn copy_move_permit_env_when_allow_sensitive_is_true() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path().to_string_lossy().to_string();
 
-    fs_write_file(root.clone(), ".env".into(), "SECRET=1\n".into(), Some(true))
-        .expect("write .env with allow_sensitive");
+    fs_write_file(
+        root.clone(),
+        ".env".into(),
+        "SECRET=1\n".into(),
+        Some(true),
+        None,
+    )
+    .expect("write .env with allow_sensitive");
 
-    fs_copy(root.clone(), ".env".into(), "env.copy".into(), Some(true))
+    fs_copy(root.clone(), ".env".into(), "env.copy".into(), Some(true), None)
         .expect("copy .env with allow_sensitive");
     assert_eq!(
         fs::read_to_string(dir.path().join("env.copy")).expect("read env.copy"),
@@ -206,11 +226,55 @@ fn copy_move_permit_env_when_allow_sensitive_is_true() {
         "SECRET=1\n"
     );
 
-    fs_move(root, ".env".into(), "env.moved".into(), Some(true))
+    fs_move(root, ".env".into(), "env.moved".into(), Some(true), None)
         .expect("move .env with allow_sensitive");
     assert!(!dir.path().join(".env").exists());
     assert_eq!(
         fs::read_to_string(dir.path().join("env.moved")).expect("read env.moved"),
         "SECRET=1\n"
     );
+}
+
+fn project_roots(slug: &str, root: &std::path::Path) -> Vec<WorkspaceRootArg> {
+    vec![WorkspaceRootArg {
+        slug: slug.to_string(),
+        path: root.to_string_lossy().to_string(),
+    }]
+}
+
+#[test]
+fn write_allows_ordinary_file_under_credentials_slug() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().to_string_lossy().to_string();
+    let roots = project_roots("credentials", dir.path());
+
+    fs_write_file(
+        root,
+        "credentials/src/index.ts".into(),
+        "export {}\n".into(),
+        None,
+        Some(roots),
+    )
+    .expect("write under credentials slug");
+    assert_eq!(
+        fs::read_to_string(dir.path().join("src/index.ts")).expect("read index"),
+        "export {}\n"
+    );
+}
+
+#[test]
+fn write_blocks_sensitive_member_relative_path() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().to_string_lossy().to_string();
+    let roots = project_roots("api", dir.path());
+
+    let err = fs_write_file(
+        root,
+        "api/.env".into(),
+        "SECRET=1\n".into(),
+        None,
+        Some(roots),
+    )
+    .expect_err("member-relative .env must stay blocked");
+    assert_eq!(err, "Sensitive path blocked");
 }

@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Folder, FolderOpen, FolderCog, PanelLeftClose, Plus, FileCode, Terminal } from '@lucide/vue'
+import { Folder, FolderOpen, FolderCog, Layers, PanelLeftClose, Plus, FileCode, Terminal } from '@lucide/vue'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
 import {
   Collapsible,
@@ -37,6 +37,7 @@ import useProjectsExpansion from '@/composables/use-projects-expansion'
 import useVixlConfig from '@/composables/use-vixl-config'
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
+import chatRouteFor from '@/utils/chat-route-for'
 import projectRouteFor from '@/utils/project-route-for'
 
 const props = defineProps<{
@@ -53,6 +54,44 @@ const expansion = useProjectsExpansion()
 const startingChat = ref(false)
 const removingProject = ref(false)
 const manualOpen = ref<boolean | null>(null)
+const isGroup = computed(() => props.project.kind === 'group')
+
+const resolveRowWorkspace = (): {
+  slug: string
+  projectRoot: string
+  activateId: string
+  remove: () => Promise<void>
+} | null => {
+  if (isGroup.value) {
+    const group = fleet.groups.value.find((item) => item.slug === props.project.slug)
+    const primarySlug = group?.memberSlugs[0]
+    const primary = primarySlug
+      ? fleet.projects.value.find((item) => item.slug === primarySlug)
+      : undefined
+    if (!group || !primary) {
+      return null
+    }
+    return {
+      slug: group.slug,
+      projectRoot: primary.rootPath,
+      activateId: primary.id,
+      remove: () => fleet.removeGroup(group.id),
+    }
+  }
+
+  const fleetProject = fleet.projects.value.find(
+    (item) => item.slug === props.project.slug,
+  )
+  if (!fleetProject) {
+    return null
+  }
+  return {
+    slug: fleetProject.slug,
+    projectRoot: fleetProject.rootPath,
+    activateId: fleetProject.id,
+    remove: () => fleet.removeProject(fleetProject.id),
+  }
+}
 
 const projectOpen = computed({
   get: (): boolean =>
@@ -82,17 +121,15 @@ const handleStartChat = async (): Promise<void> => {
     return
   }
 
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
-  if (!fleetProject) {
-    toast.error('Project not found')
+  const workspace = resolveRowWorkspace()
+  if (!workspace) {
+    toast.error(isGroup.value ? 'Group not found' : 'Project not found')
     return
   }
 
   startingChat.value = true
   try {
-    await fleet.setActiveProject(fleetProject.id)
+    await fleet.setActiveProject(workspace.activateId)
     const defaultMode = 'agent' as const
     const model = resolveModelForRole(defaultMode, config.effectiveSettings.value) ?? ''
     if (!model) {
@@ -100,13 +137,13 @@ const handleStartChat = async (): Promise<void> => {
       return
     }
     const chat = await chatStore.createNewChat({
-      projectSlug: fleetProject.slug,
-      projectRoot: fleetProject.rootPath,
+      projectSlug: workspace.slug,
+      projectRoot: workspace.projectRoot,
       mode: defaultMode,
       model,
     })
     await refreshFleetSidebar()
-    await router.push(`/project/${fleetProject.slug}/chat/${chat.id}`)
+    await router.push(chatRouteFor(workspace.slug, chat.id))
   } catch (error) {
     toast.error('Could not start chat', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -121,23 +158,21 @@ const handleRemoveFromSidebar = async (): Promise<void> => {
     return
   }
 
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
-  if (!fleetProject) {
+  const workspace = resolveRowWorkspace()
+  if (!workspace) {
     return
   }
 
   removingProject.value = true
   try {
-    await fleet.removeProject(fleetProject.id)
+    await workspace.remove()
     await refreshFleetSidebar()
     if (route.params.slug === props.project.slug) {
       await router.push('/')
     }
-    toast.success('Project removed from sidebar')
+    toast.success(isGroup.value ? 'Group removed from sidebar' : 'Project removed from sidebar')
   } catch (error) {
-    toast.error('Could not remove project', {
+    toast.error(isGroup.value ? 'Could not remove group' : 'Could not remove project', {
       description: error instanceof Error ? error.message : 'Unknown error',
     })
   } finally {
@@ -146,34 +181,30 @@ const handleRemoveFromSidebar = async (): Promise<void> => {
 }
 
 const handleOpenProject = async (): Promise<void> => {
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
-  if (!fleetProject) {
-    toast.error('Project not found')
+  const workspace = resolveRowWorkspace()
+  if (!workspace) {
+    toast.error(isGroup.value ? 'Group not found' : 'Project not found')
     return
   }
 
   try {
-    await router.push(projectRouteFor(fleetProject.slug))
+    await router.push(projectRouteFor(workspace.slug))
   } catch (error) {
-    toast.error('Could not open project', {
+    toast.error(isGroup.value ? 'Could not open group' : 'Could not open project', {
       description: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
 
 const handleOpenEditor = async (): Promise<void> => {
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
-  if (!fleetProject) {
-    toast.error('Project not found')
+  const workspace = resolveRowWorkspace()
+  if (!workspace) {
+    toast.error(isGroup.value ? 'Group not found' : 'Project not found')
     return
   }
 
   try {
-    await workbench.openEditor(fleetProject.id, 'README.md')
+    await workbench.openEditor(workspace.activateId, 'README.md')
   } catch (error) {
     toast.error('Could not open editor', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -182,16 +213,14 @@ const handleOpenEditor = async (): Promise<void> => {
 }
 
 const handleOpenTerminal = async (): Promise<void> => {
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
-  if (!fleetProject) {
-    toast.error('Project not found')
+  const workspace = resolveRowWorkspace()
+  if (!workspace) {
+    toast.error(isGroup.value ? 'Group not found' : 'Project not found')
     return
   }
 
   try {
-    await workbench.openTerminal(fleetProject.id)
+    await workbench.openTerminal(workspace.activateId)
   } catch (error) {
     toast.error('Could not open terminal', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -211,7 +240,10 @@ const handleOpenTerminal = async (): Promise<void> => {
         <ContextMenuTrigger as-child>
           <CollapsibleTrigger as-child>
             <SidebarMenuButton :tooltip="project.displayName">
-              <span class="relative inline-flex size-4 shrink-0">
+              <span v-if="isGroup" class="inline-flex size-4 shrink-0">
+                <Layers class="size-4 shrink-0" />
+              </span>
+              <span v-else class="relative inline-flex size-4 shrink-0">
                 <Folder
                   class="size-4 shrink-0 opacity-100 transition-all duration-150 group-data-[state=open]/collapsible:scale-90 group-data-[state=open]/collapsible:rotate-6 group-data-[state=open]/collapsible:opacity-0"
                 />

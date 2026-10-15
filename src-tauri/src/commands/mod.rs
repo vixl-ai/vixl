@@ -17,6 +17,7 @@ pub mod mcp;
 pub mod oauth;
 pub mod paths;
 pub mod registry;
+mod sandbox_protect;
 #[cfg(target_os = "macos")]
 pub mod sandbox;
 pub mod search;
@@ -67,8 +68,9 @@ pub use paths::{
     is_home_workspace_root, list_project_files, list_vixl_files,
 };
 pub use registry::{
-    get_active_project, open_project_at_path, open_project_at_path_command, registry_add_project,
-    registry_list_projects, registry_remove_project, registry_set_active_project,
+    get_active_project, open_project_at_path, open_project_at_path_command, registry_add_group,
+    registry_add_project, registry_list_groups, registry_list_projects, registry_remove_group,
+    registry_remove_project, registry_set_active_project, registry_update_group,
     registry_update_project_root, resolve_launch_path,
 };
 pub use search::{workspace_glob, workspace_grep};

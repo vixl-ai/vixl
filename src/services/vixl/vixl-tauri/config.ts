@@ -4,12 +4,11 @@ import {
   isHomeWorkspaceRoot,
 } from '@/services/config/is-home-workspace-root'
 import { call } from './helpers'
-import type { ConfigScope, ProjectFileEntry, VixlFilesKind } from './types'
+import type { ConfigScope, FleetProjectGroupRecord, ProjectFileEntry, VixlFilesKind } from './types'
 
 export const getUserVixlDir = (): Promise<string> => call('get_user_vixl_dir')
 
-export const readJsonFile = (path: string): Promise<unknown> =>
-  call('read_json_file', { path })
+export const readJsonFile = (path: string): Promise<unknown> => call('read_json_file', { path })
 
 export const writeJsonFile = (path: string, value: unknown): Promise<void> =>
   call('write_json_file', { path, value })
@@ -95,9 +94,7 @@ export const readLspConfig = async (): Promise<Record<string, unknown> | boolean
   return parsed.data as Record<string, unknown> | boolean
 }
 
-export const writeLspConfig = async (
-  config: Record<string, unknown> | boolean,
-): Promise<void> => {
+export const writeLspConfig = async (config: Record<string, unknown> | boolean): Promise<void> => {
   const parsed = lspConfigSchema.safeParse(config)
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? 'Invalid lsp.json')
@@ -108,18 +105,15 @@ export const writeLspConfig = async (
 export const watchVixlPaths = (projectRoot?: string | null): Promise<void> =>
   call('watch_vixl_paths', { projectRoot: projectRoot ?? null })
 
-export const getSecret = (key: string): Promise<string | null> =>
-  call('get_secret', { key })
+export const getSecret = (key: string): Promise<string | null> => call('get_secret', { key })
 
 export const setSecret = (key: string, value: string): Promise<void> =>
   call('set_secret', { key, value })
 
 export const deleteSecret = (key: string): Promise<void> => call('delete_secret', { key })
 
-export const configExists = (
-  scope: ConfigScope,
-  rootPath?: string | null,
-): Promise<boolean> => call('config_exists', { scope, rootPath: rootPath ?? null })
+export const configExists = (scope: ConfigScope, rootPath?: string | null): Promise<boolean> =>
+  call('config_exists', { scope, rootPath: rootPath ?? null })
 
 export const registryListProjects = (): Promise<
   Array<{
@@ -169,17 +163,32 @@ export const registryUpdateProjectRoot = (
 export const registryRemoveProject = (projectId: string): Promise<void> =>
   call('registry_remove_project', { projectId })
 
-export const getDefaultWorkspaceRoot = (): Promise<string> =>
-  call('get_default_workspace_root')
+export const registryListGroups = (): Promise<FleetProjectGroupRecord[]> =>
+  call('registry_list_groups')
+
+export const registryAddGroup = (
+  memberSlugs: string[],
+  name?: string | null,
+): Promise<FleetProjectGroupRecord> =>
+  call('registry_add_group', { memberSlugs, name: name ?? null })
+
+export const registryUpdateGroup = (
+  groupId: string,
+  name: string,
+  memberSlugs: string[],
+): Promise<FleetProjectGroupRecord> => call('registry_update_group', { groupId, name, memberSlugs })
+
+export const registryRemoveGroup = (groupId: string): Promise<void> =>
+  call('registry_remove_group', { groupId })
+
+export const getDefaultWorkspaceRoot = (): Promise<string> => call('get_default_workspace_root')
 
 export { getUserHomeDir } from './home-dir'
 
 export const getActiveProjectId = (): Promise<string | null> => call('get_active_project')
 
-export const getVixlDir = (
-  scope: ConfigScope,
-  rootPath?: string | null,
-): Promise<string> => call('get_vixl_dir', { scope, rootPath: rootPath ?? null })
+export const getVixlDir = (scope: ConfigScope, rootPath?: string | null): Promise<string> =>
+  call('get_vixl_dir', { scope, rootPath: rootPath ?? null })
 
 export const listVixlFiles = async (
   scope: ConfigScope,

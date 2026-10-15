@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -15,10 +16,25 @@ pub struct FleetProject {
     pub last_opened: String,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct FleetProjectGroup {
+    pub id: String,
+    pub name: String,
+    pub slug: String,
+    pub member_slugs: Vec<String>,
+    pub last_opened: String,
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ProjectsRegistry {
     version: u8,
     projects: Vec<FleetProject>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct GroupsRegistry {
+    version: u8,
+    groups: Vec<FleetProjectGroup>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -30,12 +46,20 @@ fn projects_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(user_vixl_dir(app)?.join("projects.json"))
 }
 
+fn groups_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(user_vixl_dir(app)?.join("project-groups.json"))
+}
+
 fn active_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(user_vixl_dir(app)?.join("active-project.json"))
 }
 
 pub(crate) fn fleet_projects(app: &AppHandle) -> Result<Vec<FleetProject>, String> {
     Ok(read_registry(app)?.projects)
+}
+
+pub(crate) fn fleet_groups(app: &AppHandle) -> Result<Vec<FleetProjectGroup>, String> {
+    Ok(read_groups_registry(app)?.groups)
 }
 
 fn read_registry(app: &AppHandle) -> Result<ProjectsRegistry, String> {
@@ -56,6 +80,24 @@ fn write_registry(app: &AppHandle, registry: &ProjectsRegistry) -> Result<(), St
     fs::write(path, content).map_err(|e| e.to_string())
 }
 
+fn read_groups_registry(app: &AppHandle) -> Result<GroupsRegistry, String> {
+    let path = groups_path(app)?;
+    if !path.exists() {
+        return Ok(GroupsRegistry {
+            version: 1,
+            groups: vec![],
+        });
+    }
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&content).map_err(|e| e.to_string())
+}
+
+fn write_groups_registry(app: &AppHandle, registry: &GroupsRegistry) -> Result<(), String> {
+    let path = groups_path(app)?;
+    let content = serde_json::to_string_pretty(registry).map_err(|e| e.to_string())?;
+    fs::write(path, content).map_err(|e| e.to_string())
+}
+
 fn slugify(name: &str) -> String {
     name.to_lowercase()
         .chars()
@@ -67,20 +109,49 @@ fn slugify(name: &str) -> String {
         .join("-")
 }
 
+#[cfg(test)]
 pub(crate) fn unique_project_slug(name: &str, projects: &[FleetProject]) -> String {
+    unique_fleet_slug(
+        name,
+        "project",
+        projects.iter().map(|project| project.slug.as_str()),
+    )
+}
+
+pub(crate) fn unique_group_slug(
+    name: &str,
+    projects: &[FleetProject],
+    groups: &[FleetProjectGroup],
+) -> String {
+    unique_fleet_slug(
+        name,
+        "group",
+        projects
+            .iter()
+            .map(|project| project.slug.as_str())
+            .chain(groups.iter().map(|group| group.slug.as_str())),
+    )
+}
+
+fn unique_fleet_slug<'a>(
+    name: &str,
+    empty_fallback: &str,
+    occupied: impl IntoIterator<Item = &'a str>,
+) -> String {
+    let occupied: HashSet<&str> = occupied.into_iter().collect();
     let base = slugify(name);
     let base = if base.is_empty() {
-        "project".to_string()
+        empty_fallback.to_string()
     } else {
         base
     };
-    if base != "_home_" && !projects.iter().any(|project| project.slug == base) {
+    if base != "_home_" && !occupied.contains(base.as_str()) {
         return base;
     }
     let mut n = 2u32;
     loop {
         let candidate = format!("{base}-{n}");
-        if !projects.iter().any(|project| project.slug == candidate) {
+        if !occupied.contains(candidate.as_str()) {
             return candidate;
         }
         n = n.saturating_add(1);
@@ -88,6 +159,66 @@ pub(crate) fn unique_project_slug(name: &str, projects: &[FleetProject]) -> Stri
             return format!("{base}-{n}");
         }
     }
+}
+
+fn is_valid_member_slug(slug: &str) -> bool {
+    !slug.is_empty()
+        && slug
+            .chars()
+            .all(|c| matches!(c, 'a'..='z' | '0'..='9' | '-'))
+}
+
+pub(crate) fn default_group_name(member_slugs: &[String], projects: &[FleetProject]) -> String {
+    member_slugs
+        .iter()
+        .map(|slug| {
+            projects
+                .iter()
+                .find(|project| project.slug == *slug)
+                .map(|project| project.name.as_str())
+                .unwrap_or(slug.as_str())
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn resolved_group_name(
+    name: Option<&str>,
+    member_slugs: &[String],
+    projects: &[FleetProject],
+) -> String {
+    match name.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(provided) => provided.to_string(),
+        None => default_group_name(member_slugs, projects),
+    }
+}
+
+fn member_sets_equal(left: &[String], right: &[String]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let left_set: HashSet<&str> = left.iter().map(String::as_str).collect();
+    let right_set: HashSet<&str> = right.iter().map(String::as_str).collect();
+    left_set == right_set
+}
+
+fn validate_member_slugs(member_slugs: &[String], projects: &[FleetProject]) -> Result<(), String> {
+    if member_slugs.is_empty() {
+        return Err("Group must include at least one project".to_string());
+    }
+    let mut seen = HashSet::new();
+    for slug in member_slugs {
+        if !is_valid_member_slug(slug) {
+            return Err(format!("Invalid project slug: {slug}"));
+        }
+        if !seen.insert(slug.as_str()) {
+            return Err(format!("Duplicate member slug: {slug}"));
+        }
+        if !projects.iter().any(|project| project.slug == *slug) {
+            return Err(format!("Unknown project slug: {slug}"));
+        }
+    }
+    Ok(())
 }
 
 fn roots_match(left: &str, right: &str) -> bool {
@@ -109,10 +240,30 @@ fn normalize_root_path(root_path: String) -> String {
         .unwrap_or(root_path)
 }
 
+#[cfg(test)]
 pub(crate) fn upsert_fleet_project(
     projects: &mut Vec<FleetProject>,
     name: String,
     root_path: String,
+) -> FleetProject {
+    upsert_fleet_project_occupied(projects, name, root_path, &[])
+}
+
+#[cfg(test)]
+pub(crate) fn upsert_fleet_project_occupied(
+    projects: &mut Vec<FleetProject>,
+    name: String,
+    root_path: String,
+    occupied_group_slugs: &[String],
+) -> FleetProject {
+    upsert_fleet_project_occupied_inner(projects, name, root_path, occupied_group_slugs)
+}
+
+fn upsert_fleet_project_occupied_inner(
+    projects: &mut Vec<FleetProject>,
+    name: String,
+    root_path: String,
+    occupied_group_slugs: &[String],
 ) -> FleetProject {
     let root_path = normalize_root_path(root_path);
     if let Some(index) = projects
@@ -130,7 +281,14 @@ pub(crate) fn upsert_fleet_project(
     let project = FleetProject {
         id: Uuid::new_v4().to_string(),
         name: name.clone(),
-        slug: unique_project_slug(&name, projects),
+        slug: unique_fleet_slug(
+            &name,
+            "project",
+            projects
+                .iter()
+                .map(|project| project.slug.as_str())
+                .chain(occupied_group_slugs.iter().map(String::as_str)),
+        ),
         root_path,
         last_opened: chrono_now(),
     };
@@ -170,7 +328,17 @@ pub(crate) fn add_or_update_project(
     root_path: String,
 ) -> Result<FleetProject, String> {
     let mut registry = read_registry(app)?;
-    let project = upsert_fleet_project(&mut registry.projects, name, root_path);
+    let groups = read_groups_registry(app).unwrap_or(GroupsRegistry {
+        version: 1,
+        groups: vec![],
+    });
+    let occupied: Vec<String> = groups
+        .groups
+        .iter()
+        .map(|group| group.slug.clone())
+        .collect();
+    let project =
+        upsert_fleet_project_occupied_inner(&mut registry.projects, name, root_path, &occupied);
     write_registry(app, &registry)?;
     Ok(project)
 }
@@ -247,6 +415,137 @@ pub fn registry_set_active_project(
     let active = ActiveProject { project_id };
     let content = serde_json::to_string_pretty(&active).map_err(|e| e.to_string())?;
     fs::write(path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn registry_list_groups(app: AppHandle) -> Result<Vec<FleetProjectGroup>, String> {
+    Ok(read_groups_registry(&app)?.groups)
+}
+
+fn add_or_reuse_group(
+    groups: &mut Vec<FleetProjectGroup>,
+    projects: &[FleetProject],
+    member_slugs: Vec<String>,
+    name: Option<&str>,
+) -> Result<FleetProjectGroup, String> {
+    validate_member_slugs(&member_slugs, projects)?;
+    if let Some(index) = groups
+        .iter()
+        .position(|group| member_sets_equal(&group.member_slugs, &member_slugs))
+    {
+        groups[index].last_opened = chrono_now();
+        let existing = groups[index].clone();
+        groups.sort_by(|a, b| b.last_opened.cmp(&a.last_opened));
+        return Ok(existing);
+    }
+
+    let resolved_name = resolved_group_name(name, &member_slugs, projects);
+    let group = FleetProjectGroup {
+        id: Uuid::new_v4().to_string(),
+        name: resolved_name.clone(),
+        slug: unique_group_slug(&resolved_name, projects, groups),
+        member_slugs,
+        last_opened: chrono_now(),
+    };
+    groups.push(group.clone());
+    groups.sort_by(|a, b| b.last_opened.cmp(&a.last_opened));
+    Ok(group)
+}
+
+fn update_group_in_place(
+    groups: &mut Vec<FleetProjectGroup>,
+    projects: &[FleetProject],
+    group_id: &str,
+    name: String,
+    member_slugs: Vec<String>,
+) -> Result<FleetProjectGroup, String> {
+    validate_member_slugs(&member_slugs, projects)?;
+    let group = groups
+        .iter_mut()
+        .find(|group| group.id == group_id)
+        .ok_or_else(|| "Group not found".to_string())?;
+    group.name = name;
+    group.member_slugs = member_slugs;
+    group.last_opened = chrono_now();
+    let updated = group.clone();
+    groups.sort_by(|a, b| b.last_opened.cmp(&a.last_opened));
+    Ok(updated)
+}
+
+fn remove_group_by_id(groups: &mut Vec<FleetProjectGroup>, group_id: &str) {
+    groups.retain(|group| group.id != group_id);
+}
+
+#[cfg(test)]
+pub(crate) fn upsert_fleet_group(
+    groups: &mut Vec<FleetProjectGroup>,
+    projects: &[FleetProject],
+    member_slugs: Vec<String>,
+    name: Option<&str>,
+) -> Result<FleetProjectGroup, String> {
+    add_or_reuse_group(groups, projects, member_slugs, name)
+}
+
+#[cfg(test)]
+pub(crate) fn apply_group_update(
+    groups: &mut Vec<FleetProjectGroup>,
+    projects: &[FleetProject],
+    group_id: &str,
+    name: String,
+    member_slugs: Vec<String>,
+) -> Result<FleetProjectGroup, String> {
+    update_group_in_place(groups, projects, group_id, name, member_slugs)
+}
+
+#[cfg(test)]
+pub(crate) fn remove_fleet_group(groups: &mut Vec<FleetProjectGroup>, group_id: &str) {
+    remove_group_by_id(groups, group_id)
+}
+
+#[tauri::command]
+pub fn registry_add_group(
+    app: AppHandle,
+    member_slugs: Vec<String>,
+    name: Option<String>,
+) -> Result<FleetProjectGroup, String> {
+    let projects = read_registry(&app)?.projects;
+    let mut registry = read_groups_registry(&app)?;
+    let group = add_or_reuse_group(
+        &mut registry.groups,
+        &projects,
+        member_slugs,
+        name.as_deref(),
+    )?;
+    write_groups_registry(&app, &registry)?;
+    Ok(group)
+}
+
+#[tauri::command]
+pub fn registry_update_group(
+    app: AppHandle,
+    group_id: String,
+    name: String,
+    member_slugs: Vec<String>,
+) -> Result<FleetProjectGroup, String> {
+    let projects = read_registry(&app)?.projects;
+    let mut registry = read_groups_registry(&app)?;
+    let updated = update_group_in_place(
+        &mut registry.groups,
+        &projects,
+        &group_id,
+        name,
+        member_slugs,
+    )?;
+    write_groups_registry(&app, &registry)?;
+    Ok(updated)
+}
+
+#[tauri::command]
+pub fn registry_remove_group(app: AppHandle, group_id: String) -> Result<(), String> {
+    let mut registry = read_groups_registry(&app)?;
+    remove_group_by_id(&mut registry.groups, &group_id);
+    write_groups_registry(&app, &registry)?;
+    Ok(())
 }
 
 #[tauri::command]

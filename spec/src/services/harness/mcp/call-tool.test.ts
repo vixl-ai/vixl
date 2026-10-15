@@ -418,5 +418,60 @@ describe('build-tools call_mcp_tool args normalization', () => {
     expect(stageImage).not.toHaveBeenCalled()
     expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] })
   })
+
+  it('calls a qualified member server using that project root as scopeKey', async () => {
+    const apiRoot = '/tmp/api'
+    const webRoot = '/tmp/web'
+    readMcpConfig.mockImplementation(async (scope: string, rootPath?: string | null) => {
+      if (scope === 'personal') {
+        return { servers: {} }
+      }
+      if (rootPath === apiRoot) {
+        return { servers: { docs: { command: 'npx', args: ['-y', 'api-docs'] } } }
+      }
+      if (rootPath === webRoot) {
+        return { servers: { docs: { command: 'npx', args: ['-y', 'web-docs'] } } }
+      }
+      return { servers: {} }
+    })
+    mcpGetStatus.mockResolvedValue({
+      serverId: 'docs',
+      status: 'connected',
+      tools: [
+        {
+          name: 'search_docs',
+          description: 'Search',
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ],
+      error: null,
+    })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      projectRoot: apiRoot,
+      members: [
+        { slug: 'api', name: 'API', rootPath: apiRoot },
+        { slug: 'web', name: 'Web', rootPath: webRoot },
+      ],
+    })
+    await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'web:docs',
+        tool: 'search_docs',
+        args: {},
+      },
+      'tc-mcp-qualified',
+    )
+
+    expect(mcpCallTool).toHaveBeenCalledWith(
+      'docs',
+      'search_docs',
+      {},
+      undefined,
+      webRoot,
+    )
+  })
 })
 

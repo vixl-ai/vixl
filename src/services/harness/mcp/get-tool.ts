@@ -1,9 +1,10 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { migrateMcpConfig } from '@/schemas/mcp-config'
-import { listUserMcpServers } from '@/services/mcp/merge-mcp-config'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
-import { readMcpConfig } from '@/services/vixl/vixl-tauri'
+import {
+  listUnionedMcpServers,
+  resolveUnionedMcpServer,
+} from '@/services/mcp/union-member-servers'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import inputExamplesFromMeta from './input-examples'
 
@@ -16,21 +17,14 @@ const getMcpTool = (ctx: HarnessToolContext) =>
       tool: z.string().describe('Tool name from that server'),
     }),
     execute: async ({ serverId, tool: toolName }) => {
-      const personal = migrateMcpConfig(await readMcpConfig('personal', null))
-      const projectRaw = await readMcpConfig('project', ctx.projectRoot).catch(() => null)
-      const project = projectRaw ? migrateMcpConfig(projectRaw) : null
-      const servers = listUserMcpServers(personal, project)
-      const server = servers.find((entry) => entry.id === serverId)
-      if (!server) {
-        return {
-          error: `MCP server "${serverId}" was not found in any mcp.json config.`,
-        }
+      const servers = await listUnionedMcpServers(ctx.projectRoot, ctx.members)
+      const server = resolveUnionedMcpServer(servers, serverId, ctx.members)
+      if ('error' in server) {
+        return { error: server.error }
       }
 
-      const scopeKey = server.scope === 'personal' ? 'personal' : ctx.projectRoot
-
       try {
-        const state = await mcpRuntime.getStatus(serverId, undefined, scopeKey)
+        const state = await mcpRuntime.getStatus(server.id, undefined, server.scopeKey)
         if (state.status === 'error' || state.status === 'stopped') {
           return {
             error:
@@ -45,7 +39,7 @@ const getMcpTool = (ctx: HarnessToolContext) =>
           }
         }
         return {
-          serverId,
+          serverId: server.displayId,
           name: item.name,
           description: item.description ?? '',
           inputSchema: item.inputSchema ?? null,

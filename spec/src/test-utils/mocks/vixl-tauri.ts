@@ -85,6 +85,13 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
     workbenchReplaceSession: vi.fn<() => Promise<void>>(async () => undefined),
     editorLoadViewState: vi.fn<() => Promise<unknown | null>>(async () => null),
     editorSaveViewState: vi.fn<() => Promise<void>>(async () => undefined),
+    registryListProjects: vi.fn<() => Promise<unknown[]>>(async () => []),
+    getActiveProjectId: vi.fn<() => Promise<string | null>>(async () => null),
+    hasProjectVixl: vi.fn<(root: string) => Promise<boolean>>(async () => false),
+    registryListGroups: vi.fn<() => Promise<unknown[]>>(async () => []),
+    registryAddGroup: vi.fn<() => Promise<unknown>>(),
+    registryUpdateGroup: vi.fn<() => Promise<unknown>>(),
+    registryRemoveGroup: vi.fn<() => Promise<void>>(async () => undefined),
     ...overrides,
   }
 }

@@ -35,6 +35,7 @@ fn glob(
         project_root: root.to_string_lossy().to_string(),
         pattern: pattern.to_string(),
         limit,
+        project_roots: None,
     };
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -108,6 +109,7 @@ fn empty_pattern_is_required_error() {
         project_root: project.path().to_string_lossy().to_string(),
         pattern: "   ".to_string(),
         limit: None,
+        project_roots: None,
     };
     let error = tokio::runtime::Builder::new_current_thread()
         .enable_all()

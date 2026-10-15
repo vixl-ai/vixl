@@ -1168,4 +1168,89 @@ describe('build-tools run_terminal', () => {
         'Read-only subagents require an OS sandbox. This platform has no sandbox, so run_terminal is unavailable.',
     })
   })
+
+  it('resolves cwd to a member root and passes projectRoots for sandboxing', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      projectRoot: '/tmp/api',
+      projectSlug: 'stack',
+      members: [
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+      ],
+    })
+    const result = await runTool(tools.run_terminal.execute, {
+      command: 'pwd',
+      cwd: 'web',
+    })
+
+    expect(createAgentShell).toHaveBeenCalledWith({
+      chatId: 'chat-1',
+      projectRoot: '/tmp/web',
+      command: 'pwd',
+      sandboxed: true,
+      allowNetwork: true,
+      projectRoots: [
+        { slug: 'api', path: '/tmp/api' },
+        { slug: 'web', path: '/tmp/web' },
+      ],
+    })
+    expect(result).toMatchObject({
+      cwd: '/tmp/web',
+      cwdSlug: 'web',
+    })
+    expect(String((result as { sandboxing: string }).sandboxing)).toContain(
+      'Working directory: /tmp/web (web)',
+    )
+  })
+
+  it('rejects an unknown cwd slug and lists valid slugs', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      projectRoot: '/tmp/api',
+      projectSlug: 'stack',
+      members: [
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+      ],
+    })
+
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'pwd', cwd: 'mobile' }),
+    ).rejects.toThrow(/Unknown project slug/)
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'pwd', cwd: 'mobile' }),
+    ).rejects.toThrow(/api/)
+    expect(createAgentShell).not.toHaveBeenCalled()
+  })
+
+  it('defaults cwd to the primary root when members exist', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      projectRoot: '/tmp/api',
+      projectSlug: 'stack',
+      members: [
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+      ],
+    })
+    const result = await runTool(tools.run_terminal.execute, { command: 'pwd' })
+
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectRoot: '/tmp/api',
+        projectRoots: [
+          { slug: 'api', path: '/tmp/api' },
+          { slug: 'web', path: '/tmp/web' },
+        ],
+      }),
+    )
+    expect(result).toMatchObject({
+      cwd: '/tmp/api',
+      cwdSlug: 'api',
+    })
+  })
 })

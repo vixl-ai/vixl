@@ -21,6 +21,7 @@ import {
   wrapWithSandboxingFooter,
 } from '@/services/harness/shell/sandbox-result'
 import { hasSubagent } from '@/services/harness/subagent/registry'
+import { ipcProjectRoots } from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 export const runTerminalCommand = async (
@@ -33,25 +34,32 @@ export const runTerminalCommand = async (
     sandboxed?: boolean
     allowNetwork?: boolean
     projectWritable?: boolean
+    projectRoot?: string
+    cwdSlug?: string
   },
 ): Promise<Record<string, unknown>> => {
   if (ctx.signal?.aborted) {
     throw new Error('Command aborted')
   }
 
+  const projectRoot = args.projectRoot ?? ctx.projectRoot
+  const projectRoots = ipcProjectRoots(ctx)
   const meta = resolveSandboxResultMeta({
     sandboxed: args.sandboxed,
     allowNetwork: args.allowNetwork,
+    cwd: projectRoot,
+    cwdSlug: args.cwdSlug,
   })
 
   try {
     const shell = await createAgentShell({
       chatId: ctx.chatId,
-      projectRoot: ctx.projectRoot,
+      projectRoot,
       command: args.command,
       sandboxed: args.sandboxed,
       allowNetwork: args.allowNetwork,
       ...(args.projectWritable === false ? { projectWritable: false } : {}),
+      ...(projectRoots ? { projectRoots } : {}),
       ...(ctx.subagentId ? { subagentId: ctx.subagentId } : {}),
     })
 
@@ -76,7 +84,7 @@ export const runTerminalCommand = async (
     const denial = meta.sandboxed
       ? detectSandboxRuntimeDenial(combined, {
           command: args.command,
-          projectRoot: ctx.projectRoot,
+          projectRoot,
           sandboxed: true,
           allowNetwork: args.allowNetwork,
         })

@@ -192,3 +192,98 @@ describe('get_mcp_tools', () => {
     })
   })
 })
+
+const apiRoot = '/tmp/api'
+const webRoot = '/tmp/web'
+const groupMembers = [
+  { slug: 'api', name: 'API', rootPath: apiRoot },
+  { slug: 'web', name: 'Web', rootPath: webRoot },
+]
+
+const groupCtx: HarnessToolContext = {
+  ...ctx,
+  projectRoot: apiRoot,
+  projectSlug: 'stack',
+  members: groupMembers,
+}
+
+const runGroupTool = async (input: Record<string, unknown> = {}): Promise<unknown> => {
+  const built = getMcpTools(groupCtx)
+  const runner = built.execute as (
+    value: Record<string, unknown>,
+    options: { toolCallId: string },
+  ) => Promise<unknown>
+  return runner(input, { toolCallId: 'tc-get-mcp-tools-group' })
+}
+
+describe('get_mcp_tools member resolution', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(isMcpTrusted).mockReturnValue(true)
+    readMcpConfig.mockImplementation(async (scope: string, rootPath?: string | null) => {
+      if (scope === 'personal') {
+        return { servers: {} }
+      }
+      if (rootPath === apiRoot) {
+        return { servers: { docs: { command: 'npx', args: ['-y', 'api-docs'] } } }
+      }
+      if (rootPath === webRoot) {
+        return {
+          servers: {
+            docs: { command: 'npx', args: ['-y', 'web-docs'] },
+            search: { command: 'npx', args: ['-y', 'web-search'] },
+          },
+        }
+      }
+      return { servers: {} }
+    })
+    mcpGetStatus.mockImplementation(async (serverId: string, _config?: unknown, scopeKey?: string) => ({
+      serverId,
+      status: 'connected',
+      tools: [
+        {
+          name: scopeKey === webRoot ? 'web_tool' : 'api_tool',
+          description: 'tool',
+        },
+      ],
+      error: null,
+    }))
+  })
+
+  it('lists duplicate servers with slug-qualified ids', async () => {
+    const result = (await runGroupTool({})) as {
+      servers: Array<{ serverId: string }>
+    }
+    const ids = result.servers.map((server) => server.serverId)
+    expect(ids).toEqual(expect.arrayContaining(['api:docs', 'web:docs', 'search']))
+    expect(ids).not.toContain('docs')
+  })
+
+  it('loads schemas for a qualified server from that member root', async () => {
+    const result = await runGroupTool({ serverId: 'api:docs' })
+    expect(result).toMatchObject({
+      serverId: 'api:docs',
+      tools: [{ name: 'api_tool' }],
+    })
+    expect(mcpGetStatus).toHaveBeenCalledWith('docs', undefined, apiRoot)
+  })
+
+  it('loads a bare unique server from the member that defines it', async () => {
+    const result = await runGroupTool({ serverId: 'search' })
+    expect(result).toMatchObject({
+      serverId: 'search',
+      tools: [{ name: 'web_tool' }],
+    })
+    expect(mcpGetStatus).toHaveBeenCalledWith('search', undefined, webRoot)
+  })
+
+  it('errors on a bare server id duplicated across members', async () => {
+    const result = await runGroupTool({ serverId: 'docs' })
+    expect(result).toEqual({
+      error:
+        'MCP server "docs" is defined in multiple projects. Use one of: api:docs, web:docs',
+    })
+    expect(mcpGetStatus).not.toHaveBeenCalled()
+  })
+})
+

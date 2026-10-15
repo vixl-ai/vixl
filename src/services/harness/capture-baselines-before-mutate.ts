@@ -1,10 +1,13 @@
 import { fileCheckpointCapture } from '@/services/vixl/vixl-tauri'
+import { checkpointCaptureTarget } from '@/services/harness/tool-roots'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 
 type CaptureContext = {
   projectRoot: string
   projectSlug: string
   chatId: string
   userMessageId?: string
+  members?: HarnessWorkspaceMember[]
 }
 
 const captureBaselinesBeforeMutate = async (
@@ -21,12 +24,13 @@ const captureBaselinesBeforeMutate = async (
 
   const uniquePaths = [...new Set(paths.map((path) => path.trim()).filter(Boolean))]
   for (const path of uniquePaths) {
+    const target = checkpointCaptureTarget(ctx, path)
     await fileCheckpointCapture({
       projectSlug: ctx.projectSlug,
       chatId: ctx.chatId,
       userMessageId: ctx.userMessageId,
-      projectRoot: ctx.projectRoot,
-      path,
+      projectRoot: target.projectRoot,
+      path: target.path,
       toolCallId,
     })
   }
