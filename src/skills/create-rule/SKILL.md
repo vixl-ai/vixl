@@ -11,15 +11,9 @@ Write a project rule with write_file.
 - Without write_file, stop and suggest switching to Agent mode.
 - Reserved slugs: ask, plan, agent, orchestrator.
 
-The file has no frontmatter and is injected whole into every project chat with no glob gate, so keep it short and specific.
+The file has no frontmatter and no glob gate. Keep it short and specific.
 
-Home chats inject only .vixl/AGENTS.md, not .vixl/rules. Write the rule file when the user asked for a rule; for always-on home guidance, write .vixl/AGENTS.md instead. Starter:
-
-```markdown
-# Project instructions
-
-Add repository-specific guidance for the agent here.
-```
+A home-chat rule is written at .vixl/rules/{slug}.md. The workspace root is the user home, so the file is ~/.vixl/rules/{slug}.md. It is injected on home chats, and as personal guidance on project chats.
 
 Example rule:
 
