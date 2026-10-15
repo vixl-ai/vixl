@@ -21,31 +21,48 @@ jobs:
             args: '--target aarch64-apple-darwin --bundles dmg'
             rust_targets: aarch64-apple-darwin
             cache_key: macos-latest-aarch64-apple-darwin-release
+            artifact_globs: |
+              **/bundle/dmg/*.dmg
           - platform: macos-latest
             label: macOS aarch64 app
             args: '--target aarch64-apple-darwin --bundles app'
             rust_targets: aarch64-apple-darwin
             cache_key: macos-latest-aarch64-apple-darwin-release
+            artifact_globs: |
+              **/bundle/macos/*.app.tar.gz
+              **/bundle/macos/*.app.tar.gz.sig
           - platform: ubuntu-24.04
             label: Linux AppImage
             args: '--bundles appimage --verbose'
             rust_targets: ''
             cache_key: ubuntu-24.04-release
+            artifact_globs: |
+              **/bundle/appimage/*.AppImage
+              **/bundle/appimage/*.AppImage.sig
           - platform: ubuntu-24.04
             label: Linux deb
             args: '--bundles deb'
             rust_targets: ''
             cache_key: ubuntu-24.04-release
+            artifact_globs: |
+              **/bundle/deb/*.deb
+              **/bundle/deb/*.deb.sig
           - platform: ubuntu-24.04
             label: Linux rpm
             args: '--bundles rpm --verbose'
             rust_targets: ''
             cache_key: ubuntu-24.04-release
+            artifact_globs: |
+              **/bundle/rpm/*.rpm
+              **/bundle/rpm/*.rpm.sig
           - platform: windows-latest
             label: Windows NSIS
             args: '--bundles nsis'
             rust_targets: ''
             cache_key: windows-latest-release
+            artifact_globs: |
+              **/bundle/nsis/*-setup.exe
+              **/bundle/nsis/*-setup.exe.sig
 
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 45
@@ -84,6 +101,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Clear stale bundles
+        run: rm -rf src-tauri/target/release/bundle src-tauri/target/*/release/bundle
+
       - name: Extract linuxdeploy without FUSE
         if: contains(matrix.args, '--bundles appimage')
         env:
@@ -92,7 +112,7 @@ jobs:
           chmod +x scripts/prepare-linuxdeploy.sh
           ./scripts/prepare-linuxdeploy.sh
 
-      - name: Build and upload to GitHub Release
+      - name: Build bundles
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -101,26 +121,27 @@ jobs:
           NO_STRIP: 'true'
           APPIMAGE_EXTRACT_AND_RUN: '1'
         with:
-          tagName: v__VERSION__
-          releaseName: vixl v__VERSION__
-          releaseBody: |
-            vixl v__VERSION__
-
-            Checksums (`SHA256SUMS.txt`, `SHA512SUMS.txt`) are attached after all platform builds finish.
-            See CONTRIBUTING.md for how to verify downloads.
-          releaseDraft: true
-          prerelease: false
           tauriScript: npm run tauri
           args: ${{ matrix.args }}
-          updaterJsonPreferNsis: true
+          uploadWorkflowArtifacts: false
+          uploadUpdaterJson: false
+
+      - name: Upload signed bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-bundles-${{ strategy.job-index }}
+          if-no-files-found: error
+          path: ${{ matrix.artifact_globs }}
 
   checksums:
     name: Checksums and publish
     needs: publish-tauri
-    if: ${{ always() && !cancelled() }}
+    if: success()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-tags: true
 
       - name: Resolve release tag
         id: meta
@@ -129,66 +150,21 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Download assets and write checksums
+      - name: Download workflow artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/vixl-artifacts
+          merge-multiple: true
+
+      - name: Assemble, checksum, and publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.meta.outputs.tag }}
           VERSION: ${{ steps.meta.outputs.version }}
+          ASSET_DIR: ${{ runner.temp }}/vixl-artifacts
         run: |
-          set -euo pipefail
-          mkdir -p /tmp/vixl-release
-          cd /tmp/vixl-release
-
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir . --pattern '*'
-
-          rm -f SHA256SUMS.txt SHA512SUMS.txt
-
-          mapfile -t files < <(find . -maxdepth 1 -type f ! -name 'SHA256SUMS.txt' ! -name 'SHA512SUMS.txt' | sed 's|^\./||' | sort)
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No release assets found for $TAG" >&2
-            exit 1
-          fi
-
-          sha256sum -- "${files[@]}" > SHA256SUMS.txt
-          sha512sum -- "${files[@]}" > SHA512SUMS.txt
-
-          {
-            echo "## vixl v${VERSION}"
-            echo
-            echo "Installers and bundles for macOS, Linux, and Windows are attached below."
-            echo
-            echo "### Verify downloads"
-            echo
-            echo "1. Download the asset(s) you need and \`SHA256SUMS.txt\` (or \`SHA512SUMS.txt\`)."
-            echo "2. From the download directory, run:"
-            echo
-            echo '```bash'
-            echo 'sha256sum -c SHA256SUMS.txt'
-            echo '# or'
-            echo 'sha512sum -c SHA512SUMS.txt'
-            echo '```'
-            echo
-            echo "On macOS you can use \`shasum -a 256 -c SHA256SUMS.txt\`."
-            echo
-            echo "Only trust checksum files from this GitHub Release for tag \`${TAG}\`."
-            echo
-            echo "### Assets"
-            echo
-            for f in "${files[@]}"; do
-              echo "- \`${f}\`"
-            done
-          } > RELEASE_NOTES.md
-
-          gh release upload "$TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            SHA256SUMS.txt \
-            SHA512SUMS.txt \
-            --clobber
-
-          gh release edit "$TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --notes-file RELEASE_NOTES.md \
-            --draft=false
+          chmod +x scripts/publish-github-release.sh
+          ./scripts/publish-github-release.sh
 
   # Docs go live only after every installer job and the public release edit
   # have finished, so the site never advertises a version that is not out yet.

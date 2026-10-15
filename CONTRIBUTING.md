@@ -115,7 +115,7 @@ Do not inject empty `APPLE_*` secrets: GitHub passes empty strings and macOS bun
 
 ### OTA updates
 
-The Release workflow signs updater artifacts and uploads a static `latest.json` to each GitHub Release (via tauri-action defaults). The app's updater checks `https://github.com/vixl-ai/vixl/releases/latest/download/latest.json`, which always resolves to the newest published release.
+The Release workflow signs updater artifacts and assembles a static `latest.json` once after all platform builds finish (not via parallel tauri-action uploads). The app's updater checks `https://github.com/vixl-ai/vixl/releases/latest/download/latest.json`, which always resolves to the newest published release.
 
 Required repo secret for OTA: `TAURI_SIGNING_PRIVATE_KEY` (minisign key, passwordless). Optional: `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if a password-protected key is used.
 
