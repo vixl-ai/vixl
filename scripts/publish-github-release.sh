@@ -104,7 +104,10 @@ RPM_SIG="$(find_one "vixl-${VERSION}-1.x86_64.rpm.sig" 'Linux rpm signature')"
 NSIS="$(find_one "vixl_${VERSION}_x64-setup.exe" 'Windows NSIS installer')"
 NSIS_SIG="$(find_one "vixl_${VERSION}_x64-setup.exe.sig" 'Windows NSIS signature')"
 
-mapfile -t UPLOAD_FILES < <(find "${STAGING}" -maxdepth 1 -type f ! -name 'latest.json' | sed 's|^\./||' | sort)
+UPLOAD_FILES=()
+while IFS= read -r f; do
+  UPLOAD_FILES+=("${f}")
+done < <(find "${STAGING}" -maxdepth 1 -type f ! -name 'latest.json' | sed 's|^\./||' | sort)
 if [[ ${#UPLOAD_FILES[@]} -eq 0 ]]; then
   echo "No bundle files to upload" >&2
   exit 1
@@ -119,16 +122,30 @@ fi
   echo "See CONTRIBUTING.md for how to verify downloads."
 } > "${NOTES_FILE}"
 
-gh release create "${TAG}" \
-  --repo "${GITHUB_REPOSITORY}" \
-  --draft \
-  --verify-tag \
-  --title "vixl v${VERSION}" \
-  --notes-file "${NOTES_FILE}"
+# Drafts are not addressable as /releases/tags/<tag>, so gh release upload
+# 404s. Create a published prerelease instead: /releases/latest still points
+# at the previous stable build until we flip prerelease off at the end.
+while read -r draft_id; do
+  [[ -z "${draft_id}" ]] && continue
+  echo "Deleting leftover draft ${draft_id} for ${TAG}"
+  gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${draft_id}"
+done < <(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=30" \
+  --jq ".[] | select(.draft == true and .tag_name == \"${TAG}\") | .id")
 
-gh release upload "${TAG}" \
-  --repo "${GITHUB_REPOSITORY}" \
-  -- "${UPLOAD_FILES[@]}"
+if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+  echo "Release ${TAG} already exists; uploading assets"
+  gh release upload "${TAG}" \
+    --repo "${GITHUB_REPOSITORY}" \
+    --clobber \
+    -- "${UPLOAD_FILES[@]}"
+else
+  gh release create "${TAG}" \
+    --repo "${GITHUB_REPOSITORY}" \
+    --prerelease \
+    --title "vixl v${VERSION}" \
+    --notes-file "${NOTES_FILE}" \
+    -- "${UPLOAD_FILES[@]}"
+fi
 
 gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" > "${ASSETS_JSON}"
 
@@ -216,9 +233,17 @@ gh release upload "${TAG}" \
   "${LATEST}"
 
 cd "${STAGING}"
-mapfile -t CHECKSUM_FILES < <(find . -maxdepth 1 -type f ! -name 'SHA256SUMS.txt' ! -name 'SHA512SUMS.txt' | sed 's|^\./||' | sort)
-sha256sum -- "${CHECKSUM_FILES[@]}" > SHA256SUMS.txt
-sha512sum -- "${CHECKSUM_FILES[@]}" > SHA512SUMS.txt
+CHECKSUM_FILES=()
+while IFS= read -r f; do
+  CHECKSUM_FILES+=("${f}")
+done < <(find . -maxdepth 1 -type f ! -name 'SHA256SUMS.txt' ! -name 'SHA512SUMS.txt' | sed 's|^\./||' | sort)
+if command -v sha256sum >/dev/null && command -v sha512sum >/dev/null; then
+  sha256sum -- "${CHECKSUM_FILES[@]}" > SHA256SUMS.txt
+  sha512sum -- "${CHECKSUM_FILES[@]}" > SHA512SUMS.txt
+else
+  shasum -a 256 -- "${CHECKSUM_FILES[@]}" > SHA256SUMS.txt
+  shasum -a 512 -- "${CHECKSUM_FILES[@]}" > SHA512SUMS.txt
+fi
 
 {
   echo "## vixl v${VERSION}"
@@ -255,6 +280,7 @@ gh release upload "${TAG}" \
 gh release edit "${TAG}" \
   --repo "${GITHUB_REPOSITORY}" \
   --notes-file "${NOTES_FILE}" \
-  --draft=false
+  --prerelease=false \
+  --latest
 
 echo "Published ${TAG} from ${ROOT}"
