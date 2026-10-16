@@ -22,10 +22,14 @@ import { canShowMcpOAuthLoginControl } from '@/types/vixl/mcp-config'
 import type { EffectiveMcpServer } from '@/services/mcp/merge-mcp-config'
 import connectionKey from '@/services/mcp/connection-key'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   server: EffectiveMcpServer
   scopeKey: string
-}>()
+  memberSlug?: string
+  showSettings?: boolean
+}>(), {
+  showSettings: true,
+})
 
 const emit = defineEmits<{
   login: []
@@ -124,6 +128,13 @@ const handleToggle = (): void => {
     <span class="min-w-0 flex-1 truncate px-1 text-sm font-medium">
       {{ server.id }}
     </span>
+    <span
+      v-if="memberSlug"
+      class="max-w-16 shrink-0 truncate rounded bg-muted px-1 text-[10px] text-muted-foreground"
+      :title="memberSlug"
+    >
+      {{ memberSlug }}
+    </span>
 
     <Tooltip v-if="enabled && canShowMcpOAuthLoginControl(server.config, serverStatus, serverError)">
       <TooltipTrigger as-child>
@@ -142,7 +153,7 @@ const handleToggle = (): void => {
       <TooltipContent>Log in</TooltipContent>
     </Tooltip>
 
-    <Tooltip>
+    <Tooltip v-if="showSettings">
       <TooltipTrigger as-child>
         <Button
           type="button"

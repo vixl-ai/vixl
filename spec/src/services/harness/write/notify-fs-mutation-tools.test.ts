@@ -50,9 +50,15 @@ vi.mock('@/services/harness/permission/gate', () => ({
   gateToolPermission,
 }))
 
-vi.mock('@/services/harness/capture-baselines-before-mutate', () => ({
-  default: captureBaselinesBeforeMutate,
-}))
+vi.mock('@/services/harness/capture-baselines-before-mutate', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('@/services/harness/capture-baselines-before-mutate')
+  >()
+  return {
+    ...actual,
+    default: captureBaselinesBeforeMutate,
+  }
+})
 
 vi.mock('@/services/vixl/vixl-tauri', () =>
   mockVixlTauri({
@@ -245,14 +251,36 @@ describe('harness tools notify workspace fs mutations', () => {
     expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/web', ['src/foo.ts'])
   })
 
-  it('move_file notifies each affected member root', async () => {
-    await execute(moveFile(groupCtx()), {
+  it('move_file rejects cross-member moves without notifying', async () => {
+    const result = await execute(moveFile(groupCtx()), {
       from: 'api/src/a.ts',
       to: 'web/lib/b.ts',
     })
 
-    expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/api', ['src/a.ts'])
-    expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/web', ['lib/b.ts'])
+    expect(result).toEqual({
+      error: 'Move paths must belong to a single project member',
+    })
+    expect(gateToolPermission).not.toHaveBeenCalled()
+    expect(captureBaselinesBeforeMutate).not.toHaveBeenCalled()
+    expect(fsMove).not.toHaveBeenCalled()
+    expect(notifyWorkspaceFsMutation).not.toHaveBeenCalled()
+  })
+
+  it('move_file notifies the member root for a same-member move', async () => {
+    const result = await execute(moveFile(groupCtx()), {
+      from: 'api/src/a.ts',
+      to: 'api/lib/b.ts',
+    })
+
+    expect(result).toEqual(
+      expect.objectContaining({ ok: true, from: 'api/src/a.ts', to: 'api/lib/b.ts' }),
+    )
+    expect(fsMove).toHaveBeenCalled()
+    expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/api', ['src/a.ts', 'lib/b.ts'])
+    expect(notifyWorkspaceFsMutation).not.toHaveBeenCalledWith(
+      '/tmp/web',
+      expect.anything(),
+    )
   })
 
   it('apply_patch notifies each member that the patch touched', async () => {

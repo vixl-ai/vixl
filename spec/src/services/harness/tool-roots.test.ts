@@ -12,12 +12,16 @@ vi.mock('@/services/harness/shared/notify-fs-mutation', () => ({
 import {
   checkpointCaptureTarget,
   ipcProjectRoots,
+  isAbsolutePath,
   isMultiRootWorkspace,
+  joinOntoProjectRoot,
   MULTI_ROOT_PATH_HINT,
   notifyWorkspaceMutations,
   permissionPath,
+  relativeUnderProjectRoot,
   resolveWorkspaceSlug,
   sensitiveCheckPaths,
+  toRelativeUnderProjectRoot,
   withMultiRootPathHint,
   withProjectRoots,
 } from '@/services/harness/tool-roots'
@@ -288,5 +292,44 @@ describe('notifyWorkspaceMutations', () => {
       'lib/baz.ts',
     ])
     expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/api', ['src/bar.ts'])
+  })
+})
+
+describe('joinOntoProjectRoot and relativeUnderProjectRoot', () => {
+  it('joins and strips posix paths with matching separators', () => {
+    const root = '/tmp/project'
+    const relative = '.vixl/plans/id/PLAN.md'
+    const absolute = joinOntoProjectRoot(root, relative)
+    expect(absolute).toBe('/tmp/project/.vixl/plans/id/PLAN.md')
+    expect(relativeUnderProjectRoot(root, absolute)).toBe(relative)
+    expect(toRelativeUnderProjectRoot(root, absolute)).toBe(relative)
+    expect(toRelativeUnderProjectRoot(root, relative)).toBe(relative)
+  })
+
+  it('joins and strips windows paths with backslash separators', () => {
+    const root = 'C:\\Users\\proj'
+    const relative = '.vixl/plans/id/PLAN.md'
+    const absolute = joinOntoProjectRoot(root, relative)
+    expect(absolute).toBe('C:\\Users\\proj\\.vixl\\plans\\id\\PLAN.md')
+    expect(relativeUnderProjectRoot(root, absolute)).toBe(relative)
+    expect(toRelativeUnderProjectRoot(root, absolute)).toBe(relative)
+  })
+
+  it('does not treat a sibling directory as inside the project root', () => {
+    expect(
+      relativeUnderProjectRoot('/tmp/project', '/tmp/project-other/.vixl/plans/id/PLAN.md'),
+    ).toBeNull()
+    expect(() =>
+      toRelativeUnderProjectRoot(
+        '/tmp/project',
+        '/tmp/other/.vixl/plans/id/PLAN.md',
+      ),
+    ).toThrow('Absolute path is outside the project root')
+  })
+
+  it('detects posix and windows absolute paths', () => {
+    expect(isAbsolutePath('/tmp/project')).toBe(true)
+    expect(isAbsolutePath('C:\\Users\\proj')).toBe(true)
+    expect(isAbsolutePath('.vixl/plans/id/PLAN.md')).toBe(false)
   })
 })

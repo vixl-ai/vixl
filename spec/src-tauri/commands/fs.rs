@@ -278,3 +278,77 @@ fn write_blocks_sensitive_member_relative_path() {
     .expect_err("member-relative .env must stay blocked");
     assert_eq!(err, "Sensitive path blocked");
 }
+
+#[test]
+fn fs_move_rejects_cross_member_paths() {
+    let api = tempfile::tempdir().expect("api");
+    let web = tempfile::tempdir().expect("web");
+    fs::write(api.path().join("a.ts"), "from\n").expect("write source");
+    let roots = vec![
+        WorkspaceRootArg {
+            slug: "api".to_string(),
+            path: api.path().to_string_lossy().to_string(),
+        },
+        WorkspaceRootArg {
+            slug: "web".to_string(),
+            path: web.path().to_string_lossy().to_string(),
+        },
+    ];
+
+    let err = fs_move(
+        api.path().to_string_lossy().to_string(),
+        "api/a.ts".into(),
+        "web/b.ts".into(),
+        None,
+        Some(roots),
+    )
+    .expect_err("cross-member move");
+    assert_eq!(err, "Move paths must belong to a single project member");
+    assert!(api.path().join("a.ts").exists());
+    assert!(!web.path().join("b.ts").exists());
+}
+
+#[test]
+fn fs_move_allows_same_member_rename() {
+    let api = tempfile::tempdir().expect("api");
+    let web = tempfile::tempdir().expect("web");
+    fs::write(api.path().join("a.ts"), "hello\n").expect("write source");
+    let roots = vec![
+        WorkspaceRootArg {
+            slug: "api".to_string(),
+            path: api.path().to_string_lossy().to_string(),
+        },
+        WorkspaceRootArg {
+            slug: "web".to_string(),
+            path: web.path().to_string_lossy().to_string(),
+        },
+    ];
+
+    fs_move(
+        api.path().to_string_lossy().to_string(),
+        "api/a.ts".into(),
+        "api/b.ts".into(),
+        None,
+        Some(roots),
+    )
+    .expect("same-member move");
+    assert!(!api.path().join("a.ts").exists());
+    assert_eq!(
+        fs::read_to_string(api.path().join("b.ts")).expect("read dest"),
+        "hello\n"
+    );
+}
+
+#[test]
+fn fs_move_without_project_roots_still_renames() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().to_string_lossy().to_string();
+    fs::write(dir.path().join("a.ts"), "hello\n").expect("write source");
+
+    fs_move(root, "a.ts".into(), "b.ts".into(), None, None).expect("single-root move");
+    assert!(!dir.path().join("a.ts").exists());
+    assert_eq!(
+        fs::read_to_string(dir.path().join("b.ts")).expect("read dest"),
+        "hello\n"
+    );
+}

@@ -33,6 +33,41 @@ const withResultFields = (
   return { result, ...extra }
 }
 
+const asPlainObject = (value: unknown): Record<string, unknown> | null => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null
+  }
+  return value as Record<string, unknown>
+}
+
+const mcpToolErrorMessage = (result: unknown, toolName: string): string => {
+  const fallback = `MCP tool ${toolName} failed`
+  const record = asPlainObject(result)
+  if (!record || !Array.isArray(record.content)) {
+    return fallback
+  }
+  const text = record.content
+    .map((part) => {
+      const block = asPlainObject(part)
+      if (!block || block.type !== 'text' || typeof block.text !== 'string') {
+        return ''
+      }
+      return block.text
+    })
+    .filter((part) => part.length > 0)
+    .join('\n')
+    .trim()
+  return text.length > 0 ? text : fallback
+}
+
+const assertOkMcpResult = (result: unknown, toolName: string): unknown => {
+  const record = asPlainObject(result)
+  if (record?.isError === true) {
+    throw new Error(mcpToolErrorMessage(result, toolName))
+  }
+  return result
+}
+
 const drainMcpToolImages = async (
   ctx: HarnessToolContext,
   result: unknown,
@@ -164,7 +199,10 @@ const callMcpTool = (ctx: HarnessToolContext) =>
       const source = `${serverId}/${toolName}`
 
       try {
-        return await drainMcpToolImages(ctx, await invokeTool(), source)
+        return assertOkMcpResult(
+          await drainMcpToolImages(ctx, await invokeTool(), source),
+          toolName,
+        )
       } catch (error) {
         if (!isMcpAuthError(error)) {
           throw error
@@ -193,7 +231,10 @@ const callMcpTool = (ctx: HarnessToolContext) =>
         }
 
         try {
-          return await drainMcpToolImages(ctx, await invokeTool(), source)
+          return assertOkMcpResult(
+            await drainMcpToolImages(ctx, await invokeTool(), source),
+            toolName,
+          )
         } catch (retryError) {
           if (isMcpAuthError(retryError)) {
             return { error: 'auth_required', serverId }

@@ -6,6 +6,11 @@ export type FileCheckpointBaseline = {
   toolCallId?: string
 }
 
+export type FileCheckpointCaptureResult = {
+  captured: FileCheckpointBaseline[]
+  skippedOversize: string[]
+}
+
 export type FileCheckpointRestoreTarget = {
   path: string
   userMessageId: string

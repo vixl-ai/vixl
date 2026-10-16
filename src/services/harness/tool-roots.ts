@@ -201,6 +201,65 @@ export const checkpointCaptureTarget = (
   }
 }
 
+export const isAbsolutePath = (value: string): boolean => {
+  if (value.startsWith('/') || value.startsWith('\\')) {
+    return true
+  }
+  return /^[A-Za-z]:[/\\]/.test(value)
+}
+
+export const joinOntoProjectRoot = (projectRoot: string, relativePath: string): string => {
+  const useBackslash = /\\/.test(projectRoot) && !/\//.test(projectRoot)
+  const separator = useBackslash ? '\\' : '/'
+  const trimmedRoot = projectRoot.replace(/[/\\]+$/, '')
+  const trimmedRelative = relativePath.replace(/^[/\\]+/, '')
+  const normalizedRelative = useBackslash
+    ? trimmedRelative.replace(/\//g, '\\')
+    : trimmedRelative.replace(/\\/g, '/')
+  if (!trimmedRoot) {
+    return normalizedRelative
+  }
+  if (!normalizedRelative) {
+    return trimmedRoot
+  }
+  return `${trimmedRoot}${separator}${normalizedRelative}`
+}
+
+export const relativeUnderProjectRoot = (
+  projectRoot: string,
+  absolutePath: string,
+): string | null => {
+  const useBackslash = /\\/.test(projectRoot) && !/\//.test(projectRoot)
+  const separator = useBackslash ? '\\' : '/'
+  const trimmedRoot = projectRoot.replace(/[/\\]+$/, '')
+  const normalize = (value: string): string =>
+    useBackslash ? value.replace(/\//g, '\\') : value.replace(/\\/g, '/')
+  const root = normalize(trimmedRoot)
+  const file = normalize(absolutePath.replace(/[/\\]+$/, ''))
+  if (!root) {
+    return file.replace(/\\/g, '/')
+  }
+  if (file === root) {
+    return ''
+  }
+  const prefix = `${root}${separator}`
+  if (!file.startsWith(prefix)) {
+    return null
+  }
+  return file.slice(prefix.length).replace(/\\/g, '/')
+}
+
+export const toRelativeUnderProjectRoot = (projectRoot: string, path: string): string => {
+  if (!isAbsolutePath(path)) {
+    return path
+  }
+  const relative = relativeUnderProjectRoot(projectRoot, path)
+  if (!relative) {
+    throw new Error('Absolute path is outside the project root')
+  }
+  return relative
+}
+
 export const notifyWorkspaceMutations = (
   ctx: Pick<HarnessToolContext, 'projectRoot' | 'members'>,
   paths: string[],

@@ -37,7 +37,15 @@ pub async fn workspace_glob(request: WorkspaceGlobRequest) -> Result<WorkspaceGl
 
     let scopes = glob_scopes(&request)?;
     let limit = request.limit.unwrap_or(500) as usize;
-    let pattern = request.pattern.clone();
+    let (scopes, pattern) = if request
+        .project_roots
+        .as_deref()
+        .is_some_and(|roots| !roots.is_empty())
+    {
+        restrict_glob_scopes(scopes, request.pattern)
+    } else {
+        (scopes, request.pattern)
+    };
 
     tokio::task::spawn_blocking(move || {
         let mut files = Vec::new();
@@ -101,6 +109,31 @@ fn glob_scopes(request: &WorkspaceGlobRequest) -> Result<Vec<GlobScope>, String>
         root: canonical_project_root(&request.project_root)?,
         prefix: None,
     }])
+}
+
+fn restrict_glob_scopes(mut scopes: Vec<GlobScope>, pattern: String) -> (Vec<GlobScope>, String) {
+    let (first, remainder) = match pattern.split_once('/') {
+        Some((first, rest)) => (first, rest),
+        None => (pattern.as_str(), ""),
+    };
+    if first.is_empty() {
+        return (scopes, pattern);
+    }
+
+    let Some(index) = scopes
+        .iter()
+        .position(|scope| scope.prefix.as_deref() == Some(first))
+    else {
+        return (scopes, pattern);
+    };
+
+    let scope = scopes.swap_remove(index);
+    let pattern = if remainder.is_empty() {
+        "**/*".to_string()
+    } else {
+        remainder.to_string()
+    };
+    (vec![scope], pattern)
 }
 
 fn collect_glob_files(

@@ -11,6 +11,10 @@ import {
   resolveUpdatePlanTodoPath,
 } from '@/services/harness/plan-execution-session'
 import { listSubagentsForChat } from '@/services/harness/subagent/registry'
+import {
+  joinOntoProjectRoot,
+  toRelativeUnderProjectRoot,
+} from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 type RunningSubagentHint = {
@@ -74,9 +78,13 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
           todos: z.array(planTodoItemSchema).parse(todos),
         })
       }
+      const relativePlanPath = toRelativeUnderProjectRoot(
+        ctx.projectRoot,
+        resolvedPlanPath,
+      )
       const existing = await fsReadFile({
         projectRoot: ctx.projectRoot,
-        path: resolvedPlanPath,
+        path: relativePlanPath,
       })
       const parsed = parsePlan(existing.content)
       if (parsed.parseError) {
@@ -86,7 +94,7 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
       const nextContent = updatePlanTodos(existing.content, merged)
       await fsWriteFile({
         projectRoot: ctx.projectRoot,
-        path: resolvedPlanPath,
+        path: relativePlanPath,
         content: nextContent,
       })
       const workbench = useWorkbenchStore()
@@ -101,13 +109,14 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
         await workbench.openPlan(
           projectId,
           parsed.frontmatter!.id,
-          resolvedPlanPath,
+          relativePlanPath,
           parsed.frontmatter!.title,
         )
         workbench.refreshPlanTabs()
       }
       return withRunningSubagentContext(ctx.chatId, todos, {
-        planPath: resolvedPlanPath,
+        planPath: joinOntoProjectRoot(ctx.projectRoot, relativePlanPath),
+        relativePath: relativePlanPath,
         todos: merged,
       })
     },

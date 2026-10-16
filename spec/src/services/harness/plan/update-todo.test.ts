@@ -107,14 +107,22 @@ describe('update_plan_todo', () => {
         { id: 'update', content: 'New text', status: 'completed' },
         { id: 'append', content: 'New todo', status: 'pending' },
       ],
-    })) as { planPath: string; todos: Array<{ id: string; content: string; status: string }> }
+    })) as {
+      planPath: string
+      relativePath: string
+      todos: Array<{ id: string; content: string; status: string }>
+    }
 
     const merged = [
       { id: 'keep', content: 'Keep me', status: 'in_progress' },
       { id: 'update', content: 'New text', status: 'completed' },
       { id: 'append', content: 'New todo', status: 'pending' },
     ]
-    expect(result).toEqual({ planPath: existingPlan.path, todos: merged })
+    expect(result).toEqual({
+      planPath: `${projectRoot}/${existingPlan.path}`,
+      relativePath: existingPlan.path,
+      todos: merged,
+    })
     expect(fsWriteFile).toHaveBeenCalledTimes(1)
     const written = fsWriteFile.mock.calls[0]?.[0] as {
       projectRoot: string
@@ -135,15 +143,57 @@ describe('update_plan_todo', () => {
 
     const result = (await runTool(tool.execute, {
       todos: [{ id: 'update', content: 'New text', status: 'completed' }],
-    })) as { planPath: string; todos: Array<{ id: string }> }
+    })) as { planPath: string; relativePath: string; todos: Array<{ id: string }> }
 
-    expect(result.planPath).toBe(existingPlan.path)
+    expect(result.planPath).toBe(`${projectRoot}/${existingPlan.path}`)
+    expect(result.relativePath).toBe(existingPlan.path)
     expect(result.todos.map((todo) => todo.id)).toEqual(['keep', 'update'])
     expect(fsReadFile).toHaveBeenCalledWith({
       projectRoot,
       path: existingPlan.path,
     })
     expect(fsWriteFile).toHaveBeenCalled()
+  })
+
+  it('accepts a returned absolute planPath and updates the same plan file', async () => {
+    const absolutePlanPath = `${projectRoot}/${existingPlan.path}`
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const tool = updatePlanTodo(planCtx())
+
+    const result = (await runTool(tool.execute, {
+      planPath: absolutePlanPath,
+      todos: [{ id: 'update', content: 'New text', status: 'completed' }],
+    })) as { planPath: string; relativePath: string }
+
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot,
+      path: existingPlan.path,
+    })
+    expect(fsWriteFile).toHaveBeenCalledTimes(1)
+    const written = fsWriteFile.mock.calls[0]?.[0] as { path: string }
+    expect(written.path).toBe(existingPlan.path)
+    expect(result.relativePath).toBe(existingPlan.path)
+    expect(result.planPath).toBe(absolutePlanPath)
+    expect(openPlan).toHaveBeenCalledWith(
+      'project-1',
+      existingPlan.planId,
+      existingPlan.path,
+      'Merge plan',
+    )
+  })
+
+  it('rejects an absolute planPath outside the project root', async () => {
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const tool = updatePlanTodo(planCtx())
+
+    await expect(
+      runTool(tool.execute, {
+        planPath: '/tmp/other/.vixl/plans/outside/PLAN.md',
+        todos: [{ id: 'update', content: 'New text', status: 'completed' }],
+      }),
+    ).rejects.toThrow('Absolute path is outside the project root')
+    expect(fsReadFile).not.toHaveBeenCalled()
+    expect(fsWriteFile).not.toHaveBeenCalled()
   })
 
   it('returns todos unchanged when no plan resolves', async () => {
@@ -176,7 +226,7 @@ describe('update_plan_todo', () => {
       note?: string
     }
 
-    expect(result.planPath).toBe(existingPlan.path)
+    expect(result.planPath).toBe(`${projectRoot}/${existingPlan.path}`)
     expect(result.runningSubagents).toEqual([
       { subagentId: 'sub-1', name: 'explorer' },
       { subagentId: 'sub-2', name: 'implementer' },
@@ -248,7 +298,8 @@ describe('update_plan_todo', () => {
     }
 
     expect(result).toEqual({
-      planPath: existingPlan.path,
+      planPath: `${projectRoot}/${existingPlan.path}`,
+      relativePath: existingPlan.path,
       todos: [
         { id: 'keep', content: 'Keep me', status: 'in_progress' },
         { id: 'update', content: 'New text', status: 'completed' },

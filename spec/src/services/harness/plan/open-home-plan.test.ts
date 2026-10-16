@@ -74,14 +74,15 @@ describe('plan tools home workspace', () => {
     const result = (await runTool(tool.execute, {
       title: 'Home plan',
       body: '## Goal\n\nShip it.\n',
-    })) as { planId: string; path: string }
+    })) as { planId: string; path: string; relativePath: string }
 
     expect(ensureHomeRoot).toHaveBeenCalled()
     expect(resolveProjectIdByRoot).not.toHaveBeenCalled()
+    expect(result.path).toBe(`/Users/test-home/${result.relativePath}`)
     expect(openPlan).toHaveBeenCalledWith(
       HOME_WORKSPACE_ID,
       result.planId,
-      result.path,
+      result.relativePath,
       'Home plan',
     )
   })
@@ -123,19 +124,20 @@ describe('plan tools home workspace', () => {
     const first = (await runTool(tool.execute, {
       title: 'Ticket one',
       body: '## Goal\n\nOne.\n',
-    })) as { path: string }
+    })) as { path: string; relativePath: string }
     beginPlanExecutionTurn(HOME_CHAT_SLUG, 'home-chat-1')
     const second = (await runTool(tool.execute, {
       title: 'Ticket two',
       body: '## Goal\n\nTwo.\n',
-    })) as { path: string }
+    })) as { path: string; relativePath: string }
 
     expect(second.path).not.toBe(first.path)
+    expect(second.path).toBe(`/Users/test-home/${second.relativePath}`)
     const session = getPlanExecutionSession(HOME_CHAT_SLUG, 'home-chat-1')
-    expect(session.activePlanPath).toBe(second.path)
+    expect(session.activePlanPath).toBe(second.relativePath)
     expect(session.createdPlanThisTurn).toBe(true)
     expect(updateChatMeta).toHaveBeenLastCalledWith(HOME_CHAT_SLUG, 'home-chat-1', {
-      activePlanPath: second.path,
+      activePlanPath: second.relativePath,
       awaitingPlanGo: null,
     })
   })

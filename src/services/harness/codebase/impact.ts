@@ -1,7 +1,12 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import callManagedCodegraphTool from '@/services/harness/codebase/call-managed'
-import { describeRepoTool, repoSlugFields } from '@/services/harness/codebase/repo'
+import {
+  describeRepoTool,
+  repoScopeSummary,
+  repoSlugFields,
+  withRepoSlug,
+} from '@/services/harness/codebase/repo'
 import normalizeCodegraphResult from '@/services/codegraph/normalize-codegraph-result'
 import { resolveWorkspaceSlug, slugArg } from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
@@ -23,7 +28,10 @@ const codebaseImpact = (ctx: HarnessToolContext) =>
       if (typeof input.depth === 'number' && Number.isFinite(input.depth)) {
         toolArgs.depth = input.depth
       }
-      const resolved = resolveWorkspaceSlug(ctx, slugArg(input, 'repo'))
+      const requestedRepo = slugArg(input, 'repo')
+      const resolved = resolveWorkspaceSlug(ctx, requestedRepo)
+      const repo = resolved.slug
+
       const called = await callManagedCodegraphTool(ctx, {
         toolCallId,
         firstPartyName: 'codebase_impact',
@@ -33,17 +41,33 @@ const codebaseImpact = (ctx: HarnessToolContext) =>
       })
       if (!called.ok) {
         if ('rejected' in called.payload) {
-          return called.payload
+          return withRepoSlug(repo, called.payload)
         }
-        return {
-          summary:
+        return withRepoSlug(repo, {
+          summary: repoScopeSummary(
+            ctx,
+            requestedRepo,
+            repo,
+            'analyze',
             typeof called.payload.error === 'string'
               ? called.payload.error
               : 'CodeGraph impact failed',
+          ),
           results: [],
-        }
+        })
       }
-      return normalizeCodegraphResult.impact(called.result)
+      const normalized = normalizeCodegraphResult.impact(called.result)
+      if (normalized.results.length === 0 && repo) {
+        const summaryBase =
+          typeof normalized.summary === 'string' && normalized.summary.trim().length > 0
+            ? normalized.summary
+            : `No results found for "${input.symbol}"`
+        return withRepoSlug(repo, {
+          ...normalized,
+          summary: repoScopeSummary(ctx, requestedRepo, repo, 'analyze', summaryBase),
+        })
+      }
+      return withRepoSlug(repo, normalized)
     },
   })
 

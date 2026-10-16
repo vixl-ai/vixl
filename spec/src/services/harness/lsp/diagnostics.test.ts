@@ -102,7 +102,7 @@ describe('diagnostics tool', () => {
     expect(lspEnsureServer).not.toHaveBeenCalled()
     expect(lspRequest).not.toHaveBeenCalled()
     expect(result).toMatchObject({
-      scope: 'workspace',
+      scope: 'open_documents',
       errorCount: 1,
       warningCount: 0,
       truncated: false,
@@ -126,7 +126,7 @@ describe('diagnostics tool', () => {
     expect(lspWorkspaceDiagnostics).toHaveBeenCalledWith('/project')
     expect(lspEnsureServer).not.toHaveBeenCalled()
     expect(lspRequest).not.toHaveBeenCalled()
-    expect(result).toMatchObject({ scope: 'workspace' })
+    expect(result).toMatchObject({ scope: 'open_documents' })
   })
 
   it('returns a workspace error payload when lspWorkspaceDiagnostics throws', async () => {
@@ -134,7 +134,7 @@ describe('diagnostics tool', () => {
     const result = await runTool({})
 
     expect(result).toEqual({
-      scope: 'workspace',
+      scope: 'unavailable',
       errorCount: 0,
       warningCount: 0,
       itemCap: 50,
@@ -145,6 +145,98 @@ describe('diagnostics tool', () => {
     })
     expect(lspEnsureServer).not.toHaveBeenCalled()
     expect(lspRequest).not.toHaveBeenCalled()
+  })
+
+  it('reports scope workspace when every server is workspace mode', async () => {
+    lspWorkspaceDiagnostics.mockResolvedValue({
+      servers: [
+        { id: 'eslint', mode: 'workspace', error: null, items: [] },
+        { id: 'typescript', mode: 'workspace', error: null, items: [] },
+      ],
+    })
+
+    const result = await runTool({})
+
+    expect(result).toMatchObject({
+      scope: 'workspace',
+      servers: [
+        { id: 'eslint', mode: 'workspace' },
+        { id: 'typescript', mode: 'workspace' },
+      ],
+    })
+  })
+
+  it('reports scope open_documents when every server is open_documents mode', async () => {
+    lspWorkspaceDiagnostics.mockResolvedValue({
+      servers: [
+        { id: 'typescript', mode: 'open_documents', error: null, items: [] },
+        { id: 'rust', mode: 'open_documents', error: null, items: [] },
+      ],
+    })
+
+    const result = await runTool({})
+
+    expect(result).toMatchObject({
+      scope: 'open_documents',
+      servers: [
+        { id: 'typescript', mode: 'open_documents' },
+        { id: 'rust', mode: 'open_documents' },
+      ],
+    })
+  })
+
+  it('reports scope mixed when server modes differ', async () => {
+    lspWorkspaceDiagnostics.mockResolvedValue({
+      servers: [
+        { id: 'eslint', mode: 'workspace', error: null, items: [] },
+        { id: 'typescript', mode: 'open_documents', error: null, items: [] },
+      ],
+    })
+
+    const result = await runTool({})
+
+    expect(result).toMatchObject({
+      scope: 'mixed',
+      servers: [
+        { id: 'eslint', mode: 'workspace' },
+        { id: 'typescript', mode: 'open_documents' },
+      ],
+    })
+  })
+
+  it('reports scope unavailable when every server is unavailable', async () => {
+    lspWorkspaceDiagnostics.mockResolvedValue({
+      servers: [
+        {
+          id: 'typescript',
+          mode: 'unavailable',
+          error: 'not running',
+          items: [],
+        },
+        { id: 'rust', mode: 'unavailable', error: null, items: [] },
+      ],
+    })
+
+    const result = await runTool({})
+
+    expect(result).toMatchObject({
+      scope: 'unavailable',
+      servers: [
+        { id: 'typescript', mode: 'unavailable', error: 'not running' },
+        { id: 'rust', mode: 'unavailable' },
+      ],
+    })
+  })
+
+  it('reports scope unavailable when no language servers are present', async () => {
+    lspWorkspaceDiagnostics.mockResolvedValue({ servers: [] })
+
+    const result = await runTool({})
+
+    expect(result).toMatchObject({
+      scope: 'unavailable',
+      servers: [],
+    })
   })
 
   it('ensures the language server and requests file diagnostics when path is set', async () => {

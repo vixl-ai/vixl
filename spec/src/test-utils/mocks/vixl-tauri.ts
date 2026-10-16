@@ -45,13 +45,42 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
     fsStagePreviewWrite: vi.fn<() => Promise<unknown>>(),
     fsStagePreviewEdit: vi.fn<() => Promise<unknown>>(),
     fsStagePreviewApplyPatch: vi.fn<() => Promise<unknown>>(),
-    fileCheckpointCapture: vi
-      .fn<() => Promise<{ path: string; pathHash: string; existed: boolean; capturedAt: string }>>()
+    fsStat: vi
+      .fn<
+        (
+          projectRoot: string,
+          path: string,
+        ) => Promise<{ path: string; exists: boolean; kind: string; size: number }>
+      >()
       .mockResolvedValue({
         path: 'x',
-        pathHash: 'h',
-        existed: true,
-        capturedAt: 'now',
+        exists: true,
+        kind: 'file',
+        size: 0,
+      }),
+    fileCheckpointCapture: vi
+      .fn<
+        () => Promise<{
+          captured: Array<{
+            path: string
+            pathHash: string
+            existed: boolean
+            capturedAt: string
+            toolCallId?: string
+          }>
+          skippedOversize: string[]
+        }>
+      >()
+      .mockResolvedValue({
+        captured: [
+          {
+            path: 'x',
+            pathHash: 'h',
+            existed: true,
+            capturedAt: 'now',
+          },
+        ],
+        skippedOversize: [],
       }),
     fileCheckpointRestore: vi
       .fn<

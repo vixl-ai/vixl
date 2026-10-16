@@ -108,9 +108,10 @@ describe('update_plan', () => {
 
     const result = (await runTool(tool.execute, {
       body: replacementBody,
-    })) as { planPath: string; title: string }
+    })) as { planPath: string; relativePath: string; title: string }
 
-    expect(result.planPath).toBe(latestPlanPath)
+    expect(result.planPath).toBe(`${projectRoot}/${latestPlanPath}`)
+    expect(result.relativePath).toBe(latestPlanPath)
     expect(fsReadFile).toHaveBeenCalledWith({
       projectRoot,
       path: latestPlanPath,
@@ -125,9 +126,10 @@ describe('update_plan', () => {
 
     const result = (await runTool(tool.execute, {
       body: replacementBody,
-    })) as { planPath: string; title: string }
+    })) as { planPath: string; relativePath: string; title: string }
 
-    expect(result.planPath).toBe(existingPlan.path)
+    expect(result.planPath).toBe(`${projectRoot}/${existingPlan.path}`)
+    expect(result.relativePath).toBe(existingPlan.path)
     expect(fsReadFile).toHaveBeenCalledWith({
       projectRoot,
       path: existingPlan.path,
@@ -143,14 +145,29 @@ describe('update_plan', () => {
     const result = (await runTool(tool.execute, {
       planPath: explicitPlanPath,
       body: replacementBody,
-    })) as { planPath: string; title: string }
+    })) as { planPath: string; relativePath: string; title: string }
 
-    expect(result.planPath).toBe(explicitPlanPath)
+    expect(result.planPath).toBe(`${projectRoot}/${explicitPlanPath}`)
+    expect(result.relativePath).toBe(explicitPlanPath)
     expect(fsReadFile).toHaveBeenCalledWith({
       projectRoot,
       path: explicitPlanPath,
     })
     expect(writtenCall().path).toBe(explicitPlanPath)
+  })
+
+  it('rejects an absolute planPath outside the project root', async () => {
+    const updatePlan = (await import('@/services/harness/plan/update')).default
+    const tool = updatePlan(planCtx())
+
+    await expect(
+      runTool(tool.execute, {
+        planPath: '/tmp/other/.vixl/plans/outside/PLAN.md',
+        body: replacementBody,
+      }),
+    ).rejects.toThrow('Absolute path is outside the project root')
+    expect(fsReadFile).not.toHaveBeenCalled()
+    expect(fsWriteFile).not.toHaveBeenCalled()
   })
 
   it('returns an error object when no plan resolves and does not write', async () => {
@@ -174,9 +191,13 @@ describe('update_plan', () => {
     const result = (await runTool(tool.execute, {
       planPath: existingPlan.path,
       body: replacementBody,
-    })) as { planPath: string; title: string }
+    })) as { planPath: string; relativePath: string; title: string }
 
-    expect(result).toEqual({ planPath: existingPlan.path, title: 'Merge plan' })
+    expect(result).toEqual({
+      planPath: `${projectRoot}/${existingPlan.path}`,
+      relativePath: existingPlan.path,
+      title: 'Merge plan',
+    })
     expect(fsWriteFile).toHaveBeenCalledTimes(1)
     const written = writtenCall()
     expect(written.projectRoot).toBe(projectRoot)
@@ -208,9 +229,13 @@ describe('update_plan', () => {
       planPath: existingPlan.path,
       body: replacementBody,
       title: 'Revised title',
-    })) as { planPath: string; title: string }
+    })) as { planPath: string; relativePath: string; title: string }
 
-    expect(result).toEqual({ planPath: existingPlan.path, title: 'Revised title' })
+    expect(result).toEqual({
+      planPath: `${projectRoot}/${existingPlan.path}`,
+      relativePath: existingPlan.path,
+      title: 'Revised title',
+    })
     const parsed = parsePlan(writtenCall().content)
     expect(parsed.parseError).toBeUndefined()
     expect(parsed.frontmatter?.title).toBe('Revised title')

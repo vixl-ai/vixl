@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -45,6 +45,13 @@ pub struct FileCheckpointRestoreResult {
 pub struct FileCheckpointPathError {
     pub path: String,
     pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileCheckpointCaptureResult {
+    pub captured: Vec<FileCheckpointBaseline>,
+    pub skipped_oversize: Vec<String>,
 }
 
 fn now_iso() -> String {
@@ -108,51 +115,100 @@ fn manifest_key(path: &str, key: Option<&str>) -> String {
     }
 }
 
-/// Capture a first-touch baseline for `path` under the given user message.
-/// Idempotent: if a baseline already exists for this path, returns Ok without changes.
-#[tauri::command]
-pub fn file_checkpoint_capture(
-    app: AppHandle,
-    project_slug: String,
-    chat_id: String,
-    user_message_id: String,
-    project_root: String,
-    path: String,
-    key: Option<String>,
+fn join_posix(base: &str, relative: &str) -> String {
+    if relative.is_empty() {
+        return base.to_string();
+    }
+    if base.is_empty() {
+        return relative.to_string();
+    }
+    format!(
+        "{}/{}",
+        base.trim_end_matches('/'),
+        relative.trim_start_matches('/')
+    )
+}
+
+fn posix_relative(from: &Path, to: &Path) -> Result<String, String> {
+    let rel = to
+        .strip_prefix(from)
+        .map_err(|_| format!("File is not under directory: {}", to.to_string_lossy()))?;
+    let mut parts = Vec::new();
+    for component in rel.components() {
+        match component {
+            Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
+            Component::CurDir => {}
+            _ => return Err("Invalid relative path component".to_string()),
+        }
+    }
+    Ok(parts.join("/"))
+}
+
+fn collect_dir_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(current) = stack.pop() {
+        let reader = fs::read_dir(&current).map_err(|error| error.to_string())?;
+        for entry in reader {
+            let entry = entry.map_err(|error| error.to_string())?;
+            let path = entry.path();
+            let meta = fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
+            if meta.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if meta.is_file() {
+                files.push(path);
+                continue;
+            }
+            if meta.file_type().is_symlink() && path.is_file() {
+                files.push(path);
+            }
+        }
+    }
+    Ok(())
+}
+
+enum CaptureOne {
+    Captured(FileCheckpointBaseline),
+    Existing(FileCheckpointBaseline),
+    SkippedOversize(String),
+}
+
+fn capture_one_file(
+    dir: &Path,
+    entries: &mut Vec<FileCheckpointBaseline>,
+    project_root: &str,
+    path: &str,
+    key: Option<&str>,
     tool_call_id: Option<String>,
-) -> Result<FileCheckpointBaseline, String> {
-    if project_root.trim().is_empty() {
-        return Err("Project root is required to capture file checkpoints".to_string());
-    }
-    if user_message_id.trim().is_empty() {
-        return Err("User message id is required to capture file checkpoints".to_string());
-    }
-
-    let stored_path = manifest_key(&path, key.as_deref());
-    let _root = canonical_project_root(&project_root)?;
-    let absolute = resolve_workspace_path(&project_root, &path)?;
-    let dir = message_dir(&app, &project_slug, &chat_id, &user_message_id)?;
-    let mut entries = read_manifest(&dir)?;
-    if let Some(existing) = find_entry(&entries, &stored_path) {
-        return Ok(existing.clone());
+    skip_oversize: bool,
+) -> Result<CaptureOne, String> {
+    let stored_path = manifest_key(path, key);
+    if let Some(existing) = find_entry(entries, &stored_path) {
+        return Ok(CaptureOne::Existing(existing.clone()));
     }
 
+    let absolute = resolve_workspace_path(project_root, path)?;
     let hash = path_hash(&stored_path);
     let existed = absolute.exists();
     if existed {
-        if absolute.is_dir() {
+        let meta = fs::symlink_metadata(&absolute).map_err(|error| error.to_string())?;
+        if meta.is_dir() {
             return Err(format!("Cannot checkpoint directory path: {path}"));
         }
-        let meta = fs::metadata(&absolute).map_err(|error| error.to_string())?;
-        if meta.len() > MAX_BASELINE_BYTES {
+        let file_meta = fs::metadata(&absolute).map_err(|error| error.to_string())?;
+        if file_meta.len() > MAX_BASELINE_BYTES {
+            if skip_oversize {
+                return Ok(CaptureOne::SkippedOversize(stored_path));
+            }
             return Err(format!(
                 "File exceeds checkpoint size limit ({MAX_BASELINE_BYTES} bytes): {path}"
             ));
         }
         let bytes = fs::read(&absolute).map_err(|error| error.to_string())?;
-        fs::write(content_path(&dir, &hash), bytes).map_err(|error| error.to_string())?;
+        fs::write(content_path(dir, &hash), bytes).map_err(|error| error.to_string())?;
     } else {
-        fs::write(content_path(&dir, &hash), ABSENT_MARKER.as_bytes())
+        fs::write(content_path(dir, &hash), ABSENT_MARKER.as_bytes())
             .map_err(|error| error.to_string())?;
     }
 
@@ -164,8 +220,118 @@ pub fn file_checkpoint_capture(
         tool_call_id,
     };
     entries.push(entry.clone());
-    write_manifest(&dir, &entries)?;
-    Ok(entry)
+    write_manifest(dir, entries)?;
+    Ok(CaptureOne::Captured(entry))
+}
+
+fn capture_directory(
+    dir: &Path,
+    project_root: &str,
+    path: &str,
+    key: Option<&str>,
+    tool_call_id: Option<String>,
+    absolute: &Path,
+) -> Result<FileCheckpointCaptureResult, String> {
+    let stored_prefix = manifest_key(path, key);
+    let mut files = Vec::new();
+    collect_dir_files(absolute, &mut files)?;
+    files.sort_by(|left, right| left.as_os_str().cmp(right.as_os_str()));
+
+    let mut entries = read_manifest(dir)?;
+    let mut captured = Vec::new();
+    let mut skipped_oversize = Vec::new();
+
+    for file in files {
+        let relative = posix_relative(absolute, &file)?;
+        let file_path = join_posix(path, &relative);
+        let file_key = join_posix(&stored_prefix, &relative);
+        let key_arg = if file_key == file_path {
+            None
+        } else {
+            Some(file_key.as_str())
+        };
+        match capture_one_file(
+            dir,
+            &mut entries,
+            project_root,
+            &file_path,
+            key_arg,
+            tool_call_id.clone(),
+            true,
+        )? {
+            CaptureOne::Captured(entry) | CaptureOne::Existing(entry) => captured.push(entry),
+            CaptureOne::SkippedOversize(skipped) => skipped_oversize.push(skipped),
+        }
+    }
+
+    Ok(FileCheckpointCaptureResult {
+        captured,
+        skipped_oversize,
+    })
+}
+
+pub(crate) fn capture_into(
+    dir: &Path,
+    project_root: &str,
+    path: &str,
+    key: Option<&str>,
+    tool_call_id: Option<String>,
+) -> Result<FileCheckpointCaptureResult, String> {
+    if project_root.trim().is_empty() {
+        return Err("Project root is required to capture file checkpoints".to_string());
+    }
+
+    let _root = canonical_project_root(project_root)?;
+    let absolute = resolve_workspace_path(project_root, path)?;
+    let existed = absolute.exists();
+    if existed {
+        let meta = fs::symlink_metadata(&absolute).map_err(|error| error.to_string())?;
+        if meta.is_dir() {
+            return capture_directory(dir, project_root, path, key, tool_call_id, &absolute);
+        }
+    }
+
+    let mut entries = read_manifest(dir)?;
+    match capture_one_file(
+        dir,
+        &mut entries,
+        project_root,
+        path,
+        key,
+        tool_call_id,
+        false,
+    )? {
+        CaptureOne::Captured(entry) | CaptureOne::Existing(entry) => {
+            Ok(FileCheckpointCaptureResult {
+                captured: vec![entry],
+                skipped_oversize: Vec::new(),
+            })
+        }
+        CaptureOne::SkippedOversize(_) => Err(format!(
+            "File exceeds checkpoint size limit ({MAX_BASELINE_BYTES} bytes): {path}"
+        )),
+    }
+}
+
+/// Capture a first-touch baseline for `path` under the given user message.
+/// Directories are expanded into one baseline per contained file (no gitignore).
+/// Idempotent: if a baseline already exists for a path, it is reused.
+#[tauri::command]
+pub fn file_checkpoint_capture(
+    app: AppHandle,
+    project_slug: String,
+    chat_id: String,
+    user_message_id: String,
+    project_root: String,
+    path: String,
+    key: Option<String>,
+    tool_call_id: Option<String>,
+) -> Result<FileCheckpointCaptureResult, String> {
+    if user_message_id.trim().is_empty() {
+        return Err("User message id is required to capture file checkpoints".to_string());
+    }
+    let dir = message_dir(&app, &project_slug, &chat_id, &user_message_id)?;
+    capture_into(&dir, &project_root, &path, key.as_deref(), tool_call_id)
 }
 
 /// Restore explicit path baselines. Frontend supplies which (path, userMessageId) to use.
@@ -226,14 +392,23 @@ fn restore_one(
     user_message_id: &str,
 ) -> Result<&'static str, String> {
     let dir = message_dir(app, project_slug, chat_id, user_message_id)?;
-    let entries = read_manifest(&dir)?;
+    restore_from_dir(&dir, project_root, path, key)
+}
+
+pub(crate) fn restore_from_dir(
+    dir: &Path,
+    project_root: &str,
+    path: &str,
+    key: Option<&str>,
+) -> Result<&'static str, String> {
+    let entries = read_manifest(dir)?;
     let lookup = manifest_key(path, key);
     let Some(entry) = find_entry(&entries, &lookup) else {
         return Ok("skipped");
     };
 
     let absolute = resolve_workspace_path(project_root, path)?;
-    let blob = content_path(&dir, &entry.path_hash);
+    let blob = content_path(dir, &entry.path_hash);
 
     if !entry.existed {
         if absolute.exists() {
@@ -293,7 +468,30 @@ fn copy_dir_recursive(from: &Path, to: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{manifest_key, path_hash};
+    use super::{
+        capture_into, content_path, manifest_key, path_hash, read_manifest, restore_from_dir,
+        FileCheckpointBaseline, MAX_BASELINE_BYTES,
+    };
+    use std::fs;
+    use std::path::Path;
+
+    fn write_file(root: &Path, relative: &str, bytes: &[u8]) {
+        let path = root.join(relative);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("parent dir");
+        }
+        fs::write(path, bytes).expect("write file");
+    }
+
+    fn baseline_for<'a>(
+        entries: &'a [FileCheckpointBaseline],
+        path: &str,
+    ) -> &'a FileCheckpointBaseline {
+        entries
+            .iter()
+            .find(|entry| entry.path == path)
+            .unwrap_or_else(|| panic!("missing baseline {path}"))
+    }
 
     #[test]
     fn manifest_key_defaults_to_path() {
@@ -311,5 +509,220 @@ mod tests {
     fn path_hash_differs_for_member_prefixed_keys() {
         assert_ne!(path_hash("api/src/a.ts"), path_hash("web/src/a.ts"));
         assert_eq!(path_hash("src/a.ts"), path_hash("src/a.ts"));
+    }
+
+    #[test]
+    fn single_file_capture_writes_same_manifest_entry() {
+        let project = tempfile::TempDir::new().expect("project");
+        let checkpoints = tempfile::TempDir::new().expect("checkpoints");
+        write_file(project.path(), "src/a.ts", b"hello");
+
+        let result = capture_into(
+            checkpoints.path(),
+            project.path().to_str().expect("utf8"),
+            "src/a.ts",
+            None,
+            Some("tc-1".to_string()),
+        )
+        .expect("capture");
+
+        assert!(result.skipped_oversize.is_empty());
+        assert_eq!(result.captured.len(), 1);
+        let entry = &result.captured[0];
+        assert_eq!(entry.path, "src/a.ts");
+        assert_eq!(entry.path_hash, path_hash("src/a.ts"));
+        assert!(entry.existed);
+        assert_eq!(entry.tool_call_id.as_deref(), Some("tc-1"));
+        assert!(!entry.captured_at.is_empty());
+
+        let manifest = read_manifest(checkpoints.path()).expect("manifest");
+        assert_eq!(manifest.len(), 1);
+        assert_eq!(manifest[0].path, "src/a.ts");
+        assert_eq!(manifest[0].path_hash, path_hash("src/a.ts"));
+        assert!(manifest[0].existed);
+        let blob =
+            fs::read(content_path(checkpoints.path(), &manifest[0].path_hash)).expect("blob");
+        assert_eq!(blob, b"hello");
+    }
+
+    #[test]
+    fn single_file_oversize_still_errors() {
+        let project = tempfile::TempDir::new().expect("project");
+        let checkpoints = tempfile::TempDir::new().expect("checkpoints");
+        let oversized = vec![0u8; (MAX_BASELINE_BYTES as usize) + 1];
+        write_file(project.path(), "src/big.bin", &oversized);
+
+        let error = capture_into(
+            checkpoints.path(),
+            project.path().to_str().expect("utf8"),
+            "src/big.bin",
+            None,
+            None,
+        )
+        .expect_err("oversize file");
+        assert!(error.contains("File exceeds checkpoint size limit"));
+        assert!(read_manifest(checkpoints.path())
+            .expect("manifest")
+            .is_empty());
+    }
+
+    #[test]
+    fn directory_capture_writes_per_file_keys() {
+        let project = tempfile::TempDir::new().expect("project");
+        let checkpoints = tempfile::TempDir::new().expect("checkpoints");
+        write_file(project.path(), "eval-dir/a.md", b"alpha");
+        write_file(project.path(), "eval-dir/nested/b.md", b"beta");
+
+        let result = capture_into(
+            checkpoints.path(),
+            project.path().to_str().expect("utf8"),
+            "eval-dir",
+            Some("rpg-test/eval-dir"),
+            Some("tc-dir".to_string()),
+        )
+        .expect("capture dir");
+
+        assert!(result.skipped_oversize.is_empty());
+        let mut paths: Vec<_> = result
+            .captured
+            .iter()
+            .map(|entry| entry.path.clone())
+            .collect();
+        paths.sort();
+        assert_eq!(
+            paths,
+            vec![
+                "rpg-test/eval-dir/a.md".to_string(),
+                "rpg-test/eval-dir/nested/b.md".to_string()
+            ]
+        );
+
+        let manifest = read_manifest(checkpoints.path()).expect("manifest");
+        assert!(find_dir_entry(&manifest, "rpg-test/eval-dir").is_none());
+        let a = baseline_for(&manifest, "rpg-test/eval-dir/a.md");
+        assert_eq!(a.path_hash, path_hash("rpg-test/eval-dir/a.md"));
+        assert!(a.existed);
+        assert_eq!(a.tool_call_id.as_deref(), Some("tc-dir"));
+        let nested = baseline_for(&manifest, "rpg-test/eval-dir/nested/b.md");
+        assert_eq!(nested.path_hash, path_hash("rpg-test/eval-dir/nested/b.md"));
+        assert_eq!(
+            fs::read(content_path(checkpoints.path(), &a.path_hash)).expect("a blob"),
+            b"alpha"
+        );
+        assert_eq!(
+            fs::read(content_path(checkpoints.path(), &nested.path_hash)).expect("b blob"),
+            b"beta"
+        );
+    }
+
+    fn find_dir_entry<'a>(
+        entries: &'a [FileCheckpointBaseline],
+        path: &str,
+    ) -> Option<&'a FileCheckpointBaseline> {
+        entries.iter().find(|entry| entry.path == path)
+    }
+
+    #[test]
+    fn directory_capture_skips_oversize_and_reports_key() {
+        let project = tempfile::TempDir::new().expect("project");
+        let checkpoints = tempfile::TempDir::new().expect("checkpoints");
+        write_file(project.path(), "eval-dir/ok.md", b"ok");
+        let oversized = vec![0u8; (MAX_BASELINE_BYTES as usize) + 1];
+        write_file(project.path(), "eval-dir/huge.bin", &oversized);
+
+        let result = capture_into(
+            checkpoints.path(),
+            project.path().to_str().expect("utf8"),
+            "eval-dir",
+            Some("rpg-test/eval-dir"),
+            None,
+        )
+        .expect("capture dir");
+
+        assert_eq!(result.captured.len(), 1);
+        assert_eq!(result.captured[0].path, "rpg-test/eval-dir/ok.md");
+        assert_eq!(result.skipped_oversize, vec!["rpg-test/eval-dir/huge.bin"]);
+        let manifest = read_manifest(checkpoints.path()).expect("manifest");
+        assert_eq!(manifest.len(), 1);
+        assert_eq!(manifest[0].path, "rpg-test/eval-dir/ok.md");
+    }
+
+    #[test]
+    fn directory_capture_round_trips_restore_without_dir_path() {
+        let project = tempfile::TempDir::new().expect("project");
+        let checkpoints = tempfile::TempDir::new().expect("checkpoints");
+        let root = project.path().to_str().expect("utf8");
+        write_file(project.path(), "eval-dir/a.md", b"alpha");
+        write_file(project.path(), "eval-dir/nested/b.md", b"beta");
+
+        let result = capture_into(
+            checkpoints.path(),
+            root,
+            "eval-dir",
+            Some("rpg-test/eval-dir"),
+            None,
+        )
+        .expect("capture dir");
+
+        fs::remove_dir_all(project.path().join("eval-dir")).expect("delete dir");
+        assert!(!project.path().join("eval-dir").exists());
+
+        assert_eq!(
+            restore_from_dir(
+                checkpoints.path(),
+                root,
+                "eval-dir",
+                Some("rpg-test/eval-dir")
+            )
+            .expect("restore dir path"),
+            "skipped"
+        );
+
+        for entry in &result.captured {
+            let relative = entry.path.strip_prefix("rpg-test/").expect("member prefix");
+            let status = restore_from_dir(
+                checkpoints.path(),
+                root,
+                relative,
+                Some(entry.path.as_str()),
+            )
+            .expect("restore file");
+            assert_eq!(status, "restored");
+        }
+
+        assert_eq!(
+            fs::read(project.path().join("eval-dir/a.md")).expect("restored a"),
+            b"alpha"
+        );
+        assert_eq!(
+            fs::read(project.path().join("eval-dir/nested/b.md")).expect("restored b"),
+            b"beta"
+        );
+    }
+
+    #[test]
+    fn missing_file_capture_writes_absent_marker() {
+        let project = tempfile::TempDir::new().expect("project");
+        let checkpoints = tempfile::TempDir::new().expect("checkpoints");
+        fs::create_dir_all(project.path().join("src")).expect("src");
+
+        let result = capture_into(
+            checkpoints.path(),
+            project.path().to_str().expect("utf8"),
+            "src/missing.ts",
+            None,
+            None,
+        )
+        .expect("capture missing");
+
+        assert_eq!(result.captured.len(), 1);
+        assert!(!result.captured[0].existed);
+        assert_eq!(result.captured[0].path, "src/missing.ts");
+        let blob = fs::read(content_path(
+            checkpoints.path(),
+            &result.captured[0].path_hash,
+        ))
+        .expect("blob");
+        assert_eq!(blob, super::ABSENT_MARKER.as_bytes());
     }
 }

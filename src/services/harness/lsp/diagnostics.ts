@@ -19,7 +19,7 @@ import type { LspWorkspaceIssuesResult } from '@/types/lsp'
 import { describeRepoTool, repoSlugFields } from '@/services/harness/codebase/repo'
 
 const workspaceFailure = (message: string): LspWorkspaceIssuesResult => ({
-  scope: 'workspace',
+  scope: 'unavailable',
   errorCount: 0,
   warningCount: 0,
   itemCap: 50,

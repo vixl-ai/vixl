@@ -165,6 +165,15 @@ pub fn fs_move(
     let roots = project_roots.as_deref();
     let resolved_from = resolve_command_path(&project_root, roots, &from)?;
     let resolved_to = resolve_command_path(&project_root, roots, &to)?;
+    if roots.is_some_and(|entries| !entries.is_empty()) {
+        let same_member = match (&resolved_from.slug, &resolved_to.slug) {
+            (Some(from_slug), Some(to_slug)) => from_slug == to_slug,
+            _ => resolved_from.root == resolved_to.root,
+        };
+        if !same_member {
+            return Err("Move paths must belong to a single project member".to_string());
+        }
+    }
     reject_resolved_sensitive_path_unless_allowed(&resolved_from, allow_sensitive)?;
     reject_resolved_sensitive_path_unless_allowed(&resolved_to, allow_sensitive)?;
     let absolute_from = resolved_from.path;

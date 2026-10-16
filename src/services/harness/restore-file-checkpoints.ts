@@ -100,6 +100,14 @@ export const resolveBaselinesForRevert = (
       if (!targets.has(change.path)) {
         targets.set(change.path, currentUserMessageId)
       }
+      if (
+        change.operation === 'rename' &&
+        typeof change.renameTo === 'string' &&
+        change.renameTo.length > 0 &&
+        !targets.has(change.renameTo)
+      ) {
+        targets.set(change.renameTo, currentUserMessageId)
+      }
     }
   }
 

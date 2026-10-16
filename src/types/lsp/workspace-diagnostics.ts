@@ -51,7 +51,7 @@ export type LspWorkspaceIssuesServer = {
 }
 
 export type LspWorkspaceIssuesResult = {
-  scope: 'workspace'
+  scope: 'workspace' | 'open_documents' | 'unavailable' | 'mixed'
   errorCount: number
   warningCount: number
   itemCap: number

@@ -820,7 +820,10 @@ watch(
         <ChatGitBranchSelect v-if="showGitBranch" />
       </div>
       <div class="flex min-w-0 items-center gap-1">
-        <ChatMcpServerPicker :project-root="promptWorkspaceRoot" />
+        <ChatMcpServerPicker
+          :project-root="promptWorkspaceRoot"
+          :members="promptWorkspaceMembers"
+        />
       </div>
     </div>
   </div>
