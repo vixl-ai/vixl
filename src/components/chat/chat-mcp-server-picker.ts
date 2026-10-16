@@ -64,16 +64,6 @@ export const mcpPickerServerMatchesQuery = (
 export const mcpPickerSettingsTab = (server: UnionedMcpServer): SettingsTab =>
   server.scope === 'personal' ? 'personal' : 'project'
 
-export const mcpPickerShowSettings = (
-  server: UnionedMcpServer,
-  fleetRoot: string | null | undefined,
-): boolean => {
-  if (!isMemberOwnedMcpPickerServer(server)) {
-    return true
-  }
-  return server.scopeKey.trim() === (fleetRoot?.trim() ?? '')
-}
-
 export const patchUnionMcpPickerRow = (
   rows: UnionedMcpServer[],
   server: UnionedMcpServer,

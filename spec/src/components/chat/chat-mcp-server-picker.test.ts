@@ -5,7 +5,6 @@ import {
   mcpPickerMemberSetKey,
   mcpPickerServerMatchesQuery,
   mcpPickerSettingsTab,
-  mcpPickerShowSettings,
   patchUnionMcpPickerRow,
   toSingleRootMcpPickerServer,
   unionMcpPickerProjectScopeKeys,
@@ -100,13 +99,6 @@ describe('chat mcp server picker helpers', () => {
   it('routes personal rows to the personal settings tab', () => {
     expect(mcpPickerSettingsTab(personal)).toBe('personal')
     expect(mcpPickerSettingsTab(apiDocs)).toBe('project')
-  })
-
-  it('hides settings only for member rows that are not the fleet active root', () => {
-    expect(mcpPickerShowSettings(personal, '/tmp/api')).toBe(true)
-    expect(mcpPickerShowSettings(apiDocs, '/tmp/api')).toBe(true)
-    expect(mcpPickerShowSettings(webDocs, '/tmp/api')).toBe(false)
-    expect(mcpPickerShowSettings(apiDocs, null)).toBe(false)
   })
 
   it('patches only the matching union row enabled flag', () => {

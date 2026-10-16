@@ -17,7 +17,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
-import { Badge } from '@/components/shadcn/ui/badge'
 import {
   PromptInput,
   PromptInputActionAddAttachments,
@@ -691,7 +690,6 @@ watch(
           >
             <Layers class="size-4 shrink-0" />
             <span class="min-w-0 flex-1 truncate">{{ group.name }}</span>
-            <Badge variant="outline" class="h-5 px-1.5 text-[10px]">Group</Badge>
           </DropdownMenuItem>
         </template>
         <DropdownMenuSeparator v-if="fleet.projects.value.length > 0" />

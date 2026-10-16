@@ -12,7 +12,6 @@ import {
 } from '@/components/shadcn/ui/popover'
 import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import connectionKey from '@/services/mcp/connection-key'
-import { mcpPickerShowSettings } from '@/components/chat/chat-mcp-server-picker'
 import useChatMcpServerPicker from '@/composables/mcp-servers/use-chat-mcp-server-picker'
 
 const props = defineProps<{
@@ -41,8 +40,6 @@ const {
   projectRoot: () => props.projectRoot,
   members: () => props.members,
 })
-const config = useVixlConfig()
-const fleetRoot = computed(() => config.activeRootPath.value)
 </script>
 
 <template>
@@ -94,8 +91,6 @@ const fleetRoot = computed(() => config.activeRootPath.value)
           :key="connectionKey(scopeForServer(server), server.id)"
           :server="server"
           :scope-key="scopeForServer(server)"
-          :member-slug="server.memberSlug"
-          :show-settings="mcpPickerShowSettings(server, fleetRoot)"
           @login="handleLogin(server)"
           @settings="handleOpenInSettings(server)"
           @toggle="(checked) => handleToggleChange(server, checked)"

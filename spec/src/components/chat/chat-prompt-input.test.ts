@@ -495,7 +495,7 @@ describe('ChatPromptInput project multiselect', () => {
 
     const groupItem = wrapper
       .findAllComponents(DropdownMenuItem)
-      .find((item) => item.text().includes('Group'))
+      .find((item) => item.text().includes('api, web'))
     expect(groupItem).toBeDefined()
     await groupItem!.vm.$emit('select')
     await flushPromises()
@@ -521,7 +521,7 @@ describe('ChatPromptInput project multiselect', () => {
 
     const groupItem = wrapper
       .findAllComponents(DropdownMenuItem)
-      .find((item) => item.text().includes('Group'))
+      .find((item) => item.text().includes('api, web'))
     expect(groupItem).toBeDefined()
     await groupItem!.vm.$emit('select')
     await flushPromises()
@@ -598,7 +598,7 @@ describe('ChatPromptInput git branch select', () => {
 
     const groupItem = wrapper
       .findAllComponents(DropdownMenuItem)
-      .find((item) => item.text().includes('Group'))
+      .find((item) => item.text().includes('api, web'))
     expect(groupItem).toBeDefined()
     await groupItem!.vm.$emit('select')
     await flushPromises()
