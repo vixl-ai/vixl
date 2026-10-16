@@ -135,6 +135,8 @@ describe('list_dir tool', () => {
       }),
     )
     expect(built.description).toContain('list workspace members')
+    expect(built.description).toContain('for example api/src/index.ts')
+    expect(built.description).toContain('Valid slugs: api, web.')
   })
 
   it('forwards . to fsListDir when a group has a single member', async () => {

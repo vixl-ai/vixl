@@ -46,6 +46,8 @@ describe('discover-internal-skills', () => {
     const loaded = loadInternalSkill('agent')
     expect(loaded).not.toBeNull()
     expect(loaded?.content).toContain('Agent mode')
+    expect(loaded?.content).toContain('spawn directly')
+    expect(loaded?.content).toContain('pass the model to spawn_subagent')
   })
 
   it('loads orchestrator skill content', () => {
@@ -54,6 +56,16 @@ describe('discover-internal-skills', () => {
     expect(loaded?.content).toContain('Orchestrator mode')
     expect(loaded?.content).toContain(
       'The parent uses the shell for validation only: CI, tests, lint, typecheck, gh pr view, gh api for review comments, git log, git diff, git status. Source edits and mutating commands (git stash, reset, commit, push, checkout, rm, redirects into project files) go to subagents.',
+    )
+    expect(loaded?.content).toContain('spawn directly')
+    expect(loaded?.content).toContain('pass the model to spawn_subagent')
+  })
+
+  it('loads create-plan skill only for a durable plan document', () => {
+    const loaded = loadInternalSkill('create-plan')
+    expect(loaded).not.toBeNull()
+    expect(loaded?.content).toContain(
+      'Invoke this skill only when a durable plan document is wanted.',
     )
   })
 

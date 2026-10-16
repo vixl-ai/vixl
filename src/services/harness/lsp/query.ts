@@ -10,6 +10,7 @@ import {
 } from '@/services/harness/lsp/parse-diagnostics'
 import { lspEnsureServer, lspRequest } from '@/services/vixl/vixl-tauri'
 import resolveMemberPath from '@/services/harness/resolve-member-path'
+import { withMultiRootPathHint } from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const lspQuery = (ctx: HarnessToolContext) =>
@@ -26,7 +27,12 @@ const lspQuery = (ctx: HarnessToolContext) =>
       ]),
       path: z
         .string()
-        .describe('Workspace-relative file path (also selects the language server via extension)'),
+        .describe(
+          withMultiRootPathHint(
+            'Workspace-relative file path (also selects the language server via extension)',
+            ctx,
+          ),
+        ),
       extension: z
         .string()
         .optional()
