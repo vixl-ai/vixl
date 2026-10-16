@@ -41,6 +41,7 @@ export default (args: {
           type: 'file' as const,
           data: image.dataUrl,
           mediaType: image.mediaType,
+          filename: image.source,
         })),
       ],
     }

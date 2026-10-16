@@ -101,7 +101,6 @@ export const runTerminalCommand = async (
       if (denial) {
         throw sandboxRuntimeDenialError(denial, detail)
       }
-      throw new Error(clipTerminalOutput(`Command failed (${reason}): ${detail}`))
     }
 
     // Empty device probes, silent curl, and empty out-of-workspace find can exit 0.
@@ -123,6 +122,7 @@ export const runTerminalCommand = async (
         exitCode: waitResult.exitCode,
         timedOut: false,
         description: args.description ?? null,
+        ...(waitResult.signal != null ? { signal: waitResult.signal } : {}),
       },
       meta,
     )

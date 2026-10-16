@@ -11,6 +11,7 @@ import {
   withMultiRootPathHint,
   withProjectRoots,
 } from '@/services/harness/tool-roots'
+import { withGitRepoGuard } from '@/services/harness/git/with-git-repo-guard'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const gitCommit = (ctx: HarnessToolContext) =>
@@ -47,14 +48,16 @@ const gitCommit = (ctx: HarnessToolContext) =>
       if (!allowed) {
         return { rejected: true, error: 'Git commit denied' }
       }
-      return gitCommitCommand(
-        withProjectRoots(
-          {
-            projectRoot: resolved.projectRoot,
-            message: input.message,
-            paths: input.paths,
-          },
-          ctx,
+      return withGitRepoGuard(() =>
+        gitCommitCommand(
+          withProjectRoots(
+            {
+              projectRoot: resolved.projectRoot,
+              message: input.message,
+              paths: input.paths,
+            },
+            ctx,
+          ),
         ),
       )
     },

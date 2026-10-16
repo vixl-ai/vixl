@@ -11,6 +11,7 @@ import {
   withProjectRoots,
   REPO_TOOL_HINT,
 } from '@/services/harness/tool-roots'
+import { withGitRepoGuard } from '@/services/harness/git/with-git-repo-guard'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const gitBranchCreate = (ctx: HarnessToolContext) =>
@@ -35,21 +36,23 @@ const gitBranchCreate = (ctx: HarnessToolContext) =>
       if (!allowed) {
         return { rejected: true, error: 'Git branch create denied' }
       }
-      await gitBranchCreateCommand(
-        withProjectRoots(
-          {
-            projectRoot: resolved.projectRoot,
-            name: input.name,
-            checkout: input.checkout,
-          },
-          ctx,
-        ),
-      )
-      return {
-        name: input.name,
-        checkout: input.checkout ?? true,
-        ...(resolved.slug ? { repo: resolved.slug } : {}),
-      }
+      return withGitRepoGuard(async () => {
+        await gitBranchCreateCommand(
+          withProjectRoots(
+            {
+              projectRoot: resolved.projectRoot,
+              name: input.name,
+              checkout: input.checkout,
+            },
+            ctx,
+          ),
+        )
+        return {
+          name: input.name,
+          checkout: input.checkout ?? true,
+          ...(resolved.slug ? { repo: resolved.slug } : {}),
+        }
+      })
     },
   })
 

@@ -12,7 +12,9 @@ import {
 } from '@/services/harness/subagent/registry'
 import parseTodoUpdate from '@/services/harness/parse-todo-update'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
+import resolveMemberPath from '@/services/harness/resolve-member-path'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
@@ -42,8 +44,19 @@ vi.mock('@/composables/use-workbench-store', () => ({
 const projectSlug = 'project'
 const chatId = 'chat-update-plan-todo'
 const projectRoot = '/tmp/project'
+const apiMember: HarnessWorkspaceMember = {
+  slug: 'api',
+  name: 'API',
+  rootPath: '/tmp/api',
+}
+const webMember: HarnessWorkspaceMember = {
+  slug: 'web',
+  name: 'Web',
+  rootPath: '/tmp/web',
+}
+const groupMembers = [apiMember, webMember]
 
-const planCtx = (): HarnessToolContext => ({
+const planCtx = (overrides?: Partial<HarnessToolContext>): HarnessToolContext => ({
   projectRoot,
   projectSlug,
   chatId,
@@ -55,6 +68,7 @@ const planCtx = (): HarnessToolContext => ({
   sandboxEnabled: false,
   supportsVision: false,
   onPendingApproval: vi.fn<(entry: PendingApprovalView) => void>(),
+  ...overrides,
 })
 
 const runTool = async (
@@ -91,6 +105,7 @@ describe('update_plan_todo', () => {
     openPlan.mockClear()
     ensureHomeRoot.mockClear()
     resolveProjectIdByRoot.mockClear()
+    resolveProjectIdByRoot.mockImplementation(() => 'project-1')
     refreshPlanTabs.mockClear()
     fsWriteFile.mockClear()
     fsReadFile.mockReset()
@@ -305,5 +320,95 @@ describe('update_plan_todo', () => {
         { id: 'update', content: 'New text', status: 'completed' },
       ],
     })
+  })
+
+  it('returns a slug-prefixed relativePath in group mode that file tools accept', async () => {
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const tool = updatePlanTodo(
+      planCtx({
+        projectRoot: apiMember.rootPath,
+        projectSlug: 'stack',
+        members: groupMembers,
+      }),
+    )
+
+    const result = (await runTool(tool.execute, {
+      planPath: existingPlan.path,
+      todos: [{ id: 'update', content: 'New text', status: 'completed' }],
+    })) as { planPath: string; relativePath: string }
+
+    expect(result.relativePath).toBe(`api/${existingPlan.path}`)
+    expect(result.planPath).toBe(`${apiMember.rootPath}/${existingPlan.path}`)
+    expect(resolveMemberPath(groupMembers, result.relativePath)).toEqual({
+      memberSlug: 'api',
+      root: apiMember.rootPath,
+      relativePath: existingPlan.path,
+    })
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: apiMember.rootPath,
+      path: existingPlan.path,
+    })
+  })
+
+  it('round-trips a slug-prefixed relativePath as planPath against the owning member', async () => {
+    const groupCtx = planCtx({
+      projectRoot: apiMember.rootPath,
+      projectSlug: 'stack',
+      members: groupMembers,
+    })
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const slugPrefixed = `api/${existingPlan.path}`
+
+    const result = (await runTool(updatePlanTodo(groupCtx).execute, {
+      planPath: slugPrefixed,
+      todos: [{ id: 'update', content: 'New text', status: 'completed' }],
+    })) as { planPath: string; relativePath: string }
+
+    expect(result.relativePath).toBe(slugPrefixed)
+    expect(result.planPath).toBe(`${apiMember.rootPath}/${existingPlan.path}`)
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: apiMember.rootPath,
+      path: existingPlan.path,
+    })
+    expect(resolveProjectIdByRoot).toHaveBeenCalledWith(apiMember.rootPath)
+  })
+
+  it('writes a sibling-member planPath to that member root', async () => {
+    resolveProjectIdByRoot.mockImplementation((root: string) =>
+      root === webMember.rootPath ? 'project-web' : 'project-1',
+    )
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const tool = updatePlanTodo(
+      planCtx({
+        projectRoot: apiMember.rootPath,
+        projectSlug: 'stack',
+        members: groupMembers,
+      }),
+    )
+
+    const result = (await runTool(tool.execute, {
+      planPath: `web/${existingPlan.path}`,
+      todos: [{ id: 'update', content: 'New text', status: 'completed' }],
+    })) as { planPath: string; relativePath: string }
+
+    expect(result.relativePath).toBe(`web/${existingPlan.path}`)
+    expect(result.planPath).toBe(`${webMember.rootPath}/${existingPlan.path}`)
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: webMember.rootPath,
+      path: existingPlan.path,
+    })
+    const written = fsWriteFile.mock.calls[0]?.[0] as {
+      projectRoot: string
+      path: string
+    }
+    expect(written.projectRoot).toBe(webMember.rootPath)
+    expect(written.path).toBe(existingPlan.path)
+    expect(resolveProjectIdByRoot).toHaveBeenCalledWith(webMember.rootPath)
+    expect(openPlan).toHaveBeenCalledWith(
+      'project-web',
+      existingPlan.planId,
+      existingPlan.path,
+      'Merge plan',
+    )
   })
 })

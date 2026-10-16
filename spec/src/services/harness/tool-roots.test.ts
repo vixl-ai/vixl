@@ -21,7 +21,9 @@ import {
   relativeUnderProjectRoot,
   resolveWorkspaceSlug,
   sensitiveCheckPaths,
+  resolvePlanToolPath,
   toRelativeUnderProjectRoot,
+  toWorkspaceRelativePath,
   withMultiRootPathHint,
   withProjectRoots,
 } from '@/services/harness/tool-roots'
@@ -331,5 +333,115 @@ describe('joinOntoProjectRoot and relativeUnderProjectRoot', () => {
     expect(isAbsolutePath('/tmp/project')).toBe(true)
     expect(isAbsolutePath('C:\\Users\\proj')).toBe(true)
     expect(isAbsolutePath('.vixl/plans/id/PLAN.md')).toBe(false)
+  })
+})
+
+describe('toWorkspaceRelativePath', () => {
+  const planPath = '.vixl/plans/id/PLAN.md'
+
+  it('returns the member-relative path in single-project mode', () => {
+    expect(
+      toWorkspaceRelativePath(
+        { projectRoot: '/tmp/project', projectSlug: 'project' },
+        planPath,
+      ),
+    ).toBe(planPath)
+    expect(
+      toWorkspaceRelativePath(
+        { projectRoot: '/tmp/api', projectSlug: 'api', members: [api] },
+        planPath,
+      ),
+    ).toBe(planPath)
+  })
+
+  it('prefixes the owning member slug in group mode', () => {
+    expect(
+      toWorkspaceRelativePath(
+        {
+          projectRoot: '/tmp/web',
+          projectSlug: 'stack',
+          members: [api, web],
+        },
+        planPath,
+      ),
+    ).toBe(`web/${planPath}`)
+  })
+
+  it('falls back to projectSlug then the first member when no root matches', () => {
+    expect(
+      toWorkspaceRelativePath(
+        {
+          projectRoot: '/tmp/gone',
+          projectSlug: 'web',
+          members: [api, web],
+        },
+        planPath,
+      ),
+    ).toBe(`web/${planPath}`)
+    expect(
+      toWorkspaceRelativePath(
+        {
+          projectRoot: '/tmp/gone',
+          projectSlug: '',
+          members: [api, web],
+        },
+        planPath,
+      ),
+    ).toBe(`api/${planPath}`)
+  })
+})
+
+describe('resolvePlanToolPath', () => {
+  const planPath = '.vixl/plans/id/PLAN.md'
+  const groupCtx = {
+    projectRoot: '/tmp/api',
+    members: [api, web],
+  }
+
+  it('strips absolute paths against the project root in single-project mode', () => {
+    expect(
+      resolvePlanToolPath(
+        { projectRoot: '/tmp/project' },
+        `/tmp/project/${planPath}`,
+      ),
+    ).toEqual({
+      projectRoot: '/tmp/project',
+      relativePath: planPath,
+    })
+    expect(resolvePlanToolPath({ projectRoot: '/tmp/project' }, planPath)).toEqual({
+      projectRoot: '/tmp/project',
+      relativePath: planPath,
+    })
+  })
+
+  it('keeps bare member-relative paths on the current root in group mode', () => {
+    expect(resolvePlanToolPath(groupCtx, planPath)).toEqual({
+      projectRoot: '/tmp/api',
+      relativePath: planPath,
+    })
+  })
+
+  it('resolves a slug-prefixed path against the named member, including a sibling', () => {
+    expect(resolvePlanToolPath(groupCtx, `api/${planPath}`)).toEqual({
+      projectRoot: '/tmp/api',
+      relativePath: planPath,
+    })
+    expect(resolvePlanToolPath(groupCtx, `web/${planPath}`)).toEqual({
+      projectRoot: '/tmp/web',
+      relativePath: planPath,
+    })
+  })
+
+  it('resolves an absolute path against the owning member by prefix', () => {
+    expect(resolvePlanToolPath(groupCtx, `/tmp/web/${planPath}`)).toEqual({
+      projectRoot: '/tmp/web',
+      relativePath: planPath,
+    })
+  })
+
+  it('rejects an absolute path outside every member root', () => {
+    expect(() =>
+      resolvePlanToolPath(groupCtx, `/tmp/other/${planPath}`),
+    ).toThrow('Absolute path is outside all project roots')
   })
 })

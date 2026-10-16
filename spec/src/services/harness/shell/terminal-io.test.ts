@@ -272,7 +272,7 @@ describe('build-tools terminal io', () => {
     expect(result.stdout.length).toBeLessThanOrEqual(TERMINAL_OUTPUT_MAX_CHARS + 100)
   })
 
-  it('clips giant failure detail in the thrown command error', async () => {
+  it('clips giant stderr on non-zero run_terminal results', async () => {
     waitForShellExit.mockResolvedValue({ exitCode: 2, timedOut: false })
     getAgentShell.mockReturnValue({
       shellId: 'shell-1',
@@ -284,19 +284,39 @@ describe('build-tools terminal io', () => {
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(ctx)
-
-    const error = (await runTool(tools.run_terminal.execute, {
+    const result = (await runTool(tools.run_terminal.execute, {
       command: 'npm run ci',
-    }).then(
-      () => null,
-      (err: unknown) => err,
-    )) as Error | null
+    })) as { stderr: string; exitCode: number }
 
-    expect(error).toBeInstanceOf(Error)
-    const message = (error as Error).message
-    expect(message).toContain('Command failed')
-    expect(message).toContain('output clipped')
-    expect(message).toContain('build failed')
-    expect(message.length).toBeLessThanOrEqual(TERMINAL_OUTPUT_MAX_CHARS + 2_000)
+    expect(result.exitCode).toBe(2)
+    expect(result).not.toHaveProperty('signal')
+    expect(result.stderr).toContain('output clipped')
+    expect(result.stderr).toContain('build failed')
+    expect(result.stderr.length).toBeLessThanOrEqual(TERMINAL_OUTPUT_MAX_CHARS + 100)
+  })
+
+  it('includes signal on signal-killed run_terminal results', async () => {
+    waitForShellExit.mockResolvedValue({ exitCode: -1, signal: 9, timedOut: false })
+    getAgentShell.mockReturnValue({
+      shellId: 'shell-1',
+      status: 'failed',
+      stdout: '',
+      stderr: 'Killed',
+      exitCode: -1,
+      exitSignal: 9,
+    })
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(tools.run_terminal.execute, {
+      command: 'sleep 30',
+    })
+
+    expect(result).toMatchObject({
+      exitCode: -1,
+      signal: 9,
+      stderr: 'Killed',
+      timedOut: false,
+    })
   })
 })

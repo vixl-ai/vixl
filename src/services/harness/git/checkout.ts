@@ -11,6 +11,7 @@ import {
   withMultiRootSuffix,
   REPO_TOOL_HINT,
 } from '@/services/harness/tool-roots'
+import { withGitRepoGuard } from '@/services/harness/git/with-git-repo-guard'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const gitCheckout = (ctx: HarnessToolContext) =>
@@ -34,12 +35,14 @@ const gitCheckout = (ctx: HarnessToolContext) =>
       if (!allowed) {
         return { rejected: true, error: 'Git checkout denied' }
       }
-      await gitCheckoutBranch(resolved.projectRoot, input.branch, ipcProjectRoots(ctx))
-      return {
-        branch: input.branch,
-        checkedOut: true,
-        ...(resolved.slug ? { repo: resolved.slug } : {}),
-      }
+      return withGitRepoGuard(async () => {
+        await gitCheckoutBranch(resolved.projectRoot, input.branch, ipcProjectRoots(ctx))
+        return {
+          branch: input.branch,
+          checkedOut: true,
+          ...(resolved.slug ? { repo: resolved.slug } : {}),
+        }
+      })
     },
   })
 

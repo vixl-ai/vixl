@@ -9,7 +9,16 @@ import {
 } from '@/services/harness/codebase/repo'
 import normalizeCodegraphResult from '@/services/codegraph/normalize-codegraph-result'
 import { resolveWorkspaceSlug, slugArg } from '@/services/harness/tool-roots'
+import type { CodebaseToolSpan } from '@/types/codegraph/codebase-tool-result'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+
+const hasExactSymbolMatch = (query: string, results: CodebaseToolSpan[]): boolean => {
+  const needle = query.toLowerCase()
+  return results.some((span) => {
+    const symbol = span.symbol
+    return typeof symbol === 'string' && symbol.toLowerCase().includes(needle)
+  })
+}
 
 const codebaseSearch = (ctx: HarnessToolContext) =>
   tool({
@@ -59,6 +68,16 @@ const codebaseSearch = (ctx: HarnessToolContext) =>
         return withRepoSlug(repo, {
           ...normalized,
           summary: repoScopeSummary(ctx, requestedRepo, repo, 'search', summaryBase),
+        })
+      }
+      if (
+        normalized.results.length > 0 &&
+        !hasExactSymbolMatch(input.query, normalized.results)
+      ) {
+        const fuzzyBase = `No exact matches for "${input.query}"; showing ${normalized.results.length} closest fuzzy matches`
+        return withRepoSlug(repo, {
+          ...normalized,
+          summary: repoScopeSummary(ctx, requestedRepo, repo, 'search', fuzzyBase),
         })
       }
       return withRepoSlug(repo, normalized)

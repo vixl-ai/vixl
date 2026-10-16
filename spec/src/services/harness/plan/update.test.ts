@@ -10,7 +10,9 @@ import {
   setActivePlanPath,
 } from '@/services/harness/plan-execution-session'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
+import resolveMemberPath from '@/services/harness/resolve-member-path'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
@@ -40,6 +42,17 @@ vi.mock('@/composables/use-workbench-store', () => ({
 const projectSlug = 'project'
 const chatId = 'chat-update-plan'
 const projectRoot = '/tmp/project'
+const apiMember: HarnessWorkspaceMember = {
+  slug: 'api',
+  name: 'API',
+  rootPath: '/tmp/api',
+}
+const webMember: HarnessWorkspaceMember = {
+  slug: 'web',
+  name: 'Web',
+  rootPath: '/tmp/web',
+}
+const groupMembers = [apiMember, webMember]
 const latestPlanPath = '.vixl/plans/latest/PLAN.md'
 const activePlanPath = '.vixl/plans/bound/PLAN.md'
 const explicitPlanPath = '.vixl/plans/explicit/PLAN.md'
@@ -94,6 +107,7 @@ describe('update_plan', () => {
     openPlan.mockClear()
     ensureHomeRoot.mockClear()
     resolveProjectIdByRoot.mockClear()
+    resolveProjectIdByRoot.mockImplementation(() => 'project-1')
     refreshPlanTabs.mockClear()
     fsWriteFile.mockClear()
     fsReadFile.mockReset()
@@ -330,5 +344,94 @@ describe('update_plan', () => {
       'Merge plan',
     )
     expect(refreshPlanTabs).toHaveBeenCalled()
+  })
+
+  it('returns a slug-prefixed relativePath in group mode that file tools accept', async () => {
+    const updatePlan = (await import('@/services/harness/plan/update')).default
+    const ctx = planCtx({
+      projectRoot: apiMember.rootPath,
+      projectSlug: 'stack',
+      members: groupMembers,
+    })
+    const tool = updatePlan(ctx)
+
+    const result = (await runTool(tool.execute, {
+      planPath: existingPlan.path,
+      body: replacementBody,
+    })) as { planPath: string; relativePath: string; title: string }
+
+    expect(result.relativePath).toBe(`api/${existingPlan.path}`)
+    expect(result.planPath).toBe(`${apiMember.rootPath}/${existingPlan.path}`)
+    expect(resolveMemberPath(groupMembers, result.relativePath)).toEqual({
+      memberSlug: 'api',
+      root: apiMember.rootPath,
+      relativePath: existingPlan.path,
+    })
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: apiMember.rootPath,
+      path: existingPlan.path,
+    })
+    expect(writtenCall().path).toBe(existingPlan.path)
+  })
+
+  it('round-trips a slug-prefixed relativePath as planPath against the owning member', async () => {
+    const groupCtx = planCtx({
+      projectRoot: apiMember.rootPath,
+      projectSlug: 'stack',
+      members: groupMembers,
+    })
+    const updatePlan = (await import('@/services/harness/plan/update')).default
+    const tool = updatePlan(groupCtx)
+    const slugPrefixed = `api/${existingPlan.path}`
+
+    const result = (await runTool(tool.execute, {
+      planPath: slugPrefixed,
+      body: replacementBody,
+    })) as { planPath: string; relativePath: string }
+
+    expect(result.relativePath).toBe(slugPrefixed)
+    expect(result.planPath).toBe(`${apiMember.rootPath}/${existingPlan.path}`)
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: apiMember.rootPath,
+      path: existingPlan.path,
+    })
+    expect(writtenCall().projectRoot).toBe(apiMember.rootPath)
+    expect(writtenCall().path).toBe(existingPlan.path)
+    expect(resolveProjectIdByRoot).toHaveBeenCalledWith(apiMember.rootPath)
+  })
+
+  it('writes a sibling-member planPath to that member root', async () => {
+    resolveProjectIdByRoot.mockImplementation((root: string) =>
+      root === webMember.rootPath ? 'project-web' : 'project-1',
+    )
+    const updatePlan = (await import('@/services/harness/plan/update')).default
+    const tool = updatePlan(
+      planCtx({
+        projectRoot: apiMember.rootPath,
+        projectSlug: 'stack',
+        members: groupMembers,
+      }),
+    )
+
+    const result = (await runTool(tool.execute, {
+      planPath: `web/${existingPlan.path}`,
+      body: replacementBody,
+    })) as { planPath: string; relativePath: string }
+
+    expect(result.relativePath).toBe(`web/${existingPlan.path}`)
+    expect(result.planPath).toBe(`${webMember.rootPath}/${existingPlan.path}`)
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: webMember.rootPath,
+      path: existingPlan.path,
+    })
+    expect(writtenCall().projectRoot).toBe(webMember.rootPath)
+    expect(writtenCall().path).toBe(existingPlan.path)
+    expect(resolveProjectIdByRoot).toHaveBeenCalledWith(webMember.rootPath)
+    expect(openPlan).toHaveBeenCalledWith(
+      'project-web',
+      existingPlan.planId,
+      existingPlan.path,
+      'Merge plan',
+    )
   })
 })

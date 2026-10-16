@@ -10,6 +10,7 @@ import {
   withProjectRoots,
   REPO_TOOL_HINT,
 } from '@/services/harness/tool-roots'
+import { withGitRepoGuard } from '@/services/harness/git/with-git-repo-guard'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const gitDiff = (ctx: HarnessToolContext) =>
@@ -33,15 +34,17 @@ const gitDiff = (ctx: HarnessToolContext) =>
     }),
     execute: async (input) => {
       const resolved = resolveWorkspaceSlug(ctx, slugArg(input, 'repo'))
-      return gitDiffCommand(
-        withProjectRoots(
-          {
-            projectRoot: resolved.projectRoot,
-            path: input.path,
-            staged: input.staged,
-            base: input.base,
-          },
-          ctx,
+      return withGitRepoGuard(() =>
+        gitDiffCommand(
+          withProjectRoots(
+            {
+              projectRoot: resolved.projectRoot,
+              path: input.path,
+              staged: input.staged,
+              base: input.base,
+            },
+            ctx,
+          ),
         ),
       )
     },

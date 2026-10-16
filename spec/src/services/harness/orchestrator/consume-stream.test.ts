@@ -776,6 +776,263 @@ describe('consumeStream output-limit truncation', () => {
   })
 })
 
+describe('consumeStream provider image rejection', () => {
+  const imageMessages = [
+    {
+      role: 'user' as const,
+      content: [
+        { type: 'text' as const, text: 'see' },
+        {
+          type: 'file' as const,
+          data: 'data:image/png;base64,abc',
+          mediaType: 'image/png',
+          filename: 'shot.png',
+        },
+      ],
+    },
+  ]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    persistTurnEnded.mockResolvedValue(undefined)
+    getPlanExecutionSession.mockReturnValue({ createdPlanThisTurn: false })
+    const prepareStep = vi.fn<(options: { messages: unknown[] }) => Promise<unknown>>()
+    prepareParentCompactStep.mockReturnValue(prepareStep)
+  })
+
+  it('retries once with image file parts downgraded to placeholders', async () => {
+    let calls = 0
+    streamText.mockImplementation((config) => {
+      calls += 1
+      if (calls === 1) {
+        return {
+          fullStream: (async function* () {
+            yield {
+              type: 'tool-result',
+              toolCallId: 'call-1',
+              toolName: 'read_file',
+              output: { loadedIntoContext: true },
+              input: { path: 'shot.png' },
+            }
+            if (typeof config.prepareStep === 'function') {
+              await config.prepareStep({ messages: imageMessages })
+            }
+            yield { type: 'error', error: new Error('invalid png image') }
+          })(),
+          text: Promise.resolve(''),
+          responseMessages: Promise.resolve([]),
+          usage: Promise.resolve(undefined),
+        }
+      }
+      return {
+        fullStream: (async function* () {
+          yield { type: 'start-step' }
+          yield { type: 'finish-step', finishReason: 'stop', usage: { outputTokens: 2 } }
+        })(),
+        text: Promise.resolve(''),
+        responseMessages: Promise.resolve([]),
+        usage: Promise.resolve(undefined),
+      }
+    })
+
+    const prepared = makePrepared()
+    prepared.finalModelMessages = imageMessages as PreparedHarnessStream['finalModelMessages']
+    ;(prepared.steps as { collectedStepText: string }).collectedStepText =
+      'ok without image'
+
+    await consumeStream(prepared)
+
+    expect(streamText).toHaveBeenCalledTimes(2)
+    const retryConfig = streamText.mock.calls[1]?.[0] as {
+      messages: unknown
+    }
+    expect(retryConfig.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'see' },
+          { type: 'text', text: '[Attachment: shot.png (image/png)]' },
+        ],
+      },
+    ])
+    expect(prepared.steps.emitToolResult).toHaveBeenCalledWith(
+      'call-1',
+      'read_file',
+      { loadedIntoContext: true },
+      false,
+      { path: 'shot.png' },
+    )
+    expect(prepared.onEvent).toHaveBeenCalledWith({
+      type: 'text-delta',
+      delta:
+        '\nThe provider rejected 1 image(s) and the run continued without them.\n',
+      messageId: 'turn-1',
+    })
+    expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', {
+      reason: 'completed',
+      finish: 'stop',
+    })
+    expect(persistLine).toHaveBeenCalledWith(
+      'demo',
+      'chat-1',
+      expect.objectContaining({
+        id: 'turn-1',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'text',
+            text: 'ok without image\nThe provider rejected 1 image(s) and the run continued without them.',
+          },
+        ],
+      }),
+    )
+  })
+
+  it('still throws when the rejection has no in-flight image parts', async () => {
+    mockPartsStream([{ type: 'error', error: new Error('invalid png image') }])
+    const prepared = makePrepared()
+
+    await expect(consumeStream(prepared)).rejects.toThrow('invalid png image')
+    expect(streamText).toHaveBeenCalledTimes(1)
+    expect(persistTurnEnded).not.toHaveBeenCalled()
+  })
+
+  it('does not retry a second provider image rejection', async () => {
+    streamText.mockImplementation((config) => ({
+      fullStream: (async function* () {
+        if (typeof config.prepareStep === 'function') {
+          await config.prepareStep({ messages: imageMessages })
+        }
+        yield { type: 'error', error: new Error('invalid png image') }
+      })(),
+      text: Promise.resolve(''),
+      responseMessages: Promise.resolve([]),
+      usage: Promise.resolve(undefined),
+    }))
+    const prepared = makePrepared()
+    prepared.finalModelMessages = imageMessages as PreparedHarnessStream['finalModelMessages']
+
+    await expect(consumeStream(prepared)).rejects.toThrow('invalid png image')
+    expect(streamText).toHaveBeenCalledTimes(2)
+    expect(persistLine).toHaveBeenCalledWith(
+      'demo',
+      'chat-1',
+      expect.objectContaining({
+        id: 'turn-1',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'text',
+            text: 'The provider rejected 1 image(s) and the run continued without them.',
+          },
+        ],
+      }),
+    )
+  })
+
+  it('does not treat a first-pass length finish as output-limit after a successful retry', async () => {
+    let calls = 0
+    streamText.mockImplementation((config) => {
+      calls += 1
+      if (calls === 1) {
+        return {
+          fullStream: (async function* () {
+            yield {
+              type: 'finish-step',
+              finishReason: 'length',
+              usage: { outputTokens: 4096 },
+            }
+            if (typeof config.prepareStep === 'function') {
+              await config.prepareStep({ messages: imageMessages })
+            }
+            yield { type: 'error', error: new Error('invalid png image') }
+          })(),
+          text: Promise.resolve(''),
+          responseMessages: Promise.resolve([]),
+          usage: Promise.resolve(undefined),
+        }
+      }
+      return {
+        fullStream: (async function* () {
+          yield { type: 'start-step' }
+          yield { type: 'finish-step', finishReason: 'stop', usage: { outputTokens: 2 } }
+        })(),
+        text: Promise.resolve(''),
+        responseMessages: Promise.resolve([]),
+        usage: Promise.resolve(undefined),
+      }
+    })
+
+    const prepared = makePrepared()
+    prepared.finalModelMessages = imageMessages as PreparedHarnessStream['finalModelMessages']
+    prepared.callOptions.maxOutputTokens = 4096
+    ;(prepared.steps as { collectedStepText: string }).collectedStepText =
+      'ok without image'
+
+    await expect(consumeStream(prepared)).resolves.toBeUndefined()
+    expect(streamText).toHaveBeenCalledTimes(2)
+    expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', {
+      reason: 'completed',
+      finish: 'stop',
+    })
+    expect(persistTurnEnded).not.toHaveBeenCalledWith(
+      'demo',
+      'chat-1',
+      'turn-1',
+      expect.objectContaining({ reason: 'output-limit' }),
+    )
+  })
+
+  it('still throws output-limit when the retry itself finishes with length', async () => {
+    let calls = 0
+    streamText.mockImplementation((config) => {
+      calls += 1
+      if (calls === 1) {
+        return {
+          fullStream: (async function* () {
+            if (typeof config.prepareStep === 'function') {
+              await config.prepareStep({ messages: imageMessages })
+            }
+            yield { type: 'error', error: new Error('invalid png image') }
+          })(),
+          text: Promise.resolve(''),
+          responseMessages: Promise.resolve([]),
+          usage: Promise.resolve(undefined),
+        }
+      }
+      return {
+        fullStream: (async function* () {
+          yield { type: 'start-step' }
+          yield {
+            type: 'finish-step',
+            finishReason: 'length',
+            usage: { outputTokens: 4096 },
+          }
+        })(),
+        text: Promise.resolve(''),
+        responseMessages: Promise.resolve([]),
+        usage: Promise.resolve(undefined),
+      }
+    })
+
+    const prepared = makePrepared()
+    prepared.finalModelMessages = imageMessages as PreparedHarnessStream['finalModelMessages']
+    prepared.callOptions.maxOutputTokens = 4096
+    ;(prepared.steps as { collectedStepText: string }).collectedStepText =
+      'truncated retry'
+
+    await expect(consumeStream(prepared)).rejects.toThrow(
+      'The model reached its output limit (4096 tokens) before finishing. Raise max output in model options or ask for a shorter response.',
+    )
+    expect(persistTurnEnded).toHaveBeenCalledWith(
+      'demo',
+      'chat-1',
+      'turn-1',
+      expect.objectContaining({ reason: 'output-limit', finish: 'length' }),
+    )
+  })
+})
+
 const turnEndedEvents = (onEvent: ReturnType<typeof vi.fn>): unknown[] =>
   onEvent.mock.calls
     .map((call) => call[0])

@@ -9,6 +9,7 @@ import {
   withMultiRootSuffix,
   REPO_TOOL_HINT,
 } from '@/services/harness/tool-roots'
+import { withGitRepoGuard } from '@/services/harness/git/with-git-repo-guard'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const gitLog = (ctx: HarnessToolContext) =>
@@ -20,7 +21,9 @@ const gitLog = (ctx: HarnessToolContext) =>
     }),
     execute: async (input) => {
       const resolved = resolveWorkspaceSlug(ctx, slugArg(input, 'repo'))
-      return gitLogCommand(resolved.projectRoot, input.limit, ipcProjectRoots(ctx))
+      return withGitRepoGuard(() =>
+        gitLogCommand(resolved.projectRoot, input.limit, ipcProjectRoots(ctx)),
+      )
     },
   })
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
@@ -152,6 +152,18 @@ vi.mock('@/composables/use-workbench-store', () => ({
   }),
 }))
 
+const getCurrentTodos = vi.fn<
+  () => Array<{ id: string; content: string; status: 'pending' | 'in_progress' | 'completed' | 'cancelled' }>
+>(() => [])
+
+vi.mock('@/composables/use-chat-store', () => ({
+  default: () => ({
+    forChat: () => ({
+      todos: { value: getCurrentTodos() },
+    }),
+  }),
+}))
+
 
 describe('build-tools update_todos', () => {
   const ctx = {
@@ -181,6 +193,10 @@ describe('build-tools update_todos', () => {
     return runner(input, { toolCallId })
   }
 
+  beforeEach(() => {
+    getCurrentTodos.mockReturnValue([])
+  })
+
   it('returns the full todos array without plan side effects', async () => {
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(ctx)
@@ -193,6 +209,65 @@ describe('build-tools update_todos', () => {
 
     expect(result).toEqual({ todos })
     expect(fsWriteFile).not.toHaveBeenCalled()
+  })
+
+  it('merges a partial status update over the current in-chat list', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    getCurrentTodos.mockReturnValue([
+      { id: 'review', content: 'Review harness wiring', status: 'completed' },
+      { id: 'tests', content: 'Cover update_todos', status: 'pending' },
+    ])
+
+    const result = await runTool(
+      tools.update_todos.execute,
+      { todos: [{ id: 'tests', status: 'in_progress' }] },
+      'tc-update-todos-partial',
+    )
+
+    expect(result).toEqual({
+      todos: [
+        { id: 'review', content: 'Review harness wiring', status: 'completed' },
+        { id: 'tests', content: 'Cover update_todos', status: 'in_progress' },
+      ],
+    })
+  })
+
+  it('appends an unknown id with full fields', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    getCurrentTodos.mockReturnValue([
+      { id: 'review', content: 'Review harness wiring', status: 'completed' },
+    ])
+
+    const result = await runTool(
+      tools.update_todos.execute,
+      { todos: [{ id: 'ship', content: 'Ship the merge', status: 'pending' }] },
+      'tc-update-todos-append',
+    )
+
+    expect(result).toEqual({
+      todos: [
+        { id: 'review', content: 'Review harness wiring', status: 'completed' },
+        { id: 'ship', content: 'Ship the merge', status: 'pending' },
+      ],
+    })
+  })
+
+  it('rejects an unknown id that is missing content', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    getCurrentTodos.mockReturnValue([
+      { id: 'review', content: 'Review harness wiring', status: 'completed' },
+    ])
+
+    await expect(
+      runTool(
+        tools.update_todos.execute,
+        { todos: [{ id: 'ship', status: 'pending' }] },
+        'tc-update-todos-append-missing',
+      ),
+    ).rejects.toThrow('Cannot append todo ship: content is required for new ids')
   })
 
   it('update_plan_todo with no session plan returns todos and does not write files', async () => {

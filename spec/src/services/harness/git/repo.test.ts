@@ -13,6 +13,15 @@ const gitCommitCommand = vi.hoisted(() =>
 const gitDiffCommand = vi.hoisted(() =>
   vi.fn<(args: Record<string, unknown>) => Promise<{ diff: string }>>(),
 )
+const gitLogCommand = vi.hoisted(() =>
+  vi.fn<
+    (
+      projectRoot: string,
+      limit?: number,
+      projectRoots?: unknown,
+    ) => Promise<{ commits: Array<{ hash: string; subject: string }> }>
+  >(),
+)
 
 vi.mock('@/services/vixl/vixl-tauri', () =>
   mockVixlTauri({
@@ -20,6 +29,8 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
       gitStatusCommand(projectRoot, projectRoots),
     gitCommit: (args: Record<string, unknown>) => gitCommitCommand(args),
     gitDiff: (args: Record<string, unknown>) => gitDiffCommand(args),
+    gitLog: (projectRoot: string, limit?: number, projectRoots?: unknown) =>
+      gitLogCommand(projectRoot, limit, projectRoots),
   }),
 )
 
@@ -30,6 +41,7 @@ vi.mock('@/services/harness/permission/gate', () => ({
 import gitStatus from '@/services/harness/git/status'
 import gitCommit from '@/services/harness/git/commit'
 import gitDiff from '@/services/harness/git/diff'
+import gitLog from '@/services/harness/git/log'
 
 const api: HarnessWorkspaceMember = {
   slug: 'api',
@@ -74,9 +86,11 @@ describe('git tool repo resolution', () => {
     gitStatusCommand.mockReset()
     gitCommitCommand.mockReset()
     gitDiffCommand.mockReset()
+    gitLogCommand.mockReset()
     gitStatusCommand.mockResolvedValue({ branch: 'main', entries: [] })
     gitCommitCommand.mockResolvedValue({ hash: 'abc', message: 'm', output: '' })
     gitDiffCommand.mockResolvedValue({ diff: '' })
+    gitLogCommand.mockResolvedValue({ commits: [] })
   })
 
   it('defaults git_status to the primary root and forwards projectRoots', async () => {
@@ -145,5 +159,35 @@ describe('git tool repo resolution', () => {
     })
     await execute(gitStatus(ctx), {})
     expect(gitStatusCommand).toHaveBeenCalledWith('/tmp/project', undefined)
+  })
+
+  it('returns gitRepoInfo shape when git_log is not a git repository', async () => {
+    gitLogCommand.mockRejectedValue(new Error('fatal: Not a git repository'))
+
+    await expect(execute(gitLog(baseCtx()), { repo: 'web' })).resolves.toEqual({
+      isRepo: false,
+      currentBranch: null,
+    })
+  })
+
+  it('propagates other git_log errors', async () => {
+    gitLogCommand.mockRejectedValue(new Error('IO error'))
+
+    await expect(execute(gitLog(baseCtx()), {})).rejects.toThrow('IO error')
+  })
+
+  it('returns gitRepoInfo shape when git_commit is not a git repository', async () => {
+    gitCommitCommand.mockRejectedValue(new Error('Not a git repository'))
+
+    await expect(
+      execute(gitCommit(baseCtx()), {
+        message: 'fix',
+        paths: ['web/src/a.ts'],
+        repo: 'web',
+      }),
+    ).resolves.toEqual({
+      isRepo: false,
+      currentBranch: null,
+    })
   })
 })

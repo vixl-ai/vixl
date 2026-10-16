@@ -11,7 +11,8 @@ import {
 } from '@/services/harness/plan-execution-session'
 import {
   joinOntoProjectRoot,
-  toRelativeUnderProjectRoot,
+  resolvePlanToolPath,
+  toWorkspaceRelativePath,
 } from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
@@ -33,13 +34,10 @@ const updatePlan = (ctx: HarnessToolContext) =>
             'No active plan was found. Pass planPath, or create a plan first.',
         }
       }
-      const relativePlanPath = toRelativeUnderProjectRoot(
-        ctx.projectRoot,
-        resolvedPlanPath,
-      )
+      const target = resolvePlanToolPath(ctx, resolvedPlanPath)
       const existing = await fsReadFile({
-        projectRoot: ctx.projectRoot,
-        path: relativePlanPath,
+        projectRoot: target.projectRoot,
+        path: target.relativePath,
       })
       const parsed = parsePlan(existing.content)
       if (parsed.parseError) {
@@ -47,8 +45,8 @@ const updatePlan = (ctx: HarnessToolContext) =>
       }
       const nextContent = updatePlanBody(existing.content, { body, title })
       await fsWriteFile({
-        projectRoot: ctx.projectRoot,
-        path: relativePlanPath,
+        projectRoot: target.projectRoot,
+        path: target.relativePath,
         content: nextContent,
       })
       const workbench = useWorkbenchStore()
@@ -57,21 +55,24 @@ const updatePlan = (ctx: HarnessToolContext) =>
         await workbench.ensureHomeRoot()
         projectId = HOME_WORKSPACE_ID
       } else {
-        projectId = workbench.resolveProjectIdByRoot(ctx.projectRoot)
+        projectId = workbench.resolveProjectIdByRoot(target.projectRoot)
       }
       const nextTitle = title ?? parsed.frontmatter!.title
       if (projectId) {
         await workbench.openPlan(
           projectId,
           parsed.frontmatter!.id,
-          relativePlanPath,
+          target.relativePath,
           nextTitle,
         )
         workbench.refreshPlanTabs()
       }
       return {
-        planPath: joinOntoProjectRoot(ctx.projectRoot, relativePlanPath),
-        relativePath: relativePlanPath,
+        planPath: joinOntoProjectRoot(target.projectRoot, target.relativePath),
+        relativePath: toWorkspaceRelativePath(
+          { ...ctx, projectRoot: target.projectRoot },
+          target.relativePath,
+        ),
         title: nextTitle,
       }
     },

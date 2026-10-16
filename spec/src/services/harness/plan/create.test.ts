@@ -4,7 +4,9 @@ import {
   getPlanExecutionSession,
 } from '@/services/harness/plan-execution-session'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
+import resolveMemberPath from '@/services/harness/resolve-member-path'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
@@ -36,6 +38,17 @@ vi.mock('@/composables/use-workbench-store', () => ({
 const projectSlug = 'project'
 const chatId = 'chat-create-plan'
 const projectRoot = '/tmp/project'
+const apiMember: HarnessWorkspaceMember = {
+  slug: 'api',
+  name: 'API',
+  rootPath: '/tmp/api',
+}
+const webMember: HarnessWorkspaceMember = {
+  slug: 'web',
+  name: 'Web',
+  rootPath: '/tmp/web',
+}
+const groupMembers = [apiMember, webMember]
 
 const planCtx = (overrides?: Partial<HarnessToolContext>): HarnessToolContext => ({
   projectRoot,
@@ -180,5 +193,83 @@ describe('create_plan', () => {
       (call) => call[0] as { path: string },
     )
     expect(writeCalls[1]?.path).toBe(created.relativePath)
+  })
+
+  it('returns a slug-prefixed relativePath in group mode that file tools accept', async () => {
+    const createPlanTool = (await import('@/services/harness/plan/create')).default
+    const ctx = planCtx({
+      projectRoot: apiMember.rootPath,
+      projectSlug: 'stack',
+      members: groupMembers,
+    })
+    const tool = createPlanTool(ctx)
+
+    const result = (await runTool(tool.execute, {
+      title: 'Group plan',
+      body: '## Goal\n\nShip it.\n',
+    })) as { planId: string; path: string; relativePath: string }
+
+    expect(result.relativePath).toMatch(/^api\/\.vixl\/plans\/.+\/PLAN\.md$/)
+    const resolved = resolveMemberPath(groupMembers, result.relativePath)
+    expect(resolved.memberSlug).toBe('api')
+    expect(resolved.root).toBe(apiMember.rootPath)
+    expect(result.path).toBe(`${apiMember.rootPath}/${resolved.relativePath}`)
+    expect(result.relativePath).toBe(`api/${resolved.relativePath}`)
+    expect(writtenCall().projectRoot).toBe(apiMember.rootPath)
+    expect(writtenCall().path).toBe(resolved.relativePath)
+    expect(openPlan).toHaveBeenCalledWith(
+      'project-1',
+      result.planId,
+      resolved.relativePath,
+      'Group plan',
+    )
+  })
+
+  it('lets update_plan and update_plan_todo round-trip the group-mode relativePath', async () => {
+    const groupCtx = planCtx({
+      projectRoot: apiMember.rootPath,
+      projectSlug: 'stack',
+      members: groupMembers,
+    })
+    dropPlanExecutionSession('stack', chatId)
+    const createPlanTool = (await import('@/services/harness/plan/create')).default
+    const created = (await runTool(createPlanTool(groupCtx).execute, {
+      title: 'Group round trip',
+      body: '## Goal\n\nFirst draft.\n',
+      todos: [{ id: 'first', content: 'Start', status: 'pending' }],
+    })) as { path: string; relativePath: string }
+    expect(created.relativePath.startsWith('api/')).toBe(true)
+    fsReadFile.mockResolvedValue({ content: writtenCall().content })
+
+    const updatePlan = (await import('@/services/harness/plan/update')).default
+    const updated = (await runTool(updatePlan(groupCtx).execute, {
+      planPath: created.relativePath,
+      body: '## Summary\n\nRevised body.\n',
+    })) as { planPath: string; relativePath: string }
+
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: apiMember.rootPath,
+      path: created.relativePath.slice('api/'.length),
+    })
+    expect(updated.relativePath).toBe(created.relativePath)
+    expect(updated.planPath).toBe(created.path)
+
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const todoUpdated = (await runTool(updatePlanTodo(groupCtx).execute, {
+      planPath: created.relativePath,
+      todos: [{ id: 'first', content: 'Start', status: 'in_progress' }],
+    })) as { planPath: string; relativePath: string }
+
+    expect(todoUpdated.relativePath).toBe(created.relativePath)
+    expect(todoUpdated.planPath).toBe(created.path)
+    const memberRelative = created.relativePath.slice('api/'.length)
+    const writeCalls = fsWriteFile.mock.calls.map(
+      (call) => call[0] as { projectRoot: string; path: string },
+    )
+    expect(writeCalls[0]?.path).toBe(memberRelative)
+    expect(writeCalls[1]?.path).toBe(memberRelative)
+    expect(writeCalls[1]?.projectRoot).toBe(apiMember.rootPath)
+    expect(writeCalls[2]?.path).toBe(memberRelative)
+    expect(writeCalls[2]?.projectRoot).toBe(apiMember.rootPath)
   })
 })

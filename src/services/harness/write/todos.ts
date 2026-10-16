@@ -1,17 +1,25 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { planTodoItemSchema } from '@/schemas/plan-document'
+import { planTodoItemPatchSchema, planTodoItemSchema } from '@/schemas/plan-document'
+import useChatStore from '@/composables/use-chat-store'
+import mergeInChatTodos from '@/services/harness/write/merge-in-chat-todos'
+import type { HarnessToolContext } from '@/types/harness/tool-context'
 
-const updateTodos = () =>
+const updateTodos = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Replace the in-chat todo list shown in Tasks. Each todo is one short verb-first actionable line.',
+      'Merge in-chat todos by id into the Tasks list. Matching ids update the provided fields, new ids append, and unmentioned todos keep their state. New ids must include content. Each todo is one short verb-first actionable line.',
     inputSchema: z.object({
-      todos: z.array(planTodoItemSchema).describe('Full todo list'),
+      todos: z
+        .array(planTodoItemPatchSchema)
+        .describe(
+          'Todo patches. id is required. content and status are optional for existing ids. New ids must include content.',
+        ),
     }),
     execute: async ({ todos }) => {
-      const normalized = z.array(planTodoItemSchema).parse(todos)
-      return { todos: normalized }
+      const existing = useChatStore().forChat(ctx.projectSlug, ctx.chatId).todos.value
+      const merged = mergeInChatTodos(existing, todos)
+      return { todos: z.array(planTodoItemSchema).parse(merged) }
     },
   })
 

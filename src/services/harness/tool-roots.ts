@@ -1,7 +1,11 @@
 import { z } from 'zod'
 import resolveMemberPath from '@/services/harness/resolve-member-path'
 import { notifyWorkspaceFsMutation } from '@/services/harness/shared/notify-fs-mutation'
-import { hasGroupMembers, isLiveMemberRoot } from '@/utils/parse-member-qualified-name'
+import {
+  hasGroupMembers,
+  isLiveMemberRoot,
+  parseMemberQualifiedPath,
+} from '@/utils/parse-member-qualified-name'
 import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
@@ -258,6 +262,51 @@ export const toRelativeUnderProjectRoot = (projectRoot: string, path: string): s
     throw new Error('Absolute path is outside the project root')
   }
   return relative
+}
+
+export const toWorkspaceRelativePath = (
+  ctx: Pick<HarnessToolContext, 'projectRoot' | 'projectSlug' | 'members'>,
+  memberRelativePath: string,
+): string => {
+  if (!hasGroupMembers(ctx.members)) {
+    return memberRelativePath
+  }
+  const slug =
+    ctx.members.find((member) => member.rootPath === ctx.projectRoot)?.slug ??
+    (ctx.projectSlug || ctx.members[0]!.slug)
+  const trimmed = memberRelativePath.replace(/^[/\\]+/, '')
+  if (!trimmed) {
+    return slug
+  }
+  return `${slug}/${trimmed}`
+}
+
+export type ResolvedPlanToolPath = {
+  projectRoot: string
+  relativePath: string
+}
+
+export const resolvePlanToolPath = (
+  ctx: Pick<HarnessToolContext, 'projectRoot' | 'members'>,
+  planPath: string,
+): ResolvedPlanToolPath => {
+  if (!hasGroupMembers(ctx.members)) {
+    return {
+      projectRoot: ctx.projectRoot,
+      relativePath: toRelativeUnderProjectRoot(ctx.projectRoot, planPath),
+    }
+  }
+  if (isAbsolutePath(planPath) || parseMemberQualifiedPath(planPath, ctx.members)) {
+    const resolved = resolveMemberPath(ctx.members, planPath)
+    return {
+      projectRoot: resolved.root,
+      relativePath: resolved.relativePath,
+    }
+  }
+  return {
+    projectRoot: ctx.projectRoot,
+    relativePath: planPath,
+  }
 }
 
 export const notifyWorkspaceMutations = (

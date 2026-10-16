@@ -85,4 +85,19 @@ describe('git_diff tool', () => {
       base: undefined,
     })
   })
+
+  it('returns gitRepoInfo shape when the command is not a git repository', async () => {
+    gitDiffCommand.mockRejectedValue(new Error('Not a git repository'))
+
+    await expect(execute({})).resolves.toEqual({
+      isRepo: false,
+      currentBranch: null,
+    })
+  })
+
+  it('propagates other git_diff errors', async () => {
+    gitDiffCommand.mockRejectedValue(new Error('Permission denied'))
+
+    await expect(execute({})).rejects.toThrow('Permission denied')
+  })
 })
