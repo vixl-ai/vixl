@@ -204,6 +204,7 @@ declare module 'vue' {
     GitBranchSelect: typeof import('./components/chat/GitBranchSelect.vue')['default']
     Github: typeof import('./components/ai-elements/open-in-chat/providers/icons/Github.vue')['default']
     GraphsSection: typeof import('./components/settings/sections/GraphsSection.vue')['default']
+    GroupStackIcon: typeof import('./components/navigation/aside/left/GroupStackIcon.vue')['default']
     HomeEmptyChatInput: typeof import('./components/chat/HomeEmptyChatInput.vue')['default']
     HomeFolderRow: typeof import('./components/navigation/aside/left/HomeFolderRow.vue')['default']
     Image: typeof import('./components/ai-elements/image/Image.vue')['default']

@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Folder, FolderOpen, FolderCog, Layers, PanelLeftClose, Plus, FileCode, Terminal } from '@lucide/vue'
+import { Folder, FolderOpen, FolderCog, PanelLeftClose, Plus, FileCode, Terminal } from '@lucide/vue'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
 import {
   Collapsible,
@@ -30,6 +30,7 @@ import {
   SidebarMenuSubItem,
 } from '@/components/shadcn/ui/sidebar'
 import NavigationAsideLeftChatListItem from '@/components/navigation/aside/left/ChatListItem.vue'
+import GroupStackIcon from '@/components/navigation/aside/left/GroupStackIcon.vue'
 import useChatStore from '@/composables/use-chat-store'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useWorkbenchStore from '@/composables/use-workbench-store'
@@ -241,7 +242,7 @@ const handleOpenTerminal = async (): Promise<void> => {
           <CollapsibleTrigger as-child>
             <SidebarMenuButton :tooltip="project.displayName">
               <span v-if="isGroup" class="inline-flex size-4 shrink-0">
-                <Layers class="size-4 shrink-0" />
+                <GroupStackIcon :slug="project.slug" :open="projectOpen" />
               </span>
               <span v-else class="relative inline-flex size-4 shrink-0">
                 <Folder
