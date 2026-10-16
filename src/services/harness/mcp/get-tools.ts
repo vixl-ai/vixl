@@ -1,12 +1,15 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { migrateMcpConfig } from '@/schemas/mcp-config'
-import { listUserMcpServers, type EffectiveMcpServer } from '@/services/mcp/merge-mcp-config'
 import { isMcpTrusted, sessionTrusts } from '@/services/mcp/mcp-trust'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
-import { readMcpConfig, type McpToolInfo } from '@/services/vixl/vixl-tauri'
+import type { McpToolInfo } from '@/services/vixl/vixl-tauri'
 import { truncateMcpDescription } from '@/services/harness/mcp/auth'
+import {
+  listUnionedMcpServers,
+  resolveUnionedMcpServer,
+  type UnionedMcpServer,
+} from '@/services/mcp/union-member-servers'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import inputExamplesFromMeta from './input-examples'
@@ -29,24 +32,22 @@ const mapTools = (tools: McpToolInfo[], includeSchemas: boolean) =>
   })
 
 const catalogEntry = async (
-  server: EffectiveMcpServer,
+  server: UnionedMcpServer,
   settings: VixlSettings,
   includeSchemas: boolean,
-  projectRoot: string,
 ) => {
-  const scopeKey = server.scope === 'personal' ? 'personal' : projectRoot
   const fingerprint = mcpServerFingerprint(server.config)
   const trusted = isMcpTrusted(
     settings,
     server.id,
     fingerprint,
     sessionTrusts,
-    scopeKey,
+    server.scopeKey,
   )
   try {
-    const state = await mcpRuntime.getStatus(server.id, undefined, scopeKey)
+    const state = await mcpRuntime.getStatus(server.id, undefined, server.scopeKey)
     return {
-      serverId: server.id,
+      serverId: server.displayId,
       scope: server.scope,
       status: state.status,
       trusted,
@@ -56,7 +57,7 @@ const catalogEntry = async (
     }
   } catch (error) {
     return {
-      serverId: server.id,
+      serverId: server.displayId,
       scope: server.scope,
       status: 'error',
       trusted,
@@ -75,25 +76,18 @@ const getMcpTools = (ctx: HarnessToolContext) =>
       serverId: z.string().optional(),
     }),
     execute: async ({ serverId }) => {
-      const personal = migrateMcpConfig(await readMcpConfig('personal', null))
-      const projectRaw = await readMcpConfig('project', ctx.projectRoot).catch(() => null)
-      const project = projectRaw ? migrateMcpConfig(projectRaw) : null
-      const servers = listUserMcpServers(personal, project)
+      const servers = await listUnionedMcpServers(ctx.projectRoot, ctx.members)
 
       if (serverId) {
-        const server = servers.find((entry) => entry.id === serverId)
-        if (!server) {
-          return {
-            error: `MCP server "${serverId}" was not found in any mcp.json config.`,
-          }
+        const server = resolveUnionedMcpServer(servers, serverId, ctx.members)
+        if ('error' in server) {
+          return { error: server.error }
         }
-        return catalogEntry(server, ctx.settings, true, ctx.projectRoot)
+        return catalogEntry(server, ctx.settings, true)
       }
 
       const catalog = await Promise.all(
-        servers.map((server) =>
-          catalogEntry(server, ctx.settings, false, ctx.projectRoot),
-        ),
+        servers.map((server) => catalogEntry(server, ctx.settings, false)),
       )
       return { servers: catalog }
     },

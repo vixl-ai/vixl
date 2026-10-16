@@ -552,5 +552,276 @@ describe('restoreAgentTurnFiles', () => {
     expect(contextUsage.lastStepUsage.value).toBeNull()
     expect(contextUsage.promptUsed.value).toBe(5_000)
   })
+
+  it('forwards fleet group members to restoreFileCheckpoints', async () => {
+    const lastUser: UIMessage = {
+      id: 'user-text',
+      role: 'user',
+      parts: [{ type: 'text', text: 'restore after this' }],
+    }
+    vi.mocked(resolveBaselinesForAgentTurn).mockReturnValue({
+      precedingUserMessageId: 'user-text',
+      targets: [{ path: 'web/src/a.ts', userMessageId: 'user-text' }],
+    })
+    vi.mocked(restoreFileCheckpoints).mockResolvedValue({
+      errors: [],
+      restored: ['web/src/a.ts'],
+      deleted: [],
+      skipped: [],
+    })
+    const state = buildState(lastUser)
+    ;(state as { fleet: unknown }).fleet = {
+      groups: {
+        value: [{ slug: 'proj', memberSlugs: ['api', 'web'] }],
+      },
+      projects: {
+        value: [
+          { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+          { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+        ],
+      },
+    }
+    const persistence = createPersistence(state, {
+      send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await persistence.restoreAgentTurnFiles('turn-1')
+
+    expect(restoreFileCheckpoints).toHaveBeenCalledWith({
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      projectRoot: '/tmp/proj',
+      targets: [{ path: 'web/src/a.ts', userMessageId: 'user-text' }],
+      members: [
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+      ],
+    })
+  })
+
+  it('keeps a placeholder member when a fleet group slug is missing', async () => {
+    const lastUser: UIMessage = {
+      id: 'user-text',
+      role: 'user',
+      parts: [{ type: 'text', text: 'restore after this' }],
+    }
+    vi.mocked(resolveBaselinesForAgentTurn).mockReturnValue({
+      precedingUserMessageId: 'user-text',
+      targets: [{ path: 'web/src/a.ts', userMessageId: 'user-text' }],
+    })
+    vi.mocked(restoreFileCheckpoints).mockResolvedValue({
+      errors: [],
+      restored: [],
+      deleted: [],
+      skipped: [],
+    })
+    const state = buildState(lastUser)
+    ;(state as { fleet: unknown }).fleet = {
+      groups: {
+        value: [{ slug: 'proj', memberSlugs: ['api', 'web'] }],
+      },
+      projects: {
+        value: [{ slug: 'api', name: 'API', rootPath: '/tmp/api' }],
+      },
+    }
+    const persistence = createPersistence(state, {
+      send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await persistence.restoreAgentTurnFiles('turn-1')
+
+    expect(restoreFileCheckpoints).toHaveBeenCalledWith({
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      projectRoot: '/tmp/proj',
+      targets: [{ path: 'web/src/a.ts', userMessageId: 'user-text' }],
+      members: [
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+        { slug: 'web', name: 'web', rootPath: '' },
+      ],
+    })
+  })
+
+  it('reconstructs members from slug-prefixed paths when the group row is gone', async () => {
+    const lastUser: UIMessage = {
+      id: 'user-text',
+      role: 'user',
+      parts: [{ type: 'text', text: 'restore after this' }],
+    }
+    vi.mocked(resolveBaselinesForAgentTurn).mockReturnValue({
+      precedingUserMessageId: 'user-text',
+      targets: [
+        { path: 'web/src/a.ts', userMessageId: 'user-text' },
+        { path: 'api/src/b.ts', userMessageId: 'user-text' },
+      ],
+    })
+    vi.mocked(restoreFileCheckpoints).mockResolvedValue({
+      errors: [],
+      restored: ['web/src/a.ts', 'api/src/b.ts'],
+      deleted: [],
+      skipped: [],
+    })
+    const state = buildState(lastUser)
+    ;(state as { fleet: unknown }).fleet = {
+      groups: { value: [] },
+      projects: {
+        value: [
+          { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+          { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+        ],
+      },
+    }
+    const persistence = createPersistence(state, {
+      send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await persistence.restoreAgentTurnFiles('turn-1')
+
+    expect(restoreFileCheckpoints).toHaveBeenCalledWith({
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      projectRoot: '/tmp/proj',
+      targets: [
+        { path: 'web/src/a.ts', userMessageId: 'user-text' },
+        { path: 'api/src/b.ts', userMessageId: 'user-text' },
+      ],
+      members: [
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+      ],
+    })
+  })
+
+  it('keeps a placeholder member when the group row is gone and a member project is missing', async () => {
+    const lastUser: UIMessage = {
+      id: 'user-text',
+      role: 'user',
+      parts: [{ type: 'text', text: 'restore after this' }],
+    }
+    vi.mocked(resolveBaselinesForAgentTurn).mockReturnValue({
+      precedingUserMessageId: 'user-text',
+      targets: [
+        { path: 'web/src/a.ts', userMessageId: 'user-text' },
+        { path: 'api/src/b.ts', userMessageId: 'user-text' },
+      ],
+    })
+    vi.mocked(restoreFileCheckpoints).mockResolvedValue({
+      errors: [],
+      restored: [],
+      deleted: [],
+      skipped: [],
+    })
+    const state = buildState(lastUser)
+    ;(state as { fleet: unknown }).fleet = {
+      groups: { value: [] },
+      projects: {
+        value: [{ slug: 'api', name: 'API', rootPath: '/tmp/api' }],
+      },
+    }
+    const persistence = createPersistence(state, {
+      send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await persistence.restoreAgentTurnFiles('turn-1')
+
+    expect(restoreFileCheckpoints).toHaveBeenCalledWith({
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      projectRoot: '/tmp/proj',
+      targets: [
+        { path: 'web/src/a.ts', userMessageId: 'user-text' },
+        { path: 'api/src/b.ts', userMessageId: 'user-text' },
+      ],
+      members: [
+        { slug: 'web', name: 'web', rootPath: '' },
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+      ],
+    })
+  })
+
+  it('keeps group routing when the group row is gone and only one member path is restored', async () => {
+    const lastUser: UIMessage = {
+      id: 'user-text',
+      role: 'user',
+      parts: [{ type: 'text', text: 'restore after this' }],
+    }
+    vi.mocked(resolveBaselinesForAgentTurn).mockReturnValue({
+      precedingUserMessageId: 'user-text',
+      targets: [{ path: 'web/src/a.ts', userMessageId: 'user-text' }],
+    })
+    vi.mocked(restoreFileCheckpoints).mockResolvedValue({
+      errors: [],
+      restored: ['web/src/a.ts'],
+      deleted: [],
+      skipped: [],
+    })
+    const state = buildState(lastUser)
+    ;(state as { fleet: unknown }).fleet = {
+      groups: { value: [] },
+      projects: {
+        value: [
+          { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+          { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+        ],
+      },
+    }
+    const persistence = createPersistence(state, {
+      send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await persistence.restoreAgentTurnFiles('turn-1')
+
+    expect(restoreFileCheckpoints).toHaveBeenCalledWith({
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      projectRoot: '/tmp/proj',
+      targets: [{ path: 'web/src/a.ts', userMessageId: 'user-text' }],
+      members: [
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+        { slug: 'proj', name: 'proj', rootPath: '' },
+      ],
+    })
+  })
+
+  it('does not reconstruct members when the chat slug is still a fleet project', async () => {
+    const lastUser: UIMessage = {
+      id: 'user-text',
+      role: 'user',
+      parts: [{ type: 'text', text: 'restore after this' }],
+    }
+    vi.mocked(resolveBaselinesForAgentTurn).mockReturnValue({
+      precedingUserMessageId: 'user-text',
+      targets: [{ path: 'web/src/a.ts', userMessageId: 'user-text' }],
+    })
+    vi.mocked(restoreFileCheckpoints).mockResolvedValue({
+      errors: [],
+      restored: ['web/src/a.ts'],
+      deleted: [],
+      skipped: [],
+    })
+    const state = buildState(lastUser)
+    ;(state as { fleet: unknown }).fleet = {
+      groups: { value: [] },
+      projects: {
+        value: [
+          { slug: 'proj', name: 'proj', rootPath: '/tmp/proj' },
+          { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+        ],
+      },
+    }
+    const persistence = createPersistence(state, {
+      send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+    })
+
+    await persistence.restoreAgentTurnFiles('turn-1')
+
+    expect(restoreFileCheckpoints).toHaveBeenCalledWith({
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      projectRoot: '/tmp/proj',
+      targets: [{ path: 'web/src/a.ts', userMessageId: 'user-text' }],
+      members: undefined,
+    })
+  })
 })
 

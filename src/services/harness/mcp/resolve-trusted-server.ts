@@ -1,23 +1,15 @@
-import { defaultMcpConfig, parseMcpConfig } from '@/schemas/mcp-config'
-import { listEffectiveMcpServers } from '@/services/mcp/merge-mcp-config'
 import { isMcpTrusted, sessionTrusts } from '@/services/mcp/mcp-trust'
 import { mcpServerFingerprint } from '@/services/mcp/mcp-server-fingerprint'
-import { readMcpConfig } from '@/services/vixl/vixl-tauri'
+import {
+  listUnionedMcpServers,
+  resolveUnionedMcpServer,
+} from '@/services/mcp/union-member-servers'
 import {
   buildCodegraphServer,
   isInternalMcpServer,
 } from '@/types/codegraph/managed-codegraph'
 import type { TrustedMcpServerResult } from '@/types/harness/trusted-mcp-server'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
-import type { McpConfig } from '@/types/vixl/mcp-config'
-
-const configFromRaw = (raw: unknown): McpConfig | null => {
-  const parsed = parseMcpConfig(raw)
-  if (!parsed.ok) {
-    return null
-  }
-  return parsed.config
-}
 
 const resolveTrustedMcpServer = async (
   ctx: HarnessToolContext,
@@ -29,26 +21,24 @@ const resolveTrustedMcpServer = async (
       trusted: true,
       config: buildCodegraphServer(ctx.projectRoot),
       scopeKey: ctx.projectRoot,
+      id: serverId,
     }
   }
 
-  const personalRaw = await readMcpConfig('personal', null).catch(() => null)
-  const personal = configFromRaw(personalRaw) ?? defaultMcpConfig()
-  const projectRaw = await readMcpConfig('project', ctx.projectRoot).catch(() => null)
-  const project = projectRaw ? configFromRaw(projectRaw) : null
-  const server = listEffectiveMcpServers(personal, project).find((item) => item.id === serverId)
-  if (!server) {
-    return { trusted: false, reason: 'missing' }
+  const servers = await listUnionedMcpServers(ctx.projectRoot, ctx.members)
+  const resolved = resolveUnionedMcpServer(servers, serverId, ctx.members)
+  if ('error' in resolved) {
+    return { trusted: false, reason: 'missing', error: resolved.error }
   }
-  const scopeKey = server.scope === 'personal' ? 'personal' : ctx.projectRoot
-  const fingerprint = mcpServerFingerprint(server.config)
-  if (!isMcpTrusted(ctx.settings, serverId, fingerprint, sessionTrusts, scopeKey)) {
+  const fingerprint = mcpServerFingerprint(resolved.config)
+  if (!isMcpTrusted(ctx.settings, resolved.id, fingerprint, sessionTrusts, resolved.scopeKey)) {
     return { trusted: false, reason: 'untrusted' }
   }
   return {
     trusted: true,
-    config: server.config,
-    scopeKey,
+    config: resolved.config,
+    scopeKey: resolved.scopeKey,
+    id: resolved.id,
   }
 }
 

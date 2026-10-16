@@ -5,6 +5,7 @@ import type { ContextBudget } from '@/types/harness/context-budget'
 import type { ContextBucket, ContextBucketId } from '@/types/harness/context-bucket'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { PrefixSnapshot } from '@/types/harness/prefix-snapshot'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import { CONTEXT_BUCKET_META, CONTEXT_BUCKET_ORDER } from '@/types/harness/context-bucket-meta'
 import estimateTextTokens from '@/utils/estimate-text-tokens'
 import assembleSystemPromptParts from '@/services/context/system-prompt-parts/assemble'
@@ -36,6 +37,7 @@ export type CountContextBudgetInput = {
   timeline?: ChatTimelineItem[]
   agentCatalog?: Array<{ name: string; description: string }>
   standalone?: boolean
+  members?: HarnessWorkspaceMember[]
   parts?: SystemPromptParts
   frozenSnapshot?: PrefixSnapshot | null
   activeContext?: ActiveContextSlice | null
@@ -126,6 +128,7 @@ const resolveParts = async (input: CountContextBudgetInput): Promise<SystemPromp
     mentions: input.mentions,
     agentCatalog: input.agentCatalog ?? [],
     standalone: input.standalone,
+    members: input.members,
   })
 }
 

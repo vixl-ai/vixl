@@ -5,6 +5,7 @@ import type { ContextMention } from '@/types/harness/context-mention'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import { getFrozenPrefix } from '@/services/harness/prefix-contract'
+import { resolveGroupMembers } from '@/services/harness/orchestrator/resolve-workspace'
 import { normalizeStoredModelRef } from '@/schemas/vixl-settings'
 import useChatStore from '@/composables/use-chat-store'
 import useContextUsage from '@/composables/use-context-usage'
@@ -173,21 +174,29 @@ export default () => {
     const mode = draftMode.value || meta.mode || 'agent'
     const project = fleet.activeProject.value
     const standalone = meta.projectSlug === HOME_CHAT_SLUG
-    const projectRoot = standalone
-      ? meta.projectRoot
-      : project?.rootPath ?? meta.projectRoot
+    const storedRoot = meta.projectRoot?.trim() ?? ''
+    const projectRoot = standalone ? storedRoot : storedRoot || project?.rootPath
     if (!projectRoot) {
       contextUsage.bindChat(selectedChatId)
       return
     }
 
-    const projectName = standalone
-      ? 'Home'
-      : project?.name ?? meta.projectSlug ?? 'Home'
-
     const frozenSnapshot = getFrozenPrefix(meta)
     const timeline = chatStore.timeline.value
     const messages = chatStore.messages.value
+    const members = standalone
+      ? undefined
+      : await resolveGroupMembers({
+          projectSlug: meta.projectSlug,
+          projectRoot,
+          projectName: project?.name ?? meta.projectSlug ?? 'Home',
+        })
+    const projectName = standalone
+      ? 'Home'
+      : members?.find((member) => member.rootPath === projectRoot)?.name ??
+        project?.name ??
+        meta.projectSlug ??
+        'Home'
 
     await contextUsage.refresh({
       modelId,
@@ -202,6 +211,7 @@ export default () => {
       mentions: draftMentions.value,
       activeContext: meta.activeContext ?? null,
       chatId: selectedChatId,
+      members,
     })
   }
 
@@ -224,6 +234,7 @@ export default () => {
           () => chatStore.loading.value,
           () => chatStore.messages.value.length,
           () => fleet.activeProject.value?.id,
+          () => fleet.groups?.value,
           () => chatStore.meta.value?.model,
           () => chatStore.meta.value?.mode,
           () => chatStore.meta.value?.prefixSnapshot?.hash,

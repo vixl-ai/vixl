@@ -27,6 +27,7 @@ import contextMentionFromNode from '@/utils/context-mention-from-node'
 import searchWorkspaceFiles from '@/utils/search-workspace-files'
 import formatUnknownError from '@/utils/format-unknown-error'
 import type { ContextMention } from '@/types/harness/context-mention'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { SlashIndexEntry } from '@/types/chat/slash-index-entry'
 
 const props = withDefaults(
@@ -35,11 +36,13 @@ const props = withDefaults(
     placeholder?: string
     projectRoot?: string | null
     slashRoot?: string | null
+    members?: HarnessWorkspaceMember[]
   }>(),
   {
     placeholder: '@ for context, / for commands',
     projectRoot: null,
     slashRoot: null,
+    members: undefined,
   },
 )
 
@@ -244,7 +247,12 @@ const mentionExtension = createChatMentionExtension([
     debounce: 150,
     items: async ({ query }) => {
       try {
-        return await searchWorkspaceFiles(props.projectRoot, query)
+        return await searchWorkspaceFiles(
+          props.projectRoot,
+          query,
+          undefined,
+          props.members,
+        )
       } catch (error) {
         toast.error('Failed to search files', {
           description: formatUnknownError(error),

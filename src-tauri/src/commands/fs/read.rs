@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use super::path::{
-    canonical_project_root, entry_kind, modified_ms, relative_path, resolve_workspace_path,
+    entry_kind, modified_ms, resolve_command_path, ResolvedWorkspacePath, WorkspaceRootArg,
 };
 use super::types::{FsDirEntry, FsReadFileResult, FsStatResult, FsTreeNode};
 
@@ -34,10 +34,11 @@ pub fn fs_read_file(
     offset: Option<u32>,
     limit: Option<u32>,
     include_base64: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<FsReadFileResult, String> {
-    let root = canonical_project_root(&project_root)?;
-    let absolute = resolve_workspace_path(&project_root, &path)?;
-    let rel = relative_path(&root, &absolute);
+    let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
+    let absolute = resolved.path.clone();
+    let rel = resolved.reported_path();
 
     if is_image_path(&absolute) {
         let metadata = fs::metadata(&absolute).map_err(|error| error.to_string())?;
@@ -111,9 +112,13 @@ pub fn fs_read_file(
 }
 
 #[tauri::command]
-pub fn fs_list_dir(project_root: String, path: String) -> Result<Vec<FsDirEntry>, String> {
-    let root = canonical_project_root(&project_root)?;
-    let absolute = resolve_workspace_path(&project_root, &path)?;
+pub fn fs_list_dir(
+    project_root: String,
+    path: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<Vec<FsDirEntry>, String> {
+    let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
+    let absolute = resolved.path.clone();
     if !absolute.is_dir() {
         return Err("Path is not a directory".to_string());
     }
@@ -127,7 +132,7 @@ pub fn fs_list_dir(project_root: String, path: String) -> Result<Vec<FsDirEntry>
                 continue;
             };
             let name = entry.file_name().to_string_lossy().to_string();
-            let rel = relative_path(&root, &entry_path);
+            let rel = resolved.relative_of(&entry_path);
             entries.push(FsDirEntry {
                 name,
                 path: rel,
@@ -140,12 +145,17 @@ pub fn fs_list_dir(project_root: String, path: String) -> Result<Vec<FsDirEntry>
     Ok(entries)
 }
 
-fn build_tree(root: &Path, dir: &Path, depth: u32, max_depth: u32) -> Result<FsTreeNode, String> {
+fn build_tree(
+    resolved: &ResolvedWorkspacePath,
+    dir: &Path,
+    depth: u32,
+    max_depth: u32,
+) -> Result<FsTreeNode, String> {
     let name = dir
         .file_name()
         .map(|value| value.to_string_lossy().to_string())
         .unwrap_or_else(|| ".".to_string());
-    let rel = relative_path(root, dir);
+    let rel = resolved.relative_of(dir);
     let kind = entry_kind(dir)?;
 
     let children = if kind == "directory" && depth < max_depth {
@@ -154,7 +164,7 @@ fn build_tree(root: &Path, dir: &Path, depth: u32, max_depth: u32) -> Result<FsT
         // instead of failing the entire tree.
         if let Ok(read_dir) = fs::read_dir(dir) {
             for entry in read_dir.flatten() {
-                if let Ok(node) = build_tree(root, &entry.path(), depth + 1, max_depth) {
+                if let Ok(node) = build_tree(resolved, &entry.path(), depth + 1, max_depth) {
                     nodes.push(node);
                 }
             }
@@ -178,23 +188,28 @@ pub fn fs_list_dir_tree(
     project_root: String,
     path: String,
     max_depth: Option<u32>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<FsTreeNode, String> {
-    let root = canonical_project_root(&project_root)?;
-    let absolute = resolve_workspace_path(&project_root, &path)?;
+    let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
+    let absolute = resolved.path.clone();
     if !absolute.is_dir() {
         return Err("Path is not a directory".to_string());
     }
     let depth = max_depth.unwrap_or(4);
-    build_tree(&root, &absolute, 0, depth)
+    build_tree(&resolved, &absolute, 0, depth)
 }
 
 #[tauri::command]
-pub fn fs_stat(project_root: String, path: String) -> Result<FsStatResult, String> {
-    let root = canonical_project_root(&project_root)?;
-    let absolute = resolve_workspace_path(&project_root, &path)?;
+pub fn fs_stat(
+    project_root: String,
+    path: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<FsStatResult, String> {
+    let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
+    let absolute = resolved.path.clone();
     if !absolute.exists() {
         return Ok(FsStatResult {
-            path: relative_path(&root, &absolute),
+            path: resolved.reported_path(),
             exists: false,
             kind: "missing".to_string(),
             size: 0,
@@ -204,7 +219,7 @@ pub fn fs_stat(project_root: String, path: String) -> Result<FsStatResult, Strin
 
     let meta = fs::metadata(&absolute).map_err(|error| error.to_string())?;
     Ok(FsStatResult {
-        path: relative_path(&root, &absolute),
+        path: resolved.reported_path(),
         exists: true,
         kind: entry_kind(&absolute)?,
         size: meta.len(),

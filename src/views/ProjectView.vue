@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import ProjectLayout from '@/components/project/ProjectLayout.vue'
 import useFleetRegistry from '@/composables/use-fleet-registry'
+import { primaryProjectForSlug } from '@/utils/primary-project-for-slug'
 import useVixlConfig from '@/composables/use-vixl-config'
 import {
   PROJECT_SECTIONS,
@@ -17,11 +18,26 @@ const fleet = useFleetRegistry()
 const config = useVixlConfig()
 const activating = ref(false)
 
-const projectSlug = computed(() => String(route.params.slug ?? ''))
+const workspaceSlug = computed(() => String(route.params.slug ?? ''))
+const isGroupRoute = computed(() => route.name === 'group')
+
+const group = computed(
+  () => fleet.groups.value.find((item) => item.slug === workspaceSlug.value) ?? null,
+)
 
 const project = computed(
-  () => fleet.projects.value.find((item) => item.slug === projectSlug.value) ?? null,
+  () => fleet.projects.value.find((item) => item.slug === workspaceSlug.value) ?? null,
 )
+
+const pageName = computed(() => group.value?.name ?? project.value?.name ?? workspaceSlug.value)
+
+const memberNames = computed(() => {
+  if (!group.value) {
+    return []
+  }
+  return group.value.memberSlugs
+    .map((slug) => fleet.projects.value.find((item) => item.slug === slug)?.name ?? slug)
+})
 
 const resolveSection = (section: string | undefined): ProjectSectionId => {
   if (typeof section === 'string' && PROJECT_SECTIONS.includes(section as ProjectSectionId)) {
@@ -38,7 +54,7 @@ const activeSection = computed(() =>
 
 const setSection = async (section: ProjectSectionId): Promise<void> => {
   try {
-    await router.replace(projectRouteFor(projectSlug.value, section))
+    await router.replace(projectRouteFor(workspaceSlug.value, section))
   } catch (error) {
     toast.error('Navigation failed', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -47,7 +63,13 @@ const setSection = async (section: ProjectSectionId): Promise<void> => {
 }
 
 const activateProject = async (): Promise<void> => {
-  const target = project.value
+  const target = isGroupRoute.value
+    ? primaryProjectForSlug(
+        workspaceSlug.value,
+        fleet.projects.value,
+        fleet.groups.value,
+      )
+    : project.value
   if (!target) {
     return
   }
@@ -63,7 +85,7 @@ const activateProject = async (): Promise<void> => {
     await fleet.setActiveProject(target.id)
     await config.refreshAll()
   } catch (error) {
-    toast.error('Could not open project', {
+    toast.error(isGroupRoute.value ? 'Could not open group' : 'Could not open project', {
       description: error instanceof Error ? error.message : 'Unknown error',
     })
   } finally {
@@ -72,13 +94,13 @@ const activateProject = async (): Promise<void> => {
 }
 
 watch(
-  [project, () => fleet.loaded.value],
-  async ([nextProject, loaded]) => {
+  [project, group, () => fleet.loaded.value],
+  async ([nextProject, nextGroup, loaded]) => {
     if (!loaded) {
       return
     }
-    if (!nextProject) {
-      toast.error('Project not found')
+    if (!nextProject && !nextGroup) {
+      toast.error(isGroupRoute.value ? 'Group not found' : 'Project not found')
       try {
         await router.push('/')
       } catch (error) {
@@ -116,16 +138,19 @@ onUnmounted(() => {
 
 <template>
   <div
-    v-if="!fleet.loaded.value || !project"
+    v-if="!fleet.loaded.value || (!project && !group)"
     class="flex h-full items-center justify-center p-8"
   >
-    <p class="text-sm text-muted-foreground">Loading project…</p>
+    <p class="text-sm text-muted-foreground">
+      {{ isGroupRoute ? 'Loading group…' : 'Loading project…' }}
+    </p>
   </div>
   <div v-else class="flex h-full min-h-0 flex-1 flex-col">
     <ProjectLayout
-      :project-name="project.name"
-      :project-slug="project.slug"
+      :project-name="pageName"
+      :project-slug="workspaceSlug"
       :active-section="activeSection"
+      :member-names="memberNames"
       @update:section="setSection"
     />
   </div>

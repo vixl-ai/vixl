@@ -22,6 +22,12 @@ export const createLsp = (ctx: MonacoEditorContext) => {
   const getLspServerId = (path: string): string | null =>
     ctx.lspServerByPath.get(path) ?? null
 
+  const request = (
+    serverId: string,
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<unknown> => lspRequest(serverId, method, params, ctx.projectRoot.value)
+
   /** Vue LS 3 hybrid mode: script hover/defs/completion come from TypeScript + plugin. */
   const serversForLspFeature = (path: string, primaryId: string): string[] => {
     if (primaryId === 'vue' || fileExtension(path) === 'vue') {
@@ -62,7 +68,7 @@ export const createLsp = (ctx: MonacoEditorContext) => {
       return
     }
 
-    await lspRequest(serverId, 'textDocument/didChange', { path, content })
+    await request(serverId, 'textDocument/didChange', { path, content })
     ctx.lastLspContentByPath.set(path, content)
   }
 
@@ -122,7 +128,7 @@ export const createLsp = (ctx: MonacoEditorContext) => {
 
     try {
       await syncDocumentToLsp(path, model.getValue())
-      const result = await lspRequest(serverId, 'diagnostics', {
+      const result = await request(serverId, 'diagnostics', {
         path,
         content: model.getValue(),
       })
@@ -148,7 +154,7 @@ export const createLsp = (ctx: MonacoEditorContext) => {
     }
 
     try {
-      await lspRequest(serverId, 'textDocument/didClose', { path })
+      await request(serverId, 'textDocument/didClose', { path })
     } finally {
       ctx.lspServerByPath.delete(path)
       ctx.lastLspContentByPath.delete(path)
@@ -204,7 +210,7 @@ export const createLsp = (ctx: MonacoEditorContext) => {
           })
         }
       }
-      await lspRequest(server.id, 'textDocument/didOpen', {
+      await request(server.id, 'textDocument/didOpen', {
         path,
         content: model.getValue(),
       })
@@ -244,7 +250,7 @@ export const createLsp = (ctx: MonacoEditorContext) => {
       await syncDocumentToLsp(path, model.getValue())
       for (const serverId of serversForLspFeature(path, primaryId)) {
         try {
-          const result = await lspRequest(serverId, 'textDocument/formatting', {
+          const result = await request(serverId, 'textDocument/formatting', {
             path,
             options: {
               tabSize: modelOptions.tabSize,
@@ -268,6 +274,7 @@ export const createLsp = (ctx: MonacoEditorContext) => {
   return {
     clearLspMarkers,
     getLspServerId,
+    request,
     serversForLspFeature,
     withLspTimeout,
     syncDocumentToLsp,

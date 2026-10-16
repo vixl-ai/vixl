@@ -1,6 +1,6 @@
 use super::diff::build_file_diff;
 use super::path::{
-    canonical_project_root, reject_sensitive_path, relative_path, resolve_workspace_path,
+    reject_resolved_sensitive_path, resolve_command_path, WorkspaceRootArg,
 };
 use super::types::{FileDiff, FsEditReplacement, FsStagePreviewRequest};
 use std::fs;
@@ -182,38 +182,46 @@ fn apply_update_patch(existing: &str, patched: &str) -> Result<String, String> {
     Ok(result)
 }
 
-pub(crate) fn preview_patch(project_root: &str, patch: &str) -> Result<Vec<FileDiff>, String> {
-    let root = canonical_project_root(project_root)?;
+pub(crate) fn preview_patch(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+    patch: &str,
+) -> Result<Vec<FileDiff>, String> {
     let operations = parse_patch(patch)?;
     let mut diffs = Vec::new();
 
     for operation in operations {
         match operation {
             PatchOperation::Add { path, content } => {
-                reject_sensitive_path(&path)?;
-                let _ = resolve_workspace_path(project_root, &path)?;
-                diffs.push(build_file_diff(path, "create", None, Some(content)));
+                let resolved = resolve_command_path(project_root, project_roots, &path)?;
+                reject_resolved_sensitive_path(&resolved)?;
+                diffs.push(build_file_diff(
+                    resolved.reported_path(),
+                    "create",
+                    None,
+                    Some(content),
+                ));
             }
             PatchOperation::Update { path, content } => {
-                reject_sensitive_path(&path)?;
-                let absolute = resolve_workspace_path(project_root, &path)?;
+                let resolved = resolve_command_path(project_root, project_roots, &path)?;
+                reject_resolved_sensitive_path(&resolved)?;
                 let old_content =
-                    fs::read_to_string(&absolute).map_err(|error| error.to_string())?;
+                    fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
                 let new_content = apply_update_patch(&old_content, &content)?;
                 diffs.push(build_file_diff(
-                    relative_path(&root, &absolute),
+                    resolved.reported_path(),
                     "update",
                     Some(old_content),
                     Some(new_content),
                 ));
             }
             PatchOperation::Delete { path } => {
-                reject_sensitive_path(&path)?;
-                let absolute = resolve_workspace_path(project_root, &path)?;
+                let resolved = resolve_command_path(project_root, project_roots, &path)?;
+                reject_resolved_sensitive_path(&resolved)?;
                 let old_content =
-                    fs::read_to_string(&absolute).map_err(|error| error.to_string())?;
+                    fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
                 diffs.push(build_file_diff(
-                    relative_path(&root, &absolute),
+                    resolved.reported_path(),
                     "delete",
                     Some(old_content),
                     None,
@@ -227,50 +235,50 @@ pub(crate) fn preview_patch(project_root: &str, patch: &str) -> Result<Vec<FileD
 
 pub(crate) fn apply_patch_operations(
     project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
     patch: &str,
 ) -> Result<Vec<FileDiff>, String> {
-    let root = canonical_project_root(project_root)?;
     let operations = parse_patch(patch)?;
     let mut diffs = Vec::new();
 
     for operation in operations {
         match operation {
             PatchOperation::Add { path, content } => {
-                reject_sensitive_path(&path)?;
-                let absolute = resolve_workspace_path(project_root, &path)?;
-                if let Some(parent) = absolute.parent() {
+                let resolved = resolve_command_path(project_root, project_roots, &path)?;
+                reject_resolved_sensitive_path(&resolved)?;
+                if let Some(parent) = resolved.path.parent() {
                     fs::create_dir_all(parent).map_err(|error| error.to_string())?;
                 }
-                fs::write(&absolute, &content).map_err(|error| error.to_string())?;
+                fs::write(&resolved.path, &content).map_err(|error| error.to_string())?;
                 diffs.push(build_file_diff(
-                    relative_path(&root, &absolute),
+                    resolved.reported_path(),
                     "create",
                     None,
                     Some(content),
                 ));
             }
             PatchOperation::Update { path, content } => {
-                reject_sensitive_path(&path)?;
-                let absolute = resolve_workspace_path(project_root, &path)?;
+                let resolved = resolve_command_path(project_root, project_roots, &path)?;
+                reject_resolved_sensitive_path(&resolved)?;
                 let old_content =
-                    fs::read_to_string(&absolute).map_err(|error| error.to_string())?;
+                    fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
                 let new_content = apply_update_patch(&old_content, &content)?;
-                fs::write(&absolute, &new_content).map_err(|error| error.to_string())?;
+                fs::write(&resolved.path, &new_content).map_err(|error| error.to_string())?;
                 diffs.push(build_file_diff(
-                    relative_path(&root, &absolute),
+                    resolved.reported_path(),
                     "update",
                     Some(old_content),
                     Some(new_content),
                 ));
             }
             PatchOperation::Delete { path } => {
-                reject_sensitive_path(&path)?;
-                let absolute = resolve_workspace_path(project_root, &path)?;
+                let resolved = resolve_command_path(project_root, project_roots, &path)?;
+                reject_resolved_sensitive_path(&resolved)?;
                 let old_content =
-                    fs::read_to_string(&absolute).map_err(|error| error.to_string())?;
-                fs::remove_file(&absolute).map_err(|error| error.to_string())?;
+                    fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
+                fs::remove_file(&resolved.path).map_err(|error| error.to_string())?;
                 diffs.push(build_file_diff(
-                    relative_path(&root, &absolute),
+                    resolved.reported_path(),
                     "delete",
                     Some(old_content),
                     None,
@@ -287,18 +295,18 @@ pub fn fs_edit_file(
     project_root: String,
     path: String,
     replacements: Vec<FsEditReplacement>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<FileDiff, String> {
     if replacements.is_empty() {
         return Err("At least one replacement is required".to_string());
     }
-    reject_sensitive_path(&path)?;
-    let root = canonical_project_root(&project_root)?;
-    let absolute = resolve_workspace_path(&project_root, &path)?;
-    let old_content = fs::read_to_string(&absolute).map_err(|error| error.to_string())?;
+    let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
+    reject_resolved_sensitive_path(&resolved)?;
+    let old_content = fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
     let new_content = apply_replacements(&old_content, &replacements)?;
-    fs::write(&absolute, &new_content).map_err(|error| error.to_string())?;
+    fs::write(&resolved.path, &new_content).map_err(|error| error.to_string())?;
     Ok(build_file_diff(
-        relative_path(&root, &absolute),
+        resolved.reported_path(),
         "update",
         Some(old_content),
         Some(new_content),
@@ -306,21 +314,26 @@ pub fn fs_edit_file(
 }
 
 #[tauri::command]
-pub fn fs_apply_patch(project_root: String, patch: String) -> Result<Vec<FileDiff>, String> {
-    apply_patch_operations(&project_root, &patch)
+pub fn fs_apply_patch(
+    project_root: String,
+    patch: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<Vec<FileDiff>, String> {
+    apply_patch_operations(&project_root, project_roots.as_deref(), &patch)
 }
 #[tauri::command]
 pub fn fs_stage_preview(
     project_root: String,
     request: FsStagePreviewRequest,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<Vec<FileDiff>, String> {
-    let root = canonical_project_root(&project_root)?;
+    let roots = project_roots.as_deref();
     match request {
         FsStagePreviewRequest::Write { path, content } => {
-            reject_sensitive_path(&path)?;
-            let absolute = resolve_workspace_path(&project_root, &path)?;
-            let old_content = if absolute.exists() {
-                Some(fs::read_to_string(&absolute).map_err(|error| error.to_string())?)
+            let resolved = resolve_command_path(&project_root, roots, &path)?;
+            reject_resolved_sensitive_path(&resolved)?;
+            let old_content = if resolved.path.exists() {
+                Some(fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?)
             } else {
                 None
             };
@@ -330,7 +343,7 @@ pub fn fs_stage_preview(
                 "create"
             };
             Ok(vec![build_file_diff(
-                relative_path(&root, &absolute),
+                resolved.reported_path(),
                 operation,
                 old_content,
                 Some(content),
@@ -340,24 +353,26 @@ pub fn fs_stage_preview(
             if replacements.is_empty() {
                 return Err("At least one replacement is required".to_string());
             }
-            reject_sensitive_path(&path)?;
-            let absolute = resolve_workspace_path(&project_root, &path)?;
-            let old_content = fs::read_to_string(&absolute).map_err(|error| error.to_string())?;
+            let resolved = resolve_command_path(&project_root, roots, &path)?;
+            reject_resolved_sensitive_path(&resolved)?;
+            let old_content =
+                fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
             let new_content = apply_replacements(&old_content, &replacements)?;
             Ok(vec![build_file_diff(
-                relative_path(&root, &absolute),
+                resolved.reported_path(),
                 "update",
                 Some(old_content),
                 Some(new_content),
             )])
         }
-        FsStagePreviewRequest::ApplyPatch { patch } => preview_patch(&project_root, &patch),
+        FsStagePreviewRequest::ApplyPatch { patch } => preview_patch(&project_root, roots, &patch),
         FsStagePreviewRequest::Delete { path } => {
-            reject_sensitive_path(&path)?;
-            let absolute = resolve_workspace_path(&project_root, &path)?;
-            let old_content = fs::read_to_string(&absolute).map_err(|error| error.to_string())?;
+            let resolved = resolve_command_path(&project_root, roots, &path)?;
+            reject_resolved_sensitive_path(&resolved)?;
+            let old_content =
+                fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
             Ok(vec![build_file_diff(
-                relative_path(&root, &absolute),
+                resolved.reported_path(),
                 "delete",
                 Some(old_content),
                 None,

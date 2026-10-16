@@ -33,6 +33,41 @@ const withResultFields = (
   return { result, ...extra }
 }
 
+const asPlainObject = (value: unknown): Record<string, unknown> | null => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null
+  }
+  return value as Record<string, unknown>
+}
+
+const mcpToolErrorMessage = (result: unknown, toolName: string): string => {
+  const fallback = `MCP tool ${toolName} failed`
+  const record = asPlainObject(result)
+  if (!record || !Array.isArray(record.content)) {
+    return fallback
+  }
+  const text = record.content
+    .map((part) => {
+      const block = asPlainObject(part)
+      if (!block || block.type !== 'text' || typeof block.text !== 'string') {
+        return ''
+      }
+      return block.text
+    })
+    .filter((part) => part.length > 0)
+    .join('\n')
+    .trim()
+  return text.length > 0 ? text : fallback
+}
+
+const assertOkMcpResult = (result: unknown, toolName: string): unknown => {
+  const record = asPlainObject(result)
+  if (record?.isError === true) {
+    throw new Error(mcpToolErrorMessage(result, toolName))
+  }
+  return result
+}
+
 const drainMcpToolImages = async (
   ctx: HarnessToolContext,
   result: unknown,
@@ -86,13 +121,17 @@ const callMcpTool = (ctx: HarnessToolContext) =>
       if (!trust.trusted) {
         if (trust.reason === 'missing') {
           return {
-            error: `MCP server "${serverId}" was not found in any mcp.json config. It may have been removed, or the config failed to load.`,
+            error:
+              trust.error && trust.error.includes('multiple projects')
+                ? trust.error
+                : `MCP server "${serverId}" was not found in any mcp.json config. It may have been removed, or the config failed to load.`,
           }
         }
         return {
           error: `MCP server "${serverId}" is not trusted yet. Starting it in Settings, MCP grants trust.`,
         }
       }
+      const runtimeId = trust.id
       const allowed = await gateToolPermission({
         ctx: toPermCtx(ctx),
         toolCallId,
@@ -109,7 +148,7 @@ const callMcpTool = (ctx: HarnessToolContext) =>
         return { rejected: true, error: 'MCP call denied' }
       }
 
-      const status = await mcpRuntime.getStatus(serverId, trust.config, trust.scopeKey)
+      const status = await mcpRuntime.getStatus(runtimeId, trust.config, trust.scopeKey)
       const toolInfo = status.tools.find((item) => item.name === toolName)
       const normalized = normalizeMcpToolArgs(
         (args ?? {}) as Record<string, unknown>,
@@ -146,7 +185,7 @@ const callMcpTool = (ctx: HarnessToolContext) =>
         })
         try {
           return await mcpRuntime.callTool(
-            serverId,
+            runtimeId,
             toolName,
             toolArgs,
             undefined,
@@ -160,7 +199,10 @@ const callMcpTool = (ctx: HarnessToolContext) =>
       const source = `${serverId}/${toolName}`
 
       try {
-        return await drainMcpToolImages(ctx, await invokeTool(), source)
+        return assertOkMcpResult(
+          await drainMcpToolImages(ctx, await invokeTool(), source),
+          toolName,
+        )
       } catch (error) {
         if (!isMcpAuthError(error)) {
           throw error
@@ -189,7 +231,10 @@ const callMcpTool = (ctx: HarnessToolContext) =>
         }
 
         try {
-          return await drainMcpToolImages(ctx, await invokeTool(), source)
+          return assertOkMcpResult(
+            await drainMcpToolImages(ctx, await invokeTool(), source),
+            toolName,
+          )
         } catch (retryError) {
           if (isMcpAuthError(retryError)) {
             return { error: 'auth_required', serverId }

@@ -141,6 +141,26 @@ describe('useContextUsage', () => {
     expect(contextUsage.visibleBuckets.value).toEqual([])
   })
 
+  it('forwards members into countContextBudget', async () => {
+    const members = [
+      { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+      { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+    ]
+    const { default: useContextUsage } = await import(
+      '@/composables/use-context-usage'
+    )
+    const contextUsage = useContextUsage()
+
+    await contextUsage.refresh({
+      ...refreshInput('chat-a'),
+      members,
+    })
+
+    expect(countContextBudget).toHaveBeenCalledWith(
+      expect.objectContaining({ members }),
+    )
+  })
+
   it('does not floor a new chat to the previous chat last-step usage', async () => {
     countContextBudget.mockResolvedValue(sampleBudget(8_000))
     const { default: useContextUsage } = await import(

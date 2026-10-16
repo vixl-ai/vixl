@@ -34,15 +34,25 @@ import {
   fsReadFile,
   getVixlDir,
   listVixlFiles,
+  mcpListStatuses,
+  readMcpConfig,
   type ProjectFileEntry,
 } from '@/services/vixl/vixl-tauri'
+import connectionKey from '@/services/mcp/connection-key'
 
 const projectRoot = '/tmp/vixl'
 const personalDir = '/tmp/personal-vixl'
 
+const webRoot = '/tmp/web'
+
+const groupMembers = [
+  { slug: 'api', name: 'API', rootPath: projectRoot },
+  { slug: 'web', name: 'Web', rootPath: webRoot },
+]
+
 const input = (
   mode: 'ask' | 'plan' | 'agent' | 'orchestrator',
-  extra: { standalone?: boolean } = {},
+  extra: { standalone?: boolean; members?: typeof groupMembers } = {},
 ) => ({
   mode,
   projectName: 'vixl',
@@ -50,6 +60,7 @@ const input = (
   mentions: [],
   agentCatalog: [],
   standalone: extra.standalone ?? true,
+  ...('members' in extra ? { members: extra.members } : {}),
 })
 
 const agentDocument = (name: string, description: string, body: string): string => `---
@@ -125,10 +136,14 @@ beforeEach(() => {
   vi.mocked(listVixlFiles).mockReset()
   vi.mocked(fsReadFile).mockReset()
   vi.mocked(getVixlDir).mockReset()
+  vi.mocked(readMcpConfig).mockReset()
+  vi.mocked(mcpListStatuses).mockReset()
   getUserHomeDir.mockReset()
   getUserHomeDir.mockResolvedValue('/Users/test-home')
   vi.mocked(listVixlFiles).mockResolvedValue([])
   vi.mocked(getVixlDir).mockResolvedValue(personalDir)
+  vi.mocked(readMcpConfig).mockResolvedValue({ servers: {} })
+  vi.mocked(mcpListStatuses).mockResolvedValue({})
   vi.mocked(fsReadFile).mockResolvedValue({
     path: '',
     content: '',
@@ -607,5 +622,208 @@ describe('assemble system prompt parts', () => {
     expect(parts.agentsMd).toContain('Home agents guidance.')
     expect(parts.agentsMd).not.toContain('Project AGENTS.md guidance')
     expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'agents-md', projectRoot)
+  })
+
+  it('keeps single-project base text when members are absent', async () => {
+    const parts = await assembleSystemPromptParts(input('agent', { standalone: false }))
+    expect(parts.base).toContain('Project: vixl (/tmp/vixl)')
+    expect(parts.base).toContain('Workspace tools are scoped to this repo.')
+    expect(parts.base).toContain(
+      'For work in another project, move this chat there with move_workspace when available, or suggest the user open a chat in that project.',
+    )
+    expect(parts.base).not.toContain('Projects (slug, name, path):')
+  })
+
+  it('treats an empty members list like a single-project chat', async () => {
+    const without = await assembleSystemPromptParts(input('agent', { standalone: false }))
+    const empty = await assembleSystemPromptParts(
+      input('agent', { standalone: false, members: [] }),
+    )
+    expect(empty).toEqual(without)
+  })
+
+  it('treats a single member like a single-project chat', async () => {
+    const parts = await assembleSystemPromptParts(
+      input('agent', { standalone: false, members: [groupMembers[0]!] }),
+    )
+    expect(parts.base).toContain('Project: vixl (/tmp/vixl)')
+    expect(parts.base).toContain('Workspace tools are scoped to this repo.')
+    expect(parts.base).not.toContain('Projects (slug, name, path):')
+    expect(parts.base).not.toContain('Paths must be prefixed with a member slug')
+  })
+
+  it('renders a member table and multi-project rules when members exist', async () => {
+    const parts = await assembleSystemPromptParts(
+      input('agent', { standalone: false, members: groupMembers }),
+    )
+    expect(parts.base).not.toContain('Project: vixl (/tmp/vixl)')
+    expect(parts.base).toContain('Projects (slug, name, path):')
+    expect(parts.base).toContain(`- api | API | ${projectRoot}`)
+    expect(parts.base).toContain(`- web | Web | ${webRoot}`)
+    expect(parts.base).toContain(
+      'Paths must be prefixed with a member slug, for example api/src/index.ts.',
+    )
+    expect(parts.base).toContain(
+      'run_terminal cwd and git tools repo take a member slug. Default is the primary project (first listed).',
+    )
+    expect(parts.base).toContain(
+      'Make one git commit per repo. Never stage files across projects.',
+    )
+    expect(parts.base).toContain('Search without a path filter covers all projects.')
+  })
+
+  it('indexes other members AGENTS.md without inlining their contents', async () => {
+    vi.mocked(listVixlFiles).mockImplementation(async (scope, kind, rootPath) => {
+      if (kind !== 'agents-md') {
+        return []
+      }
+      if (scope === 'project' && rootPath === projectRoot) {
+        return [{ name: 'AGENTS.md', path: `${projectRoot}/.vixl/AGENTS.md` }]
+      }
+      if (scope === 'project' && rootPath === webRoot) {
+        return [{ name: 'AGENTS.md', path: `${webRoot}/AGENTS.md` }]
+      }
+      return []
+    })
+    vi.mocked(fsReadFile).mockImplementation(async ({ path, projectRoot: root }) => {
+      const content =
+        root === webRoot ? 'Web-only agents guidance that must not leak.' : 'Primary agents guidance.'
+      return { path, content, totalLines: 1, offset: 0, limit: 1 }
+    })
+
+    const parts = await assembleSystemPromptParts(
+      input('agent', { standalone: false, members: groupMembers }),
+    )
+
+    expect(parts.agentsMd).toContain('Primary agents guidance.')
+    expect(parts.agentsMd).toContain(
+      'Project web has its own AGENTS.md at web/AGENTS.md; read it before editing files there.',
+    )
+    expect(parts.agentsMd).not.toContain('Web-only agents guidance that must not leak.')
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot,
+      path: '.vixl/AGENTS.md',
+    })
+    expect(fsReadFile).not.toHaveBeenCalledWith({
+      projectRoot: webRoot,
+      path: 'AGENTS.md',
+    })
+  })
+
+  it('unions project skills across members and slug-qualifies duplicate names', async () => {
+    vi.mocked(listVixlFiles).mockImplementation(async (scope, kind, rootPath) => {
+      if (kind !== 'skills') {
+        return []
+      }
+      if (scope === 'personal') {
+        return [{ name: 'notes', path: 'skills/notes', description: 'User notes' }]
+      }
+      if (scope === 'project' && rootPath === projectRoot) {
+        return [
+          {
+            name: 'deploy',
+            path: `${projectRoot}/.vixl/skills/deploy`,
+            description: 'API deploy',
+          },
+        ]
+      }
+      if (scope === 'project' && rootPath === webRoot) {
+        return [
+          {
+            name: 'deploy',
+            path: `${webRoot}/.vixl/skills/deploy`,
+            description: 'Web deploy',
+          },
+          {
+            name: 'lint',
+            path: `${webRoot}/.vixl/skills/lint`,
+            description: 'Web lint',
+          },
+        ]
+      }
+      return []
+    })
+
+    const parts = await assembleSystemPromptParts(
+      input('agent', { standalone: false, members: groupMembers }),
+    )
+
+    expect(parts.skills).toContain('- notes: User notes')
+    expect(parts.skills).toContain('- api:deploy: API deploy')
+    expect(parts.skills).toContain('- web:deploy: Web deploy')
+    expect(parts.skills).toContain('- lint: Web lint')
+    expect(parts.skills).not.toContain('- deploy: API deploy')
+  })
+
+  it('unions MCP catalogs across members and slug-qualifies duplicate server ids', async () => {
+    vi.mocked(readMcpConfig).mockImplementation(async (scope, rootPath) => {
+      if (scope === 'personal') {
+        return {
+          servers: {
+            brave: { command: 'npx', args: ['-y', '@brave/brave-search-mcp-server'] },
+          },
+        }
+      }
+      if (rootPath === projectRoot) {
+        return { servers: { docs: { command: 'npx', args: ['-y', 'api-docs-mcp'] } } }
+      }
+      if (rootPath === webRoot) {
+        return { servers: { docs: { command: 'npx', args: ['-y', 'web-docs-mcp'] } } }
+      }
+      return { servers: {} }
+    })
+    vi.mocked(mcpListStatuses).mockImplementation(async (scopeKey?: string) => {
+      if (scopeKey === projectRoot) {
+        return {
+          [connectionKey(projectRoot, 'docs')]: {
+            serverId: 'docs',
+            status: 'connected',
+            tools: [{ name: 'search_api_docs', description: 'Search API docs' }],
+            error: null,
+          },
+        }
+      }
+      if (scopeKey === webRoot) {
+        return {
+          [connectionKey(webRoot, 'docs')]: {
+            serverId: 'docs',
+            status: 'connected',
+            tools: [{ name: 'search_web_docs', description: 'Search web docs' }],
+            error: null,
+          },
+        }
+      }
+      return {
+        [connectionKey('personal', 'brave')]: {
+          serverId: 'brave',
+          status: 'connected',
+          tools: [{ name: 'brave_web_search', description: 'Search the web' }],
+          error: null,
+        },
+      }
+    })
+
+    const parts = await assembleSystemPromptParts(
+      input('agent', { standalone: false, members: groupMembers }),
+    )
+
+    expect(parts.mcp).toContain('- brave (connected):')
+    expect(parts.mcp).toContain('- api:docs (connected):')
+    expect(parts.mcp).toContain('search_api_docs: Search API docs')
+    expect(parts.mcp).toContain('- web:docs (connected):')
+    expect(parts.mcp).toContain('search_web_docs: Search web docs')
+    expect(parts.mcp).not.toMatch(/^- docs \(connected\):/m)
+  })
+
+  it('ignores members for standalone home chats', async () => {
+    stubSkillDisks(otherSkills)
+    const parts = await assembleSystemPromptParts(
+      input('agent', { standalone: true, members: groupMembers }),
+    )
+    expect(parts.base).toContain('Project: vixl (/tmp/vixl)')
+    expect(parts.base).not.toContain('Projects (slug, name, path):')
+    expect(parts.skills).toContain('- notes: User notes')
+    expect(parts.skills).not.toContain('- deploy:')
+    expect(listVixlFiles).not.toHaveBeenCalledWith('project', 'skills', webRoot)
   })
 })

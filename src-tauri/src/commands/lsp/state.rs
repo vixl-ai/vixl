@@ -253,8 +253,9 @@ pub fn apply_transition(
         _ => write.now_ms,
     };
     let next_revision = revision.fetch_add(1, Ordering::Relaxed) + 1;
+    let logical_id = super::instance::lsp_logical_id(write.id);
     let state = LspServerState {
-        id: write.id.to_string(),
+        id: logical_id.to_string(),
         phase: write.phase,
         generation: write.generation,
         revision: next_revision,
@@ -355,7 +356,14 @@ pub(crate) async fn transition_with(
         )
     };
     if let Some(state) = state.as_ref() {
-        let _ = app.emit("lsp://state", state.clone());
+        let active = super::resolve::active_project_root(app);
+        let emit = match (state.workspace_root.as_deref(), active.as_deref()) {
+            (Some(root), Some(active_root)) => root == active_root,
+            _ => true,
+        };
+        if emit {
+            let _ = app.emit("lsp://state", state.clone());
+        }
     }
     state
 }

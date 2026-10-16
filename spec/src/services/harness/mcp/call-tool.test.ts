@@ -105,7 +105,7 @@ vi.mock('@/services/mcp/mcp-http-client', () => ({
 }))
 
 vi.mock('@/services/mcp/mcp-auth-gate', () => ({
-  requestMcpAuth: vi.fn<() => Promise<void>>(),
+  requestMcpAuth: vi.fn<() => Promise<{ action: string }>>(),
 }))
 
 vi.mock('@/services/mcp/mcp-trust', () => ({
@@ -117,6 +117,7 @@ vi.mock('@/services/mcp/mcp-trust', () => ({
 }))
 
 import { isMcpTrusted } from '@/services/mcp/mcp-trust'
+import { requestMcpAuth } from '@/services/mcp/mcp-auth-gate'
 
 
 const createAgentShell = vi.fn<
@@ -417,6 +418,249 @@ describe('build-tools call_mcp_tool args normalization', () => {
 
     expect(stageImage).not.toHaveBeenCalled()
     expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] })
+  })
+
+  it('calls a qualified member server using that project root as scopeKey', async () => {
+    const apiRoot = '/tmp/api'
+    const webRoot = '/tmp/web'
+    readMcpConfig.mockImplementation(async (scope: string, rootPath?: string | null) => {
+      if (scope === 'personal') {
+        return { servers: {} }
+      }
+      if (rootPath === apiRoot) {
+        return { servers: { docs: { command: 'npx', args: ['-y', 'api-docs'] } } }
+      }
+      if (rootPath === webRoot) {
+        return { servers: { docs: { command: 'npx', args: ['-y', 'web-docs'] } } }
+      }
+      return { servers: {} }
+    })
+    mcpGetStatus.mockResolvedValue({
+      serverId: 'docs',
+      status: 'connected',
+      tools: [
+        {
+          name: 'search_docs',
+          description: 'Search',
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ],
+      error: null,
+    })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      projectRoot: apiRoot,
+      members: [
+        { slug: 'api', name: 'API', rootPath: apiRoot },
+        { slug: 'web', name: 'Web', rootPath: webRoot },
+      ],
+    })
+    await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'web:docs',
+        tool: 'search_docs',
+        args: {},
+      },
+      'tc-mcp-qualified',
+    )
+
+    expect(mcpCallTool).toHaveBeenCalledWith(
+      'docs',
+      'search_docs',
+      {},
+      undefined,
+      webRoot,
+    )
+  })
+
+  it('throws when the MCP result sets isError with text content', async () => {
+    mcpCallTool.mockResolvedValue({
+      isError: true,
+      content: [
+        { type: 'text', text: 'Error checking addon status: Could not connect to Blender' },
+      ],
+    })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+
+    await expect(
+      runTool(
+        tools.call_mcp_tool.execute,
+        {
+          serverId: 'brave',
+          tool: 'brave_web_search',
+          args: { query: 'search' },
+        },
+        'tc-mcp-is-error',
+      ),
+    ).rejects.toThrow('Error checking addon status: Could not connect to Blender')
+    expect(mcpCallTool).toHaveBeenCalled()
+  })
+
+  it('joins multiple text content parts when the MCP result is an error', async () => {
+    mcpCallTool.mockResolvedValue({
+      isError: true,
+      content: [
+        { type: 'text', text: 'first failure' },
+        { type: 'image', data: 'QUJD', mimeType: 'image/png' },
+        { type: 'text', text: 'second failure' },
+      ],
+    })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+
+    await expect(
+      runTool(
+        tools.call_mcp_tool.execute,
+        {
+          serverId: 'brave',
+          tool: 'brave_web_search',
+          args: { query: 'search' },
+        },
+        'tc-mcp-is-error-join',
+      ),
+    ).rejects.toThrow('first failure\nsecond failure')
+  })
+
+  it('throws a fallback message when isError is set without text content', async () => {
+    mcpCallTool.mockResolvedValue({
+      isError: true,
+      content: [{ type: 'image', data: 'QUJD', mimeType: 'image/png' }],
+    })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+
+    await expect(
+      runTool(
+        tools.call_mcp_tool.execute,
+        {
+          serverId: 'brave',
+          tool: 'brave_web_search',
+          args: { query: 'search' },
+        },
+        'tc-mcp-is-error-fallback',
+      ),
+    ).rejects.toThrow('MCP tool brave_web_search failed')
+  })
+
+  it('returns successful MCP results when isError is false', async () => {
+    mcpCallTool.mockResolvedValue({
+      isError: false,
+      content: [{ type: 'text', text: 'ok' }],
+    })
+    const stageImage = vi.fn<(image: {
+      dataUrl: string
+      mediaType: string
+      source: string
+    }) => Promise<void>>().mockResolvedValue()
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({ ...ctx, supportsVision: true, stageImage })
+    const result = await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'brave',
+        tool: 'brave_web_search',
+        args: { query: 'search' },
+      },
+      'tc-mcp-is-error-false',
+    )
+
+    expect(stageImage).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      isError: false,
+      content: [{ type: 'text', text: 'ok' }],
+    })
+  })
+
+  it('still stages images when isError is absent', async () => {
+    mcpCallTool.mockResolvedValue({
+      content: [{ type: 'image', data: 'QUJD', mimeType: 'image/png' }],
+    })
+    const stageImage = vi.fn<(image: {
+      dataUrl: string
+      mediaType: string
+      source: string
+    }) => Promise<void>>().mockResolvedValue()
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({ ...ctx, supportsVision: true, stageImage })
+    const result = await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'brave',
+        tool: 'brave_web_search',
+        args: { query: 'search' },
+      },
+      'tc-mcp-is-error-absent-image',
+    )
+
+    expect(stageImage).toHaveBeenCalledWith({
+      dataUrl: 'data:image/png;base64,QUJD',
+      mediaType: 'image/png',
+      source: 'brave/brave_web_search',
+    })
+    const serialized = JSON.stringify(result)
+    expect(serialized).toContain('[image loaded into context]')
+    expect(serialized).not.toContain('QUJD')
+  })
+
+  it('returns rejected when the permission gate denies the call', async () => {
+    gateToolPermission.mockResolvedValue(false)
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'brave',
+        tool: 'brave_web_search',
+        args: { query: 'search' },
+      },
+      'tc-mcp-denied',
+    )
+
+    expect(result).toEqual({ rejected: true, error: 'MCP call denied' })
+    expect(mcpCallTool).not.toHaveBeenCalled()
+  })
+
+  it('returns auth_required when MCP auth is needed and not completed', async () => {
+    mcpCallTool.mockRejectedValue(new Error('401 Unauthorized'))
+    vi.mocked(requestMcpAuth).mockResolvedValue({ action: 'cancelled' })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'brave',
+        tool: 'brave_web_search',
+        args: { query: 'search' },
+      },
+      'tc-mcp-auth-required',
+    )
+
+    expect(result).toEqual({ error: 'auth_required', serverId: 'brave' })
+    expect(requestMcpAuth).toHaveBeenCalled()
+  })
+
+  it('retries the MCP call after auth succeeds', async () => {
+    mcpCallTool
+      .mockRejectedValueOnce(new Error('401 Unauthorized'))
+      .mockResolvedValueOnce({ content: [{ type: 'text', text: 'ok after auth' }] })
+    vi.mocked(requestMcpAuth).mockResolvedValue({ action: 'authenticated' })
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.call_mcp_tool.execute,
+      {
+        serverId: 'brave',
+        tool: 'brave_web_search',
+        args: { query: 'search' },
+      },
+      'tc-mcp-auth-retry',
+    )
+
+    expect(result).toEqual({ content: [{ type: 'text', text: 'ok after auth' }] })
+    expect(mcpCallTool).toHaveBeenCalledTimes(2)
   })
 })
 

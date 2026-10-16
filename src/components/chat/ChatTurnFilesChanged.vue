@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { usePersistedCollapsibleOpen } from '@/composables/use-chat-turn-open-state'
 import useChatProjectId from '@/composables/use-chat-project-id'
+import useFleetRegistry from '@/composables/use-fleet-registry'
 import { ChevronRightIcon, Undo2Icon } from '@lucide/vue'
 import type { AggregatedTurnFileChange } from '@/types/harness/file-checkpoint'
 import {
@@ -35,7 +37,13 @@ import {
 } from '@/components/shadcn/ui/tooltip'
 import { summarizeMutationCounts } from '@/services/harness/restore-file-checkpoints'
 import openAtLine from '@/utils/open-at-line'
+import {
+  isLiveMemberRoot,
+  membersFromDeclaredSlugs,
+  parseMemberQualifiedPath,
+} from '@/utils/parse-member-qualified-name'
 import resolveRenameTarget from '@/utils/resolve-rename-target'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 
 const props = defineProps<{
   changes: AggregatedTurnFileChange[]
@@ -50,8 +58,20 @@ const emit = defineEmits<{
 }>()
 
 const { open } = usePersistedCollapsibleOpen(() => props.persistKey)
-const projectId = useChatProjectId()
+const route = useRoute()
+const fleet = useFleetRegistry()
+const fallbackProjectId = useChatProjectId()
 const confirmOpen = ref(false)
+
+const workspaceMembers = computed((): HarnessWorkspaceMember[] | undefined => {
+  const slug = String(route.params.slug ?? '')
+  const group = (fleet.groups?.value ?? []).find((entry) => entry.slug === slug)
+  if (!group) {
+    return undefined
+  }
+  const members = membersFromDeclaredSlugs(group.memberSlugs, fleet.projects.value)
+  return members.length > 0 ? members : undefined
+})
 
 const totals = computed(() => {
   let additions = 0
@@ -89,7 +109,26 @@ const handleOpenFile = async (
   event.preventDefault()
   event.stopPropagation()
 
-  const id = projectId.value
+  const startPath =
+    change.operation === 'rename' ? (change.renameTo ?? change.path) : change.path
+  const target = resolveRenameTarget(props.changes, startPath)
+  const qualified = parseMemberQualifiedPath(target, workspaceMembers.value)
+  if (qualified && !isLiveMemberRoot(qualified.member.rootPath)) {
+    toast.error('Project not found', {
+      description: `Project ${qualified.member.slug} is no longer available.`,
+    })
+    return
+  }
+  const memberProject = qualified
+    ? fleet.projects.value.find((entry) => entry.slug === qualified.member.slug)
+    : undefined
+  if (qualified && !memberProject) {
+    toast.error('Project not found', {
+      description: `Project ${qualified.member.slug} is no longer available.`,
+    })
+    return
+  }
+  const id = memberProject?.id ?? fallbackProjectId.value
   if (!id) {
     toast.error('Project not found', {
       description: 'Could not resolve the active project for this chat.',
@@ -98,10 +137,7 @@ const handleOpenFile = async (
   }
 
   try {
-    const startPath =
-      change.operation === 'rename' ? (change.renameTo ?? change.path) : change.path
-    const target = resolveRenameTarget(props.changes, startPath)
-    await openAtLine(id, target)
+    await openAtLine(id, qualified?.path ?? target)
   } catch (error) {
     toast.error('Failed to open file', {
       description: error instanceof Error ? error.message : 'Unknown error',

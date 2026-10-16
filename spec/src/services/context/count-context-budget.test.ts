@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { UIMessage } from 'ai'
+import type { SystemPromptParts } from '@/services/context/system-prompt-parts'
 import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 vi.mock('@/services/context/estimate-builtin-tool-definition-tokens', () => ({
@@ -12,24 +13,35 @@ vi.mock('tokenlens', () => ({
   getContext: () => ({ maxInput: 100_000, maxTotal: 100_000 }),
 }))
 
+const assembleSystemPromptParts = vi.hoisted(() =>
+  vi.fn<(input?: { members?: Array<{ slug: string }> }) => Promise<SystemPromptParts>>(
+    async (input) => {
+      const grouped = Boolean(input?.members && input.members.length > 0)
+      return {
+        base: grouped ? 'base-system\nProjects (slug, name, path):' : 'base-system',
+        tools: 'Tools are function calls, not repo code.',
+        mcp: grouped ? 'mcp-catalog\n- api:docs (connected):' : 'mcp-catalog',
+        agentsMd: grouped
+          ? 'Project web has its own AGENTS.md at web/AGENTS.md; read it before editing files there.'
+          : '',
+        rules: 'rules-body',
+        subagents: 'subagents',
+        mentions: '',
+        skills: grouped ? 'skills\n- api:deploy: Project deploy' : 'skills',
+      }
+    },
+  ),
+)
+
 vi.mock('@/services/context/system-prompt-parts/assemble', () => ({
-  default: async () => ({
-    base: 'base-system',
-    tools: 'Tools are function calls, not repo code.',
-    mcp: 'mcp-catalog',
-    agentsMd: '',
-    rules: 'rules-body',
-    subagents: 'subagents',
-    mentions: '',
-    skills: 'skills',
-  }),
+  default: (input?: { members?: Array<{ slug: string }> }) =>
+    assembleSystemPromptParts(input),
 }))
 
 import countContextBudget from '@/services/context/count-context-budget'
 import { DEFAULT_MAX_OUTPUT_TOKENS } from '@/services/models/resolve-model-call-options'
 import { mcpListStatuses, readMcpConfig } from '@/services/vixl/vixl-tauri'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
-import type { SystemPromptParts } from '@/services/context/system-prompt-parts'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const message = (id: string, createdAt: string, text: string): UIMessage => ({
@@ -316,5 +328,39 @@ describe('countContextBudget', () => {
     const rulesWith =
       withAgentsMd.buckets.find((bucket) => bucket.id === 'rules')?.tokens ?? 0
     expect(rulesWith).toBeGreaterThan(rulesWithout)
+  })
+
+  it('forwards members into assemble and counts the member block, index lines, and catalogs', async () => {
+    const members = [
+      { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+      { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+    ]
+    const single = await countContextBudget({
+      modelId: 'gpt-4.1',
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [message('1', '2026-01-01T00:00:00.000Z', 'hi')],
+    })
+    const grouped = await countContextBudget({
+      modelId: 'gpt-4.1',
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [message('1', '2026-01-01T00:00:00.000Z', 'hi')],
+      members,
+    })
+
+    expect(assembleSystemPromptParts).toHaveBeenCalledWith(
+      expect.objectContaining({ members }),
+    )
+    const token = (budget: typeof single, id: 'system' | 'rules' | 'mcp' | 'skills') =>
+      budget.buckets.find((bucket) => bucket.id === id)?.tokens ?? 0
+    expect(token(grouped, 'system')).toBeGreaterThan(token(single, 'system'))
+    expect(token(grouped, 'rules')).toBeGreaterThan(token(single, 'rules'))
+    expect(token(grouped, 'mcp')).toBeGreaterThan(token(single, 'mcp'))
+    expect(token(grouped, 'skills')).toBeGreaterThan(token(single, 'skills'))
   })
 })

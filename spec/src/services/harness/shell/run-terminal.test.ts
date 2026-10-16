@@ -256,7 +256,7 @@ describe('build-tools run_terminal', () => {
     )
   })
 
-  it('reports signal death in command failed errors', async () => {
+  it('returns structured output for signal-killed exits', async () => {
     waitForShellExit.mockResolvedValue({ exitCode: -1, signal: 6, timedOut: false })
     getAgentShell.mockReturnValue({
       shellId: 'shell-1',
@@ -269,13 +269,47 @@ describe('build-tools run_terminal', () => {
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(ctx)
+    const result = await runTool(tools.run_terminal.execute, { command: 'false' })
 
-    await expect(runTool(tools.run_terminal.execute, { command: 'false' })).rejects.toThrow(
-      /Command failed \(stopped by signal 6\): Aborted/,
+    expect(result).toMatchObject({
+      shellId: 'shell-1',
+      command: 'false',
+      stdout: '',
+      stderr: 'Aborted',
+      exitCode: -1,
+      signal: 6,
+      timedOut: false,
+    })
+    expect(String((result as { sandboxing: string }).sandboxing)).toContain(
+      'SANDBOXING:',
     )
-    await expect(runTool(tools.run_terminal.execute, { command: 'false' })).rejects.toThrow(
-      /SANDBOXING:[\s\S]*harness retries outside the sandbox/,
-    )
+  })
+
+  it('returns structured output for grep-style exit 1', async () => {
+    waitForShellExit.mockResolvedValue({ exitCode: 1, timedOut: false })
+    getAgentShell.mockReturnValue({
+      shellId: 'shell-1',
+      status: 'completed',
+      stdout: 'src/main.ts\n',
+      stderr: '',
+      exitCode: 1,
+    })
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(tools.run_terminal.execute, {
+      command: 'ls src | grep missing',
+    })
+
+    expect(result).toMatchObject({
+      shellId: 'shell-1',
+      command: 'ls src | grep missing',
+      stdout: 'src/main.ts\n',
+      stderr: '',
+      exitCode: 1,
+      timedOut: false,
+    })
+    expect(result).not.toHaveProperty('signal')
   })
 
   it('returns immediately for background commands', async () => {
@@ -400,6 +434,10 @@ describe('build-tools run_terminal', () => {
       sandboxed: false,
       network: 'allow',
       command: 'echo hello',
+      stdout: '',
+      stderr: 'boom',
+      exitCode: 1,
+      timedOut: false,
       priorPhase: {
         sandboxed: true,
         command: 'echo hello',
@@ -408,8 +446,6 @@ describe('build-tools run_terminal', () => {
     expect(String((result as { priorPhase: { error: string } }).priorPhase.error)).toContain(
       'SANDBOX_FAILED: bwrap',
     )
-    expect(String((result as { error: string }).error)).toContain('Command failed')
-    expect(String((result as { error: string }).error)).toContain('boom')
   })
 
   it('does not double-prompt when sandbox is already off', async () => {
@@ -1166,6 +1202,91 @@ describe('build-tools run_terminal', () => {
       rejected: true,
       error:
         'Read-only subagents require an OS sandbox. This platform has no sandbox, so run_terminal is unavailable.',
+    })
+  })
+
+  it('resolves cwd to a member root and passes projectRoots for sandboxing', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      projectRoot: '/tmp/api',
+      projectSlug: 'stack',
+      members: [
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+      ],
+    })
+    const result = await runTool(tools.run_terminal.execute, {
+      command: 'pwd',
+      cwd: 'web',
+    })
+
+    expect(createAgentShell).toHaveBeenCalledWith({
+      chatId: 'chat-1',
+      projectRoot: '/tmp/web',
+      command: 'pwd',
+      sandboxed: true,
+      allowNetwork: true,
+      projectRoots: [
+        { slug: 'api', path: '/tmp/api' },
+        { slug: 'web', path: '/tmp/web' },
+      ],
+    })
+    expect(result).toMatchObject({
+      cwd: '/tmp/web',
+      cwdSlug: 'web',
+    })
+    expect(String((result as { sandboxing: string }).sandboxing)).toContain(
+      'Working directory: /tmp/web (web)',
+    )
+  })
+
+  it('rejects an unknown cwd slug and lists valid slugs', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      projectRoot: '/tmp/api',
+      projectSlug: 'stack',
+      members: [
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+      ],
+    })
+
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'pwd', cwd: 'mobile' }),
+    ).rejects.toThrow(/Unknown project slug/)
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'pwd', cwd: 'mobile' }),
+    ).rejects.toThrow(/api/)
+    expect(createAgentShell).not.toHaveBeenCalled()
+  })
+
+  it('defaults cwd to the primary root when members exist', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      projectRoot: '/tmp/api',
+      projectSlug: 'stack',
+      members: [
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+      ],
+    })
+    const result = await runTool(tools.run_terminal.execute, { command: 'pwd' })
+
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectRoot: '/tmp/api',
+        projectRoots: [
+          { slug: 'api', path: '/tmp/api' },
+          { slug: 'web', path: '/tmp/web' },
+        ],
+      }),
+    )
+    expect(result).toMatchObject({
+      cwd: '/tmp/api',
+      cwdSlug: 'api',
     })
   })
 })

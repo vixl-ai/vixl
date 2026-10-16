@@ -3,6 +3,7 @@ import { call, isTauri } from './helpers'
 import type {
   FileDiffRecord,
   FsEditReplacement,
+  IpcProjectRoot,
   WorkspaceGlobResult,
   WorkspaceGrepResult,
 } from './types'
@@ -52,6 +53,7 @@ export const fsReadFile = (args: {
   offset?: number
   limit?: number
   includeBase64?: boolean
+  projectRoots?: IpcProjectRoot[]
 }): Promise<{
   path: string
   content: string
@@ -69,6 +71,7 @@ export const fsWriteFile = (args: {
   path: string
   content: string
   allowSensitive?: boolean
+  projectRoots?: IpcProjectRoot[]
 }): Promise<unknown> => call('fs_write_file', args)
 
 export const writeTempHandoff = (args: {
@@ -91,16 +94,25 @@ export const fsEditFile = (args: {
   projectRoot: string
   path: string
   replacements: FsEditReplacement[]
+  projectRoots?: IpcProjectRoot[]
 }): Promise<FileDiffRecord> => call('fs_edit_file', args)
 
-export const fsApplyPatch = (args: { projectRoot: string; patch: string }): Promise<unknown> =>
-  call('fs_apply_patch', args)
+export const fsApplyPatch = (args: {
+  projectRoot: string
+  patch: string
+  projectRoots?: IpcProjectRoot[]
+}): Promise<unknown> => call('fs_apply_patch', args)
 
 export const fsListDir = (
   projectRoot: string,
   path: string,
+  projectRoots?: IpcProjectRoot[],
 ): Promise<Array<{ name: string; path: string; kind: string }>> =>
-  call('fs_list_dir', { projectRoot, path })
+  call('fs_list_dir', {
+    projectRoot,
+    path,
+    ...(projectRoots ? { projectRoots } : {}),
+  })
 
 export const watchWorkspace = (args: {
   projectRoot: string
@@ -118,25 +130,39 @@ export const watchWorkspacePaths = (args: {
 export const fsStat = (
   projectRoot: string,
   path: string,
+  projectRoots?: IpcProjectRoot[],
 ): Promise<{
   path: string
   exists: boolean
   kind: string
   size: number
   modifiedMs?: number
-}> => call('fs_stat', { projectRoot, path })
+}> =>
+  call('fs_stat', {
+    projectRoot,
+    path,
+    ...(projectRoots ? { projectRoots } : {}),
+  })
 
 export const fsListDirTree = (
   projectRoot: string,
   path: string,
   maxDepth?: number,
-): Promise<unknown> => call('fs_list_dir_tree', { projectRoot, path, maxDepth })
+  projectRoots?: IpcProjectRoot[],
+): Promise<unknown> =>
+  call('fs_list_dir_tree', {
+    projectRoot,
+    path,
+    maxDepth,
+    ...(projectRoots ? { projectRoots } : {}),
+  })
 
 export const fsRename = (args: {
   projectRoot: string
   from: string
   to: string
   allowSensitive?: boolean
+  projectRoots?: IpcProjectRoot[]
 }): Promise<void> => call('fs_rename', args)
 
 export const fsDelete = (args: {
@@ -144,6 +170,7 @@ export const fsDelete = (args: {
   path: string
   recursive?: boolean
   allowSensitive?: boolean
+  projectRoots?: IpcProjectRoot[]
 }): Promise<void> => call('fs_delete', args)
 
 export const fsCopy = (args: {
@@ -151,6 +178,7 @@ export const fsCopy = (args: {
   from: string
   to: string
   allowSensitive?: boolean
+  projectRoots?: IpcProjectRoot[]
 }): Promise<void> => call('fs_copy', args)
 
 export const fsMove = (args: {
@@ -158,18 +186,24 @@ export const fsMove = (args: {
   from: string
   to: string
   allowSensitive?: boolean
+  projectRoots?: IpcProjectRoot[]
 }): Promise<void> => call('fs_move', args)
 
-export const fsMkdir = (args: { projectRoot: string; path: string }): Promise<void> =>
-  call('fs_mkdir', args)
+export const fsMkdir = (args: {
+  projectRoot: string
+  path: string
+  projectRoots?: IpcProjectRoot[]
+}): Promise<void> => call('fs_mkdir', args)
 
 export const fsStagePreviewWrite = (args: {
   projectRoot: string
   path: string
   content: string
+  projectRoots?: IpcProjectRoot[]
 }): Promise<FileDiffRecord[]> =>
   call('fs_stage_preview', {
     projectRoot: args.projectRoot,
+    projectRoots: args.projectRoots,
     request: { kind: 'write', path: args.path, content: args.content },
   })
 
@@ -177,27 +211,33 @@ export const fsStagePreviewEdit = (args: {
   projectRoot: string
   path: string
   replacements: FsEditReplacement[]
+  projectRoots?: IpcProjectRoot[]
 }): Promise<FileDiffRecord[]> =>
   call('fs_stage_preview', {
     projectRoot: args.projectRoot,
+    projectRoots: args.projectRoots,
     request: { kind: 'edit', path: args.path, replacements: args.replacements },
   })
 
 export const fsStagePreviewApplyPatch = (args: {
   projectRoot: string
   patch: string
+  projectRoots?: IpcProjectRoot[]
 }): Promise<FileDiffRecord[]> =>
   call('fs_stage_preview', {
     projectRoot: args.projectRoot,
+    projectRoots: args.projectRoots,
     request: { kind: 'applyPatch', patch: args.patch },
   })
 
 export const fsStagePreviewDelete = (args: {
   projectRoot: string
   path: string
+  projectRoots?: IpcProjectRoot[]
 }): Promise<FileDiffRecord[]> =>
   call('fs_stage_preview', {
     projectRoot: args.projectRoot,
+    projectRoots: args.projectRoots,
     request: { kind: 'delete', path: args.path },
   })
 
@@ -211,6 +251,7 @@ export const workspaceGrep = async (args: {
   regex?: boolean
   wholeWord?: boolean
   excludeGlob?: string
+  projectRoots?: IpcProjectRoot[]
 }): Promise<WorkspaceGrepResult> => {
   const result = await call<WorkspaceGrepResult>('workspace_grep', { request: args })
   return result
@@ -220,9 +261,15 @@ export const workspaceGlob = async (
   projectRoot: string,
   pattern: string,
   limit?: number,
+  projectRoots?: IpcProjectRoot[],
 ): Promise<WorkspaceGlobResult> => {
   const result = await call<WorkspaceGlobResult>('workspace_glob', {
-    request: { projectRoot, pattern, limit },
+    request: {
+      projectRoot,
+      pattern,
+      limit,
+      ...(projectRoots ? { projectRoots } : {}),
+    },
   })
   return result
 }

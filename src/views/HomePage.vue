@@ -9,12 +9,13 @@ import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import { setPendingChatMessage } from '@/services/chat/pending-message'
 import { getUserHomeDir } from '@/services/vixl/vixl-tauri'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
-import chatRouteFor from '@/utils/chat-route-for'
+import type { ChatPromptWorkspace } from '@/types/chat/chat-prompt-workspace'
 import type { FileUIPart } from 'ai'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { PermissionLevel } from '@/types/harness/permission'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
+import chatRouteFor from '@/utils/chat-route-for'
 
 const router = useRouter()
 const fleet = useFleetRegistry()
@@ -25,39 +26,90 @@ onMounted(() => {
   chatStore.clearChatState()
 })
 
+const startHomeChat = async (payload: {
+  mode: VixlChatMode
+  model: string
+}) =>
+  chatStore.createNewChat({
+    projectSlug: HOME_CHAT_SLUG,
+    projectRoot: await getUserHomeDir(),
+    mode: payload.mode,
+    model: payload.model,
+  })
+
+const startProjectChat = async (
+  projectId: string,
+  payload: { mode: VixlChatMode; model: string },
+) => {
+  await fleet.setActiveProject(projectId)
+  const project = fleet.projects.value.find((item) => item.id === projectId) ?? null
+  if (!project) {
+    throw new Error('Project not found')
+  }
+  return chatStore.createNewChat({
+    projectSlug: project.slug,
+    projectRoot: project.rootPath,
+    mode: payload.mode,
+    model: payload.model,
+  })
+}
+
+const startGroupChat = async (
+  groupId: string,
+  payload: { mode: VixlChatMode; model: string },
+) => {
+  const group = fleet.groups.value.find((item) => item.id === groupId) ?? null
+  if (!group) {
+    throw new Error('Group not found')
+  }
+  const primarySlug = group.memberSlugs[0]
+  const primary = primarySlug
+    ? fleet.projects.value.find((item) => item.slug === primarySlug) ?? null
+    : null
+  if (!primary) {
+    throw new Error('Group has no member projects')
+  }
+  await fleet.setActiveProject(primary.id)
+  return chatStore.createNewChat({
+    projectSlug: group.slug,
+    projectRoot: primary.rootPath,
+    mode: payload.mode,
+    model: payload.model,
+  })
+}
+
 const handleSubmit = async (payload: {
   text: string
   mode: VixlChatMode
   model: string
   reasoning?: ReasoningLevel
-  projectId: string | null
+  workspace: ChatPromptWorkspace
   permissionLevel: PermissionLevel
   files?: FileUIPart[]
   mentions?: ContextMention[]
 }): Promise<void> => {
   sending.value = true
   try {
-    if (payload.projectId) {
-      await fleet.setActiveProject(payload.projectId)
+    let chat
+    if (payload.workspace.kind === 'home') {
+      chat = await startHomeChat(payload)
+    } else if (payload.workspace.kind === 'project') {
+      chat = await startProjectChat(payload.workspace.projectId, payload)
+    } else if (payload.workspace.kind === 'group') {
+      chat = await startGroupChat(payload.workspace.groupId, payload)
+    } else {
+      const members = payload.workspace.projectIds
+        .map((id) => fleet.projects.value.find((item) => item.id === id) ?? null)
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+      if (members.length >= 2) {
+        const group = await fleet.addGroup(members.map((item) => item.slug))
+        chat = await startGroupChat(group.id, payload)
+      } else if (members.length === 1) {
+        chat = await startProjectChat(members[0]!.id, payload)
+      } else {
+        throw new Error('Selected projects are no longer available')
+      }
     }
-
-    const project = payload.projectId
-      ? fleet.projects.value.find((item) => item.id === payload.projectId) ?? null
-      : null
-
-    const chat = project
-      ? await chatStore.createNewChat({
-          projectSlug: project.slug,
-          projectRoot: project.rootPath,
-          mode: payload.mode,
-          model: payload.model,
-        })
-      : await chatStore.createNewChat({
-          projectSlug: HOME_CHAT_SLUG,
-          projectRoot: await getUserHomeDir(),
-          mode: payload.mode,
-          model: payload.model,
-        })
 
     setPendingChatMessage({
       text: payload.text,

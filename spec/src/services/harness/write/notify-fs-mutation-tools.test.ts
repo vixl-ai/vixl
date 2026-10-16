@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { FileDiff } from '@/types/harness/file-diff'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
@@ -49,9 +50,15 @@ vi.mock('@/services/harness/permission/gate', () => ({
   gateToolPermission,
 }))
 
-vi.mock('@/services/harness/capture-baselines-before-mutate', () => ({
-  default: captureBaselinesBeforeMutate,
-}))
+vi.mock('@/services/harness/capture-baselines-before-mutate', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('@/services/harness/capture-baselines-before-mutate')
+  >()
+  return {
+    ...actual,
+    default: captureBaselinesBeforeMutate,
+  }
+})
 
 vi.mock('@/services/vixl/vixl-tauri', () =>
   mockVixlTauri({
@@ -203,5 +210,89 @@ describe('harness tools notify workspace fs mutations', () => {
     expect(result).toEqual({ rejected: true, error: 'Patch not approved' })
     expect(fsApplyPatch).not.toHaveBeenCalled()
     expect(notifyWorkspaceFsMutation).not.toHaveBeenCalled()
+  })
+
+  const api: HarnessWorkspaceMember = {
+    slug: 'api',
+    name: 'API',
+    rootPath: '/tmp/api',
+  }
+  const web: HarnessWorkspaceMember = {
+    slug: 'web',
+    name: 'Web',
+    rootPath: '/tmp/web',
+  }
+
+  const groupCtx = (): HarnessToolContext => ({
+    ...baseCtx(),
+    projectRoot: '/tmp/api',
+    projectSlug: 'stack',
+    members: [api, web],
+  })
+
+  it('write_file notifies the mutated member root with a relative path', async () => {
+    fsStagePreviewWrite.mockResolvedValue([emptyDiff('web/src/foo.ts', 'create')])
+    await execute(writeFile(groupCtx()), {
+      path: 'web/src/foo.ts',
+      content: 'next',
+    })
+
+    expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/web', ['src/foo.ts'])
+    expect(notifyWorkspaceFsMutation).not.toHaveBeenCalledWith(
+      '/tmp/api',
+      expect.anything(),
+    )
+  })
+
+  it('delete_file notifies the mutated member root with a relative path', async () => {
+    fsStagePreviewDelete.mockResolvedValue([emptyDiff('web/src/foo.ts', 'delete')])
+    await execute(deleteFile(groupCtx()), { path: 'web/src/foo.ts' })
+
+    expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/web', ['src/foo.ts'])
+  })
+
+  it('move_file rejects cross-member moves without notifying', async () => {
+    const result = await execute(moveFile(groupCtx()), {
+      from: 'api/src/a.ts',
+      to: 'web/lib/b.ts',
+    })
+
+    expect(result).toEqual({
+      error: 'Move paths must belong to a single project member',
+    })
+    expect(gateToolPermission).not.toHaveBeenCalled()
+    expect(captureBaselinesBeforeMutate).not.toHaveBeenCalled()
+    expect(fsMove).not.toHaveBeenCalled()
+    expect(notifyWorkspaceFsMutation).not.toHaveBeenCalled()
+  })
+
+  it('move_file notifies the member root for a same-member move', async () => {
+    const result = await execute(moveFile(groupCtx()), {
+      from: 'api/src/a.ts',
+      to: 'api/lib/b.ts',
+    })
+
+    expect(result).toEqual(
+      expect.objectContaining({ ok: true, from: 'api/src/a.ts', to: 'api/lib/b.ts' }),
+    )
+    expect(fsMove).toHaveBeenCalled()
+    expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/api', ['src/a.ts', 'lib/b.ts'])
+    expect(notifyWorkspaceFsMutation).not.toHaveBeenCalledWith(
+      '/tmp/web',
+      expect.anything(),
+    )
+  })
+
+  it('apply_patch notifies each member that the patch touched', async () => {
+    fsStagePreviewApplyPatch.mockResolvedValue([
+      emptyDiff('api/src/added.ts', 'create'),
+      emptyDiff('web/src/edited.ts', 'update'),
+    ])
+    await execute(applyPatch(groupCtx()), {
+      patch: '*** Update File: web/src/edited.ts\n@@\n-old\n+new',
+    })
+
+    expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/api', ['src/added.ts'])
+    expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/web', ['src/edited.ts'])
   })
 })

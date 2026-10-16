@@ -232,6 +232,10 @@ export default defineUserConfig({
             link: '/getting-started/set-up-providers-and-models',
           },
           { text: 'Add a project', link: '/getting-started/add-a-project' },
+          {
+            text: 'Create a project group',
+            link: '/getting-started/create-a-project-group',
+          },
           { text: 'Your first chat', link: '/getting-started/your-first-chat' },
         ],
       },

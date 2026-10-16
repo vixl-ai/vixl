@@ -141,6 +141,7 @@ pub async fn shell_spawn_tracked(
     sandboxed: Option<bool>,
     allow_network: Option<bool>,
     project_writable: Option<bool>,
+    project_roots: Option<Vec<crate::commands::fs::WorkspaceRootArg>>,
 ) -> Result<(), String> {
     let mut child = spawn_child(
         &project_root,
@@ -148,6 +149,7 @@ pub async fn shell_spawn_tracked(
         sandboxed,
         allow_network,
         project_writable,
+        project_roots.as_deref(),
     )?;
 
     let stdout = child

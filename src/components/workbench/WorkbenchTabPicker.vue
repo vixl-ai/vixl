@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import {
   FileCode,
@@ -10,6 +11,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
 import {
@@ -32,17 +36,23 @@ const props = withDefaults(
 
 const fleet = useFleetRegistry()
 const workbench = useWorkbenchStore()
+const route = useRoute()
 const open = ref(false)
-
-const items = [
-  { id: 'editor', label: 'Editor', icon: FileCode },
-  { id: 'terminal', label: 'Terminal', icon: Terminal },
-] as const
+const contextSlug = computed(() => String(route.params.slug ?? ''))
+const workspaceProjects = computed(() =>
+  workbench.listWorkspaceProjects(contextSlug.value),
+)
+const isGroupWorkspace = computed(() => workspaceProjects.value.length > 1)
 
 const activeProjectId = computed(() => fleet.activeProjectId.value)
 
-const handleOpen = async (type: (typeof items)[number]['id']): Promise<void> => {
-  const projectId = workbench.resolveWorkspaceProjectId()
+const handleOpen = async (
+  type: 'editor' | 'terminal',
+  projectIdOverride?: string,
+): Promise<void> => {
+  const projectId =
+    projectIdOverride
+    ?? workbench.resolvePrimaryWorkspaceProjectId(contextSlug.value)
 
   try {
     switch (type) {
@@ -82,14 +92,32 @@ const handleOpen = async (type: (typeof items)[number]['id']): Promise<void> => 
               </Button>
             </slot>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" class="z-[60] w-40">
+          <DropdownMenuContent align="start" class="z-[60] w-44">
+            <DropdownMenuItem @click="handleOpen('editor')">
+              <FileCode class="mr-2 h-4 w-4" />
+              Editor
+            </DropdownMenuItem>
+            <DropdownMenuSub v-if="isGroupWorkspace">
+              <DropdownMenuSubTrigger>
+                <Terminal class="mr-2 h-4 w-4" />
+                Terminal
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent class="z-[60] w-44">
+                <DropdownMenuItem
+                  v-for="project in workspaceProjects"
+                  :key="project.id"
+                  @click="handleOpen('terminal', project.id)"
+                >
+                  {{ project.slug }}
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem
-              v-for="item in items"
-              :key="item.id"
-              @click="handleOpen(item.id)"
+              v-else
+              @click="handleOpen('terminal')"
             >
-              <component :is="item.icon" class="mr-2 h-4 w-4" />
-              {{ item.label }}
+              <Terminal class="mr-2 h-4 w-4" />
+              Terminal
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

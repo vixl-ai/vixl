@@ -5,19 +5,44 @@ import ChatTurnFilesChanged from '@/components/chat/ChatTurnFilesChanged.vue'
 import type { AggregatedTurnFileChange } from '@/types/harness/file-checkpoint'
 import openAtLine from '@/utils/open-at-line'
 
+const routeState = vi.hoisted(() => ({
+  name: 'project-chat' as string,
+  params: { slug: 'proj' } as Record<string, string>,
+}))
+
+const fleetState = vi.hoisted(() => ({
+  projects: [{ id: 'proj-1', slug: 'proj', name: 'Proj', rootPath: '/tmp/proj' }],
+  groups: [] as Array<{
+    id: string
+    name: string
+    slug: string
+    memberSlugs: string[]
+    lastOpened: string
+  }>,
+  activeProjectId: 'proj-1',
+}))
+
 vi.mock('vue-router', () => ({
-  useRoute: () => ({
-    name: 'project-chat',
-    params: { slug: 'proj' },
-  }),
+  useRoute: () => routeState,
 }))
 
 vi.mock('@/composables/use-fleet-registry', () => ({
   default: () => ({
     projects: {
-      value: [{ id: 'proj-1', slug: 'proj' }],
+      get value() {
+        return fleetState.projects
+      },
     },
-    activeProjectId: { value: 'proj-1' },
+    groups: {
+      get value() {
+        return fleetState.groups
+      },
+    },
+    activeProjectId: {
+      get value() {
+        return fleetState.activeProjectId
+      },
+    },
   }),
 }))
 
@@ -162,6 +187,13 @@ describe('ChatTurnFilesChanged restore dialog copy', () => {
 
 describe('ChatTurnFilesChanged open file', () => {
   beforeEach(() => {
+    routeState.name = 'project-chat'
+    routeState.params = { slug: 'proj' }
+    fleetState.projects = [
+      { id: 'proj-1', slug: 'proj', name: 'Proj', rootPath: '/tmp/proj' },
+    ]
+    fleetState.groups = []
+    fleetState.activeProjectId = 'proj-1'
     vi.mocked(openAtLine).mockReset()
     vi.mocked(openAtLine).mockResolvedValue(undefined)
     vi.mocked(toast.error).mockReset()
@@ -315,6 +347,99 @@ describe('ChatTurnFilesChanged open file', () => {
 
     expect(toast.error).toHaveBeenCalledWith('Failed to open file', {
       description: 'disk error',
+    })
+  })
+
+  it('opens a slug-prefixed group change in the matching member project', async () => {
+    routeState.params = { slug: 'stack' }
+    fleetState.projects = [
+      { id: 'proj-api', slug: 'api', name: 'API', rootPath: '/tmp/api' },
+      { id: 'proj-web', slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+    ]
+    fleetState.groups = [
+      {
+        id: 'group-1',
+        name: 'Stack',
+        slug: 'stack',
+        memberSlugs: ['api', 'web'],
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+    ]
+    fleetState.activeProjectId = 'proj-api'
+    const grouped: AggregatedTurnFileChange[] = [
+      { path: 'web/src/a.ts', operation: 'update', additions: 1, deletions: 0 },
+    ]
+    const mounted = mountBlock({ changes: grouped, restoreEnabled: false })
+    const row = mounted.get('[role="button"]')
+
+    await row.trigger('click')
+    await flushPromises()
+
+    expect(openAtLine).toHaveBeenCalledWith('proj-web', 'src/a.ts')
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('opens a slug-prefixed rename destination in the matching member project', async () => {
+    routeState.params = { slug: 'stack' }
+    fleetState.projects = [
+      { id: 'proj-api', slug: 'api', name: 'API', rootPath: '/tmp/api' },
+      { id: 'proj-web', slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+    ]
+    fleetState.groups = [
+      {
+        id: 'group-1',
+        name: 'Stack',
+        slug: 'stack',
+        memberSlugs: ['api', 'web'],
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+    ]
+    const renamed: AggregatedTurnFileChange[] = [
+      {
+        path: 'web/old.ts',
+        operation: 'rename',
+        additions: 0,
+        deletions: 0,
+        renameTo: 'web/new.ts',
+      },
+    ]
+    const mounted = mountBlock({ changes: renamed, restoreEnabled: false })
+    const row = mounted.get('[role="button"]')
+
+    await row.trigger('click')
+    await flushPromises()
+
+    expect(openAtLine).toHaveBeenCalledWith('proj-web', 'new.ts')
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('keeps prefix parsing when one group member is missing and toasts for that slug', async () => {
+    routeState.params = { slug: 'stack' }
+    fleetState.projects = [
+      { id: 'proj-web', slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+    ]
+    fleetState.groups = [
+      {
+        id: 'group-1',
+        name: 'Stack',
+        slug: 'stack',
+        memberSlugs: ['api', 'web'],
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+    ]
+    fleetState.activeProjectId = 'proj-web'
+    const grouped: AggregatedTurnFileChange[] = [
+      { path: 'api/src/a.ts', operation: 'update', additions: 1, deletions: 0 },
+    ]
+    const mounted = mountBlock({ changes: grouped, restoreEnabled: false })
+    const row = mounted.get('[role="button"]')
+
+    await row.trigger('click')
+    await flushPromises()
+
+    expect(openAtLine).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('Project not found', {
+      description: 'Project api is no longer available.',
     })
   })
 })

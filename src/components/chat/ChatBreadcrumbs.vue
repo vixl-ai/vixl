@@ -39,13 +39,19 @@ const isChatRoute = computed(
     (route.name === 'chat' ||
       route.name === 'home-chat' ||
       route.name === 'chat-subagent' ||
-      route.name === 'home-chat-subagent') &&
+      route.name === 'home-chat-subagent' ||
+      route.name === 'group-chat' ||
+      route.name === 'group-chat-subagent') &&
     Boolean(chatId.value),
 )
 
 const projectName = computed(() => {
   if (isStandalone.value) {
     return 'Home'
+  }
+  const group = (fleet.groups?.value ?? []).find((item) => item.slug === projectSlug.value)
+  if (group) {
+    return group.name
   }
   const project = fleet.projects.value.find((item) => item.slug === projectSlug.value)
   return project?.name ?? projectSlug.value

@@ -3,7 +3,11 @@ use std::path::PathBuf;
 
 use uuid::Uuid;
 
-use super::{normalize_root_path, unique_project_slug, upsert_fleet_project, FleetProject};
+use super::{
+    apply_group_update, default_group_name, normalize_root_path, remove_fleet_group,
+    unique_group_slug, unique_project_slug, upsert_fleet_group, upsert_fleet_project,
+    upsert_fleet_project_occupied, FleetProject, FleetProjectGroup,
+};
 
 struct TempRoot {
     path: PathBuf,
@@ -33,6 +37,16 @@ fn sample(id: &str, name: &str, slug: &str, root: &str) -> FleetProject {
     }
 }
 
+fn sample_group(id: &str, name: &str, slug: &str, members: &[&str]) -> FleetProjectGroup {
+    FleetProjectGroup {
+        id: id.to_string(),
+        name: name.to_string(),
+        slug: slug.to_string(),
+        member_slugs: members.iter().map(|member| member.to_string()).collect(),
+        last_opened: "1".to_string(),
+    }
+}
+
 #[test]
 fn unique_slug_appends_number_when_taken() {
     let existing = vec![sample("1", "Game", "game", "/tmp/game-a")];
@@ -42,6 +56,33 @@ fn unique_slug_appends_number_when_taken() {
         sample("2", "Game", "game-2", "/tmp/game-b"),
     ];
     assert_eq!(unique_project_slug("Game", &both), "game-3");
+}
+
+#[test]
+fn unique_group_slug_avoids_project_and_group_slugs() {
+    let projects = vec![sample("1", "API", "api", "/tmp/api")];
+    let groups = vec![sample_group("g1", "api, web", "api-web", &["api", "web"])];
+    assert_eq!(unique_group_slug("API", &projects, &groups), "api-2");
+    assert_eq!(
+        unique_group_slug("api, web", &projects, &groups),
+        "api-web-2"
+    );
+}
+
+#[test]
+fn default_group_name_is_csv_of_member_names() {
+    let projects = vec![
+        sample("1", "api", "api", "/tmp/api"),
+        sample("2", "web", "web", "/tmp/web"),
+        sample("3", "worker", "worker", "/tmp/worker"),
+    ];
+    assert_eq!(
+        default_group_name(
+            &["api".to_string(), "web".to_string(), "worker".to_string()],
+            &projects
+        ),
+        "api, web, worker"
+    );
 }
 
 #[test]
@@ -100,6 +141,212 @@ fn normalize_root_path_strips_trailing_slash() {
         !normalized.ends_with('/') && !normalized.ends_with('\\'),
         "normalized path should not end with a slash: {normalized}"
     );
+}
+
+fn sample_projects() -> Vec<FleetProject> {
+    vec![
+        sample("1", "api", "api", "/tmp/api"),
+        sample("2", "web", "web", "/tmp/web"),
+        sample("3", "worker", "worker", "/tmp/worker"),
+    ]
+}
+
+#[test]
+fn upsert_project_avoids_existing_group_slug() {
+    let root = TempRoot::new("api");
+    let mut projects = Vec::new();
+    let occupied = vec!["api".to_string()];
+    let created = upsert_fleet_project_occupied(
+        &mut projects,
+        "API".to_string(),
+        root.path.to_string_lossy().to_string(),
+        &occupied,
+    );
+    assert_eq!(created.slug, "api-2");
+}
+
+#[test]
+fn add_group_defaults_csv_name_and_assigns_slug() {
+    let projects = sample_projects();
+    let mut groups = Vec::new();
+    let created = upsert_fleet_group(
+        &mut groups,
+        &projects,
+        vec!["api".to_string(), "web".to_string()],
+        None,
+    )
+    .expect("create group");
+    assert_eq!(created.name, "api, web");
+    assert_eq!(created.slug, "api-web");
+    assert_eq!(created.member_slugs, vec!["api", "web"]);
+    assert_eq!(groups.len(), 1);
+}
+
+#[test]
+fn add_group_reuses_existing_member_set_regardless_of_order() {
+    let projects = sample_projects();
+    let mut groups = Vec::new();
+    let first = upsert_fleet_group(
+        &mut groups,
+        &projects,
+        vec!["api".to_string(), "web".to_string()],
+        Some("Stack"),
+    )
+    .expect("create group");
+    let reused = upsert_fleet_group(
+        &mut groups,
+        &projects,
+        vec!["web".to_string(), "api".to_string()],
+        Some("Other"),
+    )
+    .expect("reuse group");
+    assert_eq!(groups.len(), 1);
+    assert_eq!(reused.id, first.id);
+    assert_eq!(reused.slug, first.slug);
+    assert_eq!(reused.name, "Stack");
+}
+
+#[test]
+fn add_group_rejects_empty_unknown_duplicate_and_invalid_members() {
+    let projects = sample_projects();
+    let mut groups = Vec::new();
+    assert_eq!(
+        upsert_fleet_group(&mut groups, &projects, vec![], None).unwrap_err(),
+        "Group must include at least two projects"
+    );
+    assert_eq!(
+        upsert_fleet_group(&mut groups, &projects, vec!["api".to_string()], None).unwrap_err(),
+        "Group must include at least two projects"
+    );
+    assert_eq!(
+        upsert_fleet_group(
+            &mut groups,
+            &projects,
+            vec!["api".to_string(), "mobile".to_string()],
+            None
+        )
+        .unwrap_err(),
+        "Unknown project slug: mobile"
+    );
+    assert_eq!(
+        upsert_fleet_group(
+            &mut groups,
+            &projects,
+            vec!["api".to_string(), "api".to_string()],
+            None
+        )
+        .unwrap_err(),
+        "Duplicate member slug: api"
+    );
+    assert_eq!(
+        upsert_fleet_group(
+            &mut groups,
+            &projects,
+            vec!["api".to_string(), "API".to_string()],
+            None
+        )
+        .unwrap_err(),
+        "Invalid project slug: API"
+    );
+    assert!(groups.is_empty());
+}
+
+#[test]
+fn update_group_changes_name_and_members() {
+    let projects = sample_projects();
+    let mut groups = Vec::new();
+    let created = upsert_fleet_group(
+        &mut groups,
+        &projects,
+        vec!["api".to_string(), "web".to_string()],
+        None,
+    )
+    .expect("create group");
+    let updated = apply_group_update(
+        &mut groups,
+        &projects,
+        &created.id,
+        "API and web".to_string(),
+        vec!["api".to_string(), "worker".to_string()],
+    )
+    .expect("update group");
+    assert_eq!(updated.id, created.id);
+    assert_eq!(updated.slug, created.slug);
+    assert_eq!(updated.name, "API and web");
+    assert_eq!(updated.member_slugs, vec!["api", "worker"]);
+}
+
+#[test]
+fn update_group_validates_members_and_missing_id() {
+    let projects = sample_projects();
+    let mut groups = Vec::new();
+    let created = upsert_fleet_group(
+        &mut groups,
+        &projects,
+        vec!["api".to_string(), "web".to_string()],
+        None,
+    )
+    .expect("create group");
+    assert_eq!(
+        apply_group_update(
+            &mut groups,
+            &projects,
+            "missing",
+            "Nope".to_string(),
+            vec!["api".to_string(), "web".to_string()],
+        )
+        .unwrap_err(),
+        "Group not found"
+    );
+    assert_eq!(
+        apply_group_update(
+            &mut groups,
+            &projects,
+            &created.id,
+            "Nope".to_string(),
+            vec![],
+        )
+        .unwrap_err(),
+        "Group must include at least two projects"
+    );
+    assert_eq!(
+        apply_group_update(
+            &mut groups,
+            &projects,
+            &created.id,
+            "Nope".to_string(),
+            vec!["api".to_string()],
+        )
+        .unwrap_err(),
+        "Group must include at least two projects"
+    );
+    assert_eq!(groups[0].name, created.name);
+    assert_eq!(groups[0].member_slugs, created.member_slugs);
+}
+
+#[test]
+fn remove_group_drops_matching_id_and_ignores_unknown() {
+    let projects = sample_projects();
+    let mut groups = Vec::new();
+    let first = upsert_fleet_group(
+        &mut groups,
+        &projects,
+        vec!["api".to_string(), "web".to_string()],
+        None,
+    )
+    .expect("first group");
+    let second = upsert_fleet_group(
+        &mut groups,
+        &projects,
+        vec!["api".to_string(), "worker".to_string()],
+        None,
+    )
+    .expect("second group");
+    remove_fleet_group(&mut groups, "missing");
+    assert_eq!(groups.len(), 2);
+    remove_fleet_group(&mut groups, &first.id);
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].id, second.id);
 }
 
 #[cfg(windows)]

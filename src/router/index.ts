@@ -38,6 +38,21 @@ const router = createRouter({
       component: AgentThreadView,
     },
     {
+      path: '/group/:slug',
+      name: 'group',
+      component: ProjectView,
+    },
+    {
+      path: '/group/:slug/chat/:chatId',
+      name: 'group-chat',
+      component: AgentThreadView,
+    },
+    {
+      path: '/group/:slug/chat/:chatId/subagent/:subagentId',
+      name: 'group-chat-subagent',
+      component: AgentThreadView,
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: SettingsView,

@@ -11,6 +11,11 @@ import {
   resolveUpdatePlanTodoPath,
 } from '@/services/harness/plan-execution-session'
 import { listSubagentsForChat } from '@/services/harness/subagent/registry'
+import {
+  joinOntoProjectRoot,
+  resolvePlanToolPath,
+  toWorkspaceRelativePath,
+} from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 type RunningSubagentHint = {
@@ -74,9 +79,10 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
           todos: z.array(planTodoItemSchema).parse(todos),
         })
       }
+      const target = resolvePlanToolPath(ctx, resolvedPlanPath)
       const existing = await fsReadFile({
-        projectRoot: ctx.projectRoot,
-        path: resolvedPlanPath,
+        projectRoot: target.projectRoot,
+        path: target.relativePath,
       })
       const parsed = parsePlan(existing.content)
       if (parsed.parseError) {
@@ -85,8 +91,8 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
       const merged = mergePlanTodos(parsed.frontmatter?.todos ?? [], todos)
       const nextContent = updatePlanTodos(existing.content, merged)
       await fsWriteFile({
-        projectRoot: ctx.projectRoot,
-        path: resolvedPlanPath,
+        projectRoot: target.projectRoot,
+        path: target.relativePath,
         content: nextContent,
       })
       const workbench = useWorkbenchStore()
@@ -95,19 +101,23 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
         await workbench.ensureHomeRoot()
         projectId = HOME_WORKSPACE_ID
       } else {
-        projectId = workbench.resolveProjectIdByRoot(ctx.projectRoot)
+        projectId = workbench.resolveProjectIdByRoot(target.projectRoot)
       }
       if (projectId) {
         await workbench.openPlan(
           projectId,
           parsed.frontmatter!.id,
-          resolvedPlanPath,
+          target.relativePath,
           parsed.frontmatter!.title,
         )
         workbench.refreshPlanTabs()
       }
       return withRunningSubagentContext(ctx.chatId, todos, {
-        planPath: resolvedPlanPath,
+        planPath: joinOntoProjectRoot(target.projectRoot, target.relativePath),
+        relativePath: toWorkspaceRelativePath(
+          { ...ctx, projectRoot: target.projectRoot },
+          target.relativePath,
+        ),
         todos: merged,
       })
     },

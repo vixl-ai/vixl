@@ -1,4 +1,5 @@
 import { call } from './helpers'
+import type { FileCheckpointCaptureResult } from '@/types/harness/file-checkpoint'
 import type { ChatMetaRecord, FleetProjectRecord } from './types'
 
 export const createChat = (args: {
@@ -55,20 +56,15 @@ export const fileCheckpointCapture = (args: {
   userMessageId: string
   projectRoot: string
   path: string
+  key?: string
   toolCallId?: string
-}): Promise<{
-  path: string
-  pathHash: string
-  existed: boolean
-  capturedAt: string
-  toolCallId?: string
-}> => call('file_checkpoint_capture', args)
+}): Promise<FileCheckpointCaptureResult> => call('file_checkpoint_capture', args)
 
 export const fileCheckpointRestore = (args: {
   projectSlug: string
   chatId: string
   projectRoot: string
-  targets: Array<{ path: string; userMessageId: string }>
+  targets: Array<{ path: string; userMessageId: string; key?: string }>
 }): Promise<{
   restored: string[]
   deleted: string[]

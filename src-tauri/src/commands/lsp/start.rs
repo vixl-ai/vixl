@@ -17,6 +17,7 @@ use super::progress::{
     activity_for_running, clear_loading_activity, server_awaits_project_load, ActiveProgress,
     PROJECT_LOAD_FUSE_MS,
 };
+use super::instance::lsp_instance_key;
 use super::resolve::{resolve_lsp_command, LspServerEntry};
 use super::rpc::{
     json_rpc_request, send_notification, spawn_keepalive, LspProcess, ManagedLspServer, LSP_SERVERS,
@@ -39,6 +40,7 @@ pub(crate) async fn start_server(
     classic_typescript: bool,
     generation: u64,
 ) -> Result<StartOutcome, String> {
+    let instance_key = lsp_instance_key(&server_id, &workspace_root);
     let trusted = workspace_is_trusted(&app, Some(workspace_root.as_str()));
     let mut resolved = resolve_lsp_command(
         &app,
@@ -118,7 +120,7 @@ pub(crate) async fn start_server(
         published: false,
     };
 
-    super::spawn_reader(process.clone(), server_id.clone(), generation, app.clone());
+    super::spawn_reader(process.clone(), instance_key.clone(), generation, app.clone());
 
     let root_uri = path_to_uri(&canonical_project_root(&workspace_root)?);
     let init_options = build_initialization_options(
@@ -210,7 +212,7 @@ pub(crate) async fn start_server(
     {
         let mut servers = LSP_SERVERS.lock().await;
         servers.insert(
-            server_id.clone(),
+            instance_key.clone(),
             Arc::new(ManagedLspServer {
                 process: process.clone(),
                 generation,
@@ -219,7 +221,7 @@ pub(crate) async fn start_server(
     }
     child_guard.published = true;
 
-    spawn_keepalive(app.clone(), server_id.clone(), generation, process.clone());
+    spawn_keepalive(app.clone(), instance_key.clone(), generation, process.clone());
 
     let still_alive = {
         let mut guard = process.lock().await;
@@ -234,15 +236,15 @@ pub(crate) async fn start_server(
     let activity = current_running_activity(&process).await;
     let mut patch = LspStatePatch::running(resolved.source, workspace_root, pid);
     patch.activity = Some(activity.clone());
-    let published = transition(&app, &server_id, generation, LspPhase::Running, patch).await;
+    let published = transition(&app, &instance_key, generation, LspPhase::Running, patch).await;
     if published.is_none() {
         log::info!("retiring {server_id} after a dropped running publish");
-        super::retire_server_process(&server_id).await;
+        super::retire_server_process(&instance_key).await;
         return Ok(StartOutcome::Superseded);
     }
     let latest = current_running_activity(&process).await;
     if latest != activity {
-        super::commit_running_activity(&app, &server_id, generation, &process).await;
+        super::commit_running_activity(&app, &instance_key, generation, &process).await;
     }
     if server_awaits_project_load(&server_id) {
         let project_loading = {
@@ -250,7 +252,7 @@ pub(crate) async fn start_server(
             Arc::clone(&guard.project_loading)
         };
         if project_loading.load(Ordering::SeqCst) {
-            spawn_project_load_fuse(app.clone(), server_id.clone(), generation, project_loading);
+            spawn_project_load_fuse(app.clone(), instance_key.clone(), generation, project_loading);
         }
     }
     Ok(StartOutcome::Started)

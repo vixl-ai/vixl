@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import type { ChatStatus } from 'ai'
-import { FolderIcon, ChevronDownIcon, XIcon, SquareIcon } from '@lucide/vue'
+import { FolderIcon, Layers, Layers2, ChevronDownIcon, XIcon, SquareIcon } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   Tooltip,
@@ -11,8 +11,10 @@ import {
 } from '@/components/shadcn/ui/tooltip'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
 import {
@@ -56,11 +58,14 @@ import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import { CODEGRAPH_SERVER_ID } from '@/types/codegraph/managed-codegraph'
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input/types'
 import type { ContextMention } from '@/types/harness/context-mention'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { PermissionLevel } from '@/types/harness/permission'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { FileUIPart } from 'ai'
+import type { ChatPromptWorkspace } from '@/types/chat/chat-prompt-workspace'
 import contextMentionFromNode from '@/utils/context-mention-from-node'
 import normalizeAttachmentFiles from '@/utils/normalize-attachment-files'
+import { membersFromDeclaredSlugs } from '@/utils/parse-member-qualified-name'
 
 const PREFETCH_MIN_FREE_TOKENS = 4000
 const PREFETCH_MAX_CONTENT_CHARS = 12_000
@@ -95,7 +100,7 @@ const emit = defineEmits<{
     text: string
     mode: VixlChatMode
     model: string
-    projectId: string | null
+    workspace: ChatPromptWorkspace
     permissionLevel: PermissionLevel
     files?: FileUIPart[]
     mentions?: ContextMention[]
@@ -142,14 +147,16 @@ const session = reactive<{
   selectedModelRef: string
   modeInitialized: boolean
   modelInitialized: boolean
-  selectedProjectId: string | null
+  selectedProjectIds: string[]
+  selectedGroupId: string | null
   projectSelectionInitialized: boolean
 }>({
   selectedMode: 'agent',
   selectedModelRef: '',
   modeInitialized: false,
   modelInitialized: false,
-  selectedProjectId: null,
+  selectedProjectIds: [],
+  selectedGroupId: null,
   projectSelectionInitialized: false,
 })
 
@@ -159,22 +166,79 @@ const hasProviders = computed(
 
 const selectedModeMeta = computed(() => getChatModeMeta(session.selectedMode))
 
+const fleetGroups = computed(() => fleet.groups?.value ?? [])
+
+const selectedGroup = computed(
+  () => fleetGroups.value.find((group) => group.id === session.selectedGroupId) ?? null,
+)
+
+const selectedProjects = computed(() =>
+  session.selectedProjectIds
+    .map((id) => fleet.projects.value.find((project) => project.id === id) ?? null)
+    .filter((project): project is NonNullable<typeof project> => project !== null),
+)
+
+const promptWorkspace = computed((): ChatPromptWorkspace => {
+  if (!props.showProjectSelect) {
+    const activeId = fleet.activeProject.value?.id
+    return activeId ? { kind: 'project', projectId: activeId } : { kind: 'home' }
+  }
+  if (session.selectedGroupId) {
+    return { kind: 'group', groupId: session.selectedGroupId }
+  }
+  if (session.selectedProjectIds.length >= 2) {
+    return { kind: 'projects', projectIds: [...session.selectedProjectIds] }
+  }
+  if (session.selectedProjectIds.length === 1) {
+    return { kind: 'project', projectId: session.selectedProjectIds[0]! }
+  }
+  return { kind: 'home' }
+})
+
+const selectedProjectsFullName = computed(() =>
+  selectedProjects.value.map((project) => project.name).join(', '),
+)
+
 const activeProjectName = computed(() => {
   if (!props.showProjectSelect) {
     return fleet.activeProject.value?.name ?? 'Home'
   }
-  if (session.selectedProjectId === null) {
-    return 'Home'
+  if (selectedGroup.value) {
+    return selectedGroup.value.name
   }
-  return (
-    fleet.projects.value.find((project) => project.id === session.selectedProjectId)?.name ??
-    'Home'
-  )
+  if (selectedProjects.value.length >= 3) {
+    const names = selectedProjects.value.map((project) => project.name)
+    return `${names[0]}, ${names[1]}, ${names[2]!.slice(0, 4)}...`
+  }
+  if (selectedProjects.value.length === 2) {
+    return selectedProjectsFullName.value
+  }
+  if (selectedProjects.value.length === 1) {
+    return selectedProjects.value[0]!.name
+  }
+  return 'Home'
 })
 
-const projectPickerTitle = computed(() =>
-  activeProjectName.value === 'Home' ? 'Home' : `${activeProjectName.value} project`,
-)
+const pickerIcon = computed(() => {
+  const count = selectedGroup.value
+    ? selectedGroup.value.memberSlugs.length
+    : selectedProjects.value.length
+  if (count >= 3) {
+    return Layers
+  }
+  if (count === 2) {
+    return Layers2
+  }
+  return FolderIcon
+})
+
+const projectPickerTitle = computed(() => {
+  const name =
+    !selectedGroup.value && selectedProjects.value.length >= 3
+      ? selectedProjectsFullName.value
+      : activeProjectName.value
+  return name === 'Home' ? 'Home' : `${name} project`
+})
 
 const isWaitingOnReply = computed(
   () => props.status === 'submitted' || props.status === 'streaming',
@@ -202,15 +266,19 @@ const promptInputClass = computed(() => {
   return `${base} [&_[data-slot=input-group]]:border-border/50 ${fill}`
 })
 
+const selectedWorkspaceRoot = computed((): string | null => {
+  if (selectedGroup.value) {
+    const primarySlug = selectedGroup.value.memberSlugs[0]
+    return (
+      fleet.projects.value.find((project) => project.slug === primarySlug)?.rootPath ?? null
+    )
+  }
+  return selectedProjects.value[0]?.rootPath ?? null
+})
+
 const promptWorkspaceRoot = computed((): string | null => {
   if (props.showProjectSelect) {
-    if (session.selectedProjectId === null) {
-      return null
-    }
-    return (
-      fleet.projects.value.find((project) => project.id === session.selectedProjectId)
-        ?.rootPath ?? null
-    )
+    return selectedWorkspaceRoot.value
   }
 
   if (chatStore.meta.value?.projectSlug === HOME_CHAT_SLUG) {
@@ -228,13 +296,7 @@ const promptWorkspaceRoot = computed((): string | null => {
 
 const promptSlashRoot = computed((): string | null => {
   if (props.showProjectSelect) {
-    if (session.selectedProjectId === null) {
-      return null
-    }
-    return (
-      fleet.projects.value.find((project) => project.id === session.selectedProjectId)
-        ?.rootPath ?? null
-    )
+    return selectedWorkspaceRoot.value
   }
 
   if (chatStore.meta.value?.projectSlug === HOME_CHAT_SLUG) {
@@ -248,8 +310,42 @@ const promptSlashRoot = computed((): string | null => {
   return fleet.activeProject.value?.rootPath ?? null
 })
 
+const membersFromSlugs = (slugs: string[]): HarnessWorkspaceMember[] | undefined => {
+  const members = membersFromDeclaredSlugs(slugs, fleet.projects.value)
+  return members.length >= 2 ? members : undefined
+}
+
+const promptWorkspaceMembers = computed((): HarnessWorkspaceMember[] | undefined => {
+  if (props.showProjectSelect) {
+    if (selectedGroup.value) {
+      return membersFromSlugs(selectedGroup.value.memberSlugs)
+    }
+    if (selectedProjects.value.length >= 2) {
+      return selectedProjects.value.map((project) => ({
+        slug: project.slug,
+        name: project.name,
+        rootPath: project.rootPath,
+      }))
+    }
+    return undefined
+  }
+
+  const slug = chatStore.meta.value?.projectSlug
+  if (!slug || slug === HOME_CHAT_SLUG) {
+    return undefined
+  }
+  const group = fleetGroups.value.find((entry) => entry.slug === slug)
+  if (!group) {
+    return undefined
+  }
+  return membersFromSlugs(group.memberSlugs)
+})
+
 const showGitBranch = computed(
-  () => git.isRepo.value && promptWorkspaceRoot.value !== null,
+  () =>
+    git.isRepo.value
+    && promptWorkspaceRoot.value !== null
+    && !promptWorkspaceMembers.value,
 )
 
 const { settings: rootEffectiveSettings } = useRootEffectiveSettings(
@@ -287,8 +383,7 @@ const handleModeSelect = (mode: VixlChatMode): void => {
   syncDraftSelection()
 }
 
-const handleProjectSelect = async (projectId: string | null): Promise<void> => {
-  session.selectedProjectId = projectId
+const activatePrimary = async (projectId: string | null): Promise<void> => {
   if (!projectId) {
     return
   }
@@ -299,6 +394,34 @@ const handleProjectSelect = async (projectId: string | null): Promise<void> => {
       description: error instanceof Error ? error.message : 'Unknown error',
     })
   }
+}
+
+const handleSelectHome = (): void => {
+  session.selectedProjectIds = []
+  session.selectedGroupId = null
+}
+
+const handleSelectGroup = async (groupId: string): Promise<void> => {
+  session.selectedGroupId = groupId
+  session.selectedProjectIds = []
+  const group = (fleet.groups?.value ?? []).find((item) => item.id === groupId)
+  const primarySlug = group?.memberSlugs[0]
+  const primary = primarySlug
+    ? fleet.projects.value.find((project) => project.slug === primarySlug)
+    : undefined
+  await activatePrimary(primary?.id ?? null)
+}
+
+const handleProjectToggle = async (projectId: string, checked: boolean): Promise<void> => {
+  session.selectedGroupId = null
+  if (checked) {
+    if (!session.selectedProjectIds.includes(projectId)) {
+      session.selectedProjectIds = [...session.selectedProjectIds, projectId]
+    }
+  } else {
+    session.selectedProjectIds = session.selectedProjectIds.filter((id) => id !== projectId)
+  }
+  await activatePrimary(session.selectedProjectIds[0] ?? null)
 }
 
 const handleModelChange = (value: string): void => {
@@ -422,9 +545,7 @@ const handleSubmit = async (payload: PromptInputMessage): Promise<void> => {
     text,
     mode: session.selectedMode,
     model: session.selectedModelRef,
-    projectId: props.showProjectSelect
-      ? session.selectedProjectId
-      : fleet.activeProject.value?.id ?? null,
+    workspace: promptWorkspace.value,
     permissionLevel: localPermissionLevel.value,
     files: normalizedFiles,
     mentions,
@@ -482,7 +603,9 @@ watch(
     if (!loaded || session.projectSelectionInitialized || !props.showProjectSelect) {
       return
     }
-    session.selectedProjectId = fleet.activeProject.value?.id ?? null
+    const activeId = fleet.activeProject.value?.id ?? null
+    session.selectedProjectIds = activeId ? [activeId] : []
+    session.selectedGroupId = null
     session.projectSelectionInitialized = true
   },
   { immediate: true },
@@ -549,22 +672,36 @@ watch(
           class="mb-2 h-8 w-fit max-w-full gap-1.5 px-1 text-muted-foreground hover:text-foreground"
           :title="projectPickerTitle"
         >
-          <FolderIcon class="size-4 shrink-0" />
-          <span class="truncate text-sm">{{ activeProjectName }}</span>
+          <component :is="pickerIcon" class="size-4 shrink-0" />
+          <span class="min-w-0 truncate text-sm">{{ activeProjectName }}</span>
           <ChevronDownIcon class="size-3 shrink-0 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" class="w-56">
-        <DropdownMenuItem @select="handleProjectSelect(null)">
+        <DropdownMenuItem @select="handleSelectHome">
           Home
         </DropdownMenuItem>
-        <DropdownMenuItem
+        <template v-if="fleetGroups.length > 0">
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            v-for="group in fleetGroups"
+            :key="group.id"
+            @select="handleSelectGroup(group.id)"
+          >
+            <Layers class="size-4 shrink-0" />
+            <span class="min-w-0 flex-1 truncate">{{ group.name }}</span>
+          </DropdownMenuItem>
+        </template>
+        <DropdownMenuSeparator v-if="fleet.projects.value.length > 0" />
+        <DropdownMenuCheckboxItem
           v-for="project in fleet.projects.value"
           :key="project.id"
-          @select="handleProjectSelect(project.id)"
+          :model-value="session.selectedProjectIds.includes(project.id)"
+          @select.prevent
+          @update:model-value="(checked) => handleProjectToggle(project.id, Boolean(checked))"
         >
           {{ project.name }}
-        </DropdownMenuItem>
+        </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
 
@@ -604,6 +741,7 @@ watch(
             placeholder="@ for context, / for commands"
             :project-root="promptWorkspaceRoot"
             :slash-root="promptSlashRoot"
+            :members="promptWorkspaceMembers"
           />
         </PromptInputBody>
         <PromptInputFooter class="w-full min-w-0 flex-nowrap px-1 pb-1">
@@ -680,7 +818,10 @@ watch(
         <ChatGitBranchSelect v-if="showGitBranch" />
       </div>
       <div class="flex min-w-0 items-center gap-1">
-        <ChatMcpServerPicker :project-root="promptWorkspaceRoot" />
+        <ChatMcpServerPicker
+          :project-root="promptWorkspaceRoot"
+          :members="promptWorkspaceMembers"
+        />
       </div>
     </div>
   </div>

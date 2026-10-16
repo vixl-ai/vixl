@@ -14,6 +14,7 @@ const props = defineProps<{
   projectName: string
   projectSlug: string
   activeSection: ProjectSectionId
+  memberNames?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -55,9 +56,18 @@ const sectionProps = computed(() => {
 <template>
   <div class="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-6">
     <div class="flex items-center justify-between">
-      <h1 class="truncate text-2xl font-semibold tracking-tight" :title="projectName">
-        {{ projectName }}
-      </h1>
+      <div class="min-w-0">
+        <h1 class="truncate text-2xl font-semibold tracking-tight" :title="projectName">
+          {{ projectName }}
+        </h1>
+        <p
+          v-if="memberNames && memberNames.length > 0"
+          class="mt-1 truncate text-sm text-muted-foreground"
+          :title="memberNames.join(', ')"
+        >
+          Members: {{ memberNames.join(', ') }}
+        </p>
+      </div>
     </div>
 
     <ProjectNav

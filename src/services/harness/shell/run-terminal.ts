@@ -17,6 +17,12 @@ import { runTerminalCommand } from '@/services/harness/shell/run-command'
 import { getSubagent } from '@/services/harness/subagent/registry'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import {
+  cwdSlugFields,
+  isMultiRootWorkspace,
+  resolveWorkspaceSlug,
+  slugArg,
+} from '@/services/harness/tool-roots'
 import { clipTerminalLabel } from '@/utils/clip-terminal-label'
 
 const READ_ONLY_SANDBOX_DISABLED =
@@ -41,12 +47,20 @@ export const isReadOnlySubagentShell = (ctx: HarnessToolContext): boolean => {
   return (record.capabilities ?? 'read-only') !== 'write'
 }
 
+const CWD_TOOL_HINT =
+  'Optional cwd is a project slug; defaults to the primary project and is not kept between calls.'
+
 const runTerminal = (ctx: HarnessToolContext) => {
   const readOnlyProject = isReadOnlySubagentShell(ctx)
+  const multiRoot = isMultiRootWorkspace(ctx)
   return tool({
     description: readOnlyProject
-      ? 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. When the sandbox blocks a command, report the denial as the result.'
-      : 'Run a shell command in the project cwd. A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell_id for terminal_output. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.',
+      ? multiRoot
+        ? 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. Optional cwd is a project slug; defaults to the primary project and is not kept between calls. When the sandbox blocks a command, report the denial as the result.'
+        : 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. When the sandbox blocks a command, report the denial as the result.'
+      : multiRoot
+        ? `Run a shell command in the project cwd. ${CWD_TOOL_HINT} A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell_id for terminal_output. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`
+        : 'Run a shell command in the project cwd. A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell_id for terminal_output. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.',
     inputSchema: z.object({
       command: z.string().describe('Shell command'),
       is_background: z.boolean().optional().describe('Return shell_id without waiting'),
@@ -55,8 +69,11 @@ const runTerminal = (ctx: HarnessToolContext) => {
         .string()
         .min(1)
         .describe('2-6 word UI title'),
+      ...cwdSlugFields(ctx),
     }),
-    execute: async ({ command, is_background, timeout_ms, description }, { toolCallId }) => {
+    execute: async (input, { toolCallId }) => {
+      const { command, is_background, timeout_ms, description } = input
+      const resolvedCwd = resolveWorkspaceSlug(ctx, slugArg(input, 'cwd'))
       const clippedDescription = clipTerminalLabel(description ?? '')
       const uiTitle = clippedDescription || command
       const sandboxSettingEnabled = ctx.settings['agent.sandbox.enabled'] ?? true
@@ -66,6 +83,8 @@ const runTerminal = (ctx: HarnessToolContext) => {
           resolveSandboxResultMeta({
             sandboxed: false,
             allowNetwork: false,
+            cwd: resolvedCwd.projectRoot,
+            cwdSlug: resolvedCwd.slug,
           }),
         )
       }
@@ -100,6 +119,8 @@ const runTerminal = (ctx: HarnessToolContext) => {
           resolveSandboxResultMeta({
             sandboxed: sandboxEnabled,
             allowNetwork: settingsAllowNetwork,
+            cwd: resolvedCwd.projectRoot,
+            cwdSlug: resolvedCwd.slug,
           }),
         )
       }
@@ -111,6 +132,8 @@ const runTerminal = (ctx: HarnessToolContext) => {
       const meta = resolveSandboxResultMeta({
         sandboxed: sandboxEnabled,
         allowNetwork,
+        cwd: resolvedCwd.projectRoot,
+        cwdSlug: resolvedCwd.slug,
       })
 
       const runArgs = {
@@ -119,6 +142,8 @@ const runTerminal = (ctx: HarnessToolContext) => {
         timeout_ms,
         description: clippedDescription || undefined,
         projectWritable: !readOnlyProject,
+        projectRoot: resolvedCwd.projectRoot,
+        cwdSlug: resolvedCwd.slug,
       }
 
       const retryUnsandboxed = async (
@@ -143,7 +168,12 @@ const runTerminal = (ctx: HarnessToolContext) => {
               error: retryMessage,
               priorPhase,
             },
-            resolveSandboxResultMeta({ sandboxed: false, allowNetwork: true }),
+            resolveSandboxResultMeta({
+              sandboxed: false,
+              allowNetwork: true,
+              cwd: resolvedCwd.projectRoot,
+              cwdSlug: resolvedCwd.slug,
+            }),
           )
         }
       }

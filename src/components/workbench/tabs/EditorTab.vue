@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   ChevronLeft,
   ChevronRight,
@@ -53,6 +54,10 @@ const props = defineProps<{
 }>()
 
 const workbench = useWorkbenchStore()
+const route = useRoute()
+const workspaceProjects = computed(() =>
+  workbench.listWorkspaceProjects(String(route.params.slug ?? '')),
+)
 
 const monacoRef = ref<InstanceType<typeof WorkbenchMonacoEditor> | null>(null)
 const sidePaneRef = ref<{ openSearch: (expandReplace?: boolean) => void } | null>(null)
@@ -150,8 +155,8 @@ const syncWorkbenchDirty = (): void => {
   workbench.setEditorTabDirty(props.tab.id, anyDirty)
 }
 
-const handleSelect = (path: string): void => {
-  workbench.openEditor(props.tab.projectId, path)
+const handleSelect = (path: string, projectId?: string): void => {
+  workbench.openEditor(projectId ?? props.tab.projectId, path)
 }
 
 const handleSelectFileTab = (path: string): void => {
@@ -697,6 +702,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
         v-model:mode="sidePaneMode"
         :project-id="tab.projectId"
         :project-root="projectRoot"
+        :workspace-projects="workspaceProjects"
         :selected-path="selectedPath"
         :diff-view="diffView"
         v-model:line-numbers="lineNumbers"

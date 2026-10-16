@@ -5,6 +5,7 @@ import { fsWriteFile, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { HOME_WORKSPACE_ID, isHomeChatSlug } from '@/constants/home-chat'
 import { markCreatedPlanThisTurn } from '@/services/harness/plan-execution-session'
+import { joinOntoProjectRoot, toWorkspaceRelativePath } from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const createPlanTool = (ctx: HarnessToolContext) =>
@@ -34,7 +35,8 @@ const createPlanTool = (ctx: HarnessToolContext) =>
       }
       return {
         planId: plan.planId,
-        path: plan.path,
+        path: joinOntoProjectRoot(ctx.projectRoot, plan.path),
+        relativePath: toWorkspaceRelativePath(ctx, plan.path),
         todos: planTodos,
         message: 'Plan created. Stop here so the user can review it.',
       }

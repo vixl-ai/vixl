@@ -45,13 +45,57 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
     fsStagePreviewWrite: vi.fn<() => Promise<unknown>>(),
     fsStagePreviewEdit: vi.fn<() => Promise<unknown>>(),
     fsStagePreviewApplyPatch: vi.fn<() => Promise<unknown>>(),
-    fileCheckpointCapture: vi
-      .fn<() => Promise<{ path: string; pathHash: string; existed: boolean; capturedAt: string }>>()
+    fsStat: vi
+      .fn<
+        (
+          projectRoot: string,
+          path: string,
+        ) => Promise<{ path: string; exists: boolean; kind: string; size: number }>
+      >()
       .mockResolvedValue({
         path: 'x',
-        pathHash: 'h',
-        existed: true,
-        capturedAt: 'now',
+        exists: true,
+        kind: 'file',
+        size: 0,
+      }),
+    fileCheckpointCapture: vi
+      .fn<
+        () => Promise<{
+          captured: Array<{
+            path: string
+            pathHash: string
+            existed: boolean
+            capturedAt: string
+            toolCallId?: string
+          }>
+          skippedOversize: string[]
+        }>
+      >()
+      .mockResolvedValue({
+        captured: [
+          {
+            path: 'x',
+            pathHash: 'h',
+            existed: true,
+            capturedAt: 'now',
+          },
+        ],
+        skippedOversize: [],
+      }),
+    fileCheckpointRestore: vi
+      .fn<
+        () => Promise<{
+          restored: string[]
+          deleted: string[]
+          skipped: string[]
+          errors: Array<{ path: string; error: string }>
+        }>
+      >()
+      .mockResolvedValue({
+        restored: [],
+        deleted: [],
+        skipped: [],
+        errors: [],
       }),
     workspaceGrep: vi.fn<() => Promise<unknown>>(),
     workspaceGlob: vi.fn<() => Promise<unknown>>(),
@@ -85,6 +129,13 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
     workbenchReplaceSession: vi.fn<() => Promise<void>>(async () => undefined),
     editorLoadViewState: vi.fn<() => Promise<unknown | null>>(async () => null),
     editorSaveViewState: vi.fn<() => Promise<void>>(async () => undefined),
+    registryListProjects: vi.fn<() => Promise<unknown[]>>(async () => []),
+    getActiveProjectId: vi.fn<() => Promise<string | null>>(async () => null),
+    hasProjectVixl: vi.fn<(root: string) => Promise<boolean>>(async () => false),
+    registryListGroups: vi.fn<() => Promise<unknown[]>>(async () => []),
+    registryAddGroup: vi.fn<() => Promise<unknown>>(),
+    registryUpdateGroup: vi.fn<() => Promise<unknown>>(),
+    registryRemoveGroup: vi.fn<() => Promise<void>>(async () => undefined),
     ...overrides,
   }
 }

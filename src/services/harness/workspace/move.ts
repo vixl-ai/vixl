@@ -3,33 +3,13 @@ import { z } from 'zod'
 import { toast } from 'vue-sonner'
 import { moveChatToWorkspace, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import { gateWorkspaceMovePermission } from '@/services/harness/permission'
+import {
+  isAbsolutePath,
+  joinOntoProjectRoot,
+} from '@/services/harness/tool-roots'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
 import filePathBasename from '@/utils/file-path-basename'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
-
-const isAbsoluteRootPath = (value: string): boolean => {
-  if (value.startsWith('/') || value.startsWith('\\')) {
-    return true
-  }
-  return /^[A-Za-z]:[/\\]/.test(value)
-}
-
-const joinOntoProjectRoot = (projectRoot: string, relativePath: string): string => {
-  const useBackslash = /\\/.test(projectRoot) && !/\//.test(projectRoot)
-  const separator = useBackslash ? '\\' : '/'
-  const trimmedRoot = projectRoot.replace(/[/\\]+$/, '')
-  const trimmedRelative = relativePath.replace(/^[/\\]+/, '')
-  const normalizedRelative = useBackslash
-    ? trimmedRelative.replace(/\//g, '\\')
-    : trimmedRelative.replace(/\\/g, '/')
-  if (!trimmedRoot) {
-    return normalizedRelative
-  }
-  if (!normalizedRelative) {
-    return trimmedRoot
-  }
-  return `${trimmedRoot}${separator}${normalizedRelative}`
-}
 
 const resolveRootPath = (
   rootPath: string,
@@ -39,7 +19,7 @@ const resolveRootPath = (
   if (!trimmed) {
     return { error: 'rootPath is required' }
   }
-  if (isAbsoluteRootPath(trimmed)) {
+  if (isAbsolutePath(trimmed)) {
     return { resolved: trimmed }
   }
   return { resolved: joinOntoProjectRoot(projectRoot, trimmed) }
@@ -86,6 +66,7 @@ const moveWorkspace = (ctx: HarnessToolContext) =>
 
       ctx.projectRoot = moved.chat.projectRoot
       ctx.projectSlug = moved.chat.projectSlug
+      ctx.members = undefined
 
       try {
         await updateChatMeta(moved.chat.projectSlug, ctx.chatId, {

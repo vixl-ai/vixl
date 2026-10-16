@@ -70,6 +70,23 @@ const toServerSummary = (
   return summary
 }
 
+// Rust returns { servers: [] } when the warm plan finds no language servers.
+// That is a successful empty report, not a workspace scan, so treat it as unavailable.
+const deriveScope = (
+  servers: LspWorkspaceDiagnosticsResult['servers'],
+): LspWorkspaceIssuesResult['scope'] => {
+  if (servers.length === 0) {
+    return 'unavailable'
+  }
+  const first = servers[0]!.mode
+  for (const server of servers) {
+    if (server.mode !== first) {
+      return 'mixed'
+    }
+  }
+  return first
+}
+
 const summarizeWorkspace = (
   result: LspWorkspaceDiagnosticsResult,
 ): LspWorkspaceIssuesResult => {
@@ -94,7 +111,7 @@ const summarizeWorkspace = (
 
   const ranked = [...errors, ...warnings]
   return {
-    scope: 'workspace',
+    scope: deriveScope(result.servers),
     errorCount: errors.length,
     warningCount: warnings.length,
     itemCap: ITEM_CAP,

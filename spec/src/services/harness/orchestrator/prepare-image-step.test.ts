@@ -22,6 +22,25 @@ vi.mock('@/utils/normalize-image-data-url', () => ({
     normalizeImageDataUrl(args),
 }))
 
+const pngDataUrl = (label: string): string => {
+  const signature = String.fromCharCode(
+    0x89,
+    0x50,
+    0x4e,
+    0x47,
+    0x0d,
+    0x0a,
+    0x1a,
+    0x0a,
+  )
+  return `data:image/png;base64,${btoa(`${signature}${label}`)}`
+}
+
+const jpegDataUrl = (label: string): string => {
+  const prefix = String.fromCharCode(0xff, 0xd8)
+  return `data:image/jpeg;base64,${btoa(`${prefix}${label}`)}`
+}
+
 const originalMessages: ModelMessage[] = [
   { role: 'user', content: 'look at this' },
 ]
@@ -70,7 +89,7 @@ describe('prepare-image-step', () => {
       chatId: 'chat-1',
       turnId: 'turn-1',
       image: {
-        dataUrl: 'data:image/png;base64,aaaa',
+        dataUrl: pngDataUrl('aaaa'),
         mediaType: 'image/png',
         source: 'a.png',
       },
@@ -79,7 +98,7 @@ describe('prepare-image-step', () => {
       chatId: 'chat-1',
       turnId: 'turn-1',
       image: {
-        dataUrl: 'data:image/jpeg;base64,bbbb',
+        dataUrl: jpegDataUrl('bbbb'),
         mediaType: 'image/jpeg',
         source: 'b.jpg',
       },
@@ -107,13 +126,15 @@ describe('prepare-image-step', () => {
             },
             {
               type: 'file',
-              data: 'data:image/png;base64,aaaa',
+              data: pngDataUrl('aaaa'),
               mediaType: 'image/png',
+              filename: 'a.png',
             },
             {
               type: 'file',
-              data: 'data:image/jpeg;base64,bbbb',
+              data: jpegDataUrl('bbbb'),
               mediaType: 'image/jpeg',
+              filename: 'b.jpg',
             },
           ],
         },
@@ -126,7 +147,7 @@ describe('prepare-image-step', () => {
       chatId: 'chat-1',
       turnId: 'turn-1',
       image: {
-        dataUrl: 'data:image/png;base64,aaaa',
+        dataUrl: pngDataUrl('aaaa'),
         mediaType: 'image/png',
         source: 'shot.png',
       },
@@ -154,8 +175,9 @@ describe('prepare-image-step', () => {
             },
             {
               type: 'file',
-              data: 'data:image/png;base64,aaaa',
+              data: pngDataUrl('aaaa'),
               mediaType: 'image/png',
+              filename: 'shot.png',
             },
           ],
         },

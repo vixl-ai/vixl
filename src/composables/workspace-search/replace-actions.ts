@@ -22,26 +22,32 @@ export type WorkspaceSearchReplaceDeps = {
 export const createWorkspaceSearchReplaceActions = (
   deps: WorkspaceSearchReplaceDeps,
 ) => {
-  const requireRootAndFind = (): { root: string; find: string } | null => {
-    const root = deps.projectRoot.value
+  const requireFind = (): string | null => {
     const find = deps.findQuery.value
-    if (!root || !find) {
-      return null
-    }
-    return { root, find }
+    return find ? find : null
+  }
+
+  const rootForGroup = (group: SearchFileGroup | undefined): string | null =>
+    group?.projectRoot ?? deps.projectRoot.value
+
+  const rootForHit = (hit: GrepMatch): string | null => {
+    const group = deps.groups.value.find((item) => item.hits.includes(hit))
+    return rootForGroup(group)
   }
 
   const replaceOne = async (): Promise<void> => {
-    const ctx = requireRootAndFind()
-    const firstHit = deps.groups.value[0]?.hits[0]
-    if (!ctx || !firstHit || deps.replacing.value) {
+    const find = requireFind()
+    const firstGroup = deps.groups.value[0]
+    const firstHit = firstGroup?.hits[0]
+    const root = rootForGroup(firstGroup)
+    if (!find || !root || !firstHit || deps.replacing.value) {
       return
     }
     deps.replacing.value = true
     try {
       await replaceHit({
-        projectRoot: ctx.root,
-        find: ctx.find,
+        projectRoot: root,
+        find,
         replace: deps.replaceQuery.value,
         options: deps.replaceOptions.value,
         hit: firstHit,
@@ -57,15 +63,16 @@ export const createWorkspaceSearchReplaceActions = (
   }
 
   const replaceMatch = async (hit: GrepMatch): Promise<void> => {
-    const ctx = requireRootAndFind()
-    if (!ctx || deps.replacing.value) {
+    const find = requireFind()
+    const root = rootForHit(hit)
+    if (!find || !root || deps.replacing.value) {
       return
     }
     deps.replacing.value = true
     try {
       await replaceHit({
-        projectRoot: ctx.root,
-        find: ctx.find,
+        projectRoot: root,
+        find,
         replace: deps.replaceQuery.value,
         options: deps.replaceOptions.value,
         hit,
@@ -80,17 +87,23 @@ export const createWorkspaceSearchReplaceActions = (
     }
   }
 
-  const replaceFile = async (path: string): Promise<void> => {
-    const ctx = requireRootAndFind()
-    if (!ctx || deps.replacing.value) {
+  const replaceFile = async (path: string, memberSlug?: string): Promise<void> => {
+    const find = requireFind()
+    const group = deps.groups.value.find(
+      (item) =>
+        item.path === path &&
+        (memberSlug ? item.memberSlug === memberSlug : true),
+    )
+    const root = rootForGroup(group)
+    if (!find || !root || deps.replacing.value) {
       return
     }
     deps.replacing.value = true
     try {
       await replaceInFile({
-        projectRoot: ctx.root,
+        projectRoot: root,
         path,
-        find: ctx.find,
+        find,
         replace: deps.replaceQuery.value,
         options: deps.replaceOptions.value,
       })
@@ -105,16 +118,19 @@ export const createWorkspaceSearchReplaceActions = (
   }
 
   const replaceAll = async (): Promise<void> => {
-    const ctx = requireRootAndFind()
-    if (!ctx || deps.groups.value.length === 0 || deps.replacing.value) {
+    const find = requireFind()
+    const fallbackRoot = deps.projectRoot.value
+    const firstRoot = rootForGroup(deps.groups.value[0])
+    const root = firstRoot ?? fallbackRoot
+    if (!find || !root || deps.groups.value.length === 0 || deps.replacing.value) {
       return
     }
     deps.replacing.value = true
     try {
       const result = await replaceAllFiles({
-        projectRoot: ctx.root,
+        projectRoot: root,
         groups: deps.groups.value,
-        find: ctx.find,
+        find,
         replace: deps.replaceQuery.value,
         options: deps.replaceOptions.value,
       })

@@ -12,6 +12,15 @@ const fleetProjects = vi.hoisted(() => ({
   value: [] as Array<{ id: string; slug: string; name: string }>,
 }))
 
+const fleetGroups = vi.hoisted(() => ({
+  value: [] as Array<{
+    id: string
+    slug: string
+    name: string
+    memberSlugs: string[]
+  }>,
+}))
+
 const activeProjectId = vi.hoisted(() => ({
   value: null as string | null,
 }))
@@ -35,6 +44,7 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
 vi.mock('@/composables/use-fleet-registry', () => ({
   default: () => ({
     projects: fleetProjects,
+    groups: fleetGroups,
     activeProjectId,
     refresh: vi.fn<() => Promise<void>>(async () => undefined),
   }),
@@ -79,6 +89,7 @@ describe('use-fleet-sidebar activityItems', () => {
     fleetProjects.value = [
       { id: 'proj-1', slug: 'alpha', name: 'Alpha' },
     ]
+    fleetGroups.value = []
     activeProjectId.value = null
   })
 
@@ -195,5 +206,46 @@ describe('use-fleet-sidebar activityItems', () => {
 
     const homeItem = sidebar.activityItems.value.find((item) => item.kind === 'home')
     expect(homeItem?.updatedAt).toBe('2026-01-05T12:00:00.000Z')
+  })
+
+  it('includes group rows with chats keyed by group slug', async () => {
+    fleetGroups.value = [
+      {
+        id: 'grp-1',
+        slug: 'api-web',
+        name: 'api, web',
+        memberSlugs: ['alpha', 'beta'],
+      },
+    ]
+
+    const sidebar = await seedSidebar({
+      alpha: [
+        makeChat({
+          id: 'a1',
+          title: 'Alpha chat',
+          projectSlug: 'alpha',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      'api-web': [
+        makeChat({
+          id: 'g1',
+          title: 'Group chat',
+          projectSlug: 'api-web',
+          updatedAt: '2026-01-06T00:00:00.000Z',
+        }),
+      ],
+      [HOME_CHAT_SLUG]: [],
+    })
+
+    const groupRow = sidebar.sidebarProjects.value.find((item) => item.slug === 'api-web')
+    expect(groupRow?.kind).toBe('group')
+    expect(groupRow?.displayName).toBe('api, web')
+    expect(groupRow?.chats.map((chat) => chat.id)).toEqual(['g1'])
+    expect(
+      sidebar.activityItems.value.map((item) =>
+        item.kind === 'home' ? 'home' : item.project.slug,
+      ),
+    ).toEqual(['api-web', 'alpha'])
   })
 })

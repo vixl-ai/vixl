@@ -3,7 +3,7 @@ import type { HarnessWorkspace } from '@/types/harness/harness-workspace'
 
 const bindLiveToolContext = (
   workspace: HarnessWorkspace,
-  rest: Omit<HarnessToolContext, 'projectRoot' | 'projectSlug'>,
+  rest: Omit<HarnessToolContext, 'projectRoot' | 'projectSlug' | 'members'>,
 ): HarnessToolContext => ({
   ...rest,
   get projectRoot() {
@@ -17,6 +17,12 @@ const bindLiveToolContext = (
   },
   set projectSlug(value: string) {
     workspace.projectSlug = value
+  },
+  get members() {
+    return workspace.members
+  },
+  set members(value: HarnessWorkspace['members']) {
+    workspace.members = value
   },
 })
 

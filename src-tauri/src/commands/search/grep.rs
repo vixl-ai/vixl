@@ -8,9 +8,11 @@ use grep_searcher::{BinaryDetection, SearcherBuilder};
 use serde::{Deserialize, Serialize};
 
 use super::walk::walk_builder;
-use crate::commands::fs::{canonical_project_root, resolve_workspace_path};
+use crate::commands::fs::{
+    canonical_project_root, resolve_command_path, workspace_roots_from_args, WorkspaceRootArg,
+};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceGrepRequest {
     pub project_root: String,
@@ -29,6 +31,8 @@ pub struct WorkspaceGrepRequest {
     pub whole_word: Option<bool>,
     #[serde(default)]
     pub exclude_glob: Option<String>,
+    #[serde(default)]
+    pub project_roots: Option<Vec<WorkspaceRootArg>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -64,15 +68,89 @@ pub async fn workspace_grep(request: WorkspaceGrepRequest) -> Result<WorkspaceGr
         return Err("Search pattern is required".to_string());
     }
 
+    let scopes = grep_scopes(&request)?;
+
+    tokio::task::spawn_blocking(move || {
+        let mut matches = Vec::new();
+        let mut truncated = false;
+        let max_results = request.max_results.unwrap_or(200) as usize;
+        for scope in scopes {
+            let remaining = max_results.saturating_sub(matches.len());
+            if remaining == 0 {
+                truncated = true;
+                break;
+            }
+            let mut scoped = request.clone();
+            scoped.max_results = Some(remaining as u32);
+            let partial = collect_grep_matches(&scope.root, &scope.search_path, &scoped)?;
+            for mut item in partial.matches {
+                if let Some(prefix) = &scope.prefix {
+                    item.path = if item.path.is_empty() {
+                        prefix.clone()
+                    } else {
+                        format!("{prefix}/{}", item.path)
+                    };
+                }
+                matches.push(item);
+                if matches.len() >= max_results {
+                    truncated = true;
+                    break;
+                }
+            }
+            truncated = truncated || partial.truncated;
+            if truncated {
+                break;
+            }
+        }
+        Ok(WorkspaceGrepResult { matches, truncated })
+    })
+    .await
+    .map_err(|error| format!("Grep search failed: {error}"))?
+}
+
+struct GrepScope {
+    root: std::path::PathBuf,
+    search_path: std::path::PathBuf,
+    prefix: Option<String>,
+}
+
+fn grep_scopes(request: &WorkspaceGrepRequest) -> Result<Vec<GrepScope>, String> {
+    if let Some(args) = request
+        .project_roots
+        .as_deref()
+        .filter(|roots| !roots.is_empty())
+    {
+        if let Some(path) = request.path.as_deref() {
+            let resolved = resolve_command_path(&request.project_root, Some(args), path)?;
+            return Ok(vec![GrepScope {
+                root: resolved.root,
+                search_path: resolved.path,
+                prefix: resolved.slug,
+            }]);
+        }
+
+        let roots = workspace_roots_from_args(args)?;
+        return Ok(roots
+            .into_iter()
+            .filter(|root| !root.path.as_os_str().is_empty())
+            .map(|root| GrepScope {
+                prefix: Some(root.slug),
+                search_path: root.path.clone(),
+                root: root.path,
+            })
+            .collect());
+    }
+
     let root = canonical_project_root(&request.project_root)?;
     let search_path = match request.path.as_deref() {
-        Some(path) => resolve_workspace_path(&request.project_root, path)?,
+        Some(path) => resolve_command_path(&request.project_root, None, path)?.path,
         None => root.clone(),
     };
-
-    tokio::task::spawn_blocking(move || collect_grep_matches(&root, &search_path, &request))
-        .await
-        .map_err(|error| format!("Grep search failed: {error}"))?
+    Ok(vec![GrepScope {
+        root,
+        search_path,
+        prefix: None,
+    }])
 }
 
 fn collect_grep_matches(

@@ -52,16 +52,21 @@ declare global {
   const dropAgentHarness: typeof import('./composables/use-agent-harness').dropAgentHarness
   const eagerComputed: typeof import('@vueuse/core').eagerComputed
   const effectScope: typeof import('vue').effectScope
+  const ensureFleetLoaded: typeof import('./composables/use-fleet-registry').ensureFleetLoaded
   const extendRef: typeof import('@vueuse/core').extendRef
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
+  const getFleetGroups: typeof import('./composables/use-fleet-registry').getFleetGroups
+  const getFleetProjects: typeof import('./composables/use-fleet-registry').getFleetProjects
   const h: typeof import('vue').h
   const ignorableWatch: typeof import('@vueuse/core').ignorableWatch
   const inject: typeof import('vue').inject
   const injectLocal: typeof import('@vueuse/core').injectLocal
   const isChatTurnOpenKeyLive: typeof import('./composables/use-chat-turn-open-state').isChatTurnOpenKeyLive
   const isDefined: typeof import('@vueuse/core').isDefined
+  const isFleetGroupSlug: typeof import('./composables/use-fleet-registry').isFleetGroupSlug
+  const isFleetLoaded: typeof import('./composables/use-fleet-registry').isFleetLoaded
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
   const isReadonly: typeof import('vue').isReadonly
@@ -91,6 +96,7 @@ declare global {
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
   const pausableWatch: typeof import('@vueuse/core').pausableWatch
+  const primaryProjectForSlug: typeof import('./composables/use-fleet-registry').primaryProjectForSlug
   const provide: typeof import('vue').provide
   const provideChatTurnOpenState: typeof import('./composables/use-chat-turn-open-state').provideChatTurnOpenState
   const provideLocal: typeof import('@vueuse/core').provideLocal
@@ -453,16 +459,21 @@ declare module 'vue' {
     readonly dropAgentHarness: UnwrapRef<typeof import('./composables/use-agent-harness')['dropAgentHarness']>
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
+    readonly ensureFleetLoaded: UnwrapRef<typeof import('./composables/use-fleet-registry')['ensureFleetLoaded']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
+    readonly getFleetGroups: UnwrapRef<typeof import('./composables/use-fleet-registry')['getFleetGroups']>
+    readonly getFleetProjects: UnwrapRef<typeof import('./composables/use-fleet-registry')['getFleetProjects']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
     readonly isChatTurnOpenKeyLive: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['isChatTurnOpenKeyLive']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
+    readonly isFleetGroupSlug: UnwrapRef<typeof import('./composables/use-fleet-registry')['isFleetGroupSlug']>
+    readonly isFleetLoaded: UnwrapRef<typeof import('./composables/use-fleet-registry')['isFleetLoaded']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
@@ -492,6 +503,7 @@ declare module 'vue' {
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
+    readonly primaryProjectForSlug: UnwrapRef<typeof import('./composables/use-fleet-registry')['primaryProjectForSlug']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideChatTurnOpenState: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['provideChatTurnOpenState']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>

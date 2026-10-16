@@ -22,7 +22,7 @@ import resolveLiveWorkspace from './resolve-workspace'
 import runHarnessStream from './stream'
 
 export default async (input: ResumeOrchestratorInput): Promise<void> => {
-  const workspace = resolveLiveWorkspace(input)
+  const workspace = await resolveLiveWorkspace(input)
   const {
     chatId,
     messages,

@@ -25,6 +25,20 @@ vi.mock('@/utils/normalize-image-data-url', () => ({
     normalizeImageDataUrl(args),
 }))
 
+const pngDataUrl = (label: string): string => {
+  const signature = String.fromCharCode(
+    0x89,
+    0x50,
+    0x4e,
+    0x47,
+    0x0d,
+    0x0a,
+    0x1a,
+    0x0a,
+  )
+  return `data:image/png;base64,${btoa(`${signature}${label}`)}`
+}
+
 describe('image-stage registry', () => {
   beforeEach(() => {
     resetImageStageForTests()
@@ -36,19 +50,19 @@ describe('image-stage registry', () => {
       chatId: 'chat-1',
       turnId: 'turn-1',
       image: {
-        dataUrl: 'data:image/png;base64,aaaa',
+        dataUrl: pngDataUrl('aaaa'),
         mediaType: 'image/png',
         source: 'shot.png',
       },
     })
 
     expect(normalizeImageDataUrl).toHaveBeenCalledWith({
-      dataUrl: 'data:image/png;base64,aaaa',
+      dataUrl: pngDataUrl('aaaa'),
       mediaType: 'image/png',
     })
     expect(drainStagedImages({ chatId: 'chat-1', turnId: 'turn-1' })).toEqual([
       {
-        dataUrl: 'normalized:data:image/png;base64,aaaa',
+        dataUrl: `normalized:${pngDataUrl('aaaa')}`,
         mediaType: 'normalized/image/png',
         source: 'shot.png',
       },
@@ -60,7 +74,7 @@ describe('image-stage registry', () => {
       chatId: 'chat-1',
       turnId: 'turn-1',
       image: {
-        dataUrl: 'data:image/png;base64,one',
+        dataUrl: pngDataUrl('one'),
         mediaType: 'image/png',
         source: 'a.png',
       },
@@ -69,7 +83,7 @@ describe('image-stage registry', () => {
       chatId: 'chat-1',
       turnId: 'turn-1',
       image: {
-        dataUrl: 'data:image/png;base64,bbbb',
+        dataUrl: pngDataUrl('bbbb'),
         mediaType: 'image/png',
         source: 'b.png',
       },
@@ -85,7 +99,7 @@ describe('image-stage registry', () => {
       chatId: 'chat-1',
       turnId: 'turn-1',
       image: {
-        dataUrl: 'data:image/png;base64,aaaa',
+        dataUrl: pngDataUrl('aaaa'),
         mediaType: 'image/png',
         source: 'a.png',
       },
@@ -100,7 +114,7 @@ describe('image-stage registry', () => {
       chatId: 'chat-1',
       turnId: 'turn-1',
       image: {
-        dataUrl: 'data:image/png;base64,aaaa',
+        dataUrl: pngDataUrl('aaaa'),
         mediaType: 'image/png',
         source: 'a.png',
       },
@@ -109,7 +123,7 @@ describe('image-stage registry', () => {
       chatId: 'chat-1',
       turnId: 'turn-2',
       image: {
-        dataUrl: 'data:image/png;base64,bbbb',
+        dataUrl: pngDataUrl('bbbb'),
         mediaType: 'image/png',
         source: 'b.png',
       },
@@ -118,7 +132,7 @@ describe('image-stage registry', () => {
       chatId: 'chat-2',
       turnId: 'turn-1',
       image: {
-        dataUrl: 'data:image/png;base64,cccc',
+        dataUrl: pngDataUrl('cccc'),
         mediaType: 'image/png',
         source: 'c.png',
       },
@@ -126,21 +140,21 @@ describe('image-stage registry', () => {
 
     expect(drainStagedImages({ chatId: 'chat-1', turnId: 'turn-1' })).toEqual([
       {
-        dataUrl: 'normalized:data:image/png;base64,aaaa',
+        dataUrl: `normalized:${pngDataUrl('aaaa')}`,
         mediaType: 'normalized/image/png',
         source: 'a.png',
       },
     ])
     expect(drainStagedImages({ chatId: 'chat-1', turnId: 'turn-2' })).toEqual([
       {
-        dataUrl: 'normalized:data:image/png;base64,bbbb',
+        dataUrl: `normalized:${pngDataUrl('bbbb')}`,
         mediaType: 'normalized/image/png',
         source: 'b.png',
       },
     ])
     expect(drainStagedImages({ chatId: 'chat-2', turnId: 'turn-1' })).toEqual([
       {
-        dataUrl: 'normalized:data:image/png;base64,cccc',
+        dataUrl: `normalized:${pngDataUrl('cccc')}`,
         mediaType: 'normalized/image/png',
         source: 'c.png',
       },

@@ -42,6 +42,19 @@ describe('sandbox-result', () => {
     )
   })
 
+  it('appends the working directory and slug when provided', () => {
+    expect(
+      sandboxingFooter({
+        sandboxed: false,
+        network: 'allow',
+        cwd: '/tmp/web',
+        cwdSlug: 'web',
+      }),
+    ).toBe(
+      'SANDBOXING: ran unsandboxed. Network: allow\nWorking directory: /tmp/web (web)',
+    )
+  })
+
   it('attaches structured fields and a footer string on success payloads', () => {
     const result = attachSandboxResult(
       { shellId: 'shell-1', exitCode: 0 },

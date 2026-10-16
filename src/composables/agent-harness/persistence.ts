@@ -10,6 +10,7 @@ import restoreFileCheckpoints, {
   resolveBaselinesForRevert,
 } from '@/services/harness/restore-file-checkpoints'
 import canWriteVisibleContext from './can-write-visible-context'
+import membersFromFleet from './restore-workspace-members'
 import type { AgentHarnessState } from './types'
 
 type PersistenceDeps = {
@@ -45,6 +46,11 @@ export default (state: AgentHarnessState, deps: PersistenceDeps) => {
       chatId: options.chatId,
       projectRoot: options.projectRoot,
       targets,
+      members: membersFromFleet(
+        state.fleet,
+        options.projectSlug,
+        targets.map((target) => target.path),
+      ),
     })
     if (result.errors.length > 0) {
       toast.error('Failed to revert some files', {

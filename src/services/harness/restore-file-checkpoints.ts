@@ -10,6 +10,12 @@ import type {
   FileCheckpointRestoreResult,
   FileCheckpointRestoreTarget,
 } from '@/types/harness/file-checkpoint'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
+import {
+  hasGroupMembers,
+  isLiveMemberRoot,
+  parseMemberQualifiedPath,
+} from '@/utils/parse-member-qualified-name'
 
 const toolsFromTurn = (turn: AgentTurn) =>
   turn.steps.flatMap((step) => step.tools)
@@ -94,6 +100,14 @@ export const resolveBaselinesForRevert = (
       if (!targets.has(change.path)) {
         targets.set(change.path, currentUserMessageId)
       }
+      if (
+        change.operation === 'rename' &&
+        typeof change.renameTo === 'string' &&
+        change.renameTo.length > 0 &&
+        !targets.has(change.renameTo)
+      ) {
+        targets.set(change.renameTo, currentUserMessageId)
+      }
     }
   }
 
@@ -135,21 +149,134 @@ export const resolveBaselinesForAgentTurn = (
   }
 }
 
+type RestoreTargetGroup = {
+  projectRoot: string
+  targets: FileCheckpointRestoreTarget[]
+  originalPaths: string[]
+}
+
+const emptyRestoreResult = (): FileCheckpointRestoreResult => ({
+  restored: [],
+  deleted: [],
+  skipped: [],
+  errors: [],
+})
+
+export const groupCheckpointRestoreTargets = (
+  projectRoot: string,
+  targets: FileCheckpointRestoreTarget[],
+  members?: HarnessWorkspaceMember[],
+): RestoreTargetGroup[] => {
+  if (!hasGroupMembers(members)) {
+    return [
+      {
+        projectRoot,
+        targets,
+        originalPaths: targets.map((target) => target.path),
+      },
+    ]
+  }
+
+  const groups = new Map<string, RestoreTargetGroup>()
+  const ensureGroup = (root: string): RestoreTargetGroup => {
+    const existing = groups.get(root)
+    if (existing) {
+      return existing
+    }
+    const created: RestoreTargetGroup = {
+      projectRoot: root,
+      targets: [],
+      originalPaths: [],
+    }
+    groups.set(root, created)
+    return created
+  }
+
+  for (const target of targets) {
+    const qualified = parseMemberQualifiedPath(target.path, members)
+    const group = qualified
+      ? ensureGroup(qualified.member.rootPath)
+      : ensureGroup(projectRoot)
+    group.targets.push(
+      qualified
+        ? {
+            path: qualified.path,
+            userMessageId: target.userMessageId,
+            key: target.path,
+          }
+        : target,
+    )
+    group.originalPaths.push(target.path)
+  }
+
+  return [...groups.values()]
+}
+
+const remapRestorePaths = (
+  group: RestoreTargetGroup,
+  paths: string[],
+): string[] => {
+  const originalByRestored = new Map<string, string>()
+  for (let index = 0; index < group.targets.length; index += 1) {
+    const restoredPath = group.targets[index]?.path
+    const originalPath = group.originalPaths[index]
+    if (!restoredPath || !originalPath) {
+      continue
+    }
+    originalByRestored.set(restoredPath, originalPath)
+  }
+  return paths.map((path) => originalByRestored.get(path) ?? path)
+}
+
 export const restoreFileCheckpoints = async (args: {
   projectSlug: string
   chatId: string
   projectRoot: string
   targets: FileCheckpointRestoreTarget[]
+  members?: HarnessWorkspaceMember[]
 }): Promise<FileCheckpointRestoreResult> => {
   if (args.targets.length === 0) {
-    return { restored: [], deleted: [], skipped: [], errors: [] }
+    return emptyRestoreResult()
   }
-  return fileCheckpointRestore({
-    projectSlug: args.projectSlug,
-    chatId: args.chatId,
-    projectRoot: args.projectRoot,
-    targets: args.targets,
-  })
+
+  const groups = groupCheckpointRestoreTargets(
+    args.projectRoot,
+    args.targets,
+    args.members,
+  )
+  const merged = emptyRestoreResult()
+
+  for (const group of groups) {
+    if (group.targets.length === 0) {
+      continue
+    }
+    if (!isLiveMemberRoot(group.projectRoot)) {
+      merged.errors.push(
+        ...group.originalPaths.map((path) => ({
+          path,
+          error: 'Project is no longer available',
+        })),
+      )
+      continue
+    }
+    const result = await fileCheckpointRestore({
+      projectSlug: args.projectSlug,
+      chatId: args.chatId,
+      projectRoot: group.projectRoot,
+      targets: group.targets,
+    })
+    merged.restored.push(...remapRestorePaths(group, result.restored))
+    merged.deleted.push(...remapRestorePaths(group, result.deleted))
+    merged.skipped.push(...remapRestorePaths(group, result.skipped))
+    merged.errors.push(
+      ...result.errors.map((entry) => ({
+        ...entry,
+        path: remapRestorePaths(group, [entry.path])[0] ?? entry.path,
+      })),
+    )
+  }
+
+  return merged
 }
 
 export const summarizeMutationCounts = (

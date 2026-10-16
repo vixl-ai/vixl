@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 
 const fsReadFile = vi.hoisted(() =>
@@ -220,5 +221,64 @@ describe('read_file tool images', () => {
     await expect(execute({ path: 'src/a.ts', offset: 1, limit: 20 })).resolves.toEqual(
       textResult,
     )
+  })
+})
+
+describe('read_file projectRoots', () => {
+  const api: HarnessWorkspaceMember = {
+    slug: 'api',
+    name: 'API',
+    rootPath: '/tmp/api',
+  }
+  const web: HarnessWorkspaceMember = {
+    slug: 'web',
+    name: 'Web',
+    rootPath: '/tmp/web',
+  }
+
+  beforeEach(() => {
+    fsReadFile.mockReset()
+    fsReadFile.mockResolvedValue({
+      path: 'api/src/a.ts',
+      content: 'export const a = 1',
+      totalLines: 1,
+      offset: 1,
+      limit: 200,
+    })
+  })
+
+  it('passes projectRoots to IPC when members exist', async () => {
+    await execute(
+      { path: 'api/src/a.ts' },
+      baseCtx({
+        projectRoot: '/tmp/api',
+        projectSlug: 'stack',
+        members: [api, web],
+      }),
+    )
+
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: '/tmp/api',
+      path: 'api/src/a.ts',
+      offset: undefined,
+      limit: undefined,
+      includeBase64: undefined,
+      projectRoots: [
+        { slug: 'api', path: '/tmp/api' },
+        { slug: 'web', path: '/tmp/web' },
+      ],
+    })
+  })
+
+  it('omits projectRoots for a single-project chat', async () => {
+    await execute({ path: 'src/a.ts' }, baseCtx())
+
+    expect(fsReadFile).toHaveBeenCalledWith({
+      projectRoot: '/tmp/project',
+      path: 'src/a.ts',
+      offset: undefined,
+      limit: undefined,
+      includeBase64: undefined,
+    })
   })
 })

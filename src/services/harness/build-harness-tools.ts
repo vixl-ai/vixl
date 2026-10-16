@@ -71,11 +71,11 @@ const buildHarnessTools = (ctx: HarnessToolContext) => ({
   create_plan: createPlanTool(ctx),
   update_plan: updatePlan(ctx),
   update_plan_todo: updatePlanTodo(ctx),
-  update_todos: updateTodos(),
+  update_todos: updateTodos(ctx),
   run_terminal: runTerminal(ctx),
   terminal_output: terminalOutput(),
   stop_terminal: stopTerminal(),
-  lsp: lspQuery(),
+  lsp: lspQuery(ctx),
   diagnostics: diagnostics(ctx),
   web_fetch: webFetchTool(ctx),
 })

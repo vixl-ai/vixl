@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::commands::mcp::merged_shell_path;
 
-use super::super::fs::resolve_workspace_path;
+use super::super::fs::{resolve_command_path, WorkspaceRootArg};
 
 pub fn resolve_pty_shell() -> String {
     #[cfg(unix)]
@@ -57,6 +57,7 @@ pub async fn shell_spawn_pty(
     cols: u16,
     rows: u16,
     cwd: Option<String>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<PtySessionInfo, String> {
     let merged_path = tauri::async_runtime::spawn_blocking(merged_shell_path)
         .await
@@ -75,9 +76,14 @@ pub async fn shell_spawn_pty(
     let mut cmd = CommandBuilder::new(resolve_pty_shell());
     cmd.args(pty_shell_args());
     let work_dir = match cwd {
-        Some(relative_cwd) => resolve_workspace_path(&project_root, &relative_cwd)?
-            .to_string_lossy()
-            .to_string(),
+        Some(relative_cwd) => resolve_command_path(
+            &project_root,
+            project_roots.as_deref(),
+            &relative_cwd,
+        )?
+        .path
+        .to_string_lossy()
+        .to_string(),
         None => project_root,
     };
     cmd.cwd(work_dir);
@@ -85,6 +91,8 @@ pub async fn shell_spawn_pty(
         cmd.env("PATH", merged);
     }
     cmd.env("TERM", "xterm-256color");
+    cmd.env_remove("GIT_DIR");
+    cmd.env_remove("GIT_WORK_TREE");
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
 

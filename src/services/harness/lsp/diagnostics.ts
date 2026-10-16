@@ -12,11 +12,14 @@ import {
   lspWorkspaceDiagnostics,
   type LspServerState,
 } from '@/services/vixl/vixl-tauri'
+import resolveMemberPath from '@/services/harness/resolve-member-path'
+import { resolveWorkspaceSlug, slugArg } from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { LspWorkspaceIssuesResult } from '@/types/lsp'
+import { describeRepoTool, repoSlugFields } from '@/services/harness/codebase/repo'
 
 const workspaceFailure = (message: string): LspWorkspaceIssuesResult => ({
-  scope: 'workspace',
+  scope: 'unavailable',
   errorCount: 0,
   warningCount: 0,
   itemCap: 50,
@@ -43,6 +46,7 @@ const executeFile = async (
   path: string,
   extension: string | undefined,
   projectRoot: string,
+  requestRoot?: string,
 ) => {
   const ext = extension ?? path.split('.').pop() ?? ''
   let server: LspServerState
@@ -61,7 +65,9 @@ const executeFile = async (
   }
 
   try {
-    const result = await lspRequest(server.id, 'diagnostics', { path })
+    const result = await (requestRoot
+      ? lspRequest(server.id, 'diagnostics', { path }, requestRoot)
+      : lspRequest(server.id, 'diagnostics', { path }))
     if (result && typeof result === 'object' && 'error' in result) {
       return {
         path,
@@ -81,17 +87,28 @@ const executeFile = async (
 
 const diagnostics = (ctx: HarnessToolContext) =>
   tool({
-    description: 'Read LSP diagnostics, project-wide or one file.',
+    description: describeRepoTool('Read LSP diagnostics, project-wide or one file.', ctx),
     inputSchema: z.object({
       path: z.string().optional().describe('Omit for project-wide'),
       extension: z.string().optional().describe('Override extension'),
+      ...repoSlugFields(ctx),
     }),
-    execute: async ({ path, extension }) => {
-      const trimmed = path?.trim() ?? ''
+    execute: async (input) => {
+      const trimmed = input.path?.trim() ?? ''
       if (!trimmed) {
-        return executeWorkspace(ctx.projectRoot)
+        const resolved = resolveWorkspaceSlug(ctx, slugArg(input, 'repo'))
+        return executeWorkspace(resolved.projectRoot)
       }
-      return executeFile(trimmed, extension, ctx.projectRoot)
+      if (ctx.members && ctx.members.length > 0) {
+        const resolvedPath = resolveMemberPath(ctx.members, trimmed)
+        return executeFile(
+          resolvedPath.relativePath,
+          input.extension,
+          resolvedPath.root,
+          resolvedPath.root,
+        )
+      }
+      return executeFile(trimmed, input.extension, ctx.projectRoot)
     },
   })
 

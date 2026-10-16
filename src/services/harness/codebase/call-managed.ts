@@ -25,11 +25,22 @@ const callManagedCodegraphTool = async (
     firstPartyName: string
     mcpToolName: string
     toolArgs: Record<string, unknown>
+    projectRoot: string
   },
 ): Promise<ManagedCodegraphCallResult> => {
   const serverId = CODEGRAPH_SERVER_ID
+  const projectRoot = args.projectRoot
   // Product-owned CodeGraph tools skip user MCP trust and per-tool permission cards.
   // Lifecycle is owned by ensureCodeGraph + the status chip runtime path.
+  if (ctx.members && ctx.members.length > 0) {
+    try {
+      const ensureCodeGraph = (await import('@/services/codegraph/ensure-codegraph')).default
+      await ensureCodeGraph(projectRoot)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { ok: false, payload: { error: message } }
+    }
+  }
 
   const invokeTool = async (): Promise<unknown> => {
     const previous = setMcpElicitationHandler(async (request) => {
@@ -61,7 +72,7 @@ const callManagedCodegraphTool = async (
         args.mcpToolName,
         args.toolArgs,
         undefined,
-        ctx.projectRoot,
+        projectRoot,
       )
     } finally {
       setMcpElicitationHandler(previous)
@@ -78,13 +89,13 @@ const callManagedCodegraphTool = async (
 
     const kind = mcpAuthKindForError(
       error,
-      getMcpAuthMode(buildCodegraphServer(ctx.projectRoot)),
+      getMcpAuthMode(buildCodegraphServer(projectRoot)),
     )
     const resolution = await requestMcpAuth({
       chatId: ctx.chatId,
       toolCallId: args.toolCallId,
       serverId,
-      scopeKey: ctx.projectRoot,
+      scopeKey: projectRoot,
       kind,
       title: ctx.subagentLabel
         ? `Authenticate ${serverId} (${ctx.subagentLabel})`

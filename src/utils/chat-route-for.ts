@@ -1,4 +1,6 @@
 import { HOME_CHAT_SLUG, isHomeChatSlug } from '@/constants/home-chat'
+import { readFleetGroups } from '@/utils/fleet-group-reader'
+import { isGroupSlug } from '@/utils/primary-project-for-slug'
 
 export default (
   projectSlug: string,
@@ -8,7 +10,9 @@ export default (
   const base =
     isHomeChatSlug(projectSlug) || projectSlug === HOME_CHAT_SLUG
       ? `/chat/${chatId}`
-      : `/project/${projectSlug}/chat/${chatId}`
+      : isGroupSlug(projectSlug, readFleetGroups())
+        ? `/group/${projectSlug}/chat/${chatId}`
+        : `/project/${projectSlug}/chat/${chatId}`
   if (!subagentId) {
     return base
   }

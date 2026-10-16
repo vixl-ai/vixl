@@ -2,7 +2,7 @@ import { listen } from '@tauri-apps/api/event'
 import { ref } from 'vue'
 import appendStreamText from '@/services/harness/shell/append-stream-text'
 import { isRunningBackgroundSubagent } from '@/services/harness/subagent/registry'
-import { shellKillTracked, shellSpawnTracked } from '@/services/vixl/vixl-tauri'
+import { shellKillTracked, shellSpawnTracked, type IpcProjectRoot } from '@/services/vixl/vixl-tauri'
 import type { AgentShellRecord, AgentShellStatus } from '@/types/harness/agent-shell'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { ShellExitResult } from '@/types/harness/shell-exit'
@@ -133,6 +133,7 @@ export const createAgentShell = async (args: {
   sandboxed?: boolean
   allowNetwork?: boolean
   projectWritable?: boolean
+  projectRoots?: IpcProjectRoot[]
   subagentId?: string
 }): Promise<AgentShellRecord> => {
   const shellId = crypto.randomUUID()
@@ -160,6 +161,7 @@ export const createAgentShell = async (args: {
     sandboxed: args.sandboxed,
     allowNetwork: args.allowNetwork,
     ...(args.projectWritable === false ? { projectWritable: false } : {}),
+    ...(args.projectRoots ? { projectRoots: args.projectRoots } : {}),
   })
   bumpRevision()
 

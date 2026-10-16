@@ -4,13 +4,12 @@ import loadPrompt from '@/services/prompts/load-prompt'
 describe('load-prompt', () => {
   it('renders base prompt with variable substitution', () => {
     const rendered = loadPrompt('system/base.md', {
-      projectName: 'vixl',
-      projectRoot: '/tmp/vixl',
+      projectSection:
+        'Project: vixl (/tmp/vixl)\nWorkspace tools are scoped to this repo. For work in another project, move this chat there with move_workspace when available, or suggest the user open a chat in that project.',
     })
 
     expect(rendered).toContain('Project: vixl (/tmp/vixl)')
-    expect(rendered).not.toContain('{{projectName}}')
-    expect(rendered).not.toContain('{{projectRoot}}')
+    expect(rendered).not.toContain('{{projectSection}}')
     expect(rendered).toContain('Workspace tools are scoped to this repo.')
     expect(rendered).toContain(
       'For work in another project, move this chat there with move_workspace when available, or suggest the user open a chat in that project.',

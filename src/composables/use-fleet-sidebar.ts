@@ -61,10 +61,11 @@ export default () => {
   const fleet = useFleetRegistry()
   const chatStore = useChatStore()
 
-  const sidebarProjects = computed<FleetSidebarProject[]>(() =>
-    fleet.projects.value.map((project) => ({
+  const sidebarProjects = computed<FleetSidebarProject[]>(() => {
+    const projectRows: FleetSidebarProject[] = fleet.projects.value.map((project) => ({
       slug: project.slug,
       displayName: project.name,
+      kind: 'project',
       isActiveProject: fleet.activeProjectId.value === project.id,
       defaultExpanded: fleet.activeProjectId.value === project.id,
       chats: (chatsBySlug.value[project.slug] ?? []).map((chat) => ({
@@ -73,8 +74,24 @@ export default () => {
         status: chat.status,
         attention: chat.attention ?? null,
       })),
-    })),
-  )
+    }))
+
+    const groupRows: FleetSidebarProject[] = (fleet.groups?.value ?? []).map((group) => ({
+      slug: group.slug,
+      displayName: group.name,
+      kind: 'group',
+      isActiveProject: false,
+      defaultExpanded: false,
+      chats: (chatsBySlug.value[group.slug] ?? []).map((chat) => ({
+        id: chat.id,
+        title: chat.title,
+        status: chat.status,
+        attention: chat.attention ?? null,
+      })),
+    }))
+
+    return [...projectRows, ...groupRows]
+  })
 
   const standaloneChats = computed(() => chatsBySlug.value[HOME_CHAT_SLUG] ?? [])
 
@@ -118,6 +135,9 @@ export default () => {
     const next: typeof chatsBySlug.value = {}
     for (const project of fleet.projects.value) {
       next[project.slug] = await chatStore.listProjectChats(project.slug)
+    }
+    for (const group of fleet.groups?.value ?? []) {
+      next[group.slug] = await chatStore.listProjectChats(group.slug)
     }
     next[HOME_CHAT_SLUG] = await chatStore.listProjectChats(HOME_CHAT_SLUG)
     chatsBySlug.value = next
@@ -182,6 +202,9 @@ export const refreshFleetSidebar = async (): Promise<void> => {
   const next: typeof chatsBySlug.value = {}
   for (const project of fleet.projects.value) {
     next[project.slug] = await chatStore.listProjectChats(project.slug)
+  }
+  for (const group of fleet.groups?.value ?? []) {
+    next[group.slug] = await chatStore.listProjectChats(group.slug)
   }
   next[HOME_CHAT_SLUG] = await chatStore.listProjectChats(HOME_CHAT_SLUG)
   chatsBySlug.value = next

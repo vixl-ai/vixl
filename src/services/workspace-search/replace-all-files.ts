@@ -14,7 +14,7 @@ export default async (args: {
 
   for (const group of args.groups) {
     const result = await replaceInFile({
-      projectRoot: args.projectRoot,
+      projectRoot: group.projectRoot ?? args.projectRoot,
       path: group.path,
       find: args.find,
       replace: args.replace,

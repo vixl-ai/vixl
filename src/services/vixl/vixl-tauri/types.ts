@@ -16,18 +16,21 @@ export type FleetProjectRecord = {
   lastOpened: string
 }
 
+export type FleetProjectGroupRecord = {
+  id: string
+  name: string
+  slug: string
+  member_slugs: string[]
+  last_opened: string
+}
+
 export type ProjectFileEntry = {
   name: string
   path: string
   description?: string | null
 }
 
-export type VixlFilesKind =
-  | 'agents'
-  | 'agents-md'
-  | 'rules'
-  | 'skills'
-  | 'plans'
+export type VixlFilesKind = 'agents' | 'agents-md' | 'rules' | 'skills' | 'plans'
 
 export type McpToolInfo = {
   name: string
@@ -76,13 +79,7 @@ export type ChatMetaRecord = {
   mode: string
   model: string
   status: 'idle' | 'running'
-  attention?:
-    | 'needs_approval'
-    | 'needs_input'
-    | 'needs_mcp_auth'
-    | 'completed'
-    | 'error'
-    | null
+  attention?: 'needs_approval' | 'needs_input' | 'needs_mcp_auth' | 'completed' | 'error' | null
 
   createdAt: string
   updatedAt: string
@@ -111,6 +108,11 @@ export type ChatMetaRecord = {
     costUSD: number | null
     pricingComplete: boolean
   }
+}
+
+export type IpcProjectRoot = {
+  slug: string
+  path: string
 }
 
 export type FsEditReplacement = {

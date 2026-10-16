@@ -1,19 +1,39 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { FileCodeIcon, FileTextIcon } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import { Button } from '@/components/shadcn/ui/button'
 import useChatProjectId from '@/composables/use-chat-project-id'
+import useFleetRegistry from '@/composables/use-fleet-registry'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import openAtLine from '@/utils/open-at-line'
+import {
+  isLiveMemberRoot,
+  membersFromDeclaredSlugs,
+  parseMemberQualifiedPath,
+} from '@/utils/parse-member-qualified-name'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 
 const props = defineProps<{
   artifact: ChatArtifact
 }>()
 
+const route = useRoute()
+const fleet = useFleetRegistry()
 const workbench = useWorkbenchStore()
-const projectId = useChatProjectId()
+const fallbackProjectId = useChatProjectId()
+
+const workspaceMembers = computed((): HarnessWorkspaceMember[] | undefined => {
+  const slug = String(route.params.slug ?? '')
+  const group = (fleet.groups?.value ?? []).find((entry) => entry.slug === slug)
+  if (!group) {
+    return undefined
+  }
+  const members = membersFromDeclaredSlugs(group.memberSlugs, fleet.projects.value)
+  return members.length > 0 ? members : undefined
+})
 
 const lineSuffix = computed(() => {
   const start = props.artifact.startLine
@@ -53,7 +73,26 @@ const handleOpen = async (event: MouseEvent): Promise<void> => {
   event.preventDefault()
   event.stopPropagation()
 
-  const id = projectId.value
+  const qualified =
+    props.artifact.kind === 'file'
+      ? parseMemberQualifiedPath(props.artifact.path, workspaceMembers.value)
+      : null
+  if (qualified && !isLiveMemberRoot(qualified.member.rootPath)) {
+    toast.error('Project not found', {
+      description: `Project ${qualified.member.slug} is no longer available.`,
+    })
+    return
+  }
+  const memberProject = qualified
+    ? fleet.projects.value.find((entry) => entry.slug === qualified.member.slug)
+    : undefined
+  if (qualified && !memberProject) {
+    toast.error('Project not found', {
+      description: `Project ${qualified.member.slug} is no longer available.`,
+    })
+    return
+  }
+  const id = memberProject?.id ?? fallbackProjectId.value
   if (!id) {
     toast.error('Project not found', {
       description: 'Could not resolve the active project for this chat.',
@@ -70,7 +109,7 @@ const handleOpen = async (event: MouseEvent): Promise<void> => {
       return
     }
 
-    await openAtLine(id, props.artifact.path, props.artifact.startLine)
+    await openAtLine(id, qualified?.path ?? props.artifact.path, props.artifact.startLine)
   } catch (error) {
     toast.error('Failed to open artifact', {
       description: error instanceof Error ? error.message : 'Unknown error',

@@ -31,6 +31,8 @@ vi.mock('vue-sonner', () => ({
   toast: { error: toastError },
 }))
 
+import bindLiveToolContext from '@/services/harness/orchestrator/live-tool-context'
+import { ipcProjectRoots, isMultiRootWorkspace } from '@/services/harness/tool-roots'
 import moveWorkspace from '@/services/harness/workspace/move'
 
 const movedProject = (rootPath: string, slug = 'dest'): FleetProjectRecord => ({
@@ -141,6 +143,43 @@ describe('move_workspace tool', () => {
       projectSlug: 'dest',
       projectRoot: '/tmp/dest',
     })
+  })
+
+  it('clears group members on the live context after a successful move', async () => {
+    const workspace = {
+      projectSlug: 'stack',
+      projectRoot: '/tmp/api',
+      projectName: 'Stack',
+      members: [
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+      ],
+    }
+    const ctx = bindLiveToolContext(workspace, {
+      chatId: 'chat-1',
+      mode: 'agent',
+      settings: { version: 1 } as VixlSettings,
+      permissionLevel: 'ask',
+      sessionAllows: new Set(),
+      sessionDenies: new Set(),
+      sandboxEnabled: true,
+      supportsVision: false,
+      onPendingApproval: () => {},
+      onHarnessEvent: vi.fn<(event: HarnessEvent) => void | Promise<void>>(),
+    })
+    expect(isMultiRootWorkspace(ctx)).toBe(true)
+    expect(ipcProjectRoots(ctx)).toEqual([
+      { slug: 'api', path: '/tmp/api' },
+      { slug: 'web', path: '/tmp/web' },
+    ])
+
+    const result = await execute({ rootPath: '/tmp/dest' }, ctx)
+
+    expect(result).toMatchObject({ ok: true })
+    expect(ctx.members).toBeUndefined()
+    expect(workspace.members).toBeUndefined()
+    expect(isMultiRootWorkspace(ctx)).toBe(false)
+    expect(ipcProjectRoots(ctx)).toBeUndefined()
   })
 
   it('joins a relative path onto the current project root', async () => {

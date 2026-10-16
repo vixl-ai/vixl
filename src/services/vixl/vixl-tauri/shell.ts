@@ -1,11 +1,13 @@
 import type { ShellExitResult } from '@/types/harness/shell-exit'
 import { call } from './helpers'
+import type { IpcProjectRoot } from './types'
 
 export const shellSpawnPty = (args: {
   projectRoot: string
   cols: number
   rows: number
   cwd?: string
+  projectRoots?: IpcProjectRoot[]
 }): Promise<{ sessionId: string }> => call('shell_spawn_pty', args)
 
 export const shellWritePty = (sessionId: string, data: string): Promise<void> =>
@@ -27,6 +29,7 @@ export const shellSpawnTracked = (args: {
   sandboxed?: boolean
   allowNetwork?: boolean
   projectWritable?: boolean
+  projectRoots?: IpcProjectRoot[]
 }): Promise<void> => call('shell_spawn_tracked', args)
 
 export const shellKillTracked = (shellId: string): Promise<ShellExitResult> =>

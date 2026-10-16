@@ -9,6 +9,7 @@ export type CodebaseToolSpan = {
 export type CodebaseToolResult = {
   summary?: string
   results: CodebaseToolSpan[]
+  repo?: string
 }
 
 export type CodebaseImpactEdge = {
@@ -21,12 +22,14 @@ export type CodebaseImpactResult = {
   summary?: string
   results: CodebaseToolSpan[]
   edges?: CodebaseImpactEdge[]
+  repo?: string
 }
 
 export type CodebaseStatusResult = {
   ready: boolean
   indexing: boolean
   syncing: boolean
+  repo?: string
   error?: string
   detail?: string
   pendingFiles?: string[]

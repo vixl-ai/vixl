@@ -13,7 +13,10 @@ use super::super::lsp_install::{
 };
 use super::super::lsp_registry::builtin_spec_by_id;
 use super::resolve::{active_project_root, find_server_for_extension, load_effective_servers};
-use super::rpc::LSP_SERVERS;
+use super::instance::lsp_instance_key;
+use super::rpc::{
+    has_logical_server, lookup_managed, lookup_managed_key, LSP_SERVERS,
+};
 use super::start::{start_server, StartOutcome};
 use super::state::{
     current_generation, ephemeral_state, next_generation, snapshot, transition, LspPhase,
@@ -79,11 +82,12 @@ pub(crate) async fn ensure_running_server_within(
         find_server_for_extension(app, &servers, extension, Some(workspace_root.as_str()))
             .ok_or_else(|| format!("No LSP server configured for extension: {extension}"))?;
 
-    let _start_guard = match acquire_start_lock(&server_id, lock_wait).await {
+    let instance_key = lsp_instance_key(&server_id, &workspace_root);
+    let _start_guard = match acquire_start_lock(&instance_key, lock_wait).await {
         Some(guard) => guard,
         None => {
             log::warn!("start already in progress for {server_id}");
-            return Ok(snapshot(&server_id)
+            return Ok(snapshot(&instance_key)
                 .await
                 .unwrap_or_else(|| start_in_progress_state(&server_id)));
         }
@@ -99,7 +103,7 @@ pub(crate) async fn ensure_running_server_within(
         Err(_) => {
             let message = format!("Timed out starting {server_id}");
             log::warn!("{message}");
-            Ok(fail_attempt(app, &server_id, message).await)
+            Ok(fail_attempt(app, &instance_key, message).await)
         }
     }
 }
@@ -116,24 +120,39 @@ async fn ensure_locked(
     workspace_root: &str,
     entry: LspServerEntry,
 ) -> Result<LspServerState, String> {
-    let vue_running = LSP_SERVERS.lock().await.contains_key("vue");
+    let instance_key = lsp_instance_key(server_id, workspace_root);
+    let vue_running = {
+        let servers = LSP_SERVERS.lock().await;
+        has_logical_server(&servers, "vue")
+    };
     let classic_typescript = vue_in_play_for(workspace_root, Some(extension), vue_running);
 
     if classic_typescript {
-        if let Some(managed) = LSP_SERVERS.lock().await.get("typescript").cloned() {
+        if let Some(managed) = {
+            let servers = LSP_SERVERS.lock().await;
+            lookup_managed(&servers, "typescript", Some(workspace_root))
+        } {
             let uses_classic = {
                 let guard = managed.process.lock().await;
                 guard.uses_classic_typescript
             };
             if !uses_classic {
-                super::stop_server_internal(app, "typescript").await.ok();
+                if let Some(key) = {
+                    let servers = LSP_SERVERS.lock().await;
+                    lookup_managed_key(&servers, "typescript", Some(workspace_root))
+                } {
+                    super::stop_server_internal(app, &key).await.ok();
+                }
             }
         }
     }
 
     if let Some(spec) = builtin_spec_by_id(server_id) {
         if spec.requires_trust && !workspace_is_trusted(app, Some(workspace_root)) {
-            if let Some(managed) = LSP_SERVERS.lock().await.get(server_id).cloned() {
+            if let Some(managed) = {
+                let servers = LSP_SERVERS.lock().await;
+                lookup_managed(&servers, server_id, Some(workspace_root))
+            } {
                 let running = {
                     let mut guard = managed.process.lock().await;
                     let running = matches!(guard.child.try_wait(), Ok(None));
@@ -145,19 +164,25 @@ async fn ensure_locked(
                     running
                 };
                 if running {
-                    super::stop_server_internal(app, server_id).await.ok();
+                    if let Some(key) = {
+                        let servers = LSP_SERVERS.lock().await;
+                        lookup_managed_key(&servers, server_id, Some(workspace_root))
+                    } {
+                        super::stop_server_internal(app, &key).await.ok();
+                    }
                 }
             }
 
             // Stop does not bump generation, so this write is still accepted.
-            let generation = current_generation(server_id).await;
+            let generation = current_generation(&instance_key).await;
             let mut patch =
                 LspStatePatch::from_error_source(Some(WORKSPACE_TRUST_REQUIRED.to_string()), None);
             patch.message = Some(None);
             patch.pid = Some(None);
-            let written = transition(app, server_id, generation, LspPhase::NeedsTrust, patch).await;
+            let written =
+                transition(app, &instance_key, generation, LspPhase::NeedsTrust, patch).await;
             return Ok(adopted(
-                server_id,
+                &instance_key,
                 written,
                 LspPhase::NeedsTrust,
                 generation,
@@ -168,7 +193,10 @@ async fn ensure_locked(
         }
     }
 
-    if let Some(managed) = LSP_SERVERS.lock().await.get(server_id).cloned() {
+    if let Some(managed) = {
+        let servers = LSP_SERVERS.lock().await;
+        lookup_managed(&servers, server_id, Some(workspace_root))
+    } {
         let (generation, pid, running, current_root, uses_classic) = {
             let mut guard = managed.process.lock().await;
             let running = matches!(guard.child.try_wait(), Ok(None));
@@ -184,7 +212,7 @@ async fn ensure_locked(
         if running && current_root == workspace_root && !stack_mismatch {
             let written = transition(
                 app,
-                server_id,
+                &instance_key,
                 generation,
                 LspPhase::Running,
                 LspStatePatch::running(
@@ -198,25 +226,30 @@ async fn ensure_locked(
                 return Ok(state);
             }
             log::info!("retiring {server_id} after a dropped running publish");
-            retire_server_process(server_id).await;
-            if let Some(state) = snapshot(server_id)
+            retire_server_process(&instance_key).await;
+            if let Some(state) = snapshot(&instance_key)
                 .await
                 .filter(|state| stop_owns_row(state, generation))
             {
                 return Ok(state);
             }
-        } else if running {
-            super::stop_server_internal(app, server_id).await.ok();
+        } else if running && current_root == workspace_root {
+            if let Some(key) = {
+                let servers = LSP_SERVERS.lock().await;
+                lookup_managed_key(&servers, server_id, Some(workspace_root))
+            } {
+                super::stop_server_internal(app, &key).await.ok();
+            }
         }
     }
 
     // Bump only when a new process is about to start. Reuse keeps the process generation.
-    let generation = next_generation(server_id).await;
+    let generation = next_generation(&instance_key).await;
     log::info!("starting {server_id} for {extension} in {workspace_root}");
     let source = install_source_label(app, server_id);
     transition(
         app,
-        server_id,
+        &instance_key,
         generation,
         LspPhase::Starting,
         LspStatePatch::starting(source, workspace_root.to_string(), None),
@@ -258,7 +291,7 @@ async fn ensure_locked(
     let source = install_source_label(app, server_id);
     transition(
         app,
-        server_id,
+        &instance_key,
         generation,
         LspPhase::Starting,
         LspStatePatch::starting(source, workspace_root.to_string(), note.clone()),
@@ -278,7 +311,7 @@ async fn ensure_locked(
         Ok(StartOutcome::Started) => {
             let source = install_source_label(app, server_id);
             Ok(adopted(
-                server_id,
+                &instance_key,
                 None,
                 LspPhase::Running,
                 generation,
@@ -288,7 +321,7 @@ async fn ensure_locked(
             .await)
         }
         Ok(StartOutcome::Superseded) => {
-            Ok(adopted(server_id, None, LspPhase::Stopped, generation, None, None).await)
+            Ok(adopted(&instance_key, None, LspPhase::Stopped, generation, None, None).await)
         }
         Err(error) => {
             let error = match note {
@@ -296,7 +329,7 @@ async fn ensure_locked(
                 None => error,
             };
             log::warn!("start failed for {server_id}: {error}");
-            Ok(fail_attempt(app, server_id, error).await)
+            Ok(fail_attempt(app, &instance_key, error).await)
         }
     }
 }

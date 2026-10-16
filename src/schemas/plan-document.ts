@@ -6,6 +6,10 @@ export const planTodoItemSchema = z.object({
   status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']),
 })
 
+export const planTodoItemPatchSchema = planTodoItemSchema.partial().required({
+  id: true,
+})
+
 export const planFrontmatterSchema = z.object({
   id: z.string(),
   title: z.string(),

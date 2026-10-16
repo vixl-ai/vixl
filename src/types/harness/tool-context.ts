@@ -1,5 +1,6 @@
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import type { HarnessEvent } from '@/types/harness/harness-event'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { PermissionCapabilityKey, PermissionLevel } from '@/types/harness/permission'
 import type { StagedImage } from '@/types/harness/staged-image'
 import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
@@ -7,6 +8,7 @@ import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 type HarnessToolContext = {
   projectRoot: string
   projectSlug: string
+  members?: HarnessWorkspaceMember[]
   chatId: string
   mode: VixlChatMode
   /** User message that started this agent turn; required for file checkpoints. */

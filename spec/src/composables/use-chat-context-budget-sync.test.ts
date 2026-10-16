@@ -3,8 +3,15 @@ import { effectScope, nextTick, ref } from 'vue'
 import type { ChatMeta } from '@/types/chat/chat-meta'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { FleetProject } from '@/types/fleet/fleet-project'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { UIMessage } from 'ai'
 import { defaultVixlSettings } from '@/schemas/vixl-settings'
+
+const resolveGroupMembers = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<HarnessWorkspaceMember[] | undefined>>(
+    async () => undefined,
+  ),
+)
 
 const refreshFns = vi.hoisted(() => ({
   current: [] as Array<ReturnType<typeof vi.fn>>,
@@ -65,6 +72,11 @@ vi.mock('@/composables/use-mcp-servers', () => ({
   }),
 }))
 
+vi.mock('@/services/harness/orchestrator/resolve-workspace', () => ({
+  default: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+  resolveGroupMembers: (...args: unknown[]) => resolveGroupMembers(...args),
+}))
+
 vi.mock('vue-sonner', () => ({
   toast: {
     error: vi.fn<(...args: unknown[]) => void>(),
@@ -105,6 +117,8 @@ const flushDeferredRefresh = async (): Promise<void> => {
 describe('useChatContextBudgetSync', () => {
   beforeEach(() => {
     vi.resetModules()
+    resolveGroupMembers.mockReset()
+    resolveGroupMembers.mockResolvedValue(undefined)
     refreshFns.current = []
     bindChatFns.current = []
     loading.value = false
@@ -224,6 +238,105 @@ describe('useChatContextBudgetSync', () => {
       projectName: 'Demo',
       projectRoot: '/tmp/demo',
       chatId: 'chat-1',
+    })
+  })
+
+  it('forwards group members into the context budget refresh', async () => {
+    const members = [
+      { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+      { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+    ]
+    resolveGroupMembers.mockResolvedValue(members)
+    meta.value = {
+      ...sampleMeta(),
+      projectSlug: 'stack',
+      projectRoot: '/tmp/api',
+    }
+    const { default: useChatContextBudgetSync } = await import(
+      '@/composables/use-chat-context-budget-sync'
+    )
+    const sync = useChatContextBudgetSync()
+    await flushDeferredRefresh()
+    const refresh = refreshFns.current.at(-1)
+    expect(refresh).toBeDefined()
+    refresh?.mockClear()
+    resolveGroupMembers.mockClear()
+
+    await sync.refreshContextBudget()
+
+    expect(resolveGroupMembers).toHaveBeenCalledWith({
+      projectSlug: 'stack',
+      projectRoot: '/tmp/api',
+      projectName: 'Demo',
+    })
+    expect(refresh?.mock.calls[0]?.[0]).toMatchObject({
+      members,
+      projectRoot: '/tmp/api',
+      projectName: 'API',
+    })
+  })
+
+  it('keeps the chat stored primary when the sidebar active project changes', async () => {
+    const members = [
+      { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+      { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+    ]
+    resolveGroupMembers.mockResolvedValue(members)
+    meta.value = {
+      ...sampleMeta(),
+      projectSlug: 'stack',
+      projectRoot: '/tmp/api',
+    }
+    activeProject.value = {
+      id: 'proj-web',
+      name: 'Web',
+      slug: 'web',
+      rootPath: '/tmp/web',
+      lastOpened: '2026-01-01T00:00:00.000Z',
+    }
+    const { default: useChatContextBudgetSync } = await import(
+      '@/composables/use-chat-context-budget-sync'
+    )
+    const sync = useChatContextBudgetSync()
+    await flushDeferredRefresh()
+    const refresh = refreshFns.current.at(-1)
+    expect(refresh).toBeDefined()
+    refresh?.mockClear()
+    resolveGroupMembers.mockClear()
+
+    await sync.refreshContextBudget()
+
+    expect(resolveGroupMembers).toHaveBeenCalledWith({
+      projectSlug: 'stack',
+      projectRoot: '/tmp/api',
+      projectName: 'Web',
+    })
+    expect(refresh?.mock.calls[0]?.[0]).toMatchObject({
+      members,
+      projectRoot: '/tmp/api',
+      projectName: 'API',
+    })
+  })
+
+  it('falls back to the sidebar active project when the chat has no stored root', async () => {
+    meta.value = {
+      ...sampleMeta(),
+      projectRoot: '',
+    }
+    const { default: useChatContextBudgetSync } = await import(
+      '@/composables/use-chat-context-budget-sync'
+    )
+    const sync = useChatContextBudgetSync()
+    await flushDeferredRefresh()
+    const refresh = refreshFns.current.at(-1)
+    expect(refresh).toBeDefined()
+    refresh?.mockClear()
+
+    await sync.refreshContextBudget()
+
+    expect(refresh?.mock.calls[0]?.[0]).toMatchObject({
+      projectRoot: '/tmp/demo',
+      projectName: 'Demo',
     })
   })
 
@@ -394,6 +507,8 @@ describe('useChatContextBudgetSync refresh scheduling', () => {
     expect(refresh).toHaveBeenCalledTimes(1)
 
     release?.()
+    await Promise.resolve()
+    await nextTick()
     await Promise.resolve()
     await nextTick()
     expect(refresh).toHaveBeenCalledTimes(2)
