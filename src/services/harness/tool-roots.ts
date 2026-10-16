@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import resolveMemberPath from '@/services/harness/resolve-member-path'
 import { notifyWorkspaceFsMutation } from '@/services/harness/shared/notify-fs-mutation'
+import { hasGroupMembers, isLiveMemberRoot } from '@/utils/parse-member-qualified-name'
 import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
@@ -17,7 +18,7 @@ export const REPO_TOOL_HINT =
 
 export const isMultiRootWorkspace = (
   ctx: Pick<HarnessToolContext, 'members'>,
-): boolean => Boolean(ctx.members && ctx.members.length > 0)
+): boolean => hasGroupMembers(ctx.members)
 
 export const withMultiRootPathHint = (
   base: string,
@@ -99,18 +100,19 @@ export const resolveWorkspaceSlug = (
     return { projectRoot: ctx.projectRoot, slug: undefined }
   }
 
-  if (!slug) {
-    const matched = members.find((member) => member.rootPath === ctx.projectRoot)
-    if (matched) {
-      return { projectRoot: ctx.projectRoot, slug: matched.slug }
-    }
-    const primary = members[0]!
-    return { projectRoot: primary.rootPath, slug: primary.slug }
-  }
+  const resolvedSlug =
+    slug ??
+    members.find(
+      (member) => isLiveMemberRoot(member.rootPath) && member.rootPath === ctx.projectRoot,
+    )?.slug ??
+    members[0]!.slug
 
-  const member = members.find((member) => member.slug === slug)
+  const member = members.find((entry) => entry.slug === resolvedSlug)
   if (!member) {
     throw new Error(`Unknown project slug. Valid slugs: ${formatValidSlugs(members)}`)
+  }
+  if (!isLiveMemberRoot(member.rootPath)) {
+    throw new Error(`Project ${member.slug} is no longer available`)
   }
   return { projectRoot: member.rootPath, slug: member.slug }
 }
@@ -157,18 +159,45 @@ export const sensitiveCheckPaths = (
   paths: string[],
 ): string[] => paths.map((path) => sensitiveCheckPath(members, path))
 
+export type CheckpointCaptureTarget = {
+  projectRoot: string
+  path: string
+  key: string
+}
+
+const checkpointManifestKey = (
+  members: HarnessWorkspaceMember[] | undefined,
+  memberSlug: string,
+  relativePath: string,
+): string => {
+  if (!hasGroupMembers(members)) {
+    return relativePath
+  }
+  if (!relativePath) {
+    return memberSlug
+  }
+  return `${memberSlug}/${relativePath}`
+}
+
 export const checkpointCaptureTarget = (
   ctx: Pick<HarnessToolContext, 'projectRoot' | 'members'>,
   userPath: string,
-): { projectRoot: string; path: string } => {
+): CheckpointCaptureTarget => {
   if (!ctx.members || ctx.members.length === 0) {
-    return { projectRoot: ctx.projectRoot, path: userPath }
+    return { projectRoot: ctx.projectRoot, path: userPath, key: userPath }
   }
   try {
     const resolved = resolveMemberPath(ctx.members, userPath)
-    return { projectRoot: resolved.root, path: resolved.relativePath }
-  } catch {
-    return { projectRoot: ctx.projectRoot, path: userPath }
+    return {
+      projectRoot: resolved.root,
+      path: resolved.relativePath,
+      key: checkpointManifestKey(ctx.members, resolved.memberSlug, resolved.relativePath),
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('is no longer available')) {
+      throw error
+    }
+    return { projectRoot: ctx.projectRoot, path: userPath, key: userPath }
   }
 }
 

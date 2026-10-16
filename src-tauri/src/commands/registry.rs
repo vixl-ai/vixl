@@ -203,8 +203,8 @@ fn member_sets_equal(left: &[String], right: &[String]) -> bool {
 }
 
 fn validate_member_slugs(member_slugs: &[String], projects: &[FleetProject]) -> Result<(), String> {
-    if member_slugs.is_empty() {
-        return Err("Group must include at least one project".to_string());
+    if member_slugs.len() < 2 {
+        return Err("Group must include at least two projects".to_string());
     }
     let mut seen = HashSet::new();
     for slug in member_slugs {

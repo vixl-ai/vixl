@@ -9,6 +9,10 @@ import type {
   HarnessWorkspace,
   HarnessWorkspaceMember,
 } from '@/types/harness/harness-workspace'
+import {
+  isLiveMemberRoot,
+  membersFromDeclaredSlugs,
+} from '@/utils/parse-member-qualified-name'
 
 const resolveGroupMembers = async (
   workspace: HarnessWorkspace,
@@ -19,21 +23,11 @@ const resolveGroupMembers = async (
     return undefined
   }
 
-  const projects = getFleetProjects()
-  const members: HarnessWorkspaceMember[] = []
-  for (const memberSlug of group.memberSlugs) {
-    const project = projects.find((entry) => entry.slug === memberSlug)
-    if (!project) {
-      continue
-    }
-    members.push({
-      slug: project.slug,
-      name: project.name,
-      rootPath: project.rootPath,
-    })
+  const members = membersFromDeclaredSlugs(group.memberSlugs, getFleetProjects())
+  if (!members.some((member) => isLiveMemberRoot(member.rootPath))) {
+    return undefined
   }
-
-  return members.length > 0 ? members : undefined
+  return members
 }
 
 const resolveLiveWorkspace = async (input: {

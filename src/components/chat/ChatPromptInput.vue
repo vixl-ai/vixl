@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import type { ChatStatus } from 'ai'
-import { FolderIcon, Layers, ChevronDownIcon, XIcon, SquareIcon } from '@lucide/vue'
+import { FolderIcon, Layers, Layers2, ChevronDownIcon, XIcon, SquareIcon } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   Tooltip,
@@ -59,12 +59,14 @@ import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import { CODEGRAPH_SERVER_ID } from '@/types/codegraph/managed-codegraph'
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input/types'
 import type { ContextMention } from '@/types/harness/context-mention'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { PermissionLevel } from '@/types/harness/permission'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { FileUIPart } from 'ai'
 import type { ChatPromptWorkspace } from '@/types/chat/chat-prompt-workspace'
 import contextMentionFromNode from '@/utils/context-mention-from-node'
 import normalizeAttachmentFiles from '@/utils/normalize-attachment-files'
+import { membersFromDeclaredSlugs } from '@/utils/parse-member-qualified-name'
 
 const PREFETCH_MIN_FREE_TOKENS = 4000
 const PREFETCH_MAX_CONTENT_CHARS = 12_000
@@ -194,6 +196,10 @@ const promptWorkspace = computed((): ChatPromptWorkspace => {
   return { kind: 'home' }
 })
 
+const selectedProjectsFullName = computed(() =>
+  selectedProjects.value.map((project) => project.name).join(', '),
+)
+
 const activeProjectName = computed(() => {
   if (!props.showProjectSelect) {
     return fleet.activeProject.value?.name ?? 'Home'
@@ -201,8 +207,12 @@ const activeProjectName = computed(() => {
   if (selectedGroup.value) {
     return selectedGroup.value.name
   }
-  if (selectedProjects.value.length >= 2) {
-    return selectedProjects.value.map((project) => project.name).join(', ')
+  if (selectedProjects.value.length >= 3) {
+    const names = selectedProjects.value.map((project) => project.name)
+    return `${names[0]}, ${names[1]}, ${names[2]!.slice(0, 4)}...`
+  }
+  if (selectedProjects.value.length === 2) {
+    return selectedProjectsFullName.value
   }
   if (selectedProjects.value.length === 1) {
     return selectedProjects.value[0]!.name
@@ -210,13 +220,26 @@ const activeProjectName = computed(() => {
   return 'Home'
 })
 
-const pickerIcon = computed(() =>
-  selectedGroup.value || selectedProjects.value.length >= 2 ? Layers : FolderIcon,
-)
+const pickerIcon = computed(() => {
+  const count = selectedGroup.value
+    ? selectedGroup.value.memberSlugs.length
+    : selectedProjects.value.length
+  if (count >= 3) {
+    return Layers
+  }
+  if (count === 2) {
+    return Layers2
+  }
+  return FolderIcon
+})
 
-const projectPickerTitle = computed(() =>
-  activeProjectName.value === 'Home' ? 'Home' : `${activeProjectName.value} project`,
-)
+const projectPickerTitle = computed(() => {
+  const name =
+    !selectedGroup.value && selectedProjects.value.length >= 3
+      ? selectedProjectsFullName.value
+      : activeProjectName.value
+  return name === 'Home' ? 'Home' : `${name} project`
+})
 
 const isWaitingOnReply = computed(
   () => props.status === 'submitted' || props.status === 'streaming',
@@ -288,8 +311,42 @@ const promptSlashRoot = computed((): string | null => {
   return fleet.activeProject.value?.rootPath ?? null
 })
 
+const membersFromSlugs = (slugs: string[]): HarnessWorkspaceMember[] | undefined => {
+  const members = membersFromDeclaredSlugs(slugs, fleet.projects.value)
+  return members.length >= 2 ? members : undefined
+}
+
+const promptWorkspaceMembers = computed((): HarnessWorkspaceMember[] | undefined => {
+  if (props.showProjectSelect) {
+    if (selectedGroup.value) {
+      return membersFromSlugs(selectedGroup.value.memberSlugs)
+    }
+    if (selectedProjects.value.length >= 2) {
+      return selectedProjects.value.map((project) => ({
+        slug: project.slug,
+        name: project.name,
+        rootPath: project.rootPath,
+      }))
+    }
+    return undefined
+  }
+
+  const slug = chatStore.meta.value?.projectSlug
+  if (!slug || slug === HOME_CHAT_SLUG) {
+    return undefined
+  }
+  const group = fleetGroups.value.find((entry) => entry.slug === slug)
+  if (!group) {
+    return undefined
+  }
+  return membersFromSlugs(group.memberSlugs)
+})
+
 const showGitBranch = computed(
-  () => git.isRepo.value && promptWorkspaceRoot.value !== null,
+  () =>
+    git.isRepo.value
+    && promptWorkspaceRoot.value !== null
+    && !promptWorkspaceMembers.value,
 )
 
 const { settings: rootEffectiveSettings } = useRootEffectiveSettings(
@@ -617,7 +674,7 @@ watch(
           :title="projectPickerTitle"
         >
           <component :is="pickerIcon" class="size-4 shrink-0" />
-          <span class="truncate text-sm">{{ activeProjectName }}</span>
+          <span class="min-w-0 truncate text-sm">{{ activeProjectName }}</span>
           <ChevronDownIcon class="size-3 shrink-0 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
@@ -686,6 +743,7 @@ watch(
             placeholder="@ for context, / for commands"
             :project-root="promptWorkspaceRoot"
             :slash-root="promptSlashRoot"
+            :members="promptWorkspaceMembers"
           />
         </PromptInputBody>
         <PromptInputFooter class="w-full min-w-0 flex-nowrap px-1 pb-1">

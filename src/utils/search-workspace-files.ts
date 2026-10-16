@@ -1,4 +1,6 @@
 import { workspaceGlob } from '@/services/vixl/vixl-tauri'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
+import { hasGroupMembers, isLiveMemberRoot } from '@/utils/parse-member-qualified-name'
 
 const DEFAULT_LIMIT = 40
 
@@ -38,10 +40,25 @@ const rankFiles = (paths: string[], rawQuery: string): string[] => {
   })
 }
 
+const projectRootsForSearch = (
+  members: HarnessWorkspaceMember[] | undefined,
+): Array<{ slug: string; path: string }> | undefined => {
+  if (!hasGroupMembers(members)) {
+    return undefined
+  }
+  return members
+    .filter((member) => isLiveMemberRoot(member.rootPath))
+    .map((member) => ({
+      slug: member.slug,
+      path: member.rootPath,
+    }))
+}
+
 const searchWorkspaceFiles = async (
   projectRoot: string | null | undefined,
   rawQuery: string,
   limit = DEFAULT_LIMIT,
+  members?: HarnessWorkspaceMember[],
 ): Promise<string[]> => {
   if (!projectRoot) {
     return []
@@ -49,8 +66,9 @@ const searchWorkspaceFiles = async (
 
   const normalized = normalizeQuery(rawQuery)
   const pattern = normalized ? `*${escapeGlob(normalized)}*` : '*'
+  const projectRoots = projectRootsForSearch(members)
 
-  const result = await workspaceGlob(projectRoot, pattern, limit)
+  const result = await workspaceGlob(projectRoot, pattern, limit, projectRoots)
   return rankFiles(
     result.files.map((entry) => entry.path),
     rawQuery,

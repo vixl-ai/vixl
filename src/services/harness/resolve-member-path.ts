@@ -149,7 +149,9 @@ const resolveAbsoluteAgainstMembers = (
 ): ResolvedMemberPath => {
   rejectParentDirComponents(components, { allowPrefix: true })
 
-  const matches = members.filter((member) => isUnderRoot(member.rootPath, userPath))
+  const matches = members.filter(
+    (member) => member.rootPath.trim().length > 0 && isUnderRoot(member.rootPath, userPath),
+  )
   if (matches.length === 0) {
     throw new Error('Absolute path is outside all project roots')
   }
@@ -167,6 +169,10 @@ const joinUnderMember = (
   member: HarnessWorkspaceMember,
   relativeComponents: PathComponent[],
 ): ResolvedMemberPath => {
+  if (!member.rootPath.trim()) {
+    throw new Error(`Project ${member.slug} is no longer available`)
+  }
+
   for (const component of relativeComponents) {
     if (component.kind === 'parent') {
       throw new Error('Path traversal is not allowed')

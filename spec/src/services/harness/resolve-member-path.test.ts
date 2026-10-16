@@ -92,6 +92,23 @@ describe('resolveMemberPath', () => {
     })
   })
 
+  it('rejects a slug prefix for a member whose project root is gone', () => {
+    const api = member('api', '/tmp/api')
+    const web = member('web', '')
+
+    expect(() => resolveMemberPath([api, web], 'web/src/foo.ts')).toThrow(
+      'Project web is no longer available',
+    )
+    expect(resolveMemberPath([api, web], 'api/src/foo.ts')).toEqual({
+      memberSlug: 'api',
+      root: '/tmp/api',
+      relativePath: 'src/foo.ts',
+    })
+    expect(() => resolveMemberPath([api, web], 'src/foo.ts')).toThrow(
+      /prefixed with a project slug/,
+    )
+  })
+
   it('requires at least one member and a non-empty path', () => {
     expect(() => resolveMemberPath([], 'api/src/foo.ts')).toThrow(
       'At least one workspace root is required',

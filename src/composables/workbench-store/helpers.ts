@@ -3,6 +3,7 @@ import type { WorkbenchTab } from '@/types/workbench/workbench-tab'
 import useFleetRegistry, {
   getFleetGroups,
   getFleetProjects,
+  isFleetGroupSlug,
 } from '@/composables/use-fleet-registry'
 import { primaryProjectForSlug } from '@/utils/primary-project-for-slug'
 import { getUserHomeDir } from '@/services/vixl/vixl-tauri'
@@ -96,9 +97,8 @@ export const listGroupMemberProjects = (groupSlug: string): FleetProject[] => {
 export const listWorkspaceProjects = (contextSlug?: string | null): FleetProject[] => {
   const slug = contextSlug?.trim() ?? ''
   if (slug) {
-    const members = listGroupMemberProjects(slug)
-    if (members.length > 0) {
-      return members
+    if (isFleetGroupSlug(slug)) {
+      return listGroupMemberProjects(slug)
     }
     if (isHomeChatSlug(slug)) {
       const home = getProject(HOME_WORKSPACE_ID)
@@ -115,7 +115,17 @@ export const listWorkspaceProjects = (contextSlug?: string | null): FleetProject
 
 export const resolvePrimaryWorkspaceProjectId = (
   contextSlug?: string | null,
-): string => listWorkspaceProjects(contextSlug)[0]?.id ?? resolveWorkspaceProjectId()
+): string => {
+  const primaryId = listWorkspaceProjects(contextSlug)[0]?.id
+  if (primaryId) {
+    return primaryId
+  }
+  const slug = contextSlug?.trim() ?? ''
+  if (slug && isFleetGroupSlug(slug)) {
+    throw new Error(`Group ${slug} has no projects in the fleet`)
+  }
+  return resolveWorkspaceProjectId()
+}
 
 export const ensureSidebarOpen = (): void => {
   rightSidebarOpen.value = true

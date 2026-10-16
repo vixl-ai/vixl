@@ -136,14 +136,27 @@ describe('resolveGroupMembers', () => {
     expect(members).toEqual(expectedMembers)
   })
 
-  it('skips member slugs that are missing from the project registry', async () => {
+  it('keeps missing group slugs so a deleted member does not collapse to single-root', async () => {
     registryListProjects.mockResolvedValue([apiRecord])
     const members = await resolveGroupMembers({
       projectSlug: 'stack',
       projectRoot: '/tmp/api',
       projectName: 'Stack',
     })
-    expect(members).toEqual([{ slug: 'api', name: 'API', rootPath: '/tmp/api' }])
+    expect(members).toEqual([
+      { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+      { slug: 'web', name: 'web', rootPath: '' },
+    ])
+  })
+
+  it('returns undefined when every declared member slug is missing', async () => {
+    registryListProjects.mockResolvedValue([])
+    const members = await resolveGroupMembers({
+      projectSlug: 'stack',
+      projectRoot: '/tmp/api',
+      projectName: 'Stack',
+    })
+    expect(members).toBeUndefined()
   })
 })
 
@@ -283,6 +296,22 @@ describe('resolveLiveWorkspace', () => {
     await resolveLiveWorkspace(workspace)
     expect(workspace.members).toBeUndefined()
     expect(ensureCodeGraph).not.toHaveBeenCalled()
+  })
+
+  it('keeps multi-root members when one group project is missing from the fleet', async () => {
+    registryListProjects.mockResolvedValue([apiRecord])
+    const workspace: HarnessWorkspace = {
+      projectSlug: 'stack',
+      projectRoot: '/tmp/api',
+      projectName: 'Stack',
+    }
+    await resolveLiveWorkspace(workspace)
+    expect(workspace.members).toEqual([
+      { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+      { slug: 'web', name: 'web', rootPath: '' },
+    ])
+    expect(ensureCodeGraph).toHaveBeenCalledWith('/tmp/api')
+    expect(ensureCodeGraph).toHaveBeenCalledTimes(1)
   })
 
   it('starts CodeGraph for every member root on a group workspace', async () => {

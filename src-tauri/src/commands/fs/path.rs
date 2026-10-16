@@ -137,9 +137,17 @@ pub(crate) fn workspace_roots_from_args(
         if !seen.insert(slug.to_string()) {
             return Err(format!("Duplicate project slug: {slug}"));
         }
+        let path = arg.path.trim();
+        if path.is_empty() {
+            roots.push(WorkspaceRoot {
+                slug: slug.to_string(),
+                path: PathBuf::new(),
+            });
+            continue;
+        }
         roots.push(WorkspaceRoot {
             slug: slug.to_string(),
-            path: canonical_project_root(&arg.path)?,
+            path: canonical_project_root(path)?,
         });
     }
     Ok(roots)
@@ -172,6 +180,9 @@ fn reject_parent_dir_components(path: &Path) -> Result<(), String> {
 }
 
 fn join_under_member(root: &WorkspaceRoot, relative: &Path) -> Result<PathBuf, String> {
+    if root.path.as_os_str().is_empty() {
+        return Err(format!("Project {} is no longer available", root.slug));
+    }
     let mut joined = root.path.clone();
     for component in relative.components() {
         match component {
@@ -229,6 +240,9 @@ fn resolve_absolute_against_roots(
 
     let mut matches = Vec::new();
     for root in roots {
+        if root.path.as_os_str().is_empty() {
+            continue;
+        }
         if let Ok(canonical) = ensure_under_root(&root.path, user_path) {
             matches.push((root.slug.clone(), root.path.clone(), canonical));
         }
@@ -499,6 +513,74 @@ mod tests {
         );
 
         let _keep = (api_dir, web_dir);
+    }
+
+    #[test]
+    fn missing_member_slug_is_rejected_without_collapsing() {
+        let (api_dir, api) = temp_member("api");
+        write_file(&api.path, "src/foo.ts", "api");
+        write_file(&api.path, "web/src/foo.ts", "wrong tree");
+        let missing_web = WorkspaceRoot {
+            slug: "web".to_string(),
+            path: PathBuf::new(),
+        };
+
+        let error = resolve_multi_root_path(&[api.clone(), missing_web.clone()], "web/src/foo.ts")
+            .expect_err("missing member");
+        assert!(
+            error.contains("web") && error.contains("no longer available"),
+            "got: {error}"
+        );
+
+        let (slug, resolved) =
+            resolve_multi_root_path(&[api.clone(), missing_web.clone()], "api/src/foo.ts")
+                .expect("live member");
+        assert_eq!(slug, "api");
+        assert_eq!(
+            resolved,
+            api.path.join("src/foo.ts").canonicalize().expect("file")
+        );
+
+        let unprefixed = resolve_multi_root_path(&[api, missing_web], "src/foo.ts")
+            .expect_err("unprefixed with declared members");
+        assert!(
+            unprefixed.contains("prefixed with a project slug"),
+            "got: {unprefixed}"
+        );
+
+        let _keep = api_dir;
+    }
+
+    #[test]
+    fn command_path_rejects_missing_member_from_empty_root_arg() {
+        let (api_dir, api) = temp_member("api");
+        write_file(&api.path, "src/foo.ts", "api");
+        let args = vec![
+            WorkspaceRootArg {
+                slug: "api".to_string(),
+                path: api.path.to_string_lossy().to_string(),
+            },
+            WorkspaceRootArg {
+                slug: "web".to_string(),
+                path: String::new(),
+            },
+        ];
+
+        let error =
+            resolve_command_path(&api.path.to_string_lossy(), Some(&args), "web/src/foo.ts")
+                .expect_err("missing member command path");
+        assert!(
+            error.contains("web") && error.contains("no longer available"),
+            "got: {error}"
+        );
+
+        let resolved =
+            resolve_command_path(&api.path.to_string_lossy(), Some(&args), "api/src/foo.ts")
+                .expect("live member command path");
+        assert_eq!(resolved.slug.as_deref(), Some("api"));
+        assert_eq!(resolved.member_relative_path(), "src/foo.ts");
+
+        let _keep = api_dir;
     }
 
     #[test]

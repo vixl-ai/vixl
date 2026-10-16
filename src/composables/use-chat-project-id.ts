@@ -22,7 +22,7 @@ const useChatProjectId = (): ComputedRef<string | null> => {
       fleet.projects.value,
       fleet.groups?.value ?? [],
     )
-    return project?.id ?? fleet.activeProjectId.value
+    return project?.id ?? null
   })
 }
 

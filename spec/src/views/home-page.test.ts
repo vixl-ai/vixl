@@ -5,6 +5,7 @@ import ChatPromptInput from '@/components/chat/ChatPromptInput.vue'
 import { setFleetGroupReader } from '@/utils/fleet-group-reader'
 
 const routerPush = vi.hoisted(() => vi.fn<(to: string) => Promise<void>>(async () => undefined))
+const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 const createNewChat = vi.hoisted(
   () =>
     vi.fn<(args: { projectSlug: string; projectRoot: string }) => Promise<{ id: string; projectSlug: string }>>(
@@ -58,7 +59,7 @@ vi.mock('vue-router', () => ({
 
 vi.mock('vue-sonner', () => ({
   toast: {
-    error: vi.fn<(...args: unknown[]) => void>(),
+    error: (...args: unknown[]) => toastError(...args),
   },
 }))
 
@@ -95,6 +96,7 @@ describe('HomePage handleSubmit', () => {
     addGroup.mockClear()
     setActiveProject.mockClear()
     refreshFleetSidebar.mockClear()
+    toastError.mockClear()
     setFleetGroupReader(() => fleetState.groups.value as never)
   })
 
@@ -144,5 +146,30 @@ describe('HomePage handleSubmit', () => {
       }),
     )
     expect(routerPush).toHaveBeenCalledWith('/group/api-web/chat/chat-1')
+  })
+
+  it('falls back to a project chat when only one selected project still resolves', async () => {
+    await emitSubmit({ kind: 'projects', projectIds: ['p1', 'gone'] })
+    expect(addGroup).not.toHaveBeenCalled()
+    expect(createNewChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectSlug: 'api',
+        projectRoot: '/tmp/api',
+      }),
+    )
+    expect(routerPush).toHaveBeenCalledWith('/project/api/chat/chat-1')
+  })
+
+  it('toasts when no selected projects still resolve', async () => {
+    await emitSubmit({ kind: 'projects', projectIds: ['gone', 'also-gone'] })
+    expect(addGroup).not.toHaveBeenCalled()
+    expect(createNewChat).not.toHaveBeenCalled()
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(toastError).toHaveBeenCalledWith(
+      'Could not start chat',
+      expect.objectContaining({
+        description: 'Selected projects are no longer available',
+      }),
+    )
   })
 })

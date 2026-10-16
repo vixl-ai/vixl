@@ -5,6 +5,7 @@ import type { ContextBucket } from '@/types/harness/context-bucket'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { PrefixSnapshot } from '@/types/harness/prefix-snapshot'
+import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 import type { ActiveContextSlice } from '@/services/context/filter-messages-for-active-context'
 import countContextBudget from '@/services/context/count-context-budget'
@@ -45,6 +46,7 @@ export type RefreshContextUsageInput = {
   frozenSnapshot?: PrefixSnapshot | null
   activeContext?: ActiveContextSlice | null
   chatId?: string | null
+  members?: HarnessWorkspaceMember[]
 }
 
 export default () => {
@@ -141,6 +143,7 @@ export default () => {
         standalone: input.standalone,
         frozenSnapshot: input.frozenSnapshot,
         activeContext: input.activeContext,
+        members: input.members,
       })
 
       if (generation !== refreshGeneration) {

@@ -9,6 +9,7 @@ export type FileCheckpointBaseline = {
 export type FileCheckpointRestoreTarget = {
   path: string
   userMessageId: string
+  key?: string
 }
 
 export type FileCheckpointPathResult = {

@@ -53,6 +53,21 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
         existed: true,
         capturedAt: 'now',
       }),
+    fileCheckpointRestore: vi
+      .fn<
+        () => Promise<{
+          restored: string[]
+          deleted: string[]
+          skipped: string[]
+          errors: Array<{ path: string; error: string }>
+        }>
+      >()
+      .mockResolvedValue({
+        restored: [],
+        deleted: [],
+        skipped: [],
+        errors: [],
+      }),
     workspaceGrep: vi.fn<() => Promise<unknown>>(),
     workspaceGlob: vi.fn<() => Promise<unknown>>(),
     gitStatus: vi.fn<() => Promise<unknown>>(),

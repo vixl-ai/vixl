@@ -136,4 +136,28 @@ describe('list_dir tool', () => {
     )
     expect(built.description).toContain('list workspace members')
   })
+
+  it('forwards . to fsListDir when a group has a single member', async () => {
+    const ctx = baseCtx({
+      projectRoot: '/tmp/api',
+      projectSlug: 'stack',
+      members: [api],
+    })
+    await execute({ path: '.' }, ctx)
+    expect(fsListDir).toHaveBeenCalledWith('/tmp/api', '.', [
+      { slug: 'api', path: '/tmp/api' },
+    ])
+  })
+
+  it('does not tell the model to list members when a group has a single member', () => {
+    const built = listDir(
+      baseCtx({
+        projectRoot: '/tmp/api',
+        projectSlug: 'stack',
+        members: [api],
+      }),
+    )
+    expect(built.description).not.toContain('list workspace members')
+    expect(built.description).not.toContain('prefixed with a project slug')
+  })
 })

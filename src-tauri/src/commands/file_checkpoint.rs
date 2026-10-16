@@ -27,6 +27,8 @@ pub struct FileCheckpointBaseline {
 pub struct FileCheckpointRestoreTarget {
     pub path: String,
     pub user_message_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,6 +101,13 @@ fn find_entry<'a>(
     entries.iter().find(|entry| entry.path == path)
 }
 
+fn manifest_key(path: &str, key: Option<&str>) -> String {
+    match key {
+        Some(value) if !value.trim().is_empty() => value.to_string(),
+        _ => path.to_string(),
+    }
+}
+
 /// Capture a first-touch baseline for `path` under the given user message.
 /// Idempotent: if a baseline already exists for this path, returns Ok without changes.
 #[tauri::command]
@@ -109,6 +118,7 @@ pub fn file_checkpoint_capture(
     user_message_id: String,
     project_root: String,
     path: String,
+    key: Option<String>,
     tool_call_id: Option<String>,
 ) -> Result<FileCheckpointBaseline, String> {
     if project_root.trim().is_empty() {
@@ -118,15 +128,16 @@ pub fn file_checkpoint_capture(
         return Err("User message id is required to capture file checkpoints".to_string());
     }
 
+    let stored_path = manifest_key(&path, key.as_deref());
     let _root = canonical_project_root(&project_root)?;
     let absolute = resolve_workspace_path(&project_root, &path)?;
     let dir = message_dir(&app, &project_slug, &chat_id, &user_message_id)?;
     let mut entries = read_manifest(&dir)?;
-    if let Some(existing) = find_entry(&entries, &path) {
+    if let Some(existing) = find_entry(&entries, &stored_path) {
         return Ok(existing.clone());
     }
 
-    let hash = path_hash(&path);
+    let hash = path_hash(&stored_path);
     let existed = absolute.exists();
     if existed {
         if absolute.is_dir() {
@@ -146,7 +157,7 @@ pub fn file_checkpoint_capture(
     }
 
     let entry = FileCheckpointBaseline {
-        path: path.clone(),
+        path: stored_path,
         path_hash: hash,
         existed,
         captured_at: now_iso(),
@@ -183,6 +194,7 @@ pub fn file_checkpoint_restore(
             &chat_id,
             &project_root,
             &target.path,
+            target.key.as_deref(),
             &target.user_message_id,
         ) {
             Ok("restored") => restored.push(target.path),
@@ -210,11 +222,13 @@ fn restore_one(
     chat_id: &str,
     project_root: &str,
     path: &str,
+    key: Option<&str>,
     user_message_id: &str,
 ) -> Result<&'static str, String> {
     let dir = message_dir(app, project_slug, chat_id, user_message_id)?;
     let entries = read_manifest(&dir)?;
-    let Some(entry) = find_entry(&entries, path) else {
+    let lookup = manifest_key(path, key);
+    let Some(entry) = find_entry(&entries, &lookup) else {
         return Ok("skipped");
     };
 
@@ -274,5 +288,28 @@ fn copy_dir_recursive(from: &Path, to: &Path) -> Result<(), String> {
         }
         fs::copy(from, to).map_err(|error| error.to_string())?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{manifest_key, path_hash};
+
+    #[test]
+    fn manifest_key_defaults_to_path() {
+        assert_eq!(manifest_key("src/a.ts", None), "src/a.ts");
+        assert_eq!(manifest_key("src/a.ts", Some("")), "src/a.ts");
+        assert_eq!(manifest_key("src/a.ts", Some("   ")), "src/a.ts");
+    }
+
+    #[test]
+    fn manifest_key_uses_explicit_key() {
+        assert_eq!(manifest_key("src/a.ts", Some("web/src/a.ts")), "web/src/a.ts");
+    }
+
+    #[test]
+    fn path_hash_differs_for_member_prefixed_keys() {
+        assert_ne!(path_hash("api/src/a.ts"), path_hash("web/src/a.ts"));
+        assert_eq!(path_hash("src/a.ts"), path_hash("src/a.ts"));
     }
 }

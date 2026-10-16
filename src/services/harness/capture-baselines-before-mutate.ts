@@ -31,6 +31,7 @@ const captureBaselinesBeforeMutate = async (
       userMessageId: ctx.userMessageId,
       projectRoot: target.projectRoot,
       path: target.path,
+      ...(target.key !== target.path ? { key: target.key } : {}),
       toolCallId,
     })
   }

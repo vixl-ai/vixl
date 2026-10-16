@@ -132,6 +132,7 @@ fn grep_scopes(request: &WorkspaceGrepRequest) -> Result<Vec<GrepScope>, String>
         let roots = workspace_roots_from_args(args)?;
         return Ok(roots
             .into_iter()
+            .filter(|root| !root.path.as_os_str().is_empty())
             .map(|root| GrepScope {
                 prefix: Some(root.slug),
                 search_path: root.path.clone(),

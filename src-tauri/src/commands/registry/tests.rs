@@ -212,10 +212,20 @@ fn add_group_rejects_empty_unknown_duplicate_and_invalid_members() {
     let mut groups = Vec::new();
     assert_eq!(
         upsert_fleet_group(&mut groups, &projects, vec![], None).unwrap_err(),
-        "Group must include at least one project"
+        "Group must include at least two projects"
     );
     assert_eq!(
-        upsert_fleet_group(&mut groups, &projects, vec!["mobile".to_string()], None).unwrap_err(),
+        upsert_fleet_group(&mut groups, &projects, vec!["api".to_string()], None).unwrap_err(),
+        "Group must include at least two projects"
+    );
+    assert_eq!(
+        upsert_fleet_group(
+            &mut groups,
+            &projects,
+            vec!["api".to_string(), "mobile".to_string()],
+            None
+        )
+        .unwrap_err(),
         "Unknown project slug: mobile"
     );
     assert_eq!(
@@ -229,7 +239,13 @@ fn add_group_rejects_empty_unknown_duplicate_and_invalid_members() {
         "Duplicate member slug: api"
     );
     assert_eq!(
-        upsert_fleet_group(&mut groups, &projects, vec!["API".to_string()], None).unwrap_err(),
+        upsert_fleet_group(
+            &mut groups,
+            &projects,
+            vec!["api".to_string(), "API".to_string()],
+            None
+        )
+        .unwrap_err(),
         "Invalid project slug: API"
     );
     assert!(groups.is_empty());
@@ -277,7 +293,7 @@ fn update_group_validates_members_and_missing_id() {
             &projects,
             "missing",
             "Nope".to_string(),
-            vec!["api".to_string()],
+            vec!["api".to_string(), "web".to_string()],
         )
         .unwrap_err(),
         "Group not found"
@@ -291,7 +307,18 @@ fn update_group_validates_members_and_missing_id() {
             vec![],
         )
         .unwrap_err(),
-        "Group must include at least one project"
+        "Group must include at least two projects"
+    );
+    assert_eq!(
+        apply_group_update(
+            &mut groups,
+            &projects,
+            &created.id,
+            "Nope".to_string(),
+            vec!["api".to_string()],
+        )
+        .unwrap_err(),
+        "Group must include at least two projects"
     );
     assert_eq!(groups[0].name, created.name);
     assert_eq!(groups[0].member_slugs, created.member_slugs);

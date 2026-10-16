@@ -82,6 +82,24 @@ describe('workbench workspace projects', () => {
     expect(resolvePrimaryWorkspaceProjectId('missing')).toBe(alpha.id)
   })
 
+  it('lists only live members when some group projects are missing from the fleet', () => {
+    const fleet = useFleetRegistry()
+    fleet.projects.value = [alpha]
+    expect(listWorkspaceProjects('stack').map((project) => project.id)).toEqual([
+      'proj-a',
+    ])
+    expect(resolvePrimaryWorkspaceProjectId('stack')).toBe('proj-a')
+  })
+
+  it('does not fall back to the active project when a group has no live members', () => {
+    const fleet = useFleetRegistry()
+    fleet.projects.value = []
+    expect(listWorkspaceProjects('stack')).toEqual([])
+    expect(() => resolvePrimaryWorkspaceProjectId('stack')).toThrow(
+      'Group stack has no projects in the fleet',
+    )
+  })
+
   it('returns home when the context slug is the home workspace', () => {
     const fleet = useFleetRegistry()
     fleet.activeProjectId.value = null

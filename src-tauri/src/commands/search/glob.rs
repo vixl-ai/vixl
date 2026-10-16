@@ -89,6 +89,7 @@ fn glob_scopes(request: &WorkspaceGlobRequest) -> Result<Vec<GlobScope>, String>
         let roots = workspace_roots_from_args(args)?;
         return Ok(roots
             .into_iter()
+            .filter(|root| !root.path.as_os_str().is_empty())
             .map(|root| GlobScope {
                 prefix: Some(root.slug),
                 root: root.path,

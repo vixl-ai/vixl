@@ -1,3 +1,4 @@
+import { hasGroupMembers } from '@/utils/parse-member-qualified-name'
 import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 
 export const SINGLE_PROJECT_SECTION = (
@@ -30,7 +31,7 @@ export default (
   projectRoot: string,
   members?: HarnessWorkspaceMember[],
 ): string => {
-  if (!members || members.length === 0) {
+  if (!hasGroupMembers(members)) {
     return SINGLE_PROJECT_SECTION(projectName, projectRoot)
   }
   return formatMemberProjectSection(members)

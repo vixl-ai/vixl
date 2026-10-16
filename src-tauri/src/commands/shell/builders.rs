@@ -20,6 +20,7 @@ fn writable_root_paths(
         let roots = workspace_roots_from_args(args)?;
         return Ok(roots
             .into_iter()
+            .filter(|root| !root.path.as_os_str().is_empty())
             .map(|root| root.path.to_string_lossy().to_string())
             .collect());
     }

@@ -45,6 +45,11 @@ describe('withMultiRootPathHint', () => {
     )
     expect(isMultiRootWorkspace({ members: [api, web] })).toBe(true)
   })
+
+  it('treats a single member like a single-root workspace', () => {
+    expect(isMultiRootWorkspace({ members: [api] })).toBe(false)
+    expect(withMultiRootPathHint('Git status', { members: [api] })).toBe('Git status')
+  })
 })
 
 describe('ipcProjectRoots', () => {
@@ -57,6 +62,18 @@ describe('ipcProjectRoots', () => {
     expect(ipcProjectRoots({ members: [api, web] })).toEqual([
       { slug: 'api', path: '/tmp/api' },
       { slug: 'web', path: '/tmp/web' },
+    ])
+  })
+
+  it('keeps a missing member slug in the IPC payload so the jail can reject it', () => {
+    const missingWeb: HarnessWorkspaceMember = {
+      slug: 'web',
+      name: 'web',
+      rootPath: '',
+    }
+    expect(ipcProjectRoots({ members: [api, missingWeb] })).toEqual([
+      { slug: 'api', path: '/tmp/api' },
+      { slug: 'web', path: '' },
     ])
   })
 })
@@ -114,6 +131,45 @@ describe('resolveWorkspaceSlug', () => {
     })
   })
 
+  it('rejects a slug whose project root is gone', () => {
+    const missingWeb: HarnessWorkspaceMember = {
+      slug: 'web',
+      name: 'web',
+      rootPath: '',
+    }
+    expect(() =>
+      resolveWorkspaceSlug({ projectRoot: '/tmp/api', members: [api, missingWeb] }, 'web'),
+    ).toThrow('Project web is no longer available')
+  })
+
+  it('rejects a default primary whose project root is gone', () => {
+    const missingApi: HarnessWorkspaceMember = {
+      slug: 'api',
+      name: 'api',
+      rootPath: '',
+    }
+    expect(() =>
+      resolveWorkspaceSlug({ projectRoot: '/tmp/api', members: [missingApi, web] }),
+    ).toThrow('Project api is no longer available')
+    expect(() =>
+      resolveWorkspaceSlug({ projectRoot: '', members: [missingApi, web] }),
+    ).toThrow('Project api is no longer available')
+  })
+
+  it('defaults to a live member that still matches projectRoot when the first slug is gone', () => {
+    const missingApi: HarnessWorkspaceMember = {
+      slug: 'api',
+      name: 'api',
+      rootPath: '',
+    }
+    expect(
+      resolveWorkspaceSlug({ projectRoot: '/tmp/web', members: [missingApi, web] }),
+    ).toEqual({
+      projectRoot: '/tmp/web',
+      slug: 'web',
+    })
+  })
+
   it('rejects an unknown slug and lists valid slugs', () => {
     expect(() =>
       resolveWorkspaceSlug({ projectRoot: '/tmp/api', members: [api, web] }, 'mobile'),
@@ -158,13 +214,54 @@ describe('sensitiveCheckPaths', () => {
 })
 
 describe('checkpointCaptureTarget', () => {
-  it('uses the member root and unprefixed relative path', () => {
+  it('uses the input path as the manifest key when members are absent', () => {
+    expect(checkpointCaptureTarget({ projectRoot: '/tmp/project' }, 'src/a.ts')).toEqual({
+      projectRoot: '/tmp/project',
+      path: 'src/a.ts',
+      key: 'src/a.ts',
+    })
+  })
+
+  it('keeps a single-member group on the member-relative path', () => {
+    expect(
+      checkpointCaptureTarget({ projectRoot: '/tmp/api', members: [api] }, 'src/a.ts'),
+    ).toEqual({
+      projectRoot: '/tmp/api',
+      path: 'src/a.ts',
+      key: 'src/a.ts',
+    })
+  })
+
+  it('uses the member root and a slug-prefixed manifest key', () => {
     expect(
       checkpointCaptureTarget({ projectRoot: '/tmp/api', members: [api, web] }, 'web/src/a.ts'),
     ).toEqual({
       projectRoot: '/tmp/web',
       path: 'src/a.ts',
+      key: 'web/src/a.ts',
     })
+  })
+
+  it('throws when capturing a path for a member whose project is gone', () => {
+    const missingWeb: HarnessWorkspaceMember = {
+      slug: 'web',
+      name: 'web',
+      rootPath: '',
+    }
+    expect(() =>
+      checkpointCaptureTarget(
+        { projectRoot: '/tmp/api', members: [api, missingWeb] },
+        'web/src/a.ts',
+      ),
+    ).toThrow('Project web is no longer available')
+  })
+
+  it('gives colliding relative paths distinct keys per member', () => {
+    const ctx = { projectRoot: '/tmp/api', members: [api, web] }
+    expect(checkpointCaptureTarget(ctx, 'api/src/a.ts').key).toBe('api/src/a.ts')
+    expect(checkpointCaptureTarget(ctx, 'web/src/a.ts').key).toBe('web/src/a.ts')
+    expect(checkpointCaptureTarget(ctx, 'api/src/a.ts').path).toBe('src/a.ts')
+    expect(checkpointCaptureTarget(ctx, 'web/src/a.ts').path).toBe('src/a.ts')
   })
 })
 

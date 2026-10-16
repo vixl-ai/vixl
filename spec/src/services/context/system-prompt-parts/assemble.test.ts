@@ -642,6 +642,16 @@ describe('assemble system prompt parts', () => {
     expect(empty).toEqual(without)
   })
 
+  it('treats a single member like a single-project chat', async () => {
+    const parts = await assembleSystemPromptParts(
+      input('agent', { standalone: false, members: [groupMembers[0]!] }),
+    )
+    expect(parts.base).toContain('Project: vixl (/tmp/vixl)')
+    expect(parts.base).toContain('Workspace tools are scoped to this repo.')
+    expect(parts.base).not.toContain('Projects (slug, name, path):')
+    expect(parts.base).not.toContain('Paths must be prefixed with a member slug')
+  })
+
   it('renders a member table and multi-project rules when members exist', async () => {
     const parts = await assembleSystemPromptParts(
       input('agent', { standalone: false, members: groupMembers }),

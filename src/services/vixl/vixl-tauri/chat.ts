@@ -55,6 +55,7 @@ export const fileCheckpointCapture = (args: {
   userMessageId: string
   projectRoot: string
   path: string
+  key?: string
   toolCallId?: string
 }): Promise<{
   path: string
@@ -68,7 +69,7 @@ export const fileCheckpointRestore = (args: {
   projectSlug: string
   chatId: string
   projectRoot: string
-  targets: Array<{ path: string; userMessageId: string }>
+  targets: Array<{ path: string; userMessageId: string; key?: string }>
 }): Promise<{
   restored: string[]
   deleted: string[]

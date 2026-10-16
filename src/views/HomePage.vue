@@ -98,11 +98,17 @@ const handleSubmit = async (payload: {
     } else if (payload.workspace.kind === 'group') {
       chat = await startGroupChat(payload.workspace.groupId, payload)
     } else {
-      const memberSlugs = payload.workspace.projectIds
-        .map((id) => fleet.projects.value.find((item) => item.id === id)?.slug)
-        .filter((slug): slug is string => Boolean(slug))
-      const group = await fleet.addGroup(memberSlugs)
-      chat = await startGroupChat(group.id, payload)
+      const members = payload.workspace.projectIds
+        .map((id) => fleet.projects.value.find((item) => item.id === id) ?? null)
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+      if (members.length >= 2) {
+        const group = await fleet.addGroup(members.map((item) => item.slug))
+        chat = await startGroupChat(group.id, payload)
+      } else if (members.length === 1) {
+        chat = await startProjectChat(members[0]!.id, payload)
+      } else {
+        throw new Error('Selected projects are no longer available')
+      }
     }
 
     setPendingChatMessage({
