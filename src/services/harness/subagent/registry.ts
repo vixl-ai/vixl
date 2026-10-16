@@ -7,6 +7,7 @@ import {
   resetBackgroundResultSetsForTests,
 } from '@/services/harness/subagent/background-result-sets'
 import { clearSteers, resetInboxForTests } from '@/services/harness/subagent/inbox'
+import forgetResumeOverlayDelivery from '@/services/harness/orchestrator/forget-resume-overlay-delivery'
 
 export {
   isBackgroundResultFinalized,
@@ -238,6 +239,10 @@ export const reopen = (
   }
 
   forgetBackgroundResultTracking(record.chatId, record.toolCallId)
+  forgetResumeOverlayDelivery({
+    chatId: record.chatId,
+    toolCallId: record.toolCallId,
+  })
   pendingBackgroundResume.add(record.chatId)
   record.status = 'running'
   record.result = undefined

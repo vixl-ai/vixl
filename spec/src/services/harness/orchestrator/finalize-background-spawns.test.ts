@@ -219,4 +219,39 @@ describe('finalizeBackgroundSpawnResults', () => {
     expect(persistToolRun).toHaveBeenCalledTimes(2)
     expect(isBackgroundResultFinalized('chat-1', 'tc-fail')).toBe(true)
   })
+
+  it('finalizes a cloned live result instead of skipping on object identity', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    const live = listDeliverableBackgroundResults('chat-1')
+    const original = live[0]
+    if (!original) {
+      throw new Error('expected a deliverable result')
+    }
+    const cloned = {
+      toolCallId: original.toolCallId,
+      result: { ...original.result },
+    }
+    const onEvent = vi.fn<(...args: unknown[]) => void>()
+
+    const finalized = await finalizeBackgroundSpawnResults(
+      'proj',
+      'chat-1',
+      [cloned],
+      onEvent,
+      null,
+    )
+
+    expect(finalized).toEqual([cloned])
+    expect(onEvent).toHaveBeenCalledTimes(1)
+    expect(persistToolRun).toHaveBeenCalledTimes(1)
+    expect(isBackgroundResultFinalized('chat-1', 'tc-1')).toBe(true)
+  })
 })

@@ -6,6 +6,7 @@ import {
   isBackgroundResultFinalized,
   markBackgroundResultsFinalized,
 } from '@/services/harness/subagent/registry'
+import isLiveRegistryResult from './is-live-registry-result'
 import { persistToolRun } from './persistence'
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
@@ -57,10 +58,6 @@ export const persistedSpawnArgs = (
     ...(capabilities ? { capabilities } : {}),
   }
 }
-
-const isLiveRegistryResult = (
-  item: { toolCallId: string; result: SubagentResult },
-): boolean => getSubagent(item.result.subagentId)?.result === item.result
 
 export const finalizeBackgroundSpawnResults = async (
   projectSlug: string,

@@ -16,6 +16,11 @@ const explorerLedger = {
   agentName: 'explorer',
   subagentId: 'sub-1',
   status: 'completed' as const,
+  result: {
+    subagentId: 'sub-1',
+    name: 'explorer',
+    summary: 'mapped the repo',
+  },
 }
 
 describe('buildWakeNudge', () => {
@@ -33,7 +38,7 @@ describe('buildWakeNudge', () => {
         '- explorer (sub-1, completed): mapped the repo',
         '',
         'Subagent ledger:',
-        '- explorer (sub-1): completed',
+        '- explorer (sub-1): completed: mapped the repo',
       ].join('\n'),
     )
   })
@@ -52,7 +57,7 @@ describe('buildWakeNudge', () => {
     expect(content).toContain('Summaries are below.')
     expect(content).not.toContain('spawn_subagent tool results above')
     expect(content).toContain('- explorer (sub-1, completed): mapped the repo')
-    expect(content).toContain('- explorer (sub-1): completed')
+    expect(content).toContain('- explorer (sub-1): completed: mapped the repo')
   })
 
   it('names still-running subagents with ids and lists every record in the ledger', () => {
@@ -86,7 +91,7 @@ describe('buildWakeNudge', () => {
     expect(content).toContain(
       [
         'Subagent ledger:',
-        '- explorer (sub-1): completed',
+        '- explorer (sub-1): completed: mapped the repo',
         '- writer (sub-2): running',
         '- reviewer (sub-3): running',
       ].join('\n'),
@@ -107,10 +112,21 @@ describe('buildWakeNudge', () => {
         },
       ],
       [],
-      [{ agentName: 'explorer', subagentId: 'sub-fail', status: 'failed' }],
+      [
+        {
+          agentName: 'explorer',
+          subagentId: 'sub-fail',
+          status: 'failed',
+          result: {
+            subagentId: 'sub-fail',
+            name: 'explorer',
+            summary: 'boom',
+          },
+        },
+      ],
     )
 
     expect(content).toContain('- explorer (sub-fail, failed): boom')
-    expect(content).toContain('- explorer (sub-fail): failed')
+    expect(content).toContain('- explorer (sub-fail): failed: boom')
   })
 })
