@@ -110,6 +110,8 @@ describe('create_plan', () => {
     expect(result.path.startsWith(projectRoot)).toBe(true)
     expect(writtenCall().projectRoot).toBe(projectRoot)
     expect(writtenCall().path).toBe(result.relativePath)
+    expect(writtenCall().content).toContain(`sourceChatId: ${chatId}`)
+    expect(writtenCall().content).toContain(`sourceChatSlug: ${projectSlug}`)
     expect(openPlan).toHaveBeenCalledWith(
       'project-1',
       result.planId,

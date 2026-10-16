@@ -23,6 +23,43 @@ describe('mergePlanTodos', () => {
       { id: 'append', content: 'New todo', status: 'pending' },
     ])
   })
+
+  it('applies a status-only patch without replacing existing content', () => {
+    const existing = [
+      { id: 'keep', content: 'Keep me', status: 'in_progress' as const },
+      { id: 'update', content: 'Old text', status: 'pending' as const },
+    ]
+
+    expect(
+      mergePlanTodos(existing, [{ id: 'update', status: 'completed' as const }]),
+    ).toEqual([
+      { id: 'keep', content: 'Keep me', status: 'in_progress' },
+      { id: 'update', content: 'Old text', status: 'completed' },
+    ])
+  })
+
+  it('throws when appending a new id without content', () => {
+    expect(() =>
+      mergePlanTodos([], [{ id: 'new', status: 'pending' as const }]),
+    ).toThrow('Cannot append todo new: content is required for new ids')
+  })
+})
+
+describe('createPlan source chat frontmatter', () => {
+  it('writes sourceChatId and sourceChatSlug when provided', () => {
+    const created = createPlan({
+      title: 'Source chat plan',
+      body: '## Goal\n\nShip it.\n',
+      sourceChatId: 'chat-1',
+      sourceChatSlug: 'stack',
+    })
+    const parsed = parsePlan(created.content)
+    expect(parsed.parseError).toBeUndefined()
+    expect(parsed.frontmatter?.sourceChatId).toBe('chat-1')
+    expect(parsed.frontmatter?.sourceChatSlug).toBe('stack')
+    expect(created.content).toContain('sourceChatId: chat-1')
+    expect(created.content).toContain('sourceChatSlug: stack')
+  })
 })
 
 describe('updatePlanTodos', () => {

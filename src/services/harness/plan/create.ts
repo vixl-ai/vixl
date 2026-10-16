@@ -15,7 +15,13 @@ const createPlanTool = (ctx: HarnessToolContext) =>
     inputSchema: createPlanInputSchema,
     execute: async ({ title, body, todos }) => {
       const planTodos = todos ?? []
-      const plan = createPlan({ title, body, todos: planTodos, sourceChatId: ctx.chatId })
+      const plan = createPlan({
+        title,
+        body,
+        todos: planTodos,
+        sourceChatId: ctx.chatId,
+        sourceChatSlug: ctx.projectSlug,
+      })
       await fsWriteFile({ projectRoot: ctx.projectRoot, path: plan.path, content: plan.content })
       markCreatedPlanThisTurn(ctx.projectSlug, ctx.chatId, plan.path)
       await updateChatMeta(ctx.projectSlug, ctx.chatId, {

@@ -28,6 +28,13 @@ export type CreatePlanInput = {
   body: string
   todos?: PlanTodoItem[]
   sourceChatId?: string
+  sourceChatSlug?: string
+}
+
+type PlanTodoItemPatch = {
+  id: string
+  content?: string
+  status?: PlanTodoItem['status']
 }
 
 export type CreatePlanResult = {
@@ -63,18 +70,22 @@ export default (input: CreatePlanInput): CreatePlanResult => {
     createdAt: now.toISOString(),
     mode: 'plan' as const,
     ...(input.sourceChatId ? { sourceChatId: input.sourceChatId } : {}),
+    ...(input.sourceChatSlug ? { sourceChatSlug: input.sourceChatSlug } : {}),
     todos,
   }
 
   validatePlanDocument(frontmatter, body)
 
   const sourceChatLine = input.sourceChatId ? `sourceChatId: ${input.sourceChatId}\n` : ''
+  const sourceChatSlugLine = input.sourceChatSlug
+    ? `sourceChatSlug: ${input.sourceChatSlug}\n`
+    : ''
   const content = `---
 id: ${planId}
 title: ${JSON.stringify(input.title)}
 createdAt: ${now.toISOString()}
 mode: plan
-${sourceChatLine}${formatTodos(todos)}
+${sourceChatLine}${sourceChatSlugLine}${formatTodos(todos)}
 ---
 
 ${body}
@@ -103,17 +114,39 @@ const removeTodosBlock = (yaml: string): string => {
   return kept.join('\n')
 }
 
+const definedPatchFields = (patch: PlanTodoItemPatch): Partial<PlanTodoItem> => {
+  const fields: Partial<PlanTodoItem> = {}
+  if (patch.content !== undefined) {
+    fields.content = patch.content
+  }
+  if (patch.status !== undefined) {
+    fields.status = patch.status
+  }
+  return fields
+}
+
 export const mergePlanTodos = (
   existing: PlanTodoItem[],
-  incoming: PlanTodoItem[],
+  incoming: PlanTodoItemPatch[],
 ): PlanTodoItem[] => {
   const merged = [...existing]
   for (const todo of incoming) {
     const index = merged.findIndex((item) => item.id === todo.id)
     if (index === -1) {
-      merged.push(todo)
+      if (todo.content === undefined) {
+        throw new Error(`Cannot append todo ${todo.id}: content is required for new ids`)
+      }
+      merged.push({
+        id: todo.id,
+        content: todo.content,
+        status: todo.status ?? 'pending',
+      })
     } else {
-      merged[index] = todo
+      const current = merged[index]
+      if (!current) {
+        continue
+      }
+      merged[index] = { ...current, ...definedPatchFields(todo) }
     }
   }
   return merged

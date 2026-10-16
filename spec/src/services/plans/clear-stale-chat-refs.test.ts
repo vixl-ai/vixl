@@ -28,7 +28,9 @@ title: Example
 createdAt: 2026-09-09T18:00:00.000Z
 mode: plan
 sourceChatId: keep-chat
+sourceChatSlug: group
 lastBuildChatId: stale-chat
+lastBuildChatSlug: stack
 builtAt: 2026-09-09T18:00:00.000Z
 lastBuildModel: gpt-4
 todos:
@@ -60,7 +62,9 @@ describe('clear-stale-chat-refs', () => {
     expect(fsWriteFile).toHaveBeenCalledTimes(1)
     const written = fsWriteFile.mock.calls[0]?.[0].content ?? ''
     expect(written).toContain('sourceChatId: keep-chat')
+    expect(written).toContain('sourceChatSlug: group')
     expect(written).not.toContain('lastBuildChatId:')
+    expect(written).not.toContain('lastBuildChatSlug:')
     expect(written).toContain('builtAt: 2026-09-09T18:00:00.000Z')
     expect(written).toContain('lastBuildModel: gpt-4')
     expect(written).toContain('## Goal')
@@ -78,7 +82,21 @@ describe('clear-stale-chat-refs', () => {
     expect(fsWriteFile).toHaveBeenCalledTimes(1)
     const written = fsWriteFile.mock.calls[0]?.[0].content ?? ''
     expect(written).not.toContain('sourceChatId:')
+    expect(written).not.toContain('sourceChatSlug:')
     expect(written).toContain('lastBuildChatId: stale-chat')
+    expect(written).toContain('lastBuildChatSlug: stack')
+  })
+
+  it('keeps sourceChatSlug when only lastBuildChatId is stale', async () => {
+    await clearStaleChatRefs({
+      projectRoot: PROJECT_ROOT,
+      path: PLAN_PATH,
+      staleChatIds: ['stale-chat'],
+    })
+
+    const written = fsWriteFile.mock.calls[0]?.[0].content ?? ''
+    expect(written).toContain('sourceChatSlug: group')
+    expect(written).not.toContain('lastBuildChatSlug:')
   })
 
   it('keeps valid sourceChatId and lastBuildChatId when they are not stale', async () => {

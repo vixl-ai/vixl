@@ -16,6 +16,8 @@ import {
 } from '@/utils/parse-member-qualified-name'
 import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 
+const PLAN_ID_RE = /(?:^|[\\/])\.vixl[\\/]plans[\\/]([^\\/]+)[\\/]/
+
 const props = defineProps<{
   artifact: ChatArtifact
 }>()
@@ -52,7 +54,7 @@ const displayLabel = computed(() => {
     return props.artifact.label
   }
   if (props.artifact.kind === 'plan') {
-    const match = props.artifact.path.match(/^\.vixl\/plans\/([^/]+)\//)
+    const match = props.artifact.path.match(PLAN_ID_RE)
     if (match?.[1]) {
       return match[1]
     }
@@ -103,7 +105,8 @@ const handleOpen = async (event: MouseEvent): Promise<void> => {
   try {
     if (props.artifact.kind === 'plan') {
       const planId =
-        props.artifact.path.match(/^\.vixl\/plans\/([^/]+)\//)?.[1] ??
+        props.artifact.id ??
+        props.artifact.path.match(PLAN_ID_RE)?.[1] ??
         displayLabel.value
       await workbench.openPlan(id, planId, props.artifact.path, props.artifact.label)
       return

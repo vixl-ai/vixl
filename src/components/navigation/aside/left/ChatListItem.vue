@@ -36,11 +36,15 @@ import { SidebarMenuSubButton } from '@/components/shadcn/ui/sidebar'
 import { dropAgentHarness } from '@/composables/use-agent-harness'
 import useChatStore from '@/composables/use-chat-store'
 import useFleetSidebar, { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
+import { isHomeChatSlug } from '@/constants/home-chat'
 import { dropPlanExecutionSession } from '@/services/harness/plan-execution-session'
 import { killShellsForChat } from '@/services/harness/shell/registry'
+import clearBuildChatRef from '@/services/plans/clear-build-chat-ref'
+import projectRootsForSlug from '@/services/plans/project-roots-for-slug'
 import {
   deleteChat,
   forkChat,
+  getUserHomeDir,
   pinChat,
   updateChatMeta,
 } from '@/services/vixl/vixl-tauri'
@@ -55,6 +59,8 @@ const route = useRoute()
 const router = useRouter()
 const fleetSidebar = useFleetSidebar()
 const chatStore = useChatStore()
+const fleet = useFleetRegistry()
+const workbench = useWorkbenchStore()
 
 const renameOpen = ref(false)
 const deleteOpen = ref(false)
@@ -212,6 +218,27 @@ const handleDelete = async (): Promise<void> => {
     }
 
     toast.success('Chat deleted')
+    try {
+      const roots = projectRootsForSlug({
+        projectSlug: props.projectSlug,
+        homeDir: isHomeChatSlug(props.projectSlug) ? await getUserHomeDir() : undefined,
+        projects: fleet.projects.value,
+        groups: fleet.groups.value,
+      })
+      for (const projectRoot of roots) {
+        await clearBuildChatRef({
+          projectRoot,
+          chatId: props.chat.id,
+        })
+      }
+      if (roots.length > 0) {
+        workbench.refreshPlanTabs()
+      }
+    } catch (error) {
+      toast.error('Failed to clear plan build chat', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
   } catch (error) {
     toast.error('Could not delete chat', {
       description: error instanceof Error ? error.message : 'Unknown error',

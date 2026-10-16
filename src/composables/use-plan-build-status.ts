@@ -7,7 +7,16 @@ import type { ChatStatus } from '@/types/chat/chat-meta'
 type PlanBuildStatusInput = {
   projectId: MaybeRefOrGetter<string>
   lastBuildChatId: MaybeRefOrGetter<string | null>
+  lastBuildChatSlug?: MaybeRefOrGetter<string | null>
   sourceChatId: MaybeRefOrGetter<string | null>
+  sourceChatSlug?: MaybeRefOrGetter<string | null>
+}
+
+const trimmedSlug = (value: MaybeRefOrGetter<string | null> | undefined): string => {
+  if (!value) {
+    return ''
+  }
+  return toValue(value)?.trim() ?? ''
 }
 
 const isChatNotFoundError = (error: unknown): boolean =>
@@ -22,13 +31,28 @@ export default (input: PlanBuildStatusInput) => {
     () => toValue(input.lastBuildChatId) ?? toValue(input.sourceChatId),
   )
 
-  const projectSlug = computed(
+  const tabProjectSlug = computed(
     () => workbench.getProject(toValue(input.projectId))?.slug ?? null,
   )
 
+  const buildChatSlug = computed((): string | null => {
+    const id = buildChatId.value
+    const lastBuildId = toValue(input.lastBuildChatId)
+    const lastBuildSlug = trimmedSlug(input.lastBuildChatSlug)
+    if (id && lastBuildId && id === lastBuildId && lastBuildSlug) {
+      return lastBuildSlug
+    }
+    const sourceId = toValue(input.sourceChatId)
+    const sourceSlug = trimmedSlug(input.sourceChatSlug)
+    if (id && sourceId && id === sourceId && sourceSlug) {
+      return sourceSlug
+    }
+    return tabProjectSlug.value
+  })
+
   const buildChatStatus = computed((): ChatStatus => {
     const id = buildChatId.value
-    const slug = projectSlug.value
+    const slug = buildChatSlug.value
     if (!id || !slug) {
       return 'idle'
     }
@@ -55,7 +79,7 @@ export default (input: PlanBuildStatusInput) => {
   }
 
   watch(
-    [buildChatId, projectSlug],
+    [buildChatId, buildChatSlug],
     async ([id, slug]) => {
       if (!id || !slug) {
         return

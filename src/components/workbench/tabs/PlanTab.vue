@@ -45,7 +45,9 @@ const body = ref('')
 const todos = ref<PlanTodoItem[]>([])
 const title = ref('')
 const sourceChatId = ref<string | null>(null)
+const sourceChatSlug = ref<string | null>(null)
 const lastBuildChatId = ref<string | null>(null)
+const lastBuildChatSlug = ref<string | null>(null)
 const loading = ref(false)
 const parseError = ref<string | null>(null)
 const orchestrateOpen = ref(false)
@@ -54,7 +56,9 @@ const buildNowOpen = ref(false)
 const { buildChatId, buildChatStatus, buildChatMissing, missingChatIds } = usePlanBuildStatus({
   projectId: () => props.tab.projectId,
   lastBuildChatId,
+  lastBuildChatSlug,
   sourceChatId,
+  sourceChatSlug,
 })
 
 const planPayload = computed(() => props.tab.payload as PlanPayload)
@@ -121,7 +125,9 @@ const loadPlan = async (): Promise<void> => {
       body.value = parsed.body
       todos.value = []
       sourceChatId.value = null
+      sourceChatSlug.value = null
       lastBuildChatId.value = null
+      lastBuildChatSlug.value = null
       return
     }
 
@@ -129,7 +135,9 @@ const loadPlan = async (): Promise<void> => {
     body.value = parsed.body
     todos.value = parsed.frontmatter?.todos ?? []
     sourceChatId.value = parsed.frontmatter?.sourceChatId ?? null
+    sourceChatSlug.value = parsed.frontmatter?.sourceChatSlug ?? null
     lastBuildChatId.value = parsed.frontmatter?.lastBuildChatId ?? null
+    lastBuildChatSlug.value = parsed.frontmatter?.lastBuildChatSlug ?? null
   } catch (error) {
     toast.error('Failed to load plan', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -150,8 +158,14 @@ const { handleBuildNowConfirm, handleOrchestrateConfirm } = usePlanBuildActions(
 })
 
 const handleOpenBuildChat = async (): Promise<void> => {
-  const slug = workbench.getProject(props.tab.projectId)?.slug
   const chatId = buildChatId.value
+  const tabSlug = workbench.getProject(props.tab.projectId)?.slug
+  const slug =
+    chatId && chatId === lastBuildChatId.value && lastBuildChatSlug.value
+      ? lastBuildChatSlug.value
+      : chatId && chatId === sourceChatId.value && sourceChatSlug.value
+        ? sourceChatSlug.value
+        : tabSlug
   if (!chatId || buildChatMissing.value) {
     return
   }
@@ -236,9 +250,11 @@ watch(
       })
       if (sourceChatId.value && stale.includes(sourceChatId.value)) {
         sourceChatId.value = null
+        sourceChatSlug.value = null
       }
       if (lastBuildChatId.value && stale.includes(lastBuildChatId.value)) {
         lastBuildChatId.value = null
+        lastBuildChatSlug.value = null
       }
     } catch (error) {
       toast.error('Failed to clear stale chat references', {

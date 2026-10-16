@@ -69,6 +69,36 @@ describe('deriveToolArtifact', () => {
     })
   })
 
+  it('returns a plan artifact with id from create_plan planId', () => {
+    expect(
+      deriveToolArtifact(
+        'create_plan',
+        {
+          planId: 'ship-it-2026',
+          path: '/tmp/proj/.vixl/plans/ship-it-2026/PLAN.md',
+          relativePath: '.vixl/plans/ship-it-2026/PLAN.md',
+        },
+        { title: 'Ship it' },
+      ),
+    ).toEqual({
+      kind: 'plan',
+      path: '/tmp/proj/.vixl/plans/ship-it-2026/PLAN.md',
+      label: 'Ship it',
+      id: 'ship-it-2026',
+    })
+  })
+
+  it('omits plan id when create_plan does not return planId', () => {
+    expect(
+      deriveToolArtifact('create_plan', {
+        path: '.vixl/plans/ship-it-2026/PLAN.md',
+      }),
+    ).toEqual({
+      kind: 'plan',
+      path: '.vixl/plans/ship-it-2026/PLAN.md',
+    })
+  })
+
   it('returns undefined for codebase tools with empty results', () => {
     expect(
       deriveToolArtifact('codebase_impact', { summary: 'none', results: [] }),

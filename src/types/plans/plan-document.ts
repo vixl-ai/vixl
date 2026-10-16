@@ -10,9 +10,11 @@ export type PlanFrontmatter = {
   createdAt: string
   mode: 'plan'
   sourceChatId?: string
+  sourceChatSlug?: string
   parent?: string
   builtAt?: string
   lastBuildChatId?: string
+  lastBuildChatSlug?: string
   lastBuildModel?: string
   todos: PlanTodoItem[]
 }
