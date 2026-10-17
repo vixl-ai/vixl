@@ -1,0 +1,9 @@
+# Direct zip is 9.x (patched). These IDs still match zip 4.6.1, which
+# tauri-plugin-updater 2.10 pulls in as a Windows-only optional dep.
+# No crates.io updater release depends on zip >= 9 yet.
+[advisories]
+ignore = [
+    "RUSTSEC-2026-0367",
+    "RUSTSEC-2026-0368",
+    "RUSTSEC-2026-0369",
+]
