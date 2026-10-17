@@ -2,6 +2,7 @@ import {
   isMultiRootWorkspace,
   REPO_TOOL_HINT,
   repoSlugFields,
+  withMultiRootSuffix,
 } from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
@@ -10,7 +11,7 @@ export { REPO_TOOL_HINT, repoSlugFields }
 export const describeRepoTool = (
   base: string,
   ctx: Pick<HarnessToolContext, 'members'>,
-): string => (isMultiRootWorkspace(ctx) ? `${base} ${REPO_TOOL_HINT}` : base)
+): string => withMultiRootSuffix(base, ctx, REPO_TOOL_HINT)
 
 export const repoScopeSummary = (
   ctx: Pick<HarnessToolContext, 'members'>,

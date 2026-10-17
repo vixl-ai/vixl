@@ -106,7 +106,8 @@ export default (
     }
     const label =
       isRecord(args) && typeof args.title === 'string' ? args.title : undefined
-    return { kind: 'plan', path, label }
+    const id = typeof result.planId === 'string' ? result.planId : undefined
+    return { kind: 'plan', path, label, ...(id ? { id } : {}) }
   }
 
   if (

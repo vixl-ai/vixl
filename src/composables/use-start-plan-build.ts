@@ -37,6 +37,7 @@ export type StartPlanBuildInput = {
   planPath: string
   planTitle: string
   sourceChatId?: string | null
+  sourceChatSlug?: string | null
   lastBuildChatId?: string | null
   freshChat?: boolean
   model?: string
@@ -44,6 +45,11 @@ export type StartPlanBuildInput = {
   reasoning?: ReasoningLevel
   subagentReasoning?: ReasoningLevel
   executionMode?: PlanExecutionMode
+}
+
+type ExistingChatCandidate = {
+  slug: string
+  chatId: string | null | undefined
 }
 
 const seedChatTasksFromPlan = async (
@@ -75,24 +81,46 @@ export default () => {
   const config = useVixlConfig()
   const building = ref(false)
 
-  const resolveExistingChatId = async (
-    projectSlug: string,
-    candidates: Array<string | null | undefined>,
-  ): Promise<string | null> => {
+  const resolveExistingChat = async (
+    candidates: ExistingChatCandidate[],
+  ): Promise<{ slug: string; chatId: string } | null> => {
     const seen = new Set<string>()
     for (const candidate of candidates) {
-      if (!candidate || seen.has(candidate)) {
+      if (!candidate.chatId) {
         continue
       }
-      seen.add(candidate)
+      const key = `${candidate.slug}:${candidate.chatId}`
+      if (seen.has(key)) {
+        continue
+      }
+      seen.add(key)
       try {
-        await readChatMeta(projectSlug, candidate)
-        return candidate
+        await readChatMeta(candidate.slug, candidate.chatId)
+        return { slug: candidate.slug, chatId: candidate.chatId }
       } catch {
         continue
       }
     }
     return null
+  }
+
+  const sourceChatSlugForBuild = async (
+    projectRoot: string,
+    input: StartPlanBuildInput,
+  ): Promise<string | null> => {
+    const fromInput = input.sourceChatSlug?.trim()
+    if (fromInput) {
+      return fromInput
+    }
+    try {
+      const { content } = await fsReadFile({
+        projectRoot,
+        path: input.planPath,
+      })
+      return parsePlan(content).frontmatter?.sourceChatSlug ?? null
+    } catch {
+      return null
+    }
   }
 
   const startPlanBuild = async (input: StartPlanBuildInput): Promise<boolean> => {
@@ -168,12 +196,21 @@ export default () => {
         await fleet.setActiveProject(project.id)
       }
 
+      let chatSlug = project.slug
       let chatId: string | null = null
       if (!input.freshChat) {
-        chatId = await resolveExistingChatId(project.slug, [
-          input.lastBuildChatId,
-          input.sourceChatId,
+        const sourceChatSlug = await sourceChatSlugForBuild(project.rootPath, input)
+        const existing = await resolveExistingChat([
+          { slug: project.slug, chatId: input.lastBuildChatId },
+          ...(sourceChatSlug
+            ? [{ slug: sourceChatSlug, chatId: input.sourceChatId }]
+            : []),
+          { slug: project.slug, chatId: input.sourceChatId },
         ])
+        if (existing) {
+          chatSlug = existing.slug
+          chatId = existing.chatId
+        }
       }
       if (!chatId) {
         const chat = await chatStore.createNewChat({
@@ -184,15 +221,16 @@ export default () => {
           title: input.planTitle,
         })
         chatId = chat.id
+        chatSlug = project.slug
       }
 
-      const session = chatStore.forChat(project.slug, chatId)
+      const session = chatStore.forChat(chatSlug, chatId)
       if (session.meta.value?.status === 'running') {
         toast.error('Plan is already building in that chat')
         return false
       }
 
-      await updateChatMeta(project.slug, chatId, {
+      await updateChatMeta(chatSlug, chatId, {
         model,
         mode: chatMode,
         awaitingPlanGo: null,
@@ -202,9 +240,9 @@ export default () => {
         subagentReasoning: subagentReasoning ?? null,
       })
 
-      setActivePlanPath(project.slug, chatId, input.planPath)
+      setActivePlanPath(chatSlug, chatId, input.planPath)
       setSubagentModelLock(
-        project.slug,
+        chatSlug,
         chatId,
         subagentModel,
         subagentReasoning ?? null,
@@ -212,7 +250,7 @@ export default () => {
 
       await seedChatTasksFromPlan(
         project.rootPath,
-        project.slug,
+        chatSlug,
         chatId,
         input.planPath,
         session,
@@ -233,12 +271,13 @@ export default () => {
         patch: {
           builtAt: new Date().toISOString(),
           lastBuildChatId: chatId,
+          lastBuildChatSlug: chatSlug,
           lastBuildModel: model,
         },
       })
 
       await refreshFleetSidebar()
-      await router.push(chatRouteFor(project.slug, chatId))
+      await router.push(chatRouteFor(chatSlug, chatId))
       return true
     } catch (error) {
       toast.error('Could not start plan build', {

@@ -41,6 +41,14 @@ vi.mock('@/composables/use-workbench-store', () => ({
   }),
 }))
 
+vi.mock('@/composables/use-chat-store', () => ({
+  default: () => ({
+    forChat: () => ({
+      todos: { value: [] },
+    }),
+  }),
+}))
+
 const projectSlug = 'project'
 const chatId = 'chat-update-plan-todo'
 const projectRoot = '/tmp/project'
@@ -149,6 +157,26 @@ describe('update_plan_todo', () => {
     const parsed = parsePlan(written.content)
     expect(parsed.parseError).toBeUndefined()
     expect(parsed.frontmatter?.todos).toEqual(merged)
+  })
+
+  it('applies a status-only patch and keeps existing content', async () => {
+    const updatePlanTodo = (await import('@/services/harness/plan/update-todo')).default
+    const tool = updatePlanTodo(planCtx())
+
+    const result = (await runTool(tool.execute, {
+      planPath: existingPlan.path,
+      todos: [{ id: 'update', status: 'completed' }],
+    })) as {
+      todos: Array<{ id: string; content: string; status: string }>
+    }
+
+    expect(result.todos).toEqual([
+      { id: 'keep', content: 'Keep me', status: 'in_progress' },
+      { id: 'update', content: 'Old text', status: 'completed' },
+    ])
+    const written = fsWriteFile.mock.calls[0]?.[0] as { content: string }
+    const parsed = parsePlan(written.content)
+    expect(parsed.frontmatter?.todos).toEqual(result.todos)
   })
 
   it('resolves via session.activePlanPath when planPath is omitted', async () => {

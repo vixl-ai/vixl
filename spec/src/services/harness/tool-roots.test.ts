@@ -25,7 +25,11 @@ import {
   toRelativeUnderProjectRoot,
   toWorkspaceRelativePath,
   withMultiRootPathHint,
+  withMultiRootSuffix,
   withProjectRoots,
+  repoSlugFields,
+  cwdSlugFields,
+  REPO_TOOL_HINT,
 } from '@/services/harness/tool-roots'
 
 const api: HarnessWorkspaceMember = {
@@ -47,9 +51,47 @@ describe('withMultiRootPathHint', () => {
 
   it('appends the slug hint when members exist', () => {
     expect(withMultiRootPathHint('Git status', { members: [api, web] })).toBe(
-      `Git status ${MULTI_ROOT_PATH_HINT}`,
+      `Git status ${MULTI_ROOT_PATH_HINT([api, web])}`,
     )
     expect(isMultiRootWorkspace({ members: [api, web] })).toBe(true)
+  })
+
+  it('uses the first member slug in the path example and lists every slug', () => {
+    const platform = { slug: 'platform', name: 'Platform', rootPath: '/tmp/platform' }
+    const cms = { slug: 'cms-site-template', name: 'CMS', rootPath: '/tmp/cms' }
+    const widgets = { slug: 'site-widgets', name: 'Widgets', rootPath: '/tmp/widgets' }
+    const extra = { slug: 'docs', name: 'Docs', rootPath: '/tmp/docs' }
+    const hint = MULTI_ROOT_PATH_HINT([platform, cms, widgets, extra])
+    expect(hint).toBe(
+      'In a multi-project workspace, paths must be prefixed with a project slug (for example platform/src/index.ts). Valid slugs: platform, cms-site-template, site-widgets, docs.',
+    )
+  })
+
+  it('lists every slug on cwd and repo field descriptions', () => {
+    const members = [
+      { slug: 'platform', name: 'Platform', rootPath: '/tmp/platform' },
+      { slug: 'cms-site-template', name: 'CMS', rootPath: '/tmp/cms' },
+      { slug: 'site-widgets', name: 'Widgets', rootPath: '/tmp/widgets' },
+    ]
+    const ctx = { members }
+    const repo = repoSlugFields(ctx) as { repo: { description?: string } }
+    const cwd = cwdSlugFields(ctx) as { cwd: { description?: string } }
+    expect(repo.repo.description).toContain(
+      'Valid slugs: platform, cms-site-template, site-widgets.',
+    )
+    expect(cwd.cwd.description).toContain(
+      'Valid slugs: platform, cms-site-template, site-widgets.',
+    )
+  })
+
+  it('appends every slug when a repo suffix has none', () => {
+    const members = [
+      { slug: 'platform', name: 'Platform', rootPath: '/tmp/platform' },
+      { slug: 'cms-site-template', name: 'CMS', rootPath: '/tmp/cms' },
+    ]
+    expect(withMultiRootSuffix('Git status', { members }, REPO_TOOL_HINT)).toBe(
+      'Git status Optional repo is a project slug; defaults to the primary project. Valid slugs: platform, cms-site-template.',
+    )
   })
 
   it('treats a single member like a single-root workspace', () => {

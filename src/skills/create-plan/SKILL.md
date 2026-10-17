@@ -5,6 +5,7 @@ description: Research and create a durable PLAN.md.
 
 Research with read tools, then call create_plan, which writes the PLAN.md.
 
+- Invoke this skill only when a durable plan document is wanted.
 - Without create_plan, stop and suggest switching to Plan or Agent mode.
 - create_plan is for new plans; revise an existing plan with update_plan.
 - Research with read_file, grep, glob_files, list_dir, codebase_*, spawn_subagent, MCP, and web_fetch.

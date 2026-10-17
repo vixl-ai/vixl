@@ -45,12 +45,36 @@ export default async (args: {
   const yaml = match[1] ?? ''
   const body = match[2] ?? ''
   const lines = yaml.split('\n')
-  const nextLines = lines.filter((line) => staleChatIdFromLine(line, args.staleChatIds) === null)
-  if (nextLines.length === lines.length) {
+  let droppedLastBuildChatId = false
+  let droppedSourceChatId = false
+  const nextLines = lines.filter((line) => {
+    if (staleChatIdFromLine(line, args.staleChatIds) === null) {
+      return true
+    }
+    const trimmed = line.trim()
+    if (trimmed.startsWith('lastBuildChatId:')) {
+      droppedLastBuildChatId = true
+    }
+    if (trimmed.startsWith('sourceChatId:')) {
+      droppedSourceChatId = true
+    }
+    return false
+  })
+  const withoutPairedSlugs = nextLines.filter((line) => {
+    const trimmed = line.trim()
+    if (droppedLastBuildChatId && trimmed.startsWith('lastBuildChatSlug:')) {
+      return false
+    }
+    if (droppedSourceChatId && trimmed.startsWith('sourceChatSlug:')) {
+      return false
+    }
+    return true
+  })
+  if (withoutPairedSlugs.length === lines.length) {
     return
   }
 
-  const nextYaml = nextLines.join('\n').trimEnd()
+  const nextYaml = withoutPairedSlugs.join('\n').trimEnd()
   const nextContent = `---\n${nextYaml}\n---\n\n${body.trimStart()}`
 
   const parsed = parsePlan(nextContent)

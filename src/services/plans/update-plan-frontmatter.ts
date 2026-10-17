@@ -3,12 +3,27 @@ import { fsReadFile, fsWriteFile } from '@/services/vixl/vixl-tauri'
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/
 
-const BUILD_FIELD_KEYS = ['builtAt', 'lastBuildChatId', 'lastBuildModel'] as const
+const BUILD_FIELD_KEYS = [
+  'builtAt',
+  'lastBuildChatId',
+  'lastBuildChatSlug',
+  'lastBuildModel',
+] as const
+
+type BuildFieldKey = (typeof BUILD_FIELD_KEYS)[number]
 
 export type PlanBuildFrontmatterPatch = {
-  builtAt: string
-  lastBuildChatId: string
-  lastBuildModel: string
+  builtAt?: string | null
+  lastBuildChatId?: string | null
+  lastBuildChatSlug?: string | null
+  lastBuildModel?: string | null
+}
+
+const formatBuildLine = (key: BuildFieldKey, value: string): string => {
+  if (key === 'lastBuildModel') {
+    return `${key}: ${JSON.stringify(value)}`
+  }
+  return `${key}: ${value}`
 }
 
 export default async (args: {
@@ -24,16 +39,24 @@ export default async (args: {
 
   const yaml = match[1] ?? ''
   const body = match[2] ?? ''
-  const lines = yaml.split('\n').filter(
-    (line) => !BUILD_FIELD_KEYS.some((key) => line.trim().startsWith(`${key}:`)),
-  )
+  const patch = args.patch
+  const lines = yaml.split('\n').filter((line) => {
+    const key = BUILD_FIELD_KEYS.find((field) => line.trim().startsWith(`${field}:`))
+    if (!key) {
+      return true
+    }
+    return !(key in patch)
+  })
+  const buildLines = BUILD_FIELD_KEYS.flatMap((key) => {
+    const value = patch[key]
+    if (typeof value !== 'string') {
+      return []
+    }
+    return [formatBuildLine(key, value)]
+  })
   const trimmedYaml = lines.join('\n').trimEnd()
-  const buildLines = [
-    `builtAt: ${args.patch.builtAt}`,
-    `lastBuildChatId: ${args.patch.lastBuildChatId}`,
-    `lastBuildModel: ${JSON.stringify(args.patch.lastBuildModel)}`,
-  ]
-  const nextYaml = `${trimmedYaml}\n${buildLines.join('\n')}`
+  const nextYaml =
+    buildLines.length > 0 ? `${trimmedYaml}\n${buildLines.join('\n')}` : trimmedYaml
   const nextContent = `---\n${nextYaml}\n---\n\n${body.trimStart()}`
 
   const parsed = parsePlan(nextContent)

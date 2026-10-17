@@ -8,6 +8,8 @@ import type { PlanBuildFrontmatterPatch } from '@/services/plans/update-plan-fro
 import type { ChatMeta, ChatStatus } from '@/types/chat/chat-meta'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import type { PlanTodoItem } from '@/types/plans/plan-document'
+import type { FleetProjectGroup } from '@/types/fleet/fleet-project-group'
+import { setFleetGroupReader } from '@/utils/fleet-group-reader'
 
 const createNewChat = vi.hoisted(
   () =>
@@ -213,6 +215,7 @@ describe('use-start-plan-build', () => {
     loadPromptMock.mockClear()
     loadPromptMock.mockReturnValue('build this plan')
     vi.mocked(toast.error).mockClear()
+    setFleetGroupReader(() => [])
     sessionStatus.value = 'idle'
     createNewChat.mockResolvedValue({ id: 'fresh-chat' })
     readChatMetaMock.mockImplementation(async (_projectSlug, chatId) => ({ id: chatId }))
@@ -262,7 +265,10 @@ describe('use-start-plan-build', () => {
     expect(setPendingChatMessageMock).toHaveBeenCalled()
     expect(updatePlanFrontmatter).toHaveBeenCalledWith(
       expect.objectContaining({
-        patch: expect.objectContaining({ lastBuildChatId: 'fresh-chat' }),
+        patch: expect.objectContaining({
+          lastBuildChatId: 'fresh-chat',
+          lastBuildChatSlug: 'proj',
+        }),
       }),
     )
     expect(setActiveProject).toHaveBeenCalledWith('proj-1')
@@ -293,6 +299,7 @@ describe('use-start-plan-build', () => {
       expect.objectContaining({
         projectRoot: '/Users/test-home',
         path: 'plans/example.md',
+        patch: expect.objectContaining({ lastBuildChatSlug: '_home_' }),
       }),
     )
     expect(routerPush).toHaveBeenCalledWith('/chat/fresh-chat')
@@ -315,7 +322,57 @@ describe('use-start-plan-build', () => {
     expect(setPendingChatMessageMock).toHaveBeenCalled()
     expect(updatePlanFrontmatter).toHaveBeenCalledWith(
       expect.objectContaining({
-        patch: expect.objectContaining({ lastBuildChatId: 'last-build' }),
+        patch: expect.objectContaining({
+          lastBuildChatId: 'last-build',
+          lastBuildChatSlug: 'proj',
+        }),
+      }),
+    )
+  })
+
+  it('reuses sourceChatId under sourceChatSlug when the tab slug lookup fails', async () => {
+    readChatMetaMock.mockImplementation(async (projectSlug, chatId) => {
+      if (projectSlug === 'stack' && chatId === 'source-chat') {
+        return { id: chatId }
+      }
+      throw new Error('Chat not found')
+    })
+    setFleetGroupReader(
+      () =>
+        [
+          {
+            id: 'g1',
+            name: 'Stack',
+            slug: 'stack',
+            memberSlugs: ['proj'],
+            lastOpened: '',
+          },
+        ] satisfies FleetProjectGroup[],
+    )
+    const { startPlanBuild } = useStartPlanBuild()
+
+    const result = await startPlanBuild({
+      ...baseInput,
+      sourceChatId: 'source-chat',
+      sourceChatSlug: 'stack',
+    })
+
+    expect(result).toBe(true)
+    expect(createNewChat).not.toHaveBeenCalled()
+    expect(readChatMetaMock).toHaveBeenCalledWith('stack', 'source-chat')
+    expect(forChat).toHaveBeenCalledWith('stack', 'source-chat')
+    expect(updateChatMeta).toHaveBeenCalledWith(
+      'stack',
+      'source-chat',
+      expect.objectContaining({ activePlanPath: baseInput.planPath }),
+    )
+    expect(routerPush).toHaveBeenCalledWith('/group/stack/chat/source-chat')
+    expect(updatePlanFrontmatter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patch: expect.objectContaining({
+          lastBuildChatId: 'source-chat',
+          lastBuildChatSlug: 'stack',
+        }),
       }),
     )
   })

@@ -1,9 +1,11 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { planTodoItemSchema } from '@/schemas/plan-document'
+import { planTodoItemPatchSchema, planTodoItemSchema } from '@/schemas/plan-document'
 import parsePlan from '@/services/plans/parse-plan'
 import { mergePlanTodos, updatePlanTodos } from '@/services/plans/write-plan'
+import mergeInChatTodos from '@/services/harness/write/merge-in-chat-todos'
 import { fsReadFile, fsWriteFile } from '@/services/vixl/vixl-tauri'
+import useChatStore from '@/composables/use-chat-store'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { HOME_WORKSPACE_ID, isHomeChatSlug } from '@/constants/home-chat'
 import {
@@ -33,7 +35,7 @@ const listRunningSubagentHints = (chatId: string): RunningSubagentHint[] =>
 
 const withRunningSubagentContext = <T extends Record<string, unknown>>(
   chatId: string,
-  inputTodos: Array<{ status: string }>,
+  inputTodos: Array<{ status?: string }>,
   result: T,
 ): T | (T & { runningSubagents: RunningSubagentHint[]; note?: string }) => {
   const runningSubagents = listRunningSubagentHints(chatId)
@@ -60,13 +62,11 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
       'Merge todos by id into a plan: matching ids update, new ids append, others keep their state. Mark a todo cancelled to drop it. planPath defaults to the active plan, or in-chat Tasks when none exists.',
     inputSchema: z.object({
       planPath: z.string().optional(),
-      todos: z.array(
-        z.object({
-          id: z.string().describe('Stable todo id'),
-          content: z.string(),
-          status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']),
-        }),
-      ),
+      todos: z
+        .array(planTodoItemPatchSchema)
+        .describe(
+          'Todo patches. id is required. content and status are optional for existing ids. New ids must include content.',
+        ),
     }),
     execute: async ({ planPath, todos }) => {
       const session = getPlanExecutionSession(ctx.projectSlug, ctx.chatId)
@@ -75,8 +75,10 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
         session.activePlanPath,
       )
       if (!resolvedPlanPath) {
+        const existing = useChatStore().forChat(ctx.projectSlug, ctx.chatId).todos.value
+        const merged = mergeInChatTodos(existing, todos)
         return withRunningSubagentContext(ctx.chatId, todos, {
-          todos: z.array(planTodoItemSchema).parse(todos),
+          todos: z.array(planTodoItemSchema).parse(merged),
         })
       }
       const target = resolvePlanToolPath(ctx, resolvedPlanPath)

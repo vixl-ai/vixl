@@ -130,6 +130,29 @@ fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, String> {
     Ok(operations)
 }
 
+fn append_line(result: &mut String, line: &str) {
+    if !result.is_empty() {
+        result.push('\n');
+    }
+    result.push_str(line);
+}
+
+fn seek_matching_line(
+    old_lines: &[&str],
+    old_index: &mut usize,
+    target: &str,
+    result: &mut String,
+) -> Result<(), String> {
+    while *old_index < old_lines.len() && old_lines[*old_index] != target {
+        append_line(result, old_lines[*old_index]);
+        *old_index += 1;
+    }
+    if *old_index >= old_lines.len() {
+        return Err("Patch context does not match file contents".to_string());
+    }
+    Ok(())
+}
+
 fn apply_update_patch(existing: &str, patched: &str) -> Result<String, String> {
     let mut result = String::new();
     let mut old_index = 0usize;
@@ -144,38 +167,24 @@ fn apply_update_patch(existing: &str, patched: &str) -> Result<String, String> {
             continue;
         }
         if let Some(removed) = line.strip_prefix('-') {
-            if old_index >= old_lines.len() || old_lines[old_index] != removed {
-                return Err("Patch context does not match file contents".to_string());
-            }
+            seek_matching_line(&old_lines, &mut old_index, removed, &mut result)?;
             old_index += 1;
             patch_index += 1;
             continue;
         }
         if let Some(added) = line.strip_prefix('+') {
-            if !result.is_empty() {
-                result.push('\n');
-            }
-            result.push_str(added);
+            append_line(&mut result, added);
             patch_index += 1;
             continue;
         }
-        if old_index < old_lines.len() && old_lines[old_index] == line {
-            if !result.is_empty() {
-                result.push('\n');
-            }
-            result.push_str(line);
-            old_index += 1;
-            patch_index += 1;
-            continue;
-        }
-        return Err("Patch context does not match file contents".to_string());
+        seek_matching_line(&old_lines, &mut old_index, line, &mut result)?;
+        append_line(&mut result, line);
+        old_index += 1;
+        patch_index += 1;
     }
 
     while old_index < old_lines.len() {
-        if !result.is_empty() {
-            result.push('\n');
-        }
-        result.push_str(old_lines[old_index]);
+        append_line(&mut result, old_lines[old_index]);
         old_index += 1;
     }
 
@@ -378,5 +387,42 @@ pub fn fs_stage_preview(
                 None,
             )])
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::apply_update_patch;
+
+    #[test]
+    fn mid_file_hunk_preserves_prefix_and_suffix() {
+        let existing = "alpha\nbeta\ngamma\ntarget\nsuffix";
+        let patched = "@@\ntarget\n-suffix\n+changed";
+        let result = apply_update_patch(existing, patched).expect("mid-file hunk");
+        assert_eq!(result, "alpha\nbeta\ngamma\ntarget\nchanged");
+    }
+
+    #[test]
+    fn multiple_hunks_in_one_file() {
+        let existing = "keep\none\nmid\ntwo\nend";
+        let patched = "@@\n-one\n+1\n@@\n-two\n+2";
+        let result = apply_update_patch(existing, patched).expect("multiple hunks");
+        assert_eq!(result, "keep\n1\nmid\n2\nend");
+    }
+
+    #[test]
+    fn repeated_lines_anchor_at_second_occurrence() {
+        let existing = "foo\nfirst\nfoo\nsecond";
+        let patched = "@@\nfoo\n-first\n+1\n@@\nfoo\n-second\n+2";
+        let result = apply_update_patch(existing, patched).expect("second occurrence");
+        assert_eq!(result, "foo\n1\nfoo\n2");
+    }
+
+    #[test]
+    fn mismatched_hunk_still_errors() {
+        let existing = "hello\nworld";
+        let patched = "@@\n-missing\n+x";
+        let error = apply_update_patch(existing, patched).expect_err("mismatch");
+        assert_eq!(error, "Patch context does not match file contents");
     }
 }

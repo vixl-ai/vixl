@@ -468,7 +468,12 @@ describe('orchestrator run user persist', () => {
       '- writer (sub-live, failed): writer failed',
     )
     expect(wakeNudge?.content).not.toContain('explorer timed out')
-    expect(wakeNudge?.content).not.toContain('steered rewrite')
+    expect(wakeNudge?.content).not.toContain(
+      '- explorer (sub-stale, completed): steered rewrite',
+    )
+    expect(wakeNudge?.content).toContain(
+      '- explorer (sub-stale): completed: steered rewrite',
+    )
     expect(isBackgroundResultFinalized('chat-1', 'tc-stale')).toBe(false)
     expect(isBackgroundResultFinalized('chat-1', 'tc-live')).toBe(true)
   })

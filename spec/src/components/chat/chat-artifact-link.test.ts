@@ -106,6 +106,39 @@ describe('ChatArtifactLink home chat', () => {
     )
   })
 
+  it('prefers artifact.id over a path that would not match the plan id regex', async () => {
+    wrapper = mountLink({
+      kind: 'plan',
+      id: 'real-plan-id',
+      path: '/tmp/proj/.vixl/plans/real-plan-id/PLAN.md',
+      label: 'Display title',
+    })
+    await wrapper.get('button').trigger('click')
+
+    expect(openPlan).toHaveBeenCalledWith(
+      HOME_WORKSPACE_ID,
+      'real-plan-id',
+      '/tmp/proj/.vixl/plans/real-plan-id/PLAN.md',
+      'Display title',
+    )
+  })
+
+  it('extracts plan id from an absolute path when artifact.id is missing', async () => {
+    wrapper = mountLink({
+      kind: 'plan',
+      path: '/tmp/proj/.vixl/plans/abs-plan/PLAN.md',
+      label: 'Display title',
+    })
+    await wrapper.get('button').trigger('click')
+
+    expect(openPlan).toHaveBeenCalledWith(
+      HOME_WORKSPACE_ID,
+      'abs-plan',
+      '/tmp/proj/.vixl/plans/abs-plan/PLAN.md',
+      'Display title',
+    )
+  })
+
   it('opens the plan with HOME_WORKSPACE_ID on home-chat-subagent', async () => {
     routeState.name = 'home-chat-subagent'
     wrapper = mountLink()

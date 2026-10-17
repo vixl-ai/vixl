@@ -53,7 +53,7 @@ pub fn extract_zip_bytes(bytes: &[u8], dest: &Path) -> Result<(), String> {
         {
             use std::os::unix::fs::PermissionsExt;
             if let Some(mode) = entry.unix_mode() {
-                fs::set_permissions(&out_path, fs::Permissions::from_mode(mode))
+                fs::set_permissions(&out_path, fs::Permissions::from_mode(mode & 0o777))
                     .map_err(|e| e.to_string())?;
             }
         }

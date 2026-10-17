@@ -9,13 +9,21 @@ import {
 import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
-export type IpcProjectRoot = {
-  slug: string
-  path: string
-}
+export type IpcProjectRoot = { slug: string; path: string }
 
-export const MULTI_ROOT_PATH_HINT =
-  'In a multi-project workspace, paths must be prefixed with a project slug (for example api/src/index.ts).'
+const formatValidSlugs = (members: HarnessWorkspaceMember[] | undefined): string =>
+  (members ?? []).map((member) => member.slug).join(', ')
+
+const withValidSlugs = (base: string, members?: HarnessWorkspaceMember[]): string =>
+  `${base} Valid slugs: ${formatValidSlugs(members)}.`
+
+export const MULTI_ROOT_PATH_HINT = (
+  members?: HarnessWorkspaceMember[],
+): string =>
+  withValidSlugs(
+    `In a multi-project workspace, paths must be prefixed with a project slug (for example ${(members ?? [])[0]?.slug ?? 'api'}/src/index.ts).`,
+    members,
+  )
 
 export const REPO_TOOL_HINT =
   'Optional repo is a project slug; defaults to the primary project.'
@@ -27,13 +35,18 @@ export const isMultiRootWorkspace = (
 export const withMultiRootPathHint = (
   base: string,
   ctx: Pick<HarnessToolContext, 'members'>,
-): string => (isMultiRootWorkspace(ctx) ? `${base} ${MULTI_ROOT_PATH_HINT}` : base)
+): string =>
+  isMultiRootWorkspace(ctx) ? `${base} ${MULTI_ROOT_PATH_HINT(ctx.members)}` : base
 
 export const withMultiRootSuffix = (
   base: string,
   ctx: Pick<HarnessToolContext, 'members'>,
   suffix: string,
-): string => (isMultiRootWorkspace(ctx) ? `${base} ${suffix}` : base)
+): string => {
+  if (!isMultiRootWorkspace(ctx)) return base
+  const body = `${base} ${suffix}`
+  return body.includes('Valid slugs:') ? body : withValidSlugs(body, ctx.members)
+}
 
 export const repoSlugFields = (
   ctx: Pick<HarnessToolContext, 'members'>,
@@ -43,7 +56,12 @@ export const repoSlugFields = (
         repo: z
           .string()
           .optional()
-          .describe('Project slug of the git repo. Defaults to the primary project.'),
+          .describe(
+            withValidSlugs(
+              'Project slug of the git repo. Defaults to the primary project.',
+              ctx.members,
+            ),
+          ),
       }
     : {}
 
@@ -56,43 +74,32 @@ export const cwdSlugFields = (
           .string()
           .optional()
           .describe(
-            'Project slug to use as the working directory. Defaults to the primary project. Each call is independent.',
+            withValidSlugs(
+              'Project slug to use as the working directory. Defaults to the primary project. Each call is independent.',
+              ctx.members,
+            ),
           ),
       }
     : {}
 
 export const slugArg = (input: object, key: 'repo' | 'cwd'): string | undefined => {
-  if (!(key in input)) {
-    return undefined
-  }
-  const value = (input as Record<string, unknown>)[key]
+  const value = key in input ? (input as Record<string, unknown>)[key] : undefined
   return typeof value === 'string' ? value : undefined
 }
 
-const formatValidSlugs = (members: HarnessWorkspaceMember[]): string =>
-  members.map((member) => member.slug).join(', ')
-
 export const ipcProjectRoots = (
   ctx: Pick<HarnessToolContext, 'members'>,
-): IpcProjectRoot[] | undefined => {
-  if (!ctx.members || ctx.members.length === 0) {
-    return undefined
-  }
-  return ctx.members.map((member) => ({
-    slug: member.slug,
-    path: member.rootPath,
-  }))
-}
+): IpcProjectRoot[] | undefined =>
+  ctx.members && ctx.members.length > 0
+    ? ctx.members.map((member) => ({ slug: member.slug, path: member.rootPath }))
+    : undefined
 
 export const withProjectRoots = <T extends Record<string, unknown>>(
   args: T,
   ctx: Pick<HarnessToolContext, 'members'>,
 ): T & { projectRoots?: IpcProjectRoot[] } => {
   const projectRoots = ipcProjectRoots(ctx)
-  if (!projectRoots) {
-    return args
-  }
-  return { ...args, projectRoots }
+  return projectRoots ? { ...args, projectRoots } : args
 }
 
 export const resolveWorkspaceSlug = (
@@ -205,12 +212,8 @@ export const checkpointCaptureTarget = (
   }
 }
 
-export const isAbsolutePath = (value: string): boolean => {
-  if (value.startsWith('/') || value.startsWith('\\')) {
-    return true
-  }
-  return /^[A-Za-z]:[/\\]/.test(value)
-}
+export const isAbsolutePath = (value: string): boolean =>
+  value.startsWith('/') || value.startsWith('\\') || /^[A-Za-z]:[/\\]/.test(value)
 
 export const joinOntoProjectRoot = (projectRoot: string, relativePath: string): string => {
   const useBackslash = /\\/.test(projectRoot) && !/\//.test(projectRoot)
@@ -275,16 +278,10 @@ export const toWorkspaceRelativePath = (
     ctx.members.find((member) => member.rootPath === ctx.projectRoot)?.slug ??
     (ctx.projectSlug || ctx.members[0]!.slug)
   const trimmed = memberRelativePath.replace(/^[/\\]+/, '')
-  if (!trimmed) {
-    return slug
-  }
-  return `${slug}/${trimmed}`
+  return trimmed ? `${slug}/${trimmed}` : slug
 }
 
-export type ResolvedPlanToolPath = {
-  projectRoot: string
-  relativePath: string
-}
+export type ResolvedPlanToolPath = { projectRoot: string; relativePath: string }
 
 export const resolvePlanToolPath = (
   ctx: Pick<HarnessToolContext, 'projectRoot' | 'members'>,

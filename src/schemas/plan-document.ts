@@ -16,9 +16,11 @@ export const planFrontmatterSchema = z.object({
   createdAt: z.string().datetime(),
   mode: z.literal('plan'),
   sourceChatId: z.string().optional(),
+  sourceChatSlug: z.string().optional(),
   parent: z.string().optional(),
   builtAt: z.string().datetime().optional(),
   lastBuildChatId: z.string().optional(),
+  lastBuildChatSlug: z.string().optional(),
   lastBuildModel: z.string().optional(),
   todos: z.array(planTodoItemSchema),
 })

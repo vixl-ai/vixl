@@ -40,6 +40,7 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
 
 vi.mock('@/services/harness/orchestrator/persistence', () => ({
   persistToolRun: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  persistLine: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }))
 
 vi.mock('@/services/harness/orchestrator/stream', () => ({
@@ -52,9 +53,10 @@ vi.mock('@/services/harness/orchestrator/stream', () => ({
   ) => runHarnessStream(input),
 }))
 
-import { persistToolRun } from '@/services/harness/orchestrator/persistence'
+import { persistLine, persistToolRun } from '@/services/harness/orchestrator/persistence'
 import { finalizeBackgroundSpawnResults } from '@/services/harness/orchestrator/finalize-background-spawns'
 import resumeOrchestrator from '@/services/harness/orchestrator/resume'
+import resetResumeOverlay from '@/services/harness/orchestrator/reset-resume-overlay'
 import { isBackgroundResultDelivered } from '@/services/harness/subagent/background-result-sets'
 import {
   abortOne,
@@ -110,6 +112,7 @@ describe('resumeOrchestrator background waves', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     resetSubagentRegistryForTests()
+    resetResumeOverlay()
     runHarnessStream.mockResolvedValue(undefined)
   })
 
@@ -199,7 +202,7 @@ describe('resumeOrchestrator background waves', () => {
     expect(wakeNudge.content).toContain('Completed:')
     expect(wakeNudge.content).toContain('All background subagents have finished')
     expect(wakeNudge.content).toContain(
-      'Subagent ledger:\n- explorer (sub-1): completed',
+      'Subagent ledger:\n- explorer (sub-1): completed: mapped the repo',
     )
   })
 
@@ -279,7 +282,7 @@ describe('resumeOrchestrator background waves', () => {
     expect(wakeNudge?.content).toContain(
       [
         'Subagent ledger:',
-        '- explorer (sub-1): completed',
+        '- explorer (sub-1): completed: mapped the repo',
         '- writer (sub-2): running',
       ].join('\n'),
     )
@@ -460,7 +463,7 @@ describe('resumeOrchestrator background waves', () => {
     expect(wakeNudge?.content).toContain(
       [
         'Subagent ledger:',
-        '- explorer (sub-1): completed',
+        '- explorer (sub-1): completed: steered rewrite',
         '- writer (sub-2): running',
       ].join('\n'),
     )
@@ -584,7 +587,7 @@ describe('resumeOrchestrator background waves', () => {
     )
     expect(wakeNudge?.content).not.toContain('spawn_subagent tool results above')
     expect(wakeNudge?.content).toContain(
-      'Subagent ledger:\n- explorer (sub-1): completed',
+      'Subagent ledger:\n- explorer (sub-1): completed: steered rewrite after flush',
     )
     expect(hasPendingBackgroundResume('chat-1')).toBe(false)
     expect(listDeliverableBackgroundResults('chat-1')).toEqual([])
@@ -630,9 +633,9 @@ describe('resumeOrchestrator background waves', () => {
     expect(wakeNudge?.content).toContain(
       [
         'Subagent ledger:',
-        '- explorer (sub-1): completed',
-        '- writer (sub-2): failed',
-        '- reviewer (sub-3): aborted',
+        '- explorer (sub-1): completed: mapped the repo',
+        '- writer (sub-2): failed: boom',
+        '- reviewer (sub-3): aborted: Stopped',
       ].join('\n'),
     )
   })
@@ -869,7 +872,12 @@ describe('resumeOrchestrator background waves', () => {
       '- writer (sub-live, completed): drafted the patch',
     )
     expect(wakeNudge?.content).not.toContain('explorer timed out')
-    expect(wakeNudge?.content).not.toContain('steered rewrite')
+    expect(wakeNudge?.content).not.toContain(
+      '- explorer (sub-stale, completed): steered rewrite',
+    )
+    expect(wakeNudge?.content).toContain(
+      '- explorer (sub-stale): completed: steered rewrite',
+    )
   })
 
   it('omits the wake nudge when every resume snapshot was steered away', async () => {
@@ -952,4 +960,215 @@ describe('resumeOrchestrator background waves', () => {
     const wakeNudge = modelMessages[modelMessages.length - 1]
     expect(wakeNudge?.content).toContain('- explorer (sub-1, completed): mapped the repo')
   })
+
+  it('includes the persisted spawn turn on a second resume after the snapshot is cleared', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    register('chat-1', 'sub-2', new AbortController(), {
+      toolCallId: 'tc-2',
+      agentName: 'writer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    setTurnResponseMessages('chat-1', [
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'tc-1',
+            toolName: 'spawn_subagent',
+            output: { type: 'json', value: { pending: true } },
+          },
+        ],
+      },
+    ])
+
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+    expect(getTurnResponseMessages('chat-1')).toBeNull()
+    expect(persistLine).toHaveBeenCalled()
+
+    resolve('sub-2', {
+      subagentId: 'sub-2',
+      name: 'writer',
+      summary: 'drafted the patch',
+    })
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+
+    const second = runHarnessStream.mock.calls[1]?.[0]
+    const modelMessages = second?.modelMessages as Array<{
+      role: string
+      content:
+        | string
+        | Array<{
+            type: string
+            toolCallId?: string
+            output?: { type: string; value: unknown }
+          }>
+    }>
+    const patchedTool = modelMessages.find((message) => message.role === 'tool')
+    expect(patchedTool).toEqual({
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: 'tc-1',
+          toolName: 'spawn_subagent',
+          output: {
+            type: 'json',
+            value: {
+              subagentId: 'sub-1',
+              name: 'explorer',
+              summary: 'mapped the repo',
+            },
+          },
+        },
+      ],
+    })
+    const wakes = modelMessages.filter(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.includes('[harness: background subagent results]'),
+    )
+    expect(wakes).toHaveLength(2)
+  })
+
+  it('delivers each staggered summary in exactly one completed block', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    register('chat-1', 'sub-2', new AbortController(), {
+      toolCallId: 'tc-2',
+      agentName: 'writer',
+    })
+    register('chat-1', 'sub-3', new AbortController(), {
+      toolCallId: 'tc-3',
+      agentName: 'reviewer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    setTurnResponseMessages('chat-1', wave1Messages)
+
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+
+    resolve('sub-2', {
+      subagentId: 'sub-2',
+      name: 'writer',
+      summary: 'drafted the patch',
+    })
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+
+    resolve('sub-3', {
+      subagentId: 'sub-3',
+      name: 'reviewer',
+      summary: 'reviewed the patch',
+    })
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+
+    const wakeContents = runHarnessStream.mock.calls.map((call) => {
+      const modelMessages = call[0]?.modelMessages as Array<{
+        role: string
+        content: string
+      }>
+      return modelMessages
+        .filter(
+          (message) =>
+            message.role === 'user' &&
+            typeof message.content === 'string' &&
+            message.content.includes('[harness: background subagent results]'),
+        )
+        .at(-1)?.content
+    })
+    expect(wakeContents[0]).toContain('- explorer (sub-1, completed): mapped the repo')
+    expect(wakeContents[0]).not.toContain('- writer (sub-2, completed):')
+    expect(wakeContents[0]).not.toContain('- reviewer (sub-3, completed):')
+    expect(wakeContents[1]).toContain('- writer (sub-2, completed): drafted the patch')
+    expect(wakeContents[1]).not.toContain('- explorer (sub-1, completed):')
+    expect(wakeContents[1]).not.toContain('- reviewer (sub-3, completed):')
+    expect(wakeContents[2]).toContain('- reviewer (sub-3, completed): reviewed the patch')
+    expect(wakeContents[2]).not.toContain('- explorer (sub-1, completed):')
+    expect(wakeContents[2]).not.toContain('- writer (sub-2, completed):')
+    expect(wakeContents[2]).toContain(
+      '- explorer (sub-1): completed: mapped the repo',
+    )
+    expect(wakeContents[2]).toContain(
+      '- writer (sub-2): completed: drafted the patch',
+    )
+    expect(wakeContents[2]).toContain(
+      '- reviewer (sub-3): completed: reviewed the patch',
+    )
+  })
+
+  it('wakes again after reopen when the steered summary matches the first delivery', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    setTurnResponseMessages('chat-1', wave1Messages)
+
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual([])
+
+    expect(reopen('sub-1', new AbortController())?.status).toBe('running')
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    setTurnResponseMessages('chat-1', wave2Messages)
+
+    const steered = listDeliverableBackgroundResults('chat-1')
+    expect(steered).toEqual([
+      {
+        toolCallId: 'tc-1',
+        result: {
+          subagentId: 'sub-1',
+          name: 'explorer',
+          summary: 'mapped the repo',
+        },
+      },
+    ])
+
+    await resumeOrchestrator(buildInput(steered))
+
+    const streamInput = runHarnessStream.mock.calls[1]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: string
+    }>
+    const wakeNudge = modelMessages[modelMessages.length - 1]
+    expect(wakeNudge?.role).toBe('user')
+    expect(wakeNudge?.content).toContain('[harness: background subagent results]')
+    expect(wakeNudge?.content).toContain(
+      '- explorer (sub-1, completed): mapped the repo',
+    )
+  })
 })
+

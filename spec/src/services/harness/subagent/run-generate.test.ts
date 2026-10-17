@@ -467,6 +467,60 @@ describe('runSubagentGenerate agent definition', () => {
     streamText.mockReturnValue(resolvedStream({ text: 'summary', usage: {} }))
   })
 
+  it('appends the member project table in a multi-project workspace', async () => {
+    await runSubagentGenerate({
+      ctx: {
+        ...baseCtx(),
+        members: [
+          { slug: 'platform', name: 'Platform', rootPath: '/tmp/platform' },
+          { slug: 'cms-site-template', name: 'CMS', rootPath: '/tmp/cms' },
+          { slug: 'site-widgets', name: 'Widgets', rootPath: '/tmp/widgets' },
+        ],
+      },
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+
+    const config = streamText.mock.calls[0]?.[0] as GenerateConfig
+    expect(config.system).toContain('Projects (slug, name, path):')
+    expect(config.system).toContain('- platform | Platform | /tmp/platform')
+    expect(config.system).toContain('- cms-site-template | CMS | /tmp/cms')
+    expect(config.system).toContain('- site-widgets | Widgets | /tmp/widgets')
+    expect(config.system).toContain('Paths must be prefixed with a member slug')
+    expect(config.system).toContain(
+      'run_terminal cwd and git tools repo take a member slug. Default is the primary project (first listed).',
+    )
+    expect(config.system).toContain(
+      'Make one git commit per repo. Never stage files across projects.',
+    )
+    expect(config.system).toContain('Search without a path filter covers all projects.')
+  })
+
+  it('omits the member project table in a single-project chat', async () => {
+    await runSubagentGenerate({
+      ctx: {
+        ...baseCtx(),
+        members: [{ slug: 'platform', name: 'Platform', rootPath: '/tmp/platform' }],
+      },
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'find the auth bug',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+
+    const config = streamText.mock.calls[0]?.[0] as GenerateConfig
+    expect(config.system).not.toContain('Projects (slug, name, path):')
+    expect(config.system).not.toContain('Paths must be prefixed with a member slug')
+  })
+
   it('puts Agent definition and body into nested system when resolved', async () => {
     resolveAgentDefinition.mockResolvedValue({
       id: 'reviewer',

@@ -18,6 +18,8 @@ import prepareMessagesForModelVision from '@/utils/prepare-messages-for-model-vi
 import buildWakeNudge from './build-wake-nudge'
 import { finalizeBackgroundSpawnResults } from './finalize-background-spawns'
 import { patchSubagentToolResults } from './helpers'
+import loadResumeOverlay from './load-resume-overlay'
+import persistResumeOverlay from './persist-resume-overlay'
 import resolveLiveWorkspace from './resolve-workspace'
 import runHarnessStream from './stream'
 
@@ -46,12 +48,28 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
     turnMessages,
   )
 
+  const overlay = loadResumeOverlay(chatId)
   const patchedTurnMessages = turnMessages
     ? patchSubagentToolResults(turnMessages, finalizedResults)
-    : []
+    : patchSubagentToolResults(overlay.spawnMessages, finalizedResults)
+
+  if (turnMessages && patchedTurnMessages.length > 0) {
+    await persistResumeOverlay({
+      projectSlug: workspace.projectSlug,
+      chatId,
+      spawnMessages: patchedTurnMessages,
+    })
+  }
+
+  const resultKey = (toolCallId: string, summary: string): string =>
+    `${toolCallId}:${summary}`
+  const alreadyDelivered = new Set(overlay.deliveredResultKeys)
+  const wakeResults = finalizedResults.filter(
+    (item) => !alreadyDelivered.has(resultKey(item.toolCallId, item.result.summary)),
+  )
   markBackgroundResultsDelivered(
     chatId,
-    finalizedResults.map((item) => item.toolCallId),
+    wakeResults.map((item) => item.toolCallId),
   )
   const chatSubagents = listSubagentsForChat(chatId)
   const runningAgents = chatSubagents
@@ -60,6 +78,35 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
       name: record.agentName.trim() || record.subagentId,
       subagentId: record.subagentId,
     }))
+  const wakeContent =
+    wakeResults.length > 0
+      ? buildWakeNudge(
+          wakeResults.map((item) => ({
+            ...item,
+            status:
+              chatSubagents.find((record) => record.subagentId === item.result.subagentId)
+                ?.status ?? 'completed',
+          })),
+          runningAgents,
+          chatSubagents,
+          {
+            summariesInline: !turnMessages,
+          },
+        )
+      : null
+  if (wakeContent) {
+    await persistResumeOverlay({
+      projectSlug: workspace.projectSlug,
+      chatId,
+      wake: {
+        content: wakeContent,
+        toolCallIds: wakeResults.map((item) => item.toolCallId),
+        resultKeys: wakeResults.map((item) =>
+          resultKey(item.toolCallId, item.result.summary),
+        ),
+      },
+    })
+  }
   const activeContextMeta = await readChatMeta(workspace.projectSlug, chatId).catch(() => null)
   const activeContext = activeContextMeta?.activeContext
   const { messages: contextMessages, checkpointText } = filterMessagesForActiveContext(
@@ -84,25 +131,21 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
   const baseMessages: ModelMessage[] = checkpointText
     ? [{ role: 'user', content: checkpointText }, ...recentModelMessages]
     : recentModelMessages
-  // AI SDK v7 rejects system-role messages in `messages` unless allowSystemInMessages is set; keep a user turn so generateText/streamText can resume across providers.
-  const modelMessages: ModelMessage[] = [...baseMessages, ...patchedTurnMessages]
-  if (finalizedResults.length > 0) {
-    modelMessages.push({
-      role: 'user',
-      content: buildWakeNudge(
-        finalizedResults.map((item) => ({
-          ...item,
-          status:
-            chatSubagents.find((record) => record.subagentId === item.result.subagentId)
-              ?.status ?? 'completed',
-        })),
-        runningAgents,
-        chatSubagents,
-        {
-          summariesInline: !turnMessages,
-        },
-      ),
-    })
+  const modelMessages: ModelMessage[] = [...baseMessages]
+  if (turnMessages) {
+    modelMessages.push(...patchedTurnMessages)
+    if (wakeContent) {
+      modelMessages.push({ role: 'user', content: wakeContent })
+    }
+  } else {
+    const persisted = loadResumeOverlay(chatId)
+    modelMessages.push(
+      ...patchSubagentToolResults(persisted.spawnMessages, finalizedResults),
+      ...persisted.wakes.map((wake) => ({
+        role: 'user' as const,
+        content: wake.content,
+      })),
+    )
   }
 
   clearTurnResponseMessages(chatId)

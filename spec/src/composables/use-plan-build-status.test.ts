@@ -84,6 +84,72 @@ describe('use-plan-build-status', () => {
     expect(buildChatStatus.value).toBe('running')
   })
 
+  it('resolves lastBuildChatId under lastBuildChatSlug instead of the tab slug', async () => {
+    const { default: usePlanBuildStatus } = await import(
+      '@/composables/use-plan-build-status'
+    )
+    const lastBuildChatId = ref<string | null>('build-chat')
+    const lastBuildChatSlug = ref<string | null>('stack')
+    const sourceChatId = ref<string | null>('source-chat')
+    const { buildChatStatus } = usePlanBuildStatus({
+      projectId: 'proj-1',
+      lastBuildChatId,
+      lastBuildChatSlug,
+      sourceChatId,
+    })
+
+    expect(buildChatStatus.value).toBe('idle')
+    expect(forChat).toHaveBeenCalledWith('stack', 'build-chat')
+    await vi.waitFor(() => {
+      expect(refreshChatMeta).toHaveBeenCalledWith('stack', 'build-chat')
+    })
+  })
+
+  it('falls back to the tab slug when lastBuildChatSlug is missing', async () => {
+    const { default: usePlanBuildStatus } = await import(
+      '@/composables/use-plan-build-status'
+    )
+    const lastBuildChatId = ref<string | null>('build-chat')
+    const lastBuildChatSlug = ref<string | null>(null)
+    const sourceChatId = ref<string | null>(null)
+    const { buildChatStatus } = usePlanBuildStatus({
+      projectId: 'proj-1',
+      lastBuildChatId,
+      lastBuildChatSlug,
+      sourceChatId,
+    })
+
+    expect(buildChatStatus.value).toBe('idle')
+    expect(forChat).toHaveBeenCalledWith('proj', 'build-chat')
+    await vi.waitFor(() => {
+      expect(refreshChatMeta).toHaveBeenCalledWith('proj', 'build-chat')
+    })
+  })
+
+  it('resolves sourceChatId under sourceChatSlug when lastBuildChatId is missing', async () => {
+    const { default: usePlanBuildStatus } = await import(
+      '@/composables/use-plan-build-status'
+    )
+    const lastBuildChatId = ref<string | null>(null)
+    const lastBuildChatSlug = ref<string | null>(null)
+    const sourceChatId = ref<string | null>('source-chat')
+    const sourceChatSlug = ref<string | null>('stack')
+    const { buildChatId, buildChatStatus } = usePlanBuildStatus({
+      projectId: 'proj-1',
+      lastBuildChatId,
+      lastBuildChatSlug,
+      sourceChatId,
+      sourceChatSlug,
+    })
+
+    expect(buildChatId.value).toBe('source-chat')
+    expect(buildChatStatus.value).toBe('idle')
+    expect(forChat).toHaveBeenCalledWith('stack', 'source-chat')
+    await vi.waitFor(() => {
+      expect(refreshChatMeta).toHaveBeenCalledWith('stack', 'source-chat')
+    })
+  })
+
   it('falls back to sourceChatId and idle when slug or chat id is missing', async () => {
     const { default: usePlanBuildStatus } = await import(
       '@/composables/use-plan-build-status'

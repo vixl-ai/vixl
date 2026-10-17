@@ -402,5 +402,36 @@ describe('build-tools lsp', () => {
     })
     expect(lspRequest).not.toHaveBeenCalled()
   })
+
+  it('adds a slug path hint in a multi-project workspace', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      members: [
+        { slug: 'platform', name: 'Platform', rootPath: '/tmp/platform' },
+        { slug: 'cms-site-template', name: 'CMS', rootPath: '/tmp/cms' },
+      ],
+    })
+    const schema = tools.lsp.inputSchema as unknown as {
+      shape: { path: { description?: string } }
+    }
+    expect(schema.shape.path.description).toContain(
+      'for example platform/src/index.ts',
+    )
+    expect(schema.shape.path.description).toContain(
+      'Valid slugs: platform, cms-site-template.',
+    )
+  })
+
+  it('omits the slug path hint in a single-project workspace', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const schema = tools.lsp.inputSchema as unknown as {
+      shape: { path: { description?: string } }
+    }
+    expect(schema.shape.path.description).toBe(
+      'Workspace-relative file path (also selects the language server via extension)',
+    )
+  })
 })
 

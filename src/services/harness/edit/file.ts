@@ -12,6 +12,7 @@ import {
   withMultiRootPathHint,
   withProjectRoots,
 } from '@/services/harness/tool-roots'
+import withEditFileLock from './edit-file-lock'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const editFile = (ctx: HarnessToolContext) =>
@@ -27,8 +28,36 @@ const editFile = (ctx: HarnessToolContext) =>
     execute: async ({ path, old_string, new_string }, { toolCallId }) => {
       const replacements = [{ oldString: old_string, newString: new_string }]
       const gatedPath = permissionPath(ctx.members, path)
-      const diffs = mapDiffs(
-        await fsStagePreviewEdit(
+      const lockKey = `${ctx.projectRoot}\0${gatedPath}`
+      return withEditFileLock(lockKey, async () => {
+        const previewDiffs = mapDiffs(
+          await fsStagePreviewEdit(
+            withProjectRoots(
+              {
+                projectRoot: ctx.projectRoot,
+                path,
+                replacements,
+              },
+              ctx,
+            ),
+          ),
+        )
+        const allowed = await gateToolPermission({
+          ctx: toPermCtx(ctx),
+          toolCallId,
+          name: 'edit_file',
+          kind: 'fs',
+          action: 'fs.write',
+          capability: fsWriteCapability(gatedPath),
+          title: `Edit ${gatedPath}`,
+          paths: sensitiveCheckPaths(ctx.members, [path]),
+          diff: previewDiffs,
+        })
+        if (!allowed) {
+          return { rejected: true, error: 'Edit not approved' }
+        }
+        await captureBaselinesBeforeMutate(ctx, [path], toolCallId)
+        const applied = await fsEditFile(
           withProjectRoots(
             {
               projectRoot: ctx.projectRoot,
@@ -37,35 +66,11 @@ const editFile = (ctx: HarnessToolContext) =>
             },
             ctx,
           ),
-        ),
-      )
-      const allowed = await gateToolPermission({
-        ctx: toPermCtx(ctx),
-        toolCallId,
-        name: 'edit_file',
-        kind: 'fs',
-        action: 'fs.write',
-        capability: fsWriteCapability(gatedPath),
-        title: `Edit ${gatedPath}`,
-        paths: sensitiveCheckPaths(ctx.members, [path]),
-        diff: diffs,
+        )
+        const diffs = mapDiffs([applied])
+        const resultPath = diffs[0]?.path ?? path
+        return { ok: true, path: resultPath, diffs }
       })
-      if (!allowed) {
-        return { rejected: true, error: 'Edit not approved' }
-      }
-      await captureBaselinesBeforeMutate(ctx, [path], toolCallId)
-      await fsEditFile(
-        withProjectRoots(
-          {
-            projectRoot: ctx.projectRoot,
-            path,
-            replacements,
-          },
-          ctx,
-        ),
-      )
-      const resultPath = diffs[0]?.path ?? path
-      return { ok: true, path: resultPath, diffs }
     },
   })
 
