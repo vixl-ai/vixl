@@ -23,6 +23,7 @@ vi.mock('vue-sonner', () => ({
 const scroller = vi.hoisted(() => ({
   scrollToEnd: vi.fn<(...args: unknown[]) => void>(),
   handleContentChange: vi.fn<() => void>(),
+  isFollowingLive: vi.fn<() => boolean>(() => true),
   windowedMessageIds: { value: null as Set<string> | null },
   itemPlaceholderHeight: vi.fn<(messageId: string) => number>((_messageId: string) => 160),
   setItemIds: vi.fn<(ids: string[]) => void>(),
@@ -43,6 +44,7 @@ vi.mock('@/components/shadcn/ui/message-scroller/useMessageScroller', async (imp
     }),
     useMessageScrollerContext: () => ({
       handleContentChange: scroller.handleContentChange,
+      isFollowingLive: scroller.isFollowingLive,
       scrollToEnd: scroller.scrollToEnd,
       windowedMessageIds: scroller.windowedMessageIds,
       itemPlaceholderHeight: scroller.itemPlaceholderHeight,
@@ -158,6 +160,8 @@ afterEach(() => {
   wrapper = null
   scroller.scrollToEnd.mockClear()
   scroller.handleContentChange.mockClear()
+  scroller.isFollowingLive.mockClear()
+  scroller.isFollowingLive.mockReturnValue(true)
   scroller.setItemIds.mockClear()
   scroller.setPinnedMessageIds.mockClear()
   scroller.itemPlaceholderHeight.mockClear()

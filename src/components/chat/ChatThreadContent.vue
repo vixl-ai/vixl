@@ -158,7 +158,7 @@ const sameCompletedFileTools = (
 
 const { scrollToEnd } = useMessageScroller()
 const {
-  handleContentChange,
+  isFollowingLive,
   itemPlaceholderHeight,
   setItemIds,
   setPinnedMessageIds,
@@ -548,8 +548,9 @@ const followLiveOutput = async (): Promise<void> => {
   }
   try {
     await nextTick()
-    handleContentChange()
-    scrollToEnd({ behavior: 'auto' })
+    if (isFollowingLive()) {
+      scrollToEnd({ behavior: 'auto' })
+    }
   } catch (error) {
     toast.error('Failed to update chat scroll', {
       description: error instanceof Error ? error.message : 'Unknown error',
