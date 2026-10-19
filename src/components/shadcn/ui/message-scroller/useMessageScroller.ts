@@ -5,13 +5,18 @@ import {
   DEFAULT_ITEM_HEIGHT,
   DEFAULT_OVERSCAN_PX,
   estimateItemsHeight,
+  extraNonWindowedChildrenHeight,
   FALLBACK_VIEWPORT_HEIGHT,
   itemIdsEqual,
   resolveViewportHeight,
   resolveWindowScrollTop,
   shouldAnchorOnContentChange,
+  shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
+  shouldTrustFollowBottomContentMeasurements,
   shouldEstimateFollowBottomScrollTop,
+  shouldInvalidateItemHeightsOnWidthChange,
+  shouldSampleClientWidthBaseline,
   shouldExitFollowBottom,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
@@ -371,7 +376,9 @@ export interface MessageScrollerContext {
   acquireVisibility: () => void
   releaseVisibility: () => void
   handleContentChange: () => void
+  handleContentResize: () => void
   handleResize: () => void
+  handleViewportResize: () => void
   isFollowingLive: () => boolean
   scrollToEnd: (options?: { behavior?: ScrollBehavior }) => boolean
   scrollToMessage: (messageId: string, options?: MessageScrollerScrollOptions) => boolean
@@ -437,6 +444,8 @@ function createEngine(props: MessageScrollerProviderProps) {
   let windowItemIds: string[] = []
   let pinnedMessageIds: string[] = []
   let lastPositiveClientHeight = 0
+  let lastClientWidth = 0
+  let lastScrollHeight = 0
   const scrollableAttr = computed(() => {
     const attr = [scrollable.value.start && "start", scrollable.value.end && "end"]
       .filter(Boolean)
@@ -725,6 +734,7 @@ function createEngine(props: MessageScrollerProviderProps) {
       scrollTop: viewport.scrollTop,
       spacerHeight,
     })) {
+      lastScrollHeight = viewport.scrollHeight
       return true
     }
     setSpacerHeight(0)
@@ -733,6 +743,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     scrollTo(maxScrollTop(viewport), { autoscrolling: true, behavior })
     scheduleVisibilitySync()
     recomputeWindow()
+    lastScrollHeight = viewport.scrollHeight
     return true
   }
 
@@ -950,10 +961,59 @@ function createEngine(props: MessageScrollerProviderProps) {
     recomputeWindow()
   }
 
-  function handleResize() {
+  function syncItemHeightsToViewportWidth() {
+    const clientHeight = viewport?.clientHeight ?? 0
+    const clientWidth = viewport?.clientWidth ?? 0
+    if (shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight,
+      clientWidth,
+      lastClientWidth,
+    })) {
+      itemHeights.clear()
+    }
+    if (shouldSampleClientWidthBaseline({ clientHeight, clientWidth }))
+      lastClientWidth = clientWidth
+  }
+
+  function applyResize(source: "content" | "viewport") {
+    syncItemHeightsToViewportWidth()
+    const scrollHeight = viewport?.scrollHeight ?? 0
+    const previousScrollHeight = lastScrollHeight
+    lastScrollHeight = scrollHeight
     if (mode === "following-bottom" && autoScroll()) {
       // Already-at-bottom and zero-height resizes must not call scrollToEnd:
       // that retriggers ResizeObserver through autoscroll and remounts.
+      // Viewport resizes still chase when off the live edge. Content resizes
+      // chase only when scrollHeight grew and itemHeights match the DOM
+      // (late images, code blocks, fonts after reportItemHeight). Shrink,
+      // unchanged, and stale-placeholder growth only recomputeWindow so the
+      // clamp cycle cannot pump.
+      const { gap, padding } = layoutMetrics()
+      const estimatedHeight = estimateItemsHeight({
+        gap,
+        heights: itemHeights,
+        itemIds: windowItemIds,
+        paddingEnd: padding.end,
+        paddingStart: padding.start,
+      }) + spacerHeight
+      const observedHeight = content?.scrollHeight ?? scrollHeight
+      const contentGrew = source === "content" && shouldChaseFollowBottomOnContentGrowth({
+        previousScrollHeight,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollHeight,
+      })
+      let extraChildrenHeight = 0
+      if (contentGrew && content) {
+        const windowedIds = new Set(windowItemIds)
+        extraChildrenHeight = extraNonWindowedChildrenHeight({
+          children: getMessageChildren(content, spacer).map((child) => ({
+            height: child.getBoundingClientRect().height,
+            messageId: child.dataset.messageId,
+          })),
+          gap,
+          windowItemIds: windowedIds,
+        })
+      }
       if (
         viewport
         && shouldChaseFollowBottomOnResize({
@@ -962,6 +1022,18 @@ function createEngine(props: MessageScrollerProviderProps) {
           scrollEpsilon: SCROLL_EPSILON,
           scrollTop: viewport.scrollTop,
         })
+        && (
+          source === "viewport"
+          || (
+            contentGrew
+            && shouldTrustFollowBottomContentMeasurements({
+              estimatedHeight,
+              extraChildrenHeight,
+              scrollEpsilon: SCROLL_EPSILON,
+              scrollHeight: observedHeight,
+            })
+          )
+        )
       ) {
         scrollToEnd({ behavior: "auto" })
       }
@@ -986,6 +1058,18 @@ function createEngine(props: MessageScrollerProviderProps) {
     scheduleStateCommit()
     scheduleVisibilitySync()
     recomputeWindow()
+  }
+
+  function handleViewportResize() {
+    applyResize("viewport")
+  }
+
+  function handleContentResize() {
+    applyResize("content")
+  }
+
+  function handleResize() {
+    applyResize("viewport")
   }
 
   // --- visibility observation ------------------------------------------------
@@ -1146,7 +1230,9 @@ function createEngine(props: MessageScrollerProviderProps) {
     acquireVisibility,
     releaseVisibility,
     handleContentChange,
+    handleContentResize,
     handleResize,
+    handleViewportResize,
     isFollowingLive,
     scrollToEnd,
     scrollToMessage,

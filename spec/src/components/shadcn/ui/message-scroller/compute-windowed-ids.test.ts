@@ -3,12 +3,17 @@ import {
   computeWindowedIds,
   DEFAULT_ITEM_HEIGHT,
   estimateItemsHeight,
+  extraNonWindowedChildrenHeight,
   FALLBACK_VIEWPORT_HEIGHT,
   resolveViewportHeight,
   resolveWindowScrollTop,
   shouldAnchorOnContentChange,
+  shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
+  shouldTrustFollowBottomContentMeasurements,
   shouldEstimateFollowBottomScrollTop,
+  shouldInvalidateItemHeightsOnWidthChange,
+  shouldSampleClientWidthBaseline,
   shouldExitFollowBottom,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
@@ -154,6 +159,257 @@ describe('shouldChaseFollowBottomOnResize', () => {
       scrollEpsilon: 0.5,
       scrollTop: 399.4,
     })).toBe(true)
+  })
+})
+
+describe('shouldChaseFollowBottomOnContentGrowth', () => {
+  it('chases when scrollHeight grew beyond epsilon', () => {
+    expect(shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight: 1000,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000.6,
+    })).toBe(true)
+  })
+
+  it('skips chase when scrollHeight is unchanged', () => {
+    expect(shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight: 1000,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000,
+    })).toBe(false)
+  })
+
+  it('skips chase when growth is within epsilon', () => {
+    expect(shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight: 1000,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000.4,
+    })).toBe(false)
+  })
+
+  it('skips chase when scrollHeight shrank', () => {
+    expect(shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight: 1400,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000,
+    })).toBe(false)
+  })
+})
+
+describe('extraNonWindowedChildrenHeight', () => {
+  it('adds extra child height plus one row gap when windowed items exist', () => {
+    expect(extraNonWindowedChildrenHeight({
+      children: [
+        { height: 180, messageId: '0' },
+        { height: 96 },
+      ],
+      gap: 24,
+      windowItemIds: new Set(['0']),
+    })).toBe(120)
+  })
+
+  it('adds a gap between two extra children after windowed items', () => {
+    expect(extraNonWindowedChildrenHeight({
+      children: [
+        { height: 180, messageId: '0' },
+        { height: 96 },
+        { height: 48 },
+      ],
+      gap: 24,
+      windowItemIds: new Set(['0']),
+    })).toBe(192)
+  })
+
+  it('uses extraCount minus one gaps when no windowed items are present', () => {
+    expect(extraNonWindowedChildrenHeight({
+      children: [
+        { height: 96 },
+        { height: 48 },
+      ],
+      gap: 24,
+      windowItemIds: new Set(),
+    })).toBe(168)
+  })
+
+  it('ignores live-activity when it is in windowItemIds', () => {
+    expect(extraNonWindowedChildrenHeight({
+      children: [
+        { height: 180, messageId: '0' },
+        { height: 20, messageId: 'live-activity' },
+        { height: 96 },
+      ],
+      gap: 24,
+      windowItemIds: new Set(['0', 'live-activity']),
+    })).toBe(120)
+  })
+
+  it('returns 0 when every child is windowed', () => {
+    expect(extraNonWindowedChildrenHeight({
+      children: [
+        { height: 180, messageId: '0' },
+        { height: 20, messageId: 'live-activity' },
+      ],
+      gap: 24,
+      windowItemIds: new Set(['0', 'live-activity']),
+    })).toBe(0)
+  })
+})
+
+describe('shouldTrustFollowBottomContentMeasurements', () => {
+  it('trusts when estimated height matches the DOM within epsilon', () => {
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight: 1400.4,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1400,
+    })).toBe(true)
+  })
+
+  it('rejects when mounted content is taller than the height map', () => {
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight: 1600,
+      scrollEpsilon: 0.5,
+      scrollHeight: 3200,
+    })).toBe(false)
+  })
+
+  it('trusts when extra non-windowed children are counted on the estimate', () => {
+    const estimatedHeight = estimateItemsHeight({
+      gap: 24,
+      heights: new Map([['0', 180]]),
+      itemIds: ['0'],
+    })
+    const extraChildrenHeight = extraNonWindowedChildrenHeight({
+      children: [
+        { height: 180, messageId: '0' },
+        { height: 96 },
+      ],
+      gap: 24,
+      windowItemIds: new Set(['0']),
+    })
+    const scrollHeight = estimatedHeight + extraChildrenHeight
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight,
+      extraChildrenHeight: 0,
+      scrollEpsilon: 0.5,
+      scrollHeight,
+    })).toBe(false)
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight,
+      extraChildrenHeight,
+      scrollEpsilon: 0.5,
+      scrollHeight,
+    })).toBe(true)
+  })
+})
+
+describe('shouldInvalidateItemHeightsOnWidthChange', () => {
+  it('skips the first positive width observation', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 640,
+      lastClientWidth: 0,
+    })).toBe(false)
+  })
+
+  it('skips a sub-1 lastClientWidth as an unmeasured first sample', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 640,
+      lastClientWidth: 0.4,
+    })).toBe(false)
+  })
+
+  it('skips when clientWidth is below 1', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 0,
+      lastClientWidth: 720,
+    })).toBe(false)
+  })
+
+  it('skips when the viewport has no usable height (estimate path)', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 0,
+      clientWidth: 640,
+      lastClientWidth: 720,
+    })).toBe(false)
+  })
+
+  it('skips when clientHeight is positive but still below 1', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 0.4,
+      clientWidth: 640,
+      lastClientWidth: 720,
+    })).toBe(false)
+  })
+
+  it('skips subpixel jitter at the same CSS pixel width', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 640.4,
+      lastClientWidth: 640.1,
+    })).toBe(false)
+  })
+
+  it('invalidates when rounded CSS pixel widths differ', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 640.6,
+      lastClientWidth: 640.4,
+    })).toBe(true)
+  })
+
+  it('does not invalidate when integer CSS pixel width is unchanged', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 640,
+      lastClientWidth: 640,
+    })).toBe(false)
+  })
+
+  it('invalidates when the viewport width changes after a prior measure', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 480,
+      lastClientWidth: 640,
+    })).toBe(true)
+  })
+})
+
+describe('shouldSampleClientWidthBaseline', () => {
+  it('samples when the viewport has usable width and height', () => {
+    expect(shouldSampleClientWidthBaseline({
+      clientHeight: 800,
+      clientWidth: 640,
+    })).toBe(true)
+  })
+
+  it('skips when the viewport has no usable height', () => {
+    expect(shouldSampleClientWidthBaseline({
+      clientHeight: 0,
+      clientWidth: 480,
+    })).toBe(false)
+  })
+
+  it('skips when clientHeight is positive but still below 1', () => {
+    expect(shouldSampleClientWidthBaseline({
+      clientHeight: 0.4,
+      clientWidth: 480,
+    })).toBe(false)
+  })
+
+  it('skips when clientWidth is below 1', () => {
+    expect(shouldSampleClientWidthBaseline({
+      clientHeight: 800,
+      clientWidth: 0,
+    })).toBe(false)
+  })
+
+  it('skips a sub-1 clientWidth as an unmeasured first sample', () => {
+    expect(shouldSampleClientWidthBaseline({
+      clientHeight: 800,
+      clientWidth: 0.4,
+    })).toBe(false)
   })
 })
 

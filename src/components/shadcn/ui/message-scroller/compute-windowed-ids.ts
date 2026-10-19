@@ -34,6 +34,83 @@ export function shouldChaseFollowBottomOnResize({
   return Math.abs(maxScrollTop - scrollTop) > scrollEpsilon
 }
 
+export function shouldChaseFollowBottomOnContentGrowth({
+  previousScrollHeight,
+  scrollEpsilon,
+  scrollHeight,
+}: {
+  previousScrollHeight: number
+  scrollEpsilon: number
+  scrollHeight: number
+}): boolean {
+  return scrollHeight - previousScrollHeight > scrollEpsilon
+}
+
+export function extraNonWindowedChildrenHeight({
+  children,
+  gap = 0,
+  windowItemIds,
+}: {
+  children: readonly { height: number, messageId?: string }[]
+  gap?: number
+  windowItemIds: ReadonlySet<string>
+}): number {
+  let extraCount = 0
+  let extraHeight = 0
+  let windowedCount = 0
+  for (const child of children) {
+    const id = child.messageId
+    if (id && windowItemIds.has(id)) {
+      windowedCount += 1
+      continue
+    }
+    extraCount += 1
+    extraHeight += child.height
+  }
+  if (extraCount === 0)
+    return 0
+  const extraGaps = windowedCount > 0 ? extraCount : extraCount - 1
+  return extraHeight + extraGaps * gap
+}
+
+export function shouldTrustFollowBottomContentMeasurements({
+  estimatedHeight,
+  extraChildrenHeight = 0,
+  scrollEpsilon,
+  scrollHeight,
+}: {
+  estimatedHeight: number
+  extraChildrenHeight?: number
+  scrollEpsilon: number
+  scrollHeight: number
+}): boolean {
+  return Math.abs(scrollHeight - (estimatedHeight + extraChildrenHeight)) <= scrollEpsilon
+}
+
+export function shouldInvalidateItemHeightsOnWidthChange({
+  clientHeight,
+  clientWidth,
+  lastClientWidth,
+}: {
+  clientHeight: number
+  clientWidth: number
+  lastClientWidth: number
+}): boolean {
+  if (clientWidth < 1 || clientHeight < 1 || lastClientWidth < 1)
+    return false
+  return Math.round(clientWidth) !== Math.round(lastClientWidth)
+}
+
+export function shouldSampleClientWidthBaseline({
+  clientHeight,
+  clientWidth,
+}: {
+  clientHeight: number
+  clientWidth: number
+}): boolean {
+  return clientHeight >= 1 && clientWidth >= 1
+}
+
 export function shouldEstimateFollowBottomScrollTop({
   clientHeight,
   followingBottom,
