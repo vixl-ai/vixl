@@ -8,6 +8,7 @@ import {
   shouldChaseFollowBottomOnResize,
   shouldExitFollowBottom,
   shouldInvalidateItemHeightsOnWidthChange,
+  shouldSampleClientWidthBaseline,
   shouldSettleScrollToEnd,
 } from '@/components/shadcn/ui/message-scroller/compute-windowed-ids'
 
@@ -67,6 +68,30 @@ function applyFixedGuards(): Pick<SimulatorOptions, 'chaseContentResize' | 'inva
     chaseContentResize: false,
     invalidateOnWidthChange: true,
   }
+}
+
+function syncItemHeightsToViewportWidth({
+  clientHeight,
+  clientWidth,
+  heights,
+  lastClientWidth,
+}: {
+  clientHeight: number
+  clientWidth: number
+  heights: Map<string, number>
+  lastClientWidth: number
+}) {
+  let nextLastClientWidth = lastClientWidth
+  if (shouldInvalidateItemHeightsOnWidthChange({
+    clientHeight,
+    clientWidth,
+    lastClientWidth,
+  })) {
+    heights.clear()
+  }
+  if (shouldSampleClientWidthBaseline({ clientHeight, clientWidth }))
+    nextLastClientWidth = clientWidth
+  return { lastClientWidth: nextLastClientWidth }
 }
 
 function simulateFollowBottomWidthChange({
@@ -388,6 +413,46 @@ describe('stale-height follow-bottom resize loop', () => {
       expectConverged(afterFix)
       expect(afterFix.every((frame) => frame.source === 'content')).toBe(true)
       expect(afterFix.every((frame) => frame.chase === false)).toBe(true)
+    })
+
+    it('invalidates after a width change that occurred while the viewport had no height', () => {
+      const heights = new Map(ids(scenario20.itemCount).map((id) => [id, scenario20.oldHeight]))
+      let lastClientWidth = 800
+
+      const hidden = syncItemHeightsToViewportWidth({
+        clientHeight: 0,
+        clientWidth: 480,
+        heights,
+        lastClientWidth,
+      })
+      lastClientWidth = hidden.lastClientWidth
+      expect(lastClientWidth).toBe(800)
+      expect(heights.size).toBe(scenario20.itemCount)
+
+      const restored = syncItemHeightsToViewportWidth({
+        clientHeight: scenario20.viewportHeight,
+        clientWidth: 480,
+        heights,
+        lastClientWidth,
+      })
+      lastClientWidth = restored.lastClientWidth
+      expect(lastClientWidth).toBe(480)
+      expect(heights.size).toBe(0)
+
+      const framesOut = simulateFollowBottomWidthChange({
+        frames: 8,
+        reportPolicy: 'raceUnmount',
+        ...applyFixedGuards(),
+        ...scenario20,
+      })
+      expectConverged(framesOut)
+      expect(framesOut.at(-1)).toMatchObject({
+        Hdom: 3776,
+        distanceFromEnd: 0,
+        mountedKey: '14,15,16,17,18,19',
+        scrollTop: 3376,
+        settle: true,
+      })
     })
   })
 })

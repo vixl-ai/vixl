@@ -11,6 +11,7 @@ import {
   shouldChaseFollowBottomOnResize,
   shouldEstimateFollowBottomScrollTop,
   shouldInvalidateItemHeightsOnWidthChange,
+  shouldSampleClientWidthBaseline,
   shouldExitFollowBottom,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
@@ -240,6 +241,43 @@ describe('shouldInvalidateItemHeightsOnWidthChange', () => {
       clientWidth: 480,
       lastClientWidth: 640,
     })).toBe(true)
+  })
+})
+
+describe('shouldSampleClientWidthBaseline', () => {
+  it('samples when the viewport has usable width and height', () => {
+    expect(shouldSampleClientWidthBaseline({
+      clientHeight: 800,
+      clientWidth: 640,
+    })).toBe(true)
+  })
+
+  it('skips when the viewport has no usable height', () => {
+    expect(shouldSampleClientWidthBaseline({
+      clientHeight: 0,
+      clientWidth: 480,
+    })).toBe(false)
+  })
+
+  it('skips when clientHeight is positive but still below 1', () => {
+    expect(shouldSampleClientWidthBaseline({
+      clientHeight: 0.4,
+      clientWidth: 480,
+    })).toBe(false)
+  })
+
+  it('skips when clientWidth is below 1', () => {
+    expect(shouldSampleClientWidthBaseline({
+      clientHeight: 800,
+      clientWidth: 0,
+    })).toBe(false)
+  })
+
+  it('skips a sub-1 clientWidth as an unmeasured first sample', () => {
+    expect(shouldSampleClientWidthBaseline({
+      clientHeight: 800,
+      clientWidth: 0.4,
+    })).toBe(false)
   })
 })
 

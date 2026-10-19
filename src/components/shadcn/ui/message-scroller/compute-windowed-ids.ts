@@ -56,6 +56,16 @@ export function shouldInvalidateItemHeightsOnWidthChange({
   return Math.round(clientWidth) !== Math.round(lastClientWidth)
 }
 
+export function shouldSampleClientWidthBaseline({
+  clientHeight,
+  clientWidth,
+}: {
+  clientHeight: number
+  clientWidth: number
+}): boolean {
+  return clientHeight >= 1 && clientWidth >= 1
+}
+
 export function shouldEstimateFollowBottomScrollTop({
   clientHeight,
   followingBottom,

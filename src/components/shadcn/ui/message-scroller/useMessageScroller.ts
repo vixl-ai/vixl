@@ -14,6 +14,7 @@ import {
   shouldChaseFollowBottomOnResize,
   shouldEstimateFollowBottomScrollTop,
   shouldInvalidateItemHeightsOnWidthChange,
+  shouldSampleClientWidthBaseline,
   shouldExitFollowBottom,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
@@ -965,7 +966,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     })) {
       itemHeights.clear()
     }
-    if (clientWidth >= 1)
+    if (shouldSampleClientWidthBaseline({ clientHeight, clientWidth }))
       lastClientWidth = clientWidth
   }
 
