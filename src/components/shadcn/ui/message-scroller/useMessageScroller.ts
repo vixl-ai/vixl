@@ -1,6 +1,7 @@
 import type { ComputedRef, InjectionKey, Ref, ShallowRef } from "vue"
 import { computed, getCurrentScope, inject, onMounted, onScopeDispose, provide, shallowRef, watch } from "vue"
 import {
+  clampReadingWindowScrollTop,
   computeWindowedIds,
   DEFAULT_ITEM_HEIGHT,
   DEFAULT_OVERSCAN_PX,
@@ -8,15 +9,15 @@ import {
   extraNonWindowedChildrenHeight,
   FALLBACK_VIEWPORT_HEIGHT,
   itemIdsEqual,
+  resolveFollowWindowScrollTop,
   resolveViewportHeight,
   resolveWindowScrollTop,
   shouldAdvanceFollowChaseBaseline,
   shouldAnchorOnContentChange,
-  shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
+  shouldChaseFollowBottomOnSizeChange,
+  shouldChaseFollowOnViewportResize,
   shouldTrustFollowBottomContentMeasurements,
-  shouldEstimateFollowBottomScrollTop,
-  shouldInvalidateItemHeightsOnWidthChange,
   shouldSampleClientWidthBaseline,
   shouldExitFollowBottom,
   shouldSettleScrollToEnd,
@@ -532,26 +533,27 @@ function createEngine(props: MessageScrollerProviderProps) {
     }
     const { gap, padding } = layoutMetrics()
     const followingBottom = mode === "following-bottom" || (!viewport && autoScroll())
-    let scrollTop = viewport?.scrollTop ?? 0
-    if (shouldEstimateFollowBottomScrollTop({ clientHeight, followingBottom })) {
-      const total = estimateItemsHeight({
-        gap,
-        heights: itemHeights,
-        itemIds: windowItemIds,
-        paddingEnd: padding.end,
-        paddingStart: padding.start,
-      })
-      scrollTop = Math.max(0, total - viewportHeight)
-    }
-    else {
-      // Real scrollTop includes the tail spacer, which would push the window
-      // past estimated item offsets and collapse to pinned ids only.
-      scrollTop = resolveWindowScrollTop({
-        followingBottom,
-        scrollTop,
-        spacerHeight,
-      })
-    }
+    const estimatedHeight = estimateItemsHeight({
+      gap,
+      heights: itemHeights,
+      itemIds: windowItemIds,
+      paddingEnd: padding.end,
+      paddingStart: padding.start,
+    })
+    // Follow window offset is the cached document end, not live DOM scrollTop.
+    // Viewport visual rest is still scrollToEnd -> maxScrollTop of the rendered
+    // thread. Mixing those numbers collapses the tail into placeholders.
+    const scrollTop = followingBottom
+      ? resolveFollowWindowScrollTop({ estimatedHeight, viewportHeight })
+      : clampReadingWindowScrollTop({
+          estimatedHeight,
+          scrollTop: resolveWindowScrollTop({
+            followingBottom: false,
+            scrollTop: viewport?.scrollTop ?? 0,
+            spacerHeight,
+          }),
+          viewportHeight,
+        })
     setWindowed(computeWindowedIds({
       gap,
       heights: itemHeights,
@@ -591,12 +593,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     if (previous === rounded)
       return
     itemHeights.set(messageId, rounded)
-    if (
-      previous !== undefined
-      && viewport
-      && mode !== "following-bottom"
-      && mode !== "settling-jump"
-    ) {
+    if (previous !== undefined && viewport) {
       const delta = rounded - previous
       const offset = itemOffsetTop(messageId)
       if (delta !== 0 && offset !== null && offset < viewport.scrollTop - SCROLL_EPSILON)
@@ -678,6 +675,7 @@ function createEngine(props: MessageScrollerProviderProps) {
       return
     const next = Math.max(0, Math.ceil(height))
     if (spacerHeight !== next) {
+      setAutoscrolling(true)
       spacerHeight = next
       spacer.hidden = next === 0
       spacer.style.height = `${next}px`
@@ -692,13 +690,13 @@ function createEngine(props: MessageScrollerProviderProps) {
     if (!viewport)
       return
     const target = Math.max(0, top)
+    if (isAutoscrolling)
+      setAutoscrolling(true)
     if (Math.abs(viewport.scrollTop - target) <= SCROLL_EPSILON) {
       viewport.scrollTop = target
       commitScrollState()
       return
     }
-    if (isAutoscrolling)
-      setAutoscrolling(true)
     viewport.scrollTo({ top: target, behavior })
     scheduleStateCommit()
   }
@@ -741,6 +739,7 @@ function createEngine(props: MessageScrollerProviderProps) {
       lastScrollHeight = viewport.scrollHeight
       return true
     }
+    setAutoscrolling(true)
     setSpacerHeight(0)
     streamingTurn = null
     mode = nextMode
@@ -968,16 +967,6 @@ function createEngine(props: MessageScrollerProviderProps) {
   function syncItemHeightsToViewportWidth() {
     const clientHeight = viewport?.clientHeight ?? 0
     const clientWidth = viewport?.clientWidth ?? 0
-    if (shouldInvalidateItemHeightsOnWidthChange({
-      clientHeight,
-      clientWidth,
-      lastClientWidth,
-    })) {
-      itemHeights.clear()
-      // Force a new windowed set identity so placeholders re-render at
-      // DEFAULT_ITEM_HEIGHT and estimates match the DOM after the clear.
-      recomputeWindow(true)
-    }
     if (shouldSampleClientWidthBaseline({ clientHeight, clientWidth }))
       lastClientWidth = clientWidth
   }
@@ -985,12 +974,12 @@ function createEngine(props: MessageScrollerProviderProps) {
   function evaluateFollowChase(source: "content" | "viewport") {
     // Already-at-bottom and zero-height resizes must not call scrollToEnd:
     // that retriggers ResizeObserver through autoscroll and remounts.
-    // Viewport resizes still chase when off the live edge. Content resizes
-    // chase only when scrollHeight grew and itemHeights match the DOM
-    // (late images, code blocks, fonts after reportItemHeight). Shrink,
-    // unchanged, and stale-placeholder growth only recomputeWindow so the
-    // clamp cycle cannot pump. Trust-blocked content frames keep the growth
-    // baseline so a later row-height recheck can still chase.
+    // Content size changes chase when abs(delta) > epsilon, measurements
+    // match the DOM, and the viewport is off the live edge. Viewport
+    // resizes use the same trust gate: off the end alone is not enough.
+    // Untrusted growth or shrink only recomputeWindow so the clamp cycle
+    // cannot pump. Trust-blocked content frames keep the size baseline so
+    // a later row-height recheck can still chase.
     const scrollHeight = viewport?.scrollHeight ?? 0
     const previousScrollHeight = lastScrollHeight
     const { gap, padding } = layoutMetrics()
@@ -1002,13 +991,13 @@ function createEngine(props: MessageScrollerProviderProps) {
       paddingStart: padding.start,
     }) + spacerHeight
     const observedHeight = content?.scrollHeight ?? scrollHeight
-    const grew = source === "content" && shouldChaseFollowBottomOnContentGrowth({
+    const sizeChanged = source === "content" && shouldChaseFollowBottomOnSizeChange({
       previousScrollHeight,
       scrollEpsilon: SCROLL_EPSILON,
       scrollHeight,
     })
     let extraChildrenHeight = 0
-    if (grew && content) {
+    if (sizeChanged && content) {
       const windowedIds = new Set(windowItemIds)
       extraChildrenHeight = extraNonWindowedChildrenHeight({
         children: getMessageChildren(content, spacer).map((child) => ({
@@ -1040,7 +1029,9 @@ function createEngine(props: MessageScrollerProviderProps) {
         scrollTop: viewport.scrollTop,
       }),
     )
-    const chased = offEnd && (source === "viewport" || (grew && trust))
+    const chased = source === "viewport"
+      ? shouldChaseFollowOnViewportResize({ offEnd, trust })
+      : offEnd && sizeChanged && trust
     if (chased) {
       scrollToEnd({ behavior: "auto" })
       return

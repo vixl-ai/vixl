@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<{
 const {
   autoscrolling,
   handleViewportResize,
+  isFollowingLive,
   scrollableAttr,
   setPreserveScrollOnPrepend,
   setViewportElement,
@@ -27,6 +28,15 @@ watch(() => props.preserveScrollOnPrepend, setPreserveScrollOnPrepend, { immedia
 
 function onKeyDown(event: KeyboardEvent) {
   if (SCROLL_KEYS.has(event.key))
+    userScrollIntent()
+}
+
+function onPointerScrollIntent() {
+  // Wheel and touch at the live edge must not leave follow. @scroll ->
+  // syncAfterScroll -> updateModeFromScroll exits only once the view is
+  // actually above the edge threshold. Anchored and settling jumps still
+  // treat a gesture as user intent.
+  if (!isFollowingLive())
     userScrollIntent()
 }
 
@@ -67,8 +77,8 @@ onBeforeUnmount(() => {
       props.class,
     )"
     @scroll="syncAfterScroll()"
-    @wheel="userScrollIntent()"
-    @touchmove="userScrollIntent()"
+    @wheel="onPointerScrollIntent()"
+    @touchmove="onPointerScrollIntent()"
     @keydown="onKeyDown"
   >
     <slot />
