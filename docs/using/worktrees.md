@@ -18,12 +18,13 @@ In [Agent](/concepts/chat-modes) or Orchestrator, ask for a worktree, then the w
 Vixl always asks first (`Create worktree vixl/<name>?`). After you approve, it:
 
 1. Creates the git worktree and branch (optional `baseRef`, default `HEAD`).
-2. Registers it as a fleet project.
-3. Starts a [code graph](/concepts/code-graphs) for that root.
+2. Copies the parent's `.vixl/plans/` into the new checkout (plans only; existing files in the checkout are not overwritten).
+3. Registers it as a fleet project.
+4. Starts a [code graph](/concepts/code-graphs) for that root.
 
 `worktree_create` does not move the current chat. The new row appears nested under the parent in the sidebar, with the branch name and a dirty indicator. The worktree project page shows a **Worktree of {parent} on {branch}** banner. That row has its own chat list.
 
-To continue this chat inside the worktree, the agent follows with `move_workspace` (another approval). To keep this chat on the parent and run an isolated implementer, it passes the new slug as `workspaceSlug` to `spawn_subagent`. You can also open the nested row and start a chat there yourself.
+To continue this chat inside the worktree, the agent follows with `move_workspace` (another approval). If this chat has an active plan, that plan directory is copied to the new root at the same relative path, and an open plan tab follows. To keep this chat on the parent and run an isolated implementer, it passes the new slug as `workspaceSlug` to `spawn_subagent`. You can also open the nested row and start a chat there yourself.
 
 ## Several worktrees on one project
 
@@ -52,6 +53,14 @@ The nested sidebar row also has **Remove worktree**, which is that same removal,
 ## Merge back
 
 There is no merge or apply button. Bring the branch back with git tools on the parent (the agent can do that if you ask), or open a pull request yourself.
+
+## Plans
+
+[Plans](/using/work-with-plans) travel with the worktree so the same `PLAN.md` stays the source of truth.
+
+`worktree_create` copies the parent's `.vixl/plans/` directory into the new checkout. That copy is plans only. Existing files in the checkout are not overwritten, and there is no `.worktreeinclude` list for other gitignored files.
+
+`move_workspace` copies the chat's active plan directory to the new root at the same relative path. An open plan tab in the workbench follows that root, so the plan doc keeps updating live while the chat runs in the worktree.
 
 ## Code graphs
 
