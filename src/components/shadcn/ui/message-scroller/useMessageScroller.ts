@@ -391,6 +391,7 @@ export interface MessageScrollerContext {
   setPreserveScrollOnPrepend: (value: boolean) => void
   syncAfterScroll: () => void
   markUserTouchScrollIntent: () => void
+  clearUserTouchScrollIntent: () => void
   userScrollIntent: () => void
   windowedMessageIds: Readonly<ShallowRef<Set<string> | null>>
   itemPlaceholderHeight: (messageId: string) => number
@@ -693,6 +694,8 @@ function createEngine(props: MessageScrollerProviderProps) {
       return
     const next = Math.max(0, Math.ceil(height))
     if (spacerHeight !== next) {
+      // Drop leftover touch intent before layout shifts scrollTop.
+      clearUserTouchScrollIntent()
       setAutoscrolling(true)
       spacerHeight = next
       spacer.hidden = next === 0
@@ -757,6 +760,8 @@ function createEngine(props: MessageScrollerProviderProps) {
       lastScrollHeight = viewport.scrollHeight
       return true
     }
+    // Drop leftover touch intent before this write moves scrollTop.
+    clearUserTouchScrollIntent()
     setAutoscrolling(true)
     setSpacerHeight(0)
     streamingTurn = null
@@ -1182,6 +1187,10 @@ function createEngine(props: MessageScrollerProviderProps) {
       pendingUserTouchScroll = true
   }
 
+  function clearUserTouchScrollIntent() {
+    pendingUserTouchScroll = false
+  }
+
   function userScrollIntent() {
     if (
       mode === "following-bottom"
@@ -1278,6 +1287,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     setPreserveScrollOnPrepend,
     syncAfterScroll,
     markUserTouchScrollIntent,
+    clearUserTouchScrollIntent,
     userScrollIntent,
     windowedMessageIds,
     itemPlaceholderHeight,

@@ -20,6 +20,7 @@ const {
   setViewportElement,
   syncAfterScroll,
   markUserTouchScrollIntent,
+  clearUserTouchScrollIntent,
   userScrollIntent,
 } = useMessageScrollerContext()
 
@@ -45,16 +46,35 @@ function onWheel(event: WheelEvent) {
   userScrollIntent()
 }
 
+let touchClearFrame = 0
+
+function cancelPendingTouchClear() {
+  window.cancelAnimationFrame(touchClearFrame)
+  touchClearFrame = 0
+}
+
 function onTouchMove() {
   // Touch at the live edge does not call userScrollIntent. Arm a one-shot
   // flag so updateModeFromScroll can exit if the drag actually moved
   // scrollTop upward past the edge threshold. A touch that does not
   // move scroll must not leave follow.
+  cancelPendingTouchClear()
   if (isFollowingLive()) {
     markUserTouchScrollIntent()
     return
   }
   userScrollIntent()
+}
+
+function onTouchEnd() {
+  // Do not clear synchronously: a scroll event in this turn must be able
+  // to consume the flag first. The next frame drops a touch that never
+  // scrolled so a later programmatic write cannot treat it as user intent.
+  cancelPendingTouchClear()
+  touchClearFrame = window.requestAnimationFrame(() => {
+    touchClearFrame = 0
+    clearUserTouchScrollIntent()
+  })
 }
 
 let resizeObserver: ResizeObserver | null = null
@@ -74,6 +94,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.cancelAnimationFrame(resizeFrame)
+  cancelPendingTouchClear()
   resizeObserver?.disconnect()
   resizeObserver = null
   setViewportElement(null)
@@ -96,6 +117,8 @@ onBeforeUnmount(() => {
     @scroll="syncAfterScroll()"
     @wheel="onWheel"
     @touchmove="onTouchMove"
+    @touchend="onTouchEnd"
+    @touchcancel="onTouchEnd"
     @keydown="onKeyDown"
   >
     <slot />
