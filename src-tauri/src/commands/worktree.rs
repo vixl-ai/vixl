@@ -175,6 +175,10 @@ fn path_is_within(parent: &Path, child: &Path) -> bool {
     child.starts_with(&parent)
 }
 
+pub fn is_managed_worktree_path(root_path: &str, user_vixl_dir: &Path) -> bool {
+    path_is_within(&user_vixl_dir.join(WORKTREES_DIR), Path::new(root_path))
+}
+
 pub fn parse_worktree_porcelain(output: &str) -> Vec<GitWorktreeEntry> {
     let mut entries = Vec::new();
     let mut path: Option<String> = None;

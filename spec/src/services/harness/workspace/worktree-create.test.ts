@@ -175,4 +175,20 @@ describe('worktree_create tool', () => {
         'Worktree created at /tmp/worktrees/demo/feature but registration failed: disk full. Removed the checkout; delete branch vixl/feature before retrying.',
     })
   })
+
+  it('returns ok when fleet refresh fails after a successful register', async () => {
+    refreshFleetProjects.mockRejectedValue(new Error('fleet locked'))
+    const result = await execute({ name: 'feature' })
+
+    expect(gitWorktreeRemove).not.toHaveBeenCalled()
+    expect(registryAddProject).toHaveBeenCalled()
+    expect(result).toEqual({
+      ok: true,
+      slug: 'feature',
+      rootPath: '/tmp/worktrees/demo/feature',
+      branch: 'vixl/feature',
+      message:
+        'Worktree created and registered. Call move_workspace with this rootPath if the current chat should continue inside it, or pass this slug as workspaceSlug to spawn_subagent for an isolated implementer. Sidebar may need a reload.',
+    })
+  })
 })

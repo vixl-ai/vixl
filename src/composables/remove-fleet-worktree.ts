@@ -18,7 +18,7 @@ export type WorktreeRemovePreview = {
 }
 
 export type ConfirmRemoveWorktreeResult =
-  | { ok: true }
+  | { ok: true; warning?: string }
   | { ok: false; reason: 'running' | 'error'; message: string }
 
 export const loadWorktreeRemovePreview = async (args: {
@@ -91,12 +91,14 @@ export const confirmRemoveWorktree = async (args: {
   try {
     await registryRemoveProject(args.projectId)
     await refreshFleetProjects()
-  } catch (error) {
-    return {
-      ok: false,
-      reason: 'error',
-      message: `Worktree git remove succeeded but fleet unregister failed: ${invokeErrorMessage(error)}`,
+  } catch {
+    const warning = 'Checkout is gone. Remove the row from the sidebar if it lingers.'
+    try {
+      await refreshFleetProjects()
+    } catch {
+      return { ok: true, warning }
     }
+    return { ok: true, warning }
   }
 
   return { ok: true }

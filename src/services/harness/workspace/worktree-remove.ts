@@ -10,14 +10,17 @@ import toPermCtx from '@/services/harness/shared/to-perm-ctx'
 import { activeSubagentsForWorkspace } from '@/services/harness/subagent/active-for-workspace'
 import {
   gitStatus,
+  gitWorktreeList,
   gitWorktreeRemove,
   listChats,
   registryRemoveProject,
   worktreeDetectParent,
   type ChatMetaRecord,
+  type GitWorktreeEntry,
 } from '@/services/vixl/vixl-tauri'
 import invokeErrorMessage from '@/utils/invoke-error-message'
 import pathsEqual from '@/utils/paths-equal'
+import type { FleetProject } from '@/types/fleet/fleet-project'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const occupancyError = (
@@ -34,6 +37,50 @@ const occupancyError = (
     return `Cannot remove worktree while ${activeCount} active implementer(s) are running on ${slug}`
   }
   return null
+}
+
+const normalizePath = (value: string): string =>
+  value.replace(/\\/g, '/').replace(/\/+$/, '')
+
+const gitPathMatchesTarget = (gitPath: string, targetPath: string): boolean => {
+  if (pathsEqual(gitPath, targetPath)) {
+    return true
+  }
+  const gitNormalized = normalizePath(gitPath)
+  const targetNormalized = normalizePath(targetPath)
+  return (
+    gitNormalized.endsWith(targetNormalized) || targetNormalized.endsWith(gitNormalized)
+  )
+}
+
+const projectForRoot = (
+  projects: FleetProject[],
+  rootPath: string,
+): FleetProject | undefined =>
+  projects.find((entry) => pathsEqual(entry.rootPath, rootPath))
+
+const resolveFleetProject = async (
+  projects: FleetProject[],
+  targetPath: string,
+  projectRoot: string,
+): Promise<FleetProject | undefined> => {
+  const direct = projectForRoot(projects, targetPath)
+  if (direct) {
+    return direct
+  }
+
+  let entries: GitWorktreeEntry[] = []
+  try {
+    entries = await gitWorktreeList(projectRoot)
+  } catch {
+    return undefined
+  }
+
+  const reported = entries.find((entry) => gitPathMatchesTarget(entry.path, targetPath))
+  if (!reported) {
+    return undefined
+  }
+  return projectForRoot(projects, reported.path)
 }
 
 const worktreeRemove = (ctx: HarnessToolContext) =>
@@ -61,10 +108,11 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
 
       await ensureFleetLoaded()
       const projects = getFleetProjects()
-      const project = projects.find((entry) => pathsEqual(entry.rootPath, targetPath))
+      const project = await resolveFleetProject(projects, targetPath, ctx.projectRoot)
       if (!project) {
         return { error: 'No fleet project matches that worktree path' }
       }
+      const worktreePath = project.rootPath
 
       let parentRoot: string | undefined
       if (project.worktree?.parentId) {
@@ -72,7 +120,7 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
       }
       if (!parentRoot) {
         try {
-          const detected = await worktreeDetectParent(targetPath)
+          const detected = await worktreeDetectParent(worktreePath)
           if (detected) {
             parentRoot = projects.find((entry) => entry.id === detected.parentProjectId)?.rootPath
           }
@@ -80,10 +128,10 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
           parentRoot = undefined
         }
       }
-      const gitRoot = parentRoot ?? targetPath
+      const gitRoot = parentRoot ?? worktreePath
 
       const chats = await listChats(project.slug)
-      const preBusy = occupancyError(project.slug, chats, targetPath)
+      const preBusy = occupancyError(project.slug, chats, worktreePath)
       if (preBusy) {
         return { error: preBusy }
       }
@@ -91,7 +139,7 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
       const branch = project.worktree?.branch ?? 'unknown'
       let dirty: boolean | null = null
       try {
-        const status = await gitStatus(targetPath)
+        const status = await gitStatus(worktreePath)
         dirty = status.entries.some((entry) => !entry.isIgnored)
       } catch {
         dirty = null
@@ -117,14 +165,14 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
       }
 
       const latestChats = await listChats(project.slug)
-      const postBusy = occupancyError(project.slug, latestChats, targetPath)
+      const postBusy = occupancyError(project.slug, latestChats, worktreePath)
       if (postBusy) {
         return { error: postBusy }
       }
 
       const effectiveForce = force === true || dirty === true
       try {
-        await gitWorktreeRemove(gitRoot, targetPath, effectiveForce)
+        await gitWorktreeRemove(gitRoot, worktreePath, effectiveForce)
       } catch (error) {
         return { error: invokeErrorMessage(error) }
       }

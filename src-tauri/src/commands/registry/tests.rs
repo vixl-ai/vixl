@@ -361,13 +361,13 @@ fn root_update_clears_worktree_link_for_non_worktree_root() {
         branch: "vixl/feature".to_string(),
         managed: false,
     });
-    let updated =
-        apply_project_root_update(&mut projects, "child-1", root_str.clone()).expect("update root");
+    let updated = apply_project_root_update(&mut projects, "child-1", root_str.clone(), None)
+        .expect("update root");
     assert_eq!(updated.root_path, root_str);
     assert_eq!(updated.worktree, None);
     assert_eq!(projects[0].worktree, None);
     assert_eq!(
-        apply_project_root_update(&mut projects, "missing", root_str).unwrap_err(),
+        apply_project_root_update(&mut projects, "missing", root_str, None).unwrap_err(),
         "Project not found"
     );
 }

@@ -353,7 +353,8 @@ pub(crate) fn add_or_update_project(
         .collect();
     let project =
         upsert_fleet_project_occupied_inner(&mut registry.projects, name, root_path, &occupied);
-    sync_project_worktree_link(&mut registry.projects, &project.id);
+    let vixl = user_vixl_dir(app).ok();
+    sync_project_worktree_link(&mut registry.projects, &project.id, vixl.as_deref());
     write_registry(app, &registry)?;
     registry
         .projects
@@ -397,6 +398,7 @@ pub fn apply_project_root_update(
     projects: &mut [FleetProject],
     project_id: &str,
     root_path: String,
+    user_vixl_dir: Option<&Path>,
 ) -> Result<FleetProject, String> {
     {
         let project = projects
@@ -406,7 +408,7 @@ pub fn apply_project_root_update(
         project.root_path = root_path;
         project.last_opened = chrono_now();
     }
-    sync_project_worktree_link(projects, project_id);
+    sync_project_worktree_link(projects, project_id, user_vixl_dir);
     projects
         .iter()
         .find(|project| project.id == project_id)
@@ -421,7 +423,13 @@ pub fn registry_update_project_root(
     root_path: String,
 ) -> Result<FleetProject, String> {
     let mut registry = read_registry(&app)?;
-    let updated = apply_project_root_update(&mut registry.projects, &project_id, root_path)?;
+    let vixl = user_vixl_dir(&app).ok();
+    let updated = apply_project_root_update(
+        &mut registry.projects,
+        &project_id,
+        root_path,
+        vixl.as_deref(),
+    )?;
     write_registry(&app, &registry)?;
     Ok(updated)
 }
@@ -594,7 +602,11 @@ pub fn get_active_project(app: AppHandle) -> Result<Option<String>, String> {
     Ok(active.project_id)
 }
 
-pub fn sync_project_worktree_link(projects: &mut [FleetProject], project_id: &str) {
+pub fn sync_project_worktree_link(
+    projects: &mut [FleetProject],
+    project_id: &str,
+    user_vixl_dir: Option<&Path>,
+) {
     let Some(project) = projects.iter().find(|project| project.id == project_id) else {
         return;
     };
@@ -607,10 +619,13 @@ pub fn sync_project_worktree_link(projects: &mut [FleetProject], project_id: &st
     };
     match detected {
         Some(parent) => {
-            let managed = project
-                .worktree
-                .as_ref()
-                .is_some_and(|link| link.managed && link.parent_id == parent.parent_project_id);
+            let managed = match user_vixl_dir {
+                Some(dir) => super::worktree::is_managed_worktree_path(&root, dir),
+                None => project
+                    .worktree
+                    .as_ref()
+                    .is_some_and(|link| link.managed && link.parent_id == parent.parent_project_id),
+            };
             project.worktree = Some(WorktreeLink {
                 parent_id: parent.parent_project_id,
                 branch: parent.branch,

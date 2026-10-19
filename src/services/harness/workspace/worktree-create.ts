@@ -78,12 +78,12 @@ const worktreeCreate = (ctx: HarnessToolContext) =>
           error: `Worktree created at ${created.path} but registration failed: ${invokeErrorMessage(error)}. ${rollbackNote}.`,
         }
       }
+      let message =
+        'Worktree created and registered. Call move_workspace with this rootPath if the current chat should continue inside it, or pass this slug as workspaceSlug to spawn_subagent for an isolated implementer.'
       try {
         await refreshFleetProjects()
-      } catch (error) {
-        return {
-          error: `Worktree created and registered at ${created.path} but fleet refresh failed: ${invokeErrorMessage(error)}`,
-        }
+      } catch {
+        message = `${message} Sidebar may need a reload.`
       }
 
       void warmCodeGraph(created.path)
@@ -93,8 +93,7 @@ const worktreeCreate = (ctx: HarnessToolContext) =>
         slug,
         rootPath: created.path,
         branch: created.branch,
-        message:
-          'Worktree created and registered. Call move_workspace with this rootPath if the current chat should continue inside it, or pass this slug as workspaceSlug to spawn_subagent for an isolated implementer.',
+        message,
       }
     },
   })

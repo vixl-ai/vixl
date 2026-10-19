@@ -13,6 +13,10 @@ const gitWorktreeRemove = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
 )
 
+const gitWorktreeList = vi.hoisted(() =>
+  vi.fn<(root: string) => Promise<unknown[]>>().mockResolvedValue([]),
+)
+
 const registryRemoveProject = vi.hoisted(() =>
   vi.fn<(projectId: string) => Promise<void>>().mockResolvedValue(undefined),
 )
@@ -47,6 +51,7 @@ vi.mock('@/services/harness/permission', () => ({
 
 vi.mock('@/services/vixl/vixl-tauri', () => ({
   gitWorktreeRemove,
+  gitWorktreeList,
   registryRemoveProject,
   listChats,
   gitStatus,
@@ -138,6 +143,7 @@ describe('worktree_remove tool', () => {
     vi.clearAllMocks()
     gateWorkspaceMovePermission.mockResolvedValue(true)
     gitWorktreeRemove.mockResolvedValue(undefined)
+    gitWorktreeList.mockResolvedValue([])
     registryRemoveProject.mockResolvedValue(undefined)
     refreshFleetProjects.mockResolvedValue(undefined)
     ensureFleetLoaded.mockResolvedValue(undefined)
@@ -304,6 +310,31 @@ describe('worktree_remove tool', () => {
     expect(gitWorktreeRemove).toHaveBeenCalledWith(
       '/tmp/worktrees/demo/feature',
       '/tmp/worktrees/demo/feature',
+      false,
+    )
+  })
+
+  it('resolves a symlink-aliased rootPath via git worktree list', async () => {
+    const canonical = '/private/tmp/worktrees/demo/feature'
+    getFleetProjects.mockReturnValue([
+      parentProject,
+      { ...worktreeProject, rootPath: canonical },
+    ])
+    gitWorktreeList.mockResolvedValue([
+      {
+        path: canonical,
+        branch: 'vixl/feature',
+        bare: false,
+        detached: false,
+      },
+    ])
+    const result = await execute({ rootPath: '/tmp/worktrees/demo/feature' })
+
+    expect(gitWorktreeList).toHaveBeenCalledWith('/tmp/project')
+    expect(result).toMatchObject({ ok: true })
+    expect(gitWorktreeRemove).toHaveBeenCalledWith(
+      '/tmp/project',
+      canonical,
       false,
     )
   })

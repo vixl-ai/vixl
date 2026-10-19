@@ -224,4 +224,22 @@ describe('remove-fleet-worktree', () => {
     expect(refreshFleetProjects).toHaveBeenCalledTimes(1)
     expect(result).toEqual({ ok: true })
   })
+
+  it('returns ok with a warning when unregister fails after git remove', async () => {
+    registryRemoveProject.mockRejectedValue(new Error('busy'))
+    const result = await confirmRemoveWorktree({
+      projectId: 'proj-wt',
+      slug: 'feature',
+      parentRoot: '/tmp/demo',
+      worktreeRoot: '/tmp/worktrees/demo/feature',
+      force: true,
+    })
+
+    expect(gitWorktreeRemove).toHaveBeenCalled()
+    expect(refreshFleetProjects).toHaveBeenCalled()
+    expect(result).toEqual({
+      ok: true,
+      warning: 'Checkout is gone. Remove the row from the sidebar if it lingers.',
+    })
+  })
 })

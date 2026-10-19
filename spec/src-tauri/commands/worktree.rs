@@ -302,25 +302,14 @@ fn registry_sets_child_link_on_add_and_clears_on_parent_removal() {
         sample_project("parent-1", "demo", repo.path()),
         sample_project("child-1", "feature", Path::new(&added.path)),
     ];
-    sync_project_worktree_link(&mut projects, "child-1");
+    sync_project_worktree_link(&mut projects, "child-1", Some(vixl.path()));
     assert_eq!(
         projects[1].worktree.as_ref(),
         Some(&WorktreeLink {
             parent_id: "parent-1".to_string(),
             branch: "vixl/feature".to_string(),
-            managed: false,
+            managed: true,
         })
-    );
-
-    projects[1].worktree = Some(WorktreeLink {
-        parent_id: "parent-1".to_string(),
-        branch: "vixl/feature".to_string(),
-        managed: true,
-    });
-    sync_project_worktree_link(&mut projects, "child-1");
-    assert_eq!(
-        projects[1].worktree.as_ref().map(|link| link.managed),
-        Some(true)
     );
 
     projects.retain(|project| project.id != "parent-1");
@@ -344,33 +333,80 @@ fn registry_root_update_resyncs_worktree_link() {
         sample_project("parent-1", "demo", repo.path()),
         sample_project("child-1", "feature", Path::new(&feature.path)),
     ];
-    sync_project_worktree_link(&mut projects, "child-1");
+    sync_project_worktree_link(&mut projects, "child-1", Some(vixl.path()));
     assert_eq!(
         projects[1].worktree.as_ref(),
         Some(&WorktreeLink {
             parent_id: "parent-1".to_string(),
             branch: "vixl/feature".to_string(),
-            managed: false,
+            managed: true,
         })
     );
 
-    apply_project_root_update(&mut projects, "child-1", review.path.clone())
-        .expect("update to other worktree");
+    apply_project_root_update(
+        &mut projects,
+        "child-1",
+        review.path.clone(),
+        Some(vixl.path()),
+    )
+    .expect("update to other worktree");
     assert_eq!(projects[1].root_path, review.path);
     assert_eq!(
         projects[1].worktree.as_ref(),
         Some(&WorktreeLink {
             parent_id: "parent-1".to_string(),
             branch: "vixl/review".to_string(),
-            managed: false,
+            managed: true,
         })
     );
 
     let plain = tempfile::tempdir().expect("non-worktree root");
-    apply_project_root_update(&mut projects, "child-1", path_str(plain.path()))
-        .expect("update to non-worktree");
+    apply_project_root_update(
+        &mut projects,
+        "child-1",
+        path_str(plain.path()),
+        Some(vixl.path()),
+    )
+    .expect("update to non-worktree");
     assert_eq!(projects[1].root_path, path_str(plain.path()));
     assert_eq!(projects[1].worktree, None);
+}
+
+#[test]
+fn sync_marks_managed_from_vixl_worktrees_location() {
+    let repo = init_repo();
+    let vixl = tempfile::tempdir().expect("vixl dir");
+    let added =
+        git_worktree_add_in_dir(&path_str(repo.path()), "feature", None, vixl.path(), "demo")
+            .expect("add worktree");
+
+    let mut projects = vec![
+        sample_project("parent-1", "demo", repo.path()),
+        sample_project("child-1", "feature", Path::new(&added.path)),
+    ];
+    sync_project_worktree_link(&mut projects, "child-1", Some(vixl.path()));
+    assert_eq!(
+        projects[1].worktree.as_ref().map(|link| link.managed),
+        Some(true)
+    );
+
+    let other_vixl = tempfile::tempdir().expect("other vixl");
+    sync_project_worktree_link(&mut projects, "child-1", Some(other_vixl.path()));
+    assert_eq!(
+        projects[1].worktree.as_ref().map(|link| link.managed),
+        Some(false)
+    );
+
+    projects[1].worktree = Some(WorktreeLink {
+        parent_id: "parent-1".to_string(),
+        branch: "vixl/feature".to_string(),
+        managed: true,
+    });
+    sync_project_worktree_link(&mut projects, "child-1", None);
+    assert_eq!(
+        projects[1].worktree.as_ref().map(|link| link.managed),
+        Some(true)
+    );
 }
 
 #[test]
