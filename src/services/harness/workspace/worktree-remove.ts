@@ -24,7 +24,7 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
     description: 'Remove a git worktree (always user-approved).',
     inputSchema: z.object({
       rootPath: z.string().optional().describe('Worktree path (not this chat root)'),
-      force: z.boolean().optional().describe('Force if dirty'),
+      force: z.boolean().optional().describe('Force even if dirty (implied when Dirty: yes)'),
     }),
     execute: async ({ rootPath, force }, { toolCallId }) => {
       if (ctx.subagentId) {
@@ -83,14 +83,14 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
       }
 
       const branch = project.worktree?.branch ?? 'unknown'
-      let dirtyLabel = 'unknown'
+      let dirty: boolean | null = null
       try {
         const status = await gitStatus(targetPath)
-        const dirty = status.entries.some((entry) => !entry.isIgnored)
-        dirtyLabel = dirty ? 'yes' : 'no'
+        dirty = status.entries.some((entry) => !entry.isIgnored)
       } catch {
-        dirtyLabel = 'unknown'
+        dirty = null
       }
+      const dirtyLabel = dirty === null ? 'unknown' : dirty ? 'yes' : 'no'
 
       const detail = [
         `Path: ${targetPath}`,
@@ -110,8 +110,9 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
         return { rejected: true, error: 'User declined removing the worktree' }
       }
 
+      const effectiveForce = force === true || dirty === true
       try {
-        await gitWorktreeRemove(parentRoot, targetPath, force === true)
+        await gitWorktreeRemove(parentRoot, targetPath, effectiveForce)
       } catch (error) {
         return { error: invokeErrorMessage(error) }
       }

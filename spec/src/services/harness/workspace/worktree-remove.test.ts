@@ -232,4 +232,50 @@ describe('worktree_remove tool', () => {
         'Removed worktree vixl/feature at /tmp/worktrees/demo/feature and unregistered it from the fleet.',
     })
   })
+
+  it('implies force when the approved dialog showed Dirty: yes', async () => {
+    gitStatus.mockResolvedValue({
+      branch: 'vixl/feature',
+      entries: [{ path: 'src/a.ts', isUntracked: false, isIgnored: false }],
+    })
+    const result = await execute({ rootPath: '/tmp/worktrees/demo/feature' })
+
+    expect(result).toMatchObject({ ok: true })
+    expect(gateWorkspaceMovePermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.stringContaining('Dirty: yes'),
+      }),
+    )
+    expect(gitWorktreeRemove).toHaveBeenCalledWith(
+      '/tmp/project',
+      '/tmp/worktrees/demo/feature',
+      true,
+    )
+  })
+
+  it('does not imply force when dirty is unknown', async () => {
+    gitStatus.mockRejectedValue(new Error('Not a git repository'))
+    const result = await execute({ rootPath: '/tmp/worktrees/demo/feature' })
+
+    expect(result).toMatchObject({ ok: true })
+    expect(gitWorktreeRemove).toHaveBeenCalledWith(
+      '/tmp/project',
+      '/tmp/worktrees/demo/feature',
+      false,
+    )
+  })
+
+  it('forces when the caller passes force true', async () => {
+    const result = await execute({
+      rootPath: '/tmp/worktrees/demo/feature',
+      force: true,
+    })
+
+    expect(result).toMatchObject({ ok: true })
+    expect(gitWorktreeRemove).toHaveBeenCalledWith(
+      '/tmp/project',
+      '/tmp/worktrees/demo/feature',
+      true,
+    )
+  })
 })
