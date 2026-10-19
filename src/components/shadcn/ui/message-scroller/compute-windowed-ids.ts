@@ -46,6 +46,28 @@ export function shouldChaseFollowBottomOnContentGrowth({
   return scrollHeight - previousScrollHeight > scrollEpsilon
 }
 
+export function shouldChaseFollowBottomOnSizeChange({
+  previousScrollHeight,
+  scrollEpsilon,
+  scrollHeight,
+}: {
+  previousScrollHeight: number
+  scrollEpsilon: number
+  scrollHeight: number
+}): boolean {
+  return Math.abs(scrollHeight - previousScrollHeight) > scrollEpsilon
+}
+
+export function shouldChaseFollowOnViewportResize({
+  offEnd,
+  trust,
+}: {
+  offEnd: boolean
+  trust: boolean
+}): boolean {
+  return offEnd && trust
+}
+
 export function extraNonWindowedChildrenHeight({
   children,
   gap = 0,
@@ -112,9 +134,12 @@ export function shouldInvalidateItemHeightsOnWidthChange({
   clientWidth: number
   lastClientWidth: number
 }): boolean {
-  if (clientWidth < 1 || clientHeight < 1 || lastClientWidth < 1)
-    return false
-  return Math.round(clientWidth) !== Math.round(lastClientWidth)
+  void clientHeight
+  void clientWidth
+  void lastClientWidth
+  // Keep measured heights across a width change. Placeholders keep the last
+  // height until a mounted row reports a new one.
+  return false
 }
 
 export function shouldSampleClientWidthBaseline({
@@ -192,8 +217,30 @@ export function resolveWindowScrollTop({
   return scrollTop
 }
 
+export function resolveFollowWindowScrollTop({
+  estimatedHeight,
+  viewportHeight,
+}: {
+  estimatedHeight: number
+  viewportHeight: number
+}): number {
+  return Math.max(0, estimatedHeight - viewportHeight)
+}
+
+export function clampReadingWindowScrollTop({
+  estimatedHeight,
+  scrollTop,
+  viewportHeight,
+}: {
+  estimatedHeight: number
+  scrollTop: number
+  viewportHeight: number
+}): number {
+  const maxScroll = Math.max(0, estimatedHeight - viewportHeight)
+  return Math.min(Math.max(0, scrollTop), maxScroll)
+}
+
 export function shouldExitFollowBottom({
-  autoscrolling,
   distanceFromEnd,
   scrolledUp,
   threshold,
@@ -203,7 +250,21 @@ export function shouldExitFollowBottom({
   scrolledUp: boolean
   threshold: number
 }): boolean {
-  return scrolledUp && !autoscrolling && distanceFromEnd > threshold
+  return scrolledUp && distanceFromEnd > threshold
+}
+
+export function shouldExitFollowBottomOnUserTouch({
+  distanceFromEnd,
+  pendingUserTouchScroll,
+  scrolledUp,
+  threshold,
+}: {
+  distanceFromEnd: number
+  pendingUserTouchScroll: boolean
+  scrolledUp: boolean
+  threshold: number
+}): boolean {
+  return pendingUserTouchScroll && scrolledUp && distanceFromEnd > threshold
 }
 
 export function itemIdsEqual(a: readonly string[], b: readonly string[]): boolean {

@@ -5,13 +5,15 @@ import {
   DEFAULT_OVERSCAN_PX,
   estimateItemsHeight,
   extraNonWindowedChildrenHeight,
+  resolveFollowWindowScrollTop,
   shouldAdvanceFollowChaseBaseline,
   shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
+  shouldChaseFollowBottomOnSizeChange,
+  shouldChaseFollowOnViewportResize,
   shouldTrustFollowBottomContentMeasurements,
   shouldExitFollowBottom,
   shouldInvalidateItemHeightsOnWidthChange,
-  shouldSampleClientWidthBaseline,
   shouldSettleScrollToEnd,
 } from '@/components/shadcn/ui/message-scroller/compute-windowed-ids'
 
@@ -22,23 +24,29 @@ import {
  * scrollHeight, the browser clamps scrollTop, the window expands, remounts
  * grow scrollHeight, content ResizeObserver chases again.
  *
- * Production guards (width invalidation plus measured growth-gated chase) must
- * converge without streaming and without widening the pane after ignition.
- * Growth-only chase never fires on shrink or clamp frames. Chase also requires
- * itemHeights to match the DOM, so stale-placeholder remount growth cannot
- * pump. Width invalidation still clears heights after a real width change.
+ * Production guards (cached-end follow window plus trusted size chase) must
+ * converge without streaming, without wiping heights, and without widening
+ * the pane after ignition. Content chase fires on a trusted grow or shrink
+ * while off the live edge. Viewport chase uses the same trust gate. Untrusted
+ * chase must not pump the 2-cycle. A width change does not clear the height
+ * map and must not move scrollTop before new heights are reported.
+ *
+ * Send while stuck to the bottom is scrollToEnd, not align-start: see
+ * shouldAnchorOnContentChange in compute-windowed-ids.test.ts.
  */
 
 const SCROLL_EPSILON = 0.5
 const SCROLL_EDGE_THRESHOLD = 8
 
 type ResizeSource = 'content' | 'viewport'
-type ChasePolicy = 'all-content' | 'content-growth' | 'viewport-only'
+type ChasePolicy = 'all-content' | 'content-growth' | 'content-size' | 'viewport-only'
+type FollowWindow = 'live' | 'cached-end'
 
 interface SimulatorOptions {
   applyGuardsFromFrame?: number
   chasePolicy?: ChasePolicy
   extraChildHeight?: number
+  followWindow?: FollowWindow
   frames: number
   gap: number
   itemCount: number
@@ -62,6 +70,7 @@ interface FrameOut {
   distanceFromEnd: number
   exitFollowIfScrolledUp: boolean
   Hdom: number
+  heightMapSize: number
   mountedKey: string
   mountedSize: number
   scrollTop: number
@@ -90,41 +99,64 @@ function reportedHeight(height: number, roundReportedHeights: boolean): number {
   return roundReportedHeights ? Math.round(height) : height
 }
 
-function applyFixedGuards(): Pick<SimulatorOptions, 'chasePolicy' | 'invalidateOnWidthChange'> {
+function applyFixedGuards(): Pick<SimulatorOptions, 'chasePolicy' | 'followWindow'> {
   return {
-    chasePolicy: 'content-growth',
-    invalidateOnWidthChange: true,
+    chasePolicy: 'content-size',
+    followWindow: 'cached-end',
   }
 }
 
-function syncItemHeightsToViewportWidth({
-  clientHeight,
-  clientWidth,
-  heights,
-  lastClientWidth,
+function windowScrollTopFor({
+  followWindow,
+  estimatedHeight,
+  scrollTop,
+  viewportHeight,
 }: {
-  clientHeight: number
-  clientWidth: number
-  heights: Map<string, number>
-  lastClientWidth: number
-}) {
-  let nextLastClientWidth = lastClientWidth
-  if (shouldInvalidateItemHeightsOnWidthChange({
-    clientHeight,
-    clientWidth,
-    lastClientWidth,
-  })) {
-    heights.clear()
+  followWindow: FollowWindow
+  estimatedHeight: number
+  scrollTop: number
+  viewportHeight: number
+}): number {
+  if (followWindow === 'cached-end') {
+    return resolveFollowWindowScrollTop({
+      estimatedHeight,
+      viewportHeight,
+    })
   }
-  if (shouldSampleClientWidthBaseline({ clientHeight, clientWidth }))
-    nextLastClientWidth = clientWidth
-  return { lastClientWidth: nextLastClientWidth }
+  return scrollTop
+}
+
+function chaseFollowFrame({
+  policy,
+  source,
+  grew,
+  sizeChanged,
+  trusted,
+  offEnd,
+}: {
+  policy: ChasePolicy
+  source: ResizeSource
+  grew: boolean
+  sizeChanged: boolean
+  trusted: boolean
+  offEnd: boolean
+}): boolean {
+  if (policy === 'content-size') {
+    return source === 'viewport'
+      ? shouldChaseFollowOnViewportResize({ offEnd, trust: trusted })
+      : offEnd && sizeChanged && trusted
+  }
+  const allowChase = source === 'viewport'
+    || policy === 'all-content'
+    || (policy === 'content-growth' && grew && trusted)
+  return allowChase && offEnd
 }
 
 function simulateFollowBottomWidthChange({
   applyGuardsFromFrame,
   chasePolicy = 'all-content',
   extraChildHeight = 0,
+  followWindow = 'live',
   frames,
   gap,
   itemCount,
@@ -149,16 +181,22 @@ function simulateFollowBottomWidthChange({
     itemIds,
   })
 
+  let policy = chasePolicy
+  let liveFollowWindow = followWindow
   let scrollTop = Math.max(0, estimated() - viewportHeight)
   let mounted = computeWindowedIds({
     gap,
     heights,
     itemIds,
     overscanPx,
-    scrollTop,
+    scrollTop: windowScrollTopFor({
+      estimatedHeight: estimated(),
+      followWindow: liveFollowWindow,
+      scrollTop,
+      viewportHeight,
+    }),
     viewportHeight,
   })
-  let policy = chasePolicy
   let liveTrueHeight = trueHeight
   let shouldClearHeightsOnWidth = invalidateOnWidthChange
   let previousScrollHeight = 0
@@ -167,9 +205,9 @@ function simulateFollowBottomWidthChange({
 
   for (let frame = 0; frame < frames; frame += 1) {
     if (applyGuardsFromFrame !== undefined && frame === applyGuardsFromFrame) {
-      policy = 'content-growth'
-      heights.clear()
-      shouldClearHeightsOnWidth = false
+      const fixed = applyFixedGuards()
+      policy = fixed.chasePolicy ?? policy
+      liveFollowWindow = fixed.followWindow ?? liveFollowWindow
     }
 
     if (
@@ -203,8 +241,10 @@ function simulateFollowBottomWidthChange({
       const id = itemIds[index]
       if (!id)
         continue
-      const unmountedHeight = heights.get(id)
-        ?? (placeholdersStale ? staleUnmountedHeight : DEFAULT_ITEM_HEIGHT)
+      const cachedUnmounted = heights.get(id) ?? DEFAULT_ITEM_HEIGHT
+      const unmountedHeight = placeholdersStale
+        ? staleUnmountedHeight
+        : cachedUnmounted
       const height = mounted.has(id) ? liveTrueHeight : unmountedHeight
       children.push({ height, messageId: id })
       Hdom += height
@@ -231,6 +271,11 @@ function simulateFollowBottomWidthChange({
       scrollEpsilon: SCROLL_EPSILON,
       scrollHeight: Hdom,
     })
+    const sizeChanged = shouldChaseFollowBottomOnSizeChange({
+      previousScrollHeight,
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollHeight: Hdom,
+    })
     const trusted = shouldTrustFollowBottomContentMeasurements({
       estimatedHeight: estimated(),
       extraChildrenHeight,
@@ -238,14 +283,19 @@ function simulateFollowBottomWidthChange({
       scrollEpsilon: SCROLL_EPSILON,
       scrollHeight: Hdom,
     })
-    const allowChase = source === 'viewport'
-      || policy === 'all-content'
-      || (policy === 'content-growth' && grew && trusted)
-    const chase = allowChase && shouldChaseFollowBottomOnResize({
+    const offEnd = shouldChaseFollowBottomOnResize({
       clientHeight: viewportHeight,
       maxScrollTop,
       scrollEpsilon: SCROLL_EPSILON,
       scrollTop,
+    })
+    const chase = chaseFollowFrame({
+      grew,
+      offEnd,
+      policy,
+      sizeChanged,
+      source,
+      trusted,
     })
     const settle = shouldSettleScrollToEnd({
       hasStreamingTurn: false,
@@ -273,7 +323,12 @@ function simulateFollowBottomWidthChange({
       heights,
       itemIds,
       overscanPx,
-      scrollTop,
+      scrollTop: windowScrollTopFor({
+        estimatedHeight: estimated(),
+        followWindow: liveFollowWindow,
+        scrollTop,
+        viewportHeight,
+      }),
       viewportHeight,
     })
 
@@ -294,6 +349,7 @@ function simulateFollowBottomWidthChange({
       distanceFromEnd,
       exitFollowIfScrolledUp,
       Hdom,
+      heightMapSize: heights.size,
       mountedKey: windowKey(nextMounted),
       mountedSize: nextMounted.size,
       scrollTop,
@@ -347,9 +403,7 @@ function simulatePinnedContentHeightChanges({
       continue
     const Hdom = observed(itemHeight)
     const maxScrollTop = Math.max(0, Hdom - viewportHeight)
-    if (scrollTop > maxScrollTop)
-      scrollTop = maxScrollTop
-    const grew = shouldChaseFollowBottomOnContentGrowth({
+    const sizeChanged = shouldChaseFollowBottomOnSizeChange({
       previousScrollHeight,
       scrollEpsilon: SCROLL_EPSILON,
       scrollHeight: Hdom,
@@ -360,14 +414,17 @@ function simulatePinnedContentHeightChanges({
       scrollEpsilon: SCROLL_EPSILON,
       scrollHeight: Hdom,
     })
-    const chase = grew && trusted && shouldChaseFollowBottomOnResize({
+    const offEnd = shouldChaseFollowBottomOnResize({
       clientHeight: viewportHeight,
       maxScrollTop,
       scrollEpsilon: SCROLL_EPSILON,
       scrollTop,
     })
+    const chase = offEnd && sizeChanged && trusted
     previousScrollHeight = Hdom
     if (chase)
+      scrollTop = maxScrollTop
+    else if (scrollTop > maxScrollTop)
       scrollTop = maxScrollTop
     framesOut.push({
       chase,
@@ -476,8 +533,16 @@ describe('stale-height follow-bottom resize loop', () => {
     })
   })
 
-  describe('fixed guards (width invalidation plus growth-gated chase)', () => {
+  describe('fixed guards (cached-end window plus trusted size chase)', () => {
     it('converges for 20 items at rest after narrowing', () => {
+      const initialScrollTop = resolveFollowWindowScrollTop({
+        estimatedHeight: estimateItemsHeight({
+          gap: scenario20.gap,
+          heights: new Map(ids(scenario20.itemCount).map((id) => [id, scenario20.oldHeight])),
+          itemIds: ids(scenario20.itemCount),
+        }),
+        viewportHeight: scenario20.viewportHeight,
+      })
       const framesOut = simulateFollowBottomWidthChange({
         frames: 8,
         reportPolicy: 'raceUnmount',
@@ -487,31 +552,26 @@ describe('stale-height follow-bottom resize loop', () => {
 
       expectConverged(framesOut)
       expect(framesOut[0]?.source).toBe('viewport')
+      expect(framesOut[0]?.chase).toBe(false)
+      expect(framesOut[0]?.scrollTop).toBe(initialScrollTop)
       expect(framesOut.slice(1).every((frame) => frame.source === 'content')).toBe(true)
+      expect(framesOut.every((frame) => frame.heightMapSize === scenario20.itemCount)).toBe(true)
       expect(framesOut.at(-1)).toMatchObject({
-        Hdom: 3776,
-        distanceFromEnd: 0,
         mountedKey: '14,15,16,17,18,19',
-        scrollTop: 3376,
-        settle: true,
-      })
-
-      const withoutInvalidation = simulateFollowBottomWidthChange({
-        chasePolicy: 'content-growth',
-        frames: 8,
-        invalidateOnWidthChange: false,
-        reportPolicy: 'raceUnmount',
-        ...scenario20,
-      })
-      expect(isTwoCycle(withoutInvalidation)).toBe(false)
-      expect(withoutInvalidation.at(-1)).toMatchObject({
-        distanceFromEnd: 1000,
-        mountedKey: '9,10,11,12,13,14,15,16,17,18',
         settle: false,
       })
+      expect(framesOut.at(-1)?.mountedKey).not.toBe('19')
     })
 
     it('converges for 40 items at rest after narrowing', () => {
+      const initialScrollTop = resolveFollowWindowScrollTop({
+        estimatedHeight: estimateItemsHeight({
+          gap: scenario40.gap,
+          heights: new Map(ids(scenario40.itemCount).map((id) => [id, scenario40.oldHeight])),
+          itemIds: ids(scenario40.itemCount),
+        }),
+        viewportHeight: scenario40.viewportHeight,
+      })
       const framesOut = simulateFollowBottomWidthChange({
         frames: 10,
         reportPolicy: 'raceUnmount',
@@ -520,11 +580,11 @@ describe('stale-height follow-bottom resize loop', () => {
       })
 
       expectConverged(framesOut)
-      expect(framesOut.at(-1)).toMatchObject({
-        Hdom: 8456,
-        mountedKey: '33,34,35,36,37,38,39',
-        scrollTop: 6896,
-      })
+      expect(framesOut[0]?.chase).toBe(false)
+      expect(framesOut[0]?.scrollTop).toBe(initialScrollTop)
+      expect(framesOut.every((frame) => frame.heightMapSize === scenario40.itemCount)).toBe(true)
+      expect(framesOut.at(-1)?.mountedKey).not.toBe('39')
+      expect(framesOut.at(-1)?.mountedKey?.endsWith('39')).toBe(true)
     })
 
     it('converges when every mounted id can report its new height', () => {
@@ -561,30 +621,30 @@ describe('stale-height follow-bottom resize loop', () => {
       expect(afterFix.every((frame) => frame.source === 'content')).toBe(true)
     })
 
-    it('invalidates after a width change that occurred while the viewport had no height', () => {
+    it('does not clear heights after a width change that occurred while the viewport had no height', () => {
       const heights = new Map(ids(scenario20.itemCount).map((id) => [id, scenario20.oldHeight]))
-      let lastClientWidth = 800
-
-      const hidden = syncItemHeightsToViewportWidth({
+      expect(shouldInvalidateItemHeightsOnWidthChange({
         clientHeight: 0,
         clientWidth: 480,
-        heights,
-        lastClientWidth,
-      })
-      lastClientWidth = hidden.lastClientWidth
-      expect(lastClientWidth).toBe(800)
+        lastClientWidth: 800,
+      })).toBe(false)
       expect(heights.size).toBe(scenario20.itemCount)
 
-      const restored = syncItemHeightsToViewportWidth({
+      expect(shouldInvalidateItemHeightsOnWidthChange({
         clientHeight: scenario20.viewportHeight,
         clientWidth: 480,
-        heights,
-        lastClientWidth,
-      })
-      lastClientWidth = restored.lastClientWidth
-      expect(lastClientWidth).toBe(480)
-      expect(heights.size).toBe(0)
+        lastClientWidth: 800,
+      })).toBe(false)
+      expect(heights.size).toBe(scenario20.itemCount)
 
+      const initialScrollTop = resolveFollowWindowScrollTop({
+        estimatedHeight: estimateItemsHeight({
+          gap: scenario20.gap,
+          heights,
+          itemIds: ids(scenario20.itemCount),
+        }),
+        viewportHeight: scenario20.viewportHeight,
+      })
       const framesOut = simulateFollowBottomWidthChange({
         frames: 8,
         reportPolicy: 'raceUnmount',
@@ -592,13 +652,9 @@ describe('stale-height follow-bottom resize loop', () => {
         ...scenario20,
       })
       expectConverged(framesOut)
-      expect(framesOut.at(-1)).toMatchObject({
-        Hdom: 3776,
-        distanceFromEnd: 0,
-        mountedKey: '14,15,16,17,18,19',
-        scrollTop: 3376,
-        settle: true,
-      })
+      expect(framesOut[0]?.scrollTop).toBe(initialScrollTop)
+      expect(framesOut.every((frame) => frame.heightMapSize === scenario20.itemCount)).toBe(true)
+      expect(framesOut.at(-1)?.mountedKey).toBe('14,15,16,17,18,19')
     })
 
     it('chases content growth while pinned and lands at the new bottom', () => {
@@ -615,18 +671,61 @@ describe('stale-height follow-bottom resize loop', () => {
       }])
     })
 
-    it('does not chase when content shrinks', () => {
-      const framesOut = simulatePinnedContentHeightChanges({
-        heightsSequence: [1400, 1000],
-        viewportHeight: 400,
+    it('chases a trusted shrink onto the new follow end', () => {
+      const previousScrollHeight = 1400
+      const scrollHeight = 1000
+      const viewportHeight = 400
+      const scrollTop = 1000
+      const maxScrollTop = Math.max(0, scrollHeight - viewportHeight)
+      const sizeChanged = shouldChaseFollowBottomOnSizeChange({
+        previousScrollHeight,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollHeight,
       })
+      const trust = shouldTrustFollowBottomContentMeasurements({
+        estimatedHeight: scrollHeight,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollHeight,
+      })
+      const offEnd = shouldChaseFollowBottomOnResize({
+        clientHeight: viewportHeight,
+        maxScrollTop,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollTop,
+      })
+      const chase = offEnd && sizeChanged && trust
+      expect(sizeChanged).toBe(true)
+      expect(trust).toBe(true)
+      expect(chase).toBe(true)
+      expect(maxScrollTop).toBe(600)
+    })
 
-      expect(framesOut).toEqual([{
-        chase: false,
-        distanceFromEnd: 0,
-        Hdom: 1000,
-        scrollTop: 600,
-      }])
+    it('does not chase an untrusted shrink', () => {
+      const previousScrollHeight = 1400
+      const scrollHeight = 1000
+      const viewportHeight = 400
+      const scrollTop = 1000
+      const maxScrollTop = Math.max(0, scrollHeight - viewportHeight)
+      const sizeChanged = shouldChaseFollowBottomOnSizeChange({
+        previousScrollHeight,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollHeight,
+      })
+      const trust = shouldTrustFollowBottomContentMeasurements({
+        estimatedHeight: previousScrollHeight,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollHeight,
+      })
+      const offEnd = shouldChaseFollowBottomOnResize({
+        clientHeight: viewportHeight,
+        maxScrollTop,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollTop,
+      })
+      const chase = offEnd && sizeChanged && trust
+      expect(sizeChanged).toBe(true)
+      expect(trust).toBe(false)
+      expect(chase).toBe(false)
     })
 
     it('does not re-ignite after a narrowing drag plus late content growth', () => {
@@ -659,7 +758,8 @@ describe('stale-height follow-bottom resize loop', () => {
 
       expect(isTwoCycle(framesOut)).toBe(false)
       expectConverged(framesOut)
-      expect(framesOut.at(-1)?.Hdom).toBe(3776 + extraChildHeight + scenario20.gap)
+      expect(framesOut.every((frame) => frame.heightMapSize === scenario20.itemCount)).toBe(true)
+      expect(framesOut.at(-1)?.mountedKey).toBe('14,15,16,17,18,19')
     })
 
     it('chases pinned growth with a non-windowed question card counted in trust', () => {
@@ -883,6 +983,11 @@ describe('follow-bottom chase recheck after stale row heights', () => {
       scrollEpsilon: SCROLL_EPSILON,
       scrollHeight: observedHeight,
     })
+    const sizeChanged = source === 'content' && shouldChaseFollowBottomOnSizeChange({
+      previousScrollHeight: lastScrollHeight,
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollHeight: observedHeight,
+    })
     const trust = shouldTrustFollowBottomContentMeasurements({
       estimatedHeight,
       extraChildrenHeight,
@@ -898,7 +1003,9 @@ describe('follow-bottom chase recheck after stale row heights', () => {
       scrollEpsilon: SCROLL_EPSILON,
       scrollTop: nextScrollTop,
     })
-    const chased = offEnd && (source === 'viewport' || (grew && trust))
+    const chased = source === 'viewport'
+      ? shouldChaseFollowOnViewportResize({ offEnd, trust })
+      : offEnd && sizeChanged && trust
     if (chased)
       nextScrollTop = maxScrollTop
     const advance = baselinePolicy === 'always'
@@ -1085,5 +1192,141 @@ describe('follow-bottom chase recheck after stale row heights', () => {
     expect(recheck.trust).toBe(false)
     expect(recheck.chased).toBe(false)
     expect(recheck.distanceFromEnd).toBeGreaterThan(0)
+  })
+})
+
+describe('follow window offset while stuck to the bottom', () => {
+  it('keeps the tail when live scrollTop is past the cache, with or without pinned ids', () => {
+    const itemIds = ids(6)
+    const heights = new Map(itemIds.map((id) => [id, 100]))
+    const estimatedHeight = estimateItemsHeight({
+      gap: 0,
+      heights,
+      itemIds,
+    })
+    const viewportHeight = 200
+    const liveScrollTop = 2000
+    const followOffset = resolveFollowWindowScrollTop({
+      estimatedHeight,
+      viewportHeight,
+    })
+    const collapsed = computeWindowedIds({
+      gap: 0,
+      heights,
+      itemIds,
+      overscanPx: 0,
+      pinnedIds: ['5'],
+      scrollTop: liveScrollTop,
+      viewportHeight,
+    })
+    const followed = computeWindowedIds({
+      gap: 0,
+      heights,
+      itemIds,
+      overscanPx: 0,
+      pinnedIds: ['5'],
+      scrollTop: followOffset,
+      viewportHeight,
+    })
+    const followedWithoutPin = computeWindowedIds({
+      gap: 0,
+      heights,
+      itemIds,
+      overscanPx: 0,
+      scrollTop: followOffset,
+      viewportHeight,
+    })
+
+    expect(followOffset).toBe(400)
+    expect([...collapsed]).toEqual(['5'])
+    expect([...followed]).toEqual(['3', '4', '5'])
+    expect([...followedWithoutPin]).toEqual(['3', '4', '5'])
+  })
+
+  it('keeps each new trailing row on the cached end, not a pinned-only set', () => {
+    const viewportHeight = 200
+    let itemIds = ids(4)
+    const heights = new Map(itemIds.map((id) => [id, 100]))
+
+    const mountAtCache = (idsNow: readonly string[]) => {
+      const estimatedHeight = estimateItemsHeight({
+        gap: 0,
+        heights,
+        itemIds: idsNow,
+      })
+      const scrollTop = resolveFollowWindowScrollTop({
+        estimatedHeight,
+        viewportHeight,
+      })
+      return {
+        estimatedHeight,
+        mounted: [...computeWindowedIds({
+          gap: 0,
+          heights,
+          itemIds: idsNow,
+          overscanPx: 0,
+          pinnedIds: idsNow.at(-1) ? [idsNow.at(-1)!] : [],
+          scrollTop,
+          viewportHeight,
+        })],
+        scrollTop,
+      }
+    }
+
+    const before = mountAtCache(itemIds)
+    expect(before.scrollTop).toBe(200)
+    expect(before.mounted).toEqual(['1', '2', '3'])
+
+    itemIds = [...itemIds, '4']
+    heights.set('4', 100)
+    const after = mountAtCache(itemIds)
+    expect(after.scrollTop).toBe(resolveFollowWindowScrollTop({
+      estimatedHeight: after.estimatedHeight,
+      viewportHeight,
+    }))
+    expect(after.mounted).toEqual(['2', '3', '4'])
+    expect(after.mounted).not.toEqual(['4'])
+  })
+})
+
+describe('reading scrollTop after width-driven height deltas', () => {
+  function readingScrollTopAfterHeightDeltas({
+    deltas,
+    itemOffsets,
+    scrollEpsilon = SCROLL_EPSILON,
+    scrollTop,
+  }: {
+    deltas: readonly number[]
+    itemOffsets: readonly number[]
+    scrollEpsilon?: number
+    scrollTop: number
+  }): number {
+    // Pure sum of deltas for items whose offset is above the viewport.
+    let next = scrollTop
+    for (let index = 0; index < itemOffsets.length; index += 1) {
+      const offset = itemOffsets[index]
+      const delta = deltas[index]
+      if (offset === undefined || delta === undefined)
+        continue
+      if (delta !== 0 && offset < scrollTop - scrollEpsilon)
+        next += delta
+    }
+    return next
+  }
+
+  it('adds only the deltas of items whose offset is above scrollTop', () => {
+    expect(readingScrollTopAfterHeightDeltas({
+      deltas: [20, 30, 40, 50],
+      itemOffsets: [0, 100, 250, 400],
+      scrollTop: 250,
+    })).toBe(300)
+  })
+
+  it('leaves scrollTop unchanged when every item is in or below the viewport', () => {
+    expect(readingScrollTopAfterHeightDeltas({
+      deltas: [80, 80],
+      itemOffsets: [400, 520],
+      scrollTop: 400,
+    })).toBe(400)
   })
 })
