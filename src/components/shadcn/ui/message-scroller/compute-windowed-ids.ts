@@ -44,6 +44,75 @@ export function shouldEstimateFollowBottomScrollTop({
   return followingBottom && clientHeight < 1
 }
 
+export function shouldSettleScrollToEnd({
+  hasStreamingTurn,
+  maxScrollTop,
+  mode,
+  nextMode,
+  scrollEpsilon,
+  scrollTop,
+  spacerHeight,
+}: {
+  hasStreamingTurn: boolean
+  maxScrollTop: number
+  mode: string
+  nextMode: string
+  scrollEpsilon: number
+  scrollTop: number
+  spacerHeight: number
+}): boolean {
+  const atEnd = Math.abs(scrollTop - maxScrollTop) <= scrollEpsilon
+  return spacerHeight === 0 && !hasStreamingTurn && mode === nextMode && atEnd
+}
+
+export function shouldAnchorOnContentChange({
+  followingLive,
+}: {
+  followingLive: boolean
+}): boolean {
+  return !followingLive
+}
+
+export function shouldTreatAnchorAsUnhandled({
+  handledMessageIds,
+  messageId,
+}: {
+  handledMessageIds: ReadonlySet<string>
+  messageId: string | undefined
+}): boolean {
+  if (!messageId)
+    return true
+  return !handledMessageIds.has(messageId)
+}
+
+export function resolveWindowScrollTop({
+  followingBottom,
+  scrollTop,
+  spacerHeight,
+}: {
+  followingBottom: boolean
+  scrollTop: number
+  spacerHeight: number
+}): number {
+  if (followingBottom || spacerHeight > 0)
+    return Math.max(0, scrollTop - spacerHeight)
+  return scrollTop
+}
+
+export function shouldExitFollowBottom({
+  autoscrolling,
+  distanceFromEnd,
+  scrolledUp,
+  threshold,
+}: {
+  autoscrolling: boolean
+  distanceFromEnd: number
+  scrolledUp: boolean
+  threshold: number
+}): boolean {
+  return scrolledUp && !autoscrolling && distanceFromEnd > threshold
+}
+
 export function itemIdsEqual(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length)
     return false

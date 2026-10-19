@@ -8,8 +8,13 @@ import {
   FALLBACK_VIEWPORT_HEIGHT,
   itemIdsEqual,
   resolveViewportHeight,
+  resolveWindowScrollTop,
+  shouldAnchorOnContentChange,
   shouldChaseFollowBottomOnResize,
   shouldEstimateFollowBottomScrollTop,
+  shouldExitFollowBottom,
+  shouldSettleScrollToEnd,
+  shouldTreatAnchorAsUnhandled,
   windowedIdSetsEqual,
 } from "./compute-windowed-ids"
 
@@ -310,28 +315,19 @@ function findFirstAnchorFrom(
 
 function findFirstUnhandledAnchor(
   elements: HTMLElement[],
-  handled: WeakSet<HTMLElement>,
+  handled: Set<string>,
 ): HTMLElement | null {
   for (const element of elements) {
-    if (element.dataset.scrollAnchor === "true" && !handled.has(element))
+    if (element.dataset.scrollAnchor !== "true")
+      continue
+    if (shouldTreatAnchorAsUnhandled({
+      handledMessageIds: handled,
+      messageId: element.dataset.messageId,
+    })) {
       return element
-  }
-  return null
-}
-
-function hasMultipleAnchorsFrom(
-  elements: HTMLElement[],
-  startIndex: number,
-): boolean {
-  let count = 0
-  for (let i = startIndex; i < elements.length; i++) {
-    if (elements[i]?.dataset.scrollAnchor === "true") {
-      count += 1
-      if (count > 1)
-        return true
     }
   }
-  return false
+  return null
 }
 
 function findLastAnchor(elements: HTMLElement[]): HTMLElement | null {
@@ -376,6 +372,7 @@ export interface MessageScrollerContext {
   releaseVisibility: () => void
   handleContentChange: () => void
   handleResize: () => void
+  isFollowingLive: () => boolean
   scrollToEnd: (options?: { behavior?: ScrollBehavior }) => boolean
   scrollToMessage: (messageId: string, options?: MessageScrollerScrollOptions) => boolean
   scrollToStart: (options?: { behavior?: ScrollBehavior }) => boolean
@@ -430,7 +427,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   let visibilityConsumers = 0
   const messageElements = new Map<string, HTMLElement>()
   const visibleMessageIds = new Set<string>()
-  const handledScrollAnchors = new WeakSet<HTMLElement>()
+  const handledScrollAnchors = new Set<string>()
 
   const autoscrolling = shallowRef(false)
   const scrollable = shallowRef<MessageScrollerScrollable>(EMPTY_SCROLLABLE)
@@ -461,13 +458,20 @@ function createEngine(props: MessageScrollerProviderProps) {
     ) {
       mode = "following-bottom"
     }
-    else if (
-      mode === "following-bottom"
-      && next.end
-      && scrolledUp
-      && !autoscrolling.value
-    ) {
-      mode = "free-scrolling"
+    else if (mode === "following-bottom" && next.end) {
+      // Placeholder remounts can shrink scrollHeight after AUTOSCROLLING_TIMEOUT
+      // and look like scrolledUp even while the live edge is still in view.
+      const distanceFromEnd = viewport
+        ? maxScrollTop(viewport) - viewport.scrollTop
+        : Number.POSITIVE_INFINITY
+      if (shouldExitFollowBottom({
+        autoscrolling: autoscrolling.value,
+        distanceFromEnd,
+        scrolledUp,
+        threshold: scrollEdgeThreshold(),
+      })) {
+        mode = "free-scrolling"
+      }
     }
   }
 
@@ -527,6 +531,15 @@ function createEngine(props: MessageScrollerProviderProps) {
         paddingStart: padding.start,
       })
       scrollTop = Math.max(0, total - viewportHeight)
+    }
+    else {
+      // Real scrollTop includes the tail spacer, which would push the window
+      // past estimated item offsets and collapse to pinned ids only.
+      scrollTop = resolveWindowScrollTop({
+        followingBottom,
+        scrollTop,
+        spacerHeight,
+      })
     }
     setWindowed(computeWindowedIds({
       gap,
@@ -689,12 +702,34 @@ function createEngine(props: MessageScrollerProviderProps) {
     return true
   }
 
+  function isFollowingLive() {
+    return autoScroll() && mode === "following-bottom"
+  }
+
+  function markAnchorHandled(element: HTMLElement) {
+    const messageId = element.dataset.messageId
+    if (messageId)
+      handledScrollAnchors.add(messageId)
+  }
+
   function scrollToEnd({ behavior = "auto" }: { behavior?: ScrollBehavior } = {}): boolean {
     if (!viewport)
       return false
+    const nextMode = autoScroll() ? "following-bottom" : "free-scrolling"
+    if (shouldSettleScrollToEnd({
+      hasStreamingTurn: streamingTurn !== null,
+      maxScrollTop: maxScrollTop(viewport),
+      mode,
+      nextMode,
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollTop: viewport.scrollTop,
+      spacerHeight,
+    })) {
+      return true
+    }
     setSpacerHeight(0)
     streamingTurn = null
-    mode = autoScroll() ? "following-bottom" : "free-scrolling"
+    mode = nextMode
     scrollTo(maxScrollTop(viewport), { autoscrolling: true, behavior })
     scheduleVisibilitySync()
     recomputeWindow()
@@ -871,24 +906,24 @@ function createEngine(props: MessageScrollerProviderProps) {
     if (children.length > previousCount) {
       const anchor = findFirstAnchorFrom(children, previousCount)
       if (anchor) {
-        if (
-          autoScroll()
-          && mode === "following-bottom"
-          && hasMultipleAnchorsFrom(children, previousCount)
-        ) {
-          scrollToEnd({ behavior: "auto" })
+        markAnchorHandled(anchor)
+        if (shouldAnchorOnContentChange({ followingLive: isFollowingLive() })) {
+          scrollToElement(anchor, { align: "start" }, { keepPreviousPeek: true })
           return
         }
-        scrollToElement(anchor, { align: "start" }, { keepPreviousPeek: true })
-        handledScrollAnchors.add(anchor)
+        scrollToEnd({ behavior: "auto" })
         return
       }
     }
     if (children.length === previousCount) {
       const anchor = findFirstUnhandledAnchor(children, handledScrollAnchors)
       if (anchor) {
-        scrollToElement(anchor, { align: "start" }, { keepPreviousPeek: true })
-        handledScrollAnchors.add(anchor)
+        markAnchorHandled(anchor)
+        if (shouldAnchorOnContentChange({ followingLive: isFollowingLive() })) {
+          scrollToElement(anchor, { align: "start" }, { keepPreviousPeek: true })
+          return
+        }
+        scrollToEnd({ behavior: "auto" })
         return
       }
     }
@@ -1112,6 +1147,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     releaseVisibility,
     handleContentChange,
     handleResize,
+    isFollowingLive,
     scrollToEnd,
     scrollToMessage,
     scrollToStart,

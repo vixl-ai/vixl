@@ -25,6 +25,7 @@ vi.mock('vue-sonner', () => ({
 const scroller = vi.hoisted(() => ({
   scrollToEnd: vi.fn<(...args: unknown[]) => void>(),
   handleContentChange: vi.fn<() => void>(),
+  isFollowingLive: vi.fn<() => boolean>(() => true),
   windowedMessageIds: { value: null as Set<string> | null },
   itemPlaceholderHeight: (_messageId: string) => 160,
   setItemIds: vi.fn<(ids: string[]) => void>(),
@@ -45,6 +46,7 @@ vi.mock('@/components/shadcn/ui/message-scroller/useMessageScroller', async (imp
     }),
     useMessageScrollerContext: () => ({
       handleContentChange: scroller.handleContentChange,
+      isFollowingLive: scroller.isFollowingLive,
       scrollToEnd: scroller.scrollToEnd,
       windowedMessageIds: scroller.windowedMessageIds,
       itemPlaceholderHeight: scroller.itemPlaceholderHeight,
@@ -204,6 +206,8 @@ afterEach(() => {
   wrapper = null
   scroller.scrollToEnd.mockClear()
   scroller.handleContentChange.mockClear()
+  scroller.isFollowingLive.mockClear()
+  scroller.isFollowingLive.mockReturnValue(true)
   scroller.setItemIds.mockClear()
   scroller.setPinnedMessageIds.mockClear()
   scroller.windowedMessageIds.value = null
@@ -494,7 +498,77 @@ describe('ChatThreadContent stream scroll coalescing', () => {
     raf[0]!(0)
     await flushPromises()
 
-    expect(scroller.handleContentChange).toHaveBeenCalledTimes(1)
+    expect(scroller.handleContentChange).not.toHaveBeenCalled()
+    expect(scroller.scrollToEnd).toHaveBeenCalledTimes(1)
+    expect(scroller.scrollToEnd).toHaveBeenCalledWith({ behavior: 'auto' })
+  })
+
+  it('does not call scrollToEnd when the user has taken over scrolling', async () => {
+    const raf: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      raf.push(cb)
+      return raf.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      raf[id - 1] = () => undefined
+    })
+    scroller.isFollowingLive.mockReturnValue(false)
+
+    const liveTurn = {
+      type: 'agent-turn' as const,
+      turn: { ...makeTurn('t1', []), text: 'a' },
+    }
+    const mounted = mountContent([liveTurn], 'streaming')
+
+    await mounted.setProps({
+      timeline: [
+        { type: 'agent-turn', turn: { ...makeTurn('t1', []), text: 'ab' } },
+      ],
+    })
+
+    expect(raf).toHaveLength(1)
+    raf[0]!(0)
+    await flushPromises()
+
+    expect(scroller.isFollowingLive).toHaveBeenCalled()
+    expect(scroller.handleContentChange).not.toHaveBeenCalled()
+    expect(scroller.scrollToEnd).not.toHaveBeenCalled()
+  })
+
+  it('calls scrollToEnd exactly once when still following live', async () => {
+    const raf: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      raf.push(cb)
+      return raf.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      raf[id - 1] = () => undefined
+    })
+    scroller.isFollowingLive.mockReturnValue(true)
+
+    const liveTurn = {
+      type: 'agent-turn' as const,
+      turn: { ...makeTurn('t1', []), text: 'a' },
+    }
+    const mounted = mountContent([liveTurn], 'streaming')
+
+    await mounted.setProps({
+      timeline: [
+        { type: 'agent-turn', turn: { ...makeTurn('t1', []), text: 'ab' } },
+      ],
+    })
+    await mounted.setProps({
+      timeline: [
+        { type: 'agent-turn', turn: { ...makeTurn('t1', []), text: 'abc' } },
+      ],
+    })
+
+    expect(raf).toHaveLength(1)
+    raf[0]!(0)
+    await flushPromises()
+
+    expect(scroller.isFollowingLive).toHaveBeenCalled()
+    expect(scroller.handleContentChange).not.toHaveBeenCalled()
     expect(scroller.scrollToEnd).toHaveBeenCalledTimes(1)
     expect(scroller.scrollToEnd).toHaveBeenCalledWith({ behavior: 'auto' })
   })
