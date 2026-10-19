@@ -314,7 +314,7 @@ describe('worktree_remove tool', () => {
     )
   })
 
-  it('resolves a symlink-aliased rootPath via git worktree list', async () => {
+  it('resolves a /tmp vs /private/tmp alias via git worktree list', async () => {
     const canonical = '/private/tmp/worktrees/demo/feature'
     getFleetProjects.mockReturnValue([
       parentProject,
@@ -337,5 +337,52 @@ describe('worktree_remove tool', () => {
       canonical,
       false,
     )
+  })
+
+  it('does not match a suffix-only rootPath to a longer worktree path', async () => {
+    gitWorktreeList.mockResolvedValue([
+      {
+        path: '/tmp/worktrees/demo/feature',
+        branch: 'vixl/feature',
+        bare: false,
+        detached: false,
+      },
+    ])
+    const result = await execute({ rootPath: '/demo/feature' })
+
+    expect(result).toEqual({
+      error: 'No fleet project matches that worktree path',
+    })
+    expect(gitWorktreeRemove).not.toHaveBeenCalled()
+    expect(registryRemoveProject).not.toHaveBeenCalled()
+  })
+
+  it('treats a not-a-worktree git error as already removed and unregisters', async () => {
+    gitWorktreeRemove.mockRejectedValue(
+      new Error('Path is not a worktree of this repository'),
+    )
+    const result = await execute({ rootPath: '/tmp/worktrees/demo/feature' })
+
+    expect(registryRemoveProject).toHaveBeenCalledWith('proj-wt')
+    expect(refreshFleetProjects).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({
+      ok: true,
+      message:
+        'Removed worktree vixl/feature at /tmp/worktrees/demo/feature and unregistered it from the fleet.',
+    })
+  })
+
+  it('returns ok with a warning when unregister fails after git remove', async () => {
+    registryRemoveProject.mockRejectedValue(new Error('registry down'))
+    const result = await execute({ rootPath: '/tmp/worktrees/demo/feature' })
+
+    expect(gitWorktreeRemove).toHaveBeenCalled()
+    expect(refreshFleetProjects).toHaveBeenCalled()
+    expect(result).toEqual({
+      ok: true,
+      warning: 'Checkout is gone. Remove the row from the sidebar if it lingers.',
+      message:
+        'Removed worktree vixl/feature at /tmp/worktrees/demo/feature. Checkout is gone. Remove the row from the sidebar if it lingers.',
+    })
   })
 })

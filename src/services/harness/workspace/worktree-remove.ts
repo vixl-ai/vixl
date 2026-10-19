@@ -39,19 +39,15 @@ const occupancyError = (
   return null
 }
 
-const normalizePath = (value: string): string =>
-  value.replace(/\\/g, '/').replace(/\/+$/, '')
+const UNREGISTER_WARNING =
+  'Checkout is gone. Remove the row from the sidebar if it lingers.'
 
-const gitPathMatchesTarget = (gitPath: string, targetPath: string): boolean => {
-  if (pathsEqual(gitPath, targetPath)) {
-    return true
-  }
-  const gitNormalized = normalizePath(gitPath)
-  const targetNormalized = normalizePath(targetPath)
-  return (
-    gitNormalized.endsWith(targetNormalized) || targetNormalized.endsWith(gitNormalized)
-  )
-}
+const collapsePrivatePrefix = (value: string): string =>
+  value.replace(/\\/g, '/').replace(/\/+$/, '').replace(/^\/private(?=\/)/, '')
+
+const gitPathMatchesTarget = (gitPath: string, targetPath: string): boolean =>
+  pathsEqual(gitPath, targetPath) ||
+  collapsePrivatePrefix(gitPath) === collapsePrivatePrefix(targetPath)
 
 const projectForRoot = (
   projects: FleetProject[],
@@ -174,15 +170,29 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
       try {
         await gitWorktreeRemove(gitRoot, worktreePath, effectiveForce)
       } catch (error) {
-        return { error: invokeErrorMessage(error) }
+        const message = invokeErrorMessage(error)
+        if (!message.includes('not a worktree')) {
+          return { error: message }
+        }
       }
 
       try {
         await registryRemoveProject(project.id)
         await refreshFleetProjects()
-      } catch (error) {
+      } catch {
+        try {
+          await refreshFleetProjects()
+        } catch {
+          return {
+            ok: true,
+            warning: UNREGISTER_WARNING,
+            message: `Removed worktree ${branch} at ${targetPath}. ${UNREGISTER_WARNING}`,
+          }
+        }
         return {
-          error: `Worktree git remove succeeded but fleet unregister failed: ${invokeErrorMessage(error)}`,
+          ok: true,
+          warning: UNREGISTER_WARNING,
+          message: `Removed worktree ${branch} at ${targetPath}. ${UNREGISTER_WARNING}`,
         }
       }
 
