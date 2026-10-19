@@ -195,3 +195,87 @@ describe('vixl-tauri IPC adapters', () => {
     await expect(workspaceGlob('/project', '**/*.ts')).rejects.toBe(original)
   })
 })
+
+describe('vixl-tauri worktree IPC adapters', () => {
+  beforeEach(() => {
+    invoke.mockReset()
+    setTauriWindow()
+  })
+
+  it('calls git_worktree_list with rootPath', async () => {
+    invoke.mockResolvedValueOnce([
+      { path: '/repo', branch: 'main', bare: false, detached: false },
+    ])
+
+    const { gitWorktreeList } = await import('@/services/vixl/vixl-tauri')
+    const result = await gitWorktreeList('/repo')
+
+    expect(invoke).toHaveBeenCalledWith('git_worktree_list', { rootPath: '/repo' })
+    expect(result).toEqual([
+      { path: '/repo', branch: 'main', bare: false, detached: false },
+    ])
+  })
+
+  it('calls git_worktree_add with rootPath, name, and optional baseRef', async () => {
+    invoke.mockResolvedValueOnce({
+      path: '/vixl/worktrees/demo/feature',
+      branch: 'feature',
+      name: 'feature',
+    })
+
+    const { gitWorktreeAdd } = await import('@/services/vixl/vixl-tauri')
+    const result = await gitWorktreeAdd('/repo', 'feature', 'main')
+
+    expect(invoke).toHaveBeenCalledWith('git_worktree_add', {
+      rootPath: '/repo',
+      name: 'feature',
+      baseRef: 'main',
+    })
+    expect(result).toEqual({
+      path: '/vixl/worktrees/demo/feature',
+      branch: 'feature',
+      name: 'feature',
+    })
+  })
+
+  it('omits baseRef when git_worktree_add is called without it', async () => {
+    invoke.mockResolvedValueOnce({
+      path: '/vixl/worktrees/demo/review',
+      branch: 'review',
+      name: 'review',
+    })
+
+    const { gitWorktreeAdd } = await import('@/services/vixl/vixl-tauri')
+    await gitWorktreeAdd('/repo', 'review')
+
+    expect(invoke).toHaveBeenCalledWith('git_worktree_add', {
+      rootPath: '/repo',
+      name: 'review',
+    })
+  })
+
+  it('calls git_worktree_remove with rootPath, worktreePath, and force', async () => {
+    invoke.mockResolvedValueOnce(undefined)
+
+    const { gitWorktreeRemove } = await import('@/services/vixl/vixl-tauri')
+    await gitWorktreeRemove('/repo', '/vixl/worktrees/demo/feature', true)
+
+    expect(invoke).toHaveBeenCalledWith('git_worktree_remove', {
+      rootPath: '/repo',
+      worktreePath: '/vixl/worktrees/demo/feature',
+      force: true,
+    })
+  })
+
+  it('calls worktree_detect_parent with path', async () => {
+    invoke.mockResolvedValueOnce({ parentProjectId: 'proj-a', branch: 'feature' })
+
+    const { worktreeDetectParent } = await import('@/services/vixl/vixl-tauri')
+    const result = await worktreeDetectParent('/vixl/worktrees/demo/feature')
+
+    expect(invoke).toHaveBeenCalledWith('worktree_detect_parent', {
+      path: '/vixl/worktrees/demo/feature',
+    })
+    expect(result).toEqual({ parentProjectId: 'proj-a', branch: 'feature' })
+  })
+})

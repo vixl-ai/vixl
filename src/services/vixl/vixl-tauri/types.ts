@@ -8,12 +8,19 @@ export type OAuthLoopbackStart = {
   redirectUrl: string
 }
 
+export type FleetProjectWorktreeRecord = {
+  parent_id: string
+  branch: string
+  managed: boolean
+}
+
 export type FleetProjectRecord = {
   id: string
   name: string
   slug: string
   rootPath: string
   lastOpened: string
+  worktree?: FleetProjectWorktreeRecord
 }
 
 export type FleetProjectGroupRecord = {

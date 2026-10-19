@@ -110,4 +110,159 @@ describe('useFleetRegistry setActiveProject', () => {
     expect(clearSpy).not.toHaveBeenCalled()
     expect([...sessionTrusts.entries()]).toEqual(snapshot)
   })
+
+  it('ensures CodeGraph for a worktree project root, not the parent root', async () => {
+    const parent = {
+      id: 'proj-parent',
+      name: 'Parent',
+      slug: 'parent',
+      root_path: '/tmp/parent',
+      last_opened: '2026-01-01T00:00:00.000Z',
+    }
+    const worktree = {
+      id: 'proj-worktree',
+      name: 'feature',
+      slug: 'feature',
+      root_path: '/tmp/worktrees/parent/feature',
+      last_opened: '2026-01-03T00:00:00.000Z',
+      worktree: {
+        parent_id: parent.id,
+        branch: 'feature',
+        managed: true,
+      },
+    }
+    registryListProjects.mockResolvedValue([parent, worktree])
+    getActiveProjectId.mockResolvedValue(parent.id)
+
+    const fleet = useFleetRegistry()
+    await fleet.refresh()
+    await fleet.setActiveProject(worktree.id)
+
+    expect(ensureCodeGraph).toHaveBeenCalledWith('/tmp/worktrees/parent/feature')
+    expect(ensureCodeGraph).not.toHaveBeenCalledWith('/tmp/parent')
+  })
+})
+
+const worktreeChildOlder = {
+  id: 'proj-wt-old',
+  name: 'review',
+  slug: 'review',
+  root_path: '/tmp/worktrees/alpha/review',
+  last_opened: '2026-01-03T00:00:00.000Z',
+  worktree: {
+    parent_id: projectA.id,
+    branch: 'review',
+    managed: true,
+  },
+}
+
+const worktreeChildNewer = {
+  id: 'proj-wt-new',
+  name: 'feature',
+  slug: 'feature',
+  root_path: '/tmp/worktrees/alpha/feature',
+  last_opened: '2026-01-04T00:00:00.000Z',
+  worktree: {
+    parent_id: projectA.id,
+    branch: 'feature',
+    managed: true,
+  },
+}
+
+const worktreeOtherParent = {
+  id: 'proj-wt-beta',
+  name: 'hotfix',
+  slug: 'hotfix',
+  root_path: '/tmp/worktrees/beta/hotfix',
+  last_opened: '2026-01-05T00:00:00.000Z',
+  worktree: {
+    parent_id: projectB.id,
+    branch: 'hotfix',
+    managed: false,
+  },
+}
+
+describe('useFleetRegistry worktree mapping', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    isTauri.mockReturnValue(true)
+    getActiveProjectId.mockResolvedValue(null)
+    hasProjectVixl.mockResolvedValue(true)
+    const fleet = useFleetRegistry()
+    fleet.projects.value = []
+    fleet.activeProjectId.value = null
+  })
+
+  it('maps a snake_case worktree record onto WorktreeLink', async () => {
+    registryListProjects.mockResolvedValue([worktreeChildNewer])
+
+    const fleet = useFleetRegistry()
+    await fleet.refresh()
+
+    expect(fleet.projects.value).toEqual([
+      {
+        id: 'proj-wt-new',
+        name: 'feature',
+        slug: 'feature',
+        rootPath: '/tmp/worktrees/alpha/feature',
+        lastOpened: '2026-01-04T00:00:00.000Z',
+        worktree: {
+          parentId: projectA.id,
+          branch: 'feature',
+          managed: true,
+        },
+      },
+    ])
+  })
+
+  it('omits worktree on records that have no link', async () => {
+    registryListProjects.mockResolvedValue([projectA])
+
+    const fleet = useFleetRegistry()
+    await fleet.refresh()
+
+    expect(fleet.projects.value).toEqual([
+      {
+        id: 'proj-a',
+        name: 'Alpha',
+        slug: 'alpha',
+        rootPath: '/tmp/project-a',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+    ])
+    expect(fleet.projects.value[0]).not.toHaveProperty('worktree')
+  })
+})
+
+describe('useFleetRegistry worktreesOf', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    isTauri.mockReturnValue(true)
+    getActiveProjectId.mockResolvedValue(null)
+    hasProjectVixl.mockResolvedValue(true)
+    registryListProjects.mockResolvedValue([
+      projectA,
+      projectB,
+      worktreeChildOlder,
+      worktreeChildNewer,
+      worktreeOtherParent,
+    ])
+    const fleet = useFleetRegistry()
+    fleet.projects.value = []
+    fleet.activeProjectId.value = null
+  })
+
+  it('returns only children of the given id, sorted by lastOpened desc', async () => {
+    const fleet = useFleetRegistry()
+    await fleet.refresh()
+
+    expect(fleet.worktreesOf(projectA.id).map((project) => project.id)).toEqual([
+      worktreeChildNewer.id,
+      worktreeChildOlder.id,
+    ])
+    expect(fleet.worktreesOf(projectB.id).map((project) => project.id)).toEqual([
+      worktreeOtherParent.id,
+    ])
+    expect(fleet.worktreesOf('missing')).toEqual([])
+  })
 })

@@ -37,12 +37,26 @@ const mapProject = (record: {
   slug: string
   root_path: string
   last_opened: string
+  worktree?: {
+    parent_id: string
+    branch: string
+    managed: boolean
+  }
 }): FleetProject => ({
   id: record.id,
   name: record.name,
   slug: record.slug,
   rootPath: record.root_path,
   lastOpened: record.last_opened,
+  ...(record.worktree
+    ? {
+        worktree: {
+          parentId: record.worktree.parent_id,
+          branch: record.worktree.branch,
+          managed: record.worktree.managed,
+        },
+      }
+    : {}),
 })
 
 const mapGroup = (record: {
@@ -85,6 +99,12 @@ const refresh = async (): Promise<void> => {
 }
 
 export const getFleetProjects = (): FleetProject[] => projects.value
+
+export const worktreesOf = (projectId: string): FleetProject[] =>
+  projects.value
+    .filter((project) => project.worktree?.parentId === projectId)
+    .slice()
+    .sort((a, b) => b.lastOpened.localeCompare(a.lastOpened))
 
 export const getFleetGroups = (): FleetProjectGroup[] => groups.value
 
@@ -235,5 +255,6 @@ export default () => {
     updateGroup,
     removeGroup,
     ensureDefaultProject,
+    worktreesOf,
   }
 }

@@ -3,6 +3,7 @@ export type {
   ConfigScope,
   OAuthLoopbackStart,
   FleetProjectRecord,
+  FleetProjectWorktreeRecord,
   FleetProjectGroupRecord,
   ProjectFileEntry,
   VixlFilesKind,
@@ -106,6 +107,17 @@ export {
   watchGitHead,
 } from './git'
 export type { GitHeadChanged } from './git'
+export {
+  gitWorktreeList,
+  gitWorktreeAdd,
+  gitWorktreeRemove,
+  worktreeDetectParent,
+} from './worktree'
+export type {
+  GitWorktreeEntry,
+  GitWorktreeAddResult,
+  WorktreeParentMatch,
+} from './worktree'
 export {
   openExternalUrl,
   oauthBeginLoopback,
