@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -14,6 +15,7 @@ mod worktree_copy_plans;
 
 const WORKTREE_NAME_MAX_LEN: usize = 64;
 const WORKTREES_DIR: &str = "worktrees";
+const PARENT_SLUG_WALK_LIMIT: usize = 32;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -103,16 +105,40 @@ fn filesystem_slug_from_path(root_path: &str) -> String {
     parent_dir_slug(name)
 }
 
+fn main_checkout_slug(matched: &FleetProject, projects: &[FleetProject]) -> String {
+    let mut current = matched;
+    let mut seen = HashSet::new();
+    seen.insert(current.id.clone());
+    for _ in 0..PARENT_SLUG_WALK_LIMIT {
+        let Some(link) = current.worktree.as_ref() else {
+            return current.slug.clone();
+        };
+        if !seen.insert(link.parent_id.clone()) {
+            return matched.slug.clone();
+        }
+        let Some(parent) = projects.iter().find(|project| project.id == link.parent_id) else {
+            return matched.slug.clone();
+        };
+        current = parent;
+    }
+    matched.slug.clone()
+}
+
+pub fn parent_slug_among(root_path: &str, projects: &[FleetProject]) -> String {
+    let Some(matched) = projects
+        .iter()
+        .find(|project| roots_match(&project.root_path, root_path))
+    else {
+        return filesystem_slug_from_path(root_path);
+    };
+    parent_dir_slug(&main_checkout_slug(matched, projects))
+}
+
 fn parent_slug_for_root(app: &AppHandle, root_path: &str) -> String {
-    fleet_projects(app)
-        .ok()
-        .and_then(|projects| {
-            projects
-                .into_iter()
-                .find(|project| roots_match(&project.root_path, root_path))
-                .map(|project| parent_dir_slug(&project.slug))
-        })
-        .unwrap_or_else(|| filesystem_slug_from_path(root_path))
+    match fleet_projects(app) {
+        Ok(projects) => parent_slug_among(root_path, &projects),
+        Err(_) => filesystem_slug_from_path(root_path),
+    }
 }
 
 fn validate_base_ref(base_ref: &str) -> Result<&str, String> {

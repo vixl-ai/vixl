@@ -5,7 +5,7 @@ use app_lib::commands::registry::{
 };
 use app_lib::commands::worktree::{
     detect_worktree_parent_among, git_worktree_add_in_dir, git_worktree_list, git_worktree_remove,
-    parse_worktree_porcelain, validate_worktree_name, GitWorktreeEntry,
+    parent_slug_among, parse_worktree_porcelain, validate_worktree_name, GitWorktreeEntry,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -390,4 +390,52 @@ fn worktree_field_is_omitted_from_projects_json_when_absent() {
     assert_eq!(linked["worktree"]["parent_id"], "parent");
     assert_eq!(linked["worktree"]["branch"], "vixl/feature");
     assert_eq!(linked["worktree"]["managed"], false);
+}
+
+#[test]
+fn parent_slug_from_child_worktree_uses_main_checkout_slug() {
+    let repo = init_repo();
+    let vixl = tempfile::tempdir().expect("vixl dir");
+    let added =
+        git_worktree_add_in_dir(&path_str(repo.path()), "feature", None, vixl.path(), "demo")
+            .expect("add worktree");
+
+    let mut child = sample_project("child-1", "feature", Path::new(&added.path));
+    child.worktree = Some(WorktreeLink {
+        parent_id: "parent-1".to_string(),
+        branch: "vixl/feature".to_string(),
+        managed: true,
+    });
+    let projects = vec![sample_project("parent-1", "demo", repo.path()), child];
+
+    assert_eq!(parent_slug_among(&added.path, &projects), "demo");
+    assert_eq!(parent_slug_among(&path_str(repo.path()), &projects), "demo");
+}
+
+#[test]
+fn parent_slug_cycle_falls_back_to_matched_slug() {
+    let first_root = tempfile::tempdir().expect("cycle-a");
+    let second_root = tempfile::tempdir().expect("cycle-b");
+    let mut first = sample_project("a", "alpha", first_root.path());
+    let mut second = sample_project("b", "beta", second_root.path());
+    first.worktree = Some(WorktreeLink {
+        parent_id: "b".to_string(),
+        branch: "vixl/alpha".to_string(),
+        managed: false,
+    });
+    second.worktree = Some(WorktreeLink {
+        parent_id: "a".to_string(),
+        branch: "vixl/beta".to_string(),
+        managed: false,
+    });
+    let projects = vec![first, second];
+
+    assert_eq!(
+        parent_slug_among(&path_str(second_root.path()), &projects),
+        "beta"
+    );
+    assert_eq!(
+        parent_slug_among(&path_str(first_root.path()), &projects),
+        "alpha"
+    );
 }
