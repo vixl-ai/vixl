@@ -6,7 +6,11 @@ import ensureCodeGraph from '@/services/codegraph/ensure-codegraph'
 import { isHomeWorkspaceRoot } from '@/services/config/is-home-workspace-root'
 import { gateWorkspaceMovePermission } from '@/services/harness/permission'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
-import { gitWorktreeAdd, registryAddProject } from '@/services/vixl/vixl-tauri'
+import {
+  gitWorktreeAdd,
+  gitWorktreeRemove,
+  registryAddProject,
+} from '@/services/vixl/vixl-tauri'
 import invokeErrorMessage from '@/utils/invoke-error-message'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
@@ -63,10 +67,22 @@ const worktreeCreate = (ctx: HarnessToolContext) =>
       try {
         const registered = await registryAddProject(created.name, created.path)
         slug = registered.slug
+      } catch (error) {
+        let rollbackNote = `Removed the checkout; delete branch ${created.branch} before retrying`
+        try {
+          await gitWorktreeRemove(ctx.projectRoot, created.path, true)
+        } catch (rollbackError) {
+          rollbackNote = `Rollback failed: ${invokeErrorMessage(rollbackError)}. Delete worktree ${created.path} and branch ${created.branch} before retrying`
+        }
+        return {
+          error: `Worktree created at ${created.path} but registration failed: ${invokeErrorMessage(error)}. ${rollbackNote}.`,
+        }
+      }
+      try {
         await refreshFleetProjects()
       } catch (error) {
         return {
-          error: `Worktree created at ${created.path} but registration failed: ${invokeErrorMessage(error)}`,
+          error: `Worktree created and registered at ${created.path} but fleet refresh failed: ${invokeErrorMessage(error)}`,
         }
       }
 

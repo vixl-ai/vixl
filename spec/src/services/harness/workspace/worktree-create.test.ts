@@ -11,6 +11,10 @@ const gitWorktreeAdd = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 )
 
+const gitWorktreeRemove = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+)
+
 const registryAddProject = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 )
@@ -37,6 +41,7 @@ vi.mock('@/services/harness/permission', () => ({
 
 vi.mock('@/services/vixl/vixl-tauri', () => ({
   gitWorktreeAdd,
+  gitWorktreeRemove,
   registryAddProject,
   moveChatToWorkspace,
 }))
@@ -102,6 +107,7 @@ describe('worktree_create tool', () => {
     gateWorkspaceMovePermission.mockResolvedValue(true)
     isHomeWorkspaceRoot.mockResolvedValue(false)
     gitWorktreeAdd.mockResolvedValue(createdWorktree)
+    gitWorktreeRemove.mockResolvedValue(undefined)
     registryAddProject.mockResolvedValue(registeredProject)
     ensureCodeGraph.mockResolvedValue(undefined)
     refreshFleetProjects.mockResolvedValue(undefined)
@@ -151,6 +157,22 @@ describe('worktree_create tool', () => {
       branch: 'vixl/feature',
       message:
         'Worktree created and registered. Call move_workspace with this rootPath if the current chat should continue inside it, or pass this slug as workspaceSlug to spawn_subagent for an isolated implementer.',
+    })
+  })
+
+  it('rolls back the checkout when registration fails', async () => {
+    registryAddProject.mockRejectedValue(new Error('disk full'))
+    const result = await execute({ name: 'feature' })
+
+    expect(gitWorktreeAdd).toHaveBeenCalled()
+    expect(gitWorktreeRemove).toHaveBeenCalledWith(
+      '/tmp/project',
+      '/tmp/worktrees/demo/feature',
+      true,
+    )
+    expect(result).toEqual({
+      error:
+        'Worktree created at /tmp/worktrees/demo/feature but registration failed: disk full. Removed the checkout; delete branch vixl/feature before retrying.',
     })
   })
 })

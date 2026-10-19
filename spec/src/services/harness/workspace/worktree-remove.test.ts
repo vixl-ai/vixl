@@ -144,6 +144,7 @@ describe('worktree_remove tool', () => {
     getFleetProjects.mockReturnValue([parentProject, worktreeProject])
     listChats.mockResolvedValue([idleChat('feature')])
     gitStatus.mockResolvedValue({ branch: 'vixl/feature', entries: [] })
+    worktreeDetectParent.mockResolvedValue(null)
     activeSubagentsForWorkspace.mockReturnValue([])
   })
 
@@ -276,6 +277,34 @@ describe('worktree_remove tool', () => {
       '/tmp/project',
       '/tmp/worktrees/demo/feature',
       true,
+    )
+  })
+
+  it('refuses after approval if a chat starts during the prompt', async () => {
+    gateWorkspaceMovePermission.mockImplementation(async () => {
+      listChats.mockResolvedValue([runningChat('feature')])
+      return true
+    })
+    const result = await execute({ rootPath: '/tmp/worktrees/demo/feature' })
+
+    expect(gateWorkspaceMovePermission).toHaveBeenCalled()
+    expect(result).toEqual({
+      error: 'Cannot remove worktree while 1 chat(s) are running on feature',
+    })
+    expect(gitWorktreeRemove).not.toHaveBeenCalled()
+    expect(registryRemoveProject).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the worktree path when the parent is not in the fleet', async () => {
+    getFleetProjects.mockReturnValue([worktreeProject])
+    worktreeDetectParent.mockResolvedValue(null)
+    const result = await execute({ rootPath: '/tmp/worktrees/demo/feature' })
+
+    expect(result).toMatchObject({ ok: true })
+    expect(gitWorktreeRemove).toHaveBeenCalledWith(
+      '/tmp/worktrees/demo/feature',
+      '/tmp/worktrees/demo/feature',
+      false,
     )
   })
 })

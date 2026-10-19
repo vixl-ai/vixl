@@ -14,10 +14,27 @@ import {
   listChats,
   registryRemoveProject,
   worktreeDetectParent,
+  type ChatMetaRecord,
 } from '@/services/vixl/vixl-tauri'
 import invokeErrorMessage from '@/utils/invoke-error-message'
 import pathsEqual from '@/utils/paths-equal'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+
+const occupancyError = (
+  slug: string,
+  chats: ChatMetaRecord[],
+  targetPath: string,
+): string | null => {
+  const runningCount = chats.filter((chat) => chat.status === 'running').length
+  if (runningCount > 0) {
+    return `Cannot remove worktree while ${runningCount} chat(s) are running on ${slug}`
+  }
+  const activeCount = activeSubagentsForWorkspace(slug, targetPath).length
+  if (activeCount > 0) {
+    return `Cannot remove worktree while ${activeCount} active implementer(s) are running on ${slug}`
+  }
+  return null
+}
 
 const worktreeRemove = (ctx: HarnessToolContext) =>
   tool({
@@ -63,23 +80,12 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
           parentRoot = undefined
         }
       }
-      if (!parentRoot) {
-        return { error: 'Could not resolve the parent repository for this worktree' }
-      }
+      const gitRoot = parentRoot ?? targetPath
 
       const chats = await listChats(project.slug)
-      const runningCount = chats.filter((chat) => chat.status === 'running').length
-      if (runningCount > 0) {
-        return {
-          error: `Cannot remove worktree while ${runningCount} chat(s) are running on ${project.slug}`,
-        }
-      }
-
-      const activeImplementers = activeSubagentsForWorkspace(project.slug, targetPath)
-      if (activeImplementers.length > 0) {
-        return {
-          error: `Cannot remove worktree while ${activeImplementers.length} active implementer(s) are running on ${project.slug}`,
-        }
+      const preBusy = occupancyError(project.slug, chats, targetPath)
+      if (preBusy) {
+        return { error: preBusy }
       }
 
       const branch = project.worktree?.branch ?? 'unknown'
@@ -110,9 +116,15 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
         return { rejected: true, error: 'User declined removing the worktree' }
       }
 
+      const latestChats = await listChats(project.slug)
+      const postBusy = occupancyError(project.slug, latestChats, targetPath)
+      if (postBusy) {
+        return { error: postBusy }
+      }
+
       const effectiveForce = force === true || dirty === true
       try {
-        await gitWorktreeRemove(parentRoot, targetPath, effectiveForce)
+        await gitWorktreeRemove(gitRoot, targetPath, effectiveForce)
       } catch (error) {
         return { error: invokeErrorMessage(error) }
       }
