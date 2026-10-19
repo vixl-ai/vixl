@@ -241,7 +241,6 @@ export function clampReadingWindowScrollTop({
 }
 
 export function shouldExitFollowBottom({
-  autoscrolling,
   distanceFromEnd,
   scrolledUp,
   threshold,
@@ -251,7 +250,7 @@ export function shouldExitFollowBottom({
   scrolledUp: boolean
   threshold: number
 }): boolean {
-  return scrolledUp && !autoscrolling && distanceFromEnd > threshold
+  return scrolledUp && distanceFromEnd > threshold
 }
 
 export function shouldExitFollowBottomOnUserTouch({

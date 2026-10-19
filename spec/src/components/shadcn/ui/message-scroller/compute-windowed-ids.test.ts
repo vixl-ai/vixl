@@ -821,11 +821,11 @@ describe('shouldExitFollowBottom', () => {
     expect(shouldExitFollowBottom(exiting)).toBe(true)
   })
 
-  it('keeps follow while autoscrolling even if distance exceeds the threshold', () => {
+  it('exits follow when the user scrolled up past the threshold even while autoscrolling', () => {
     expect(shouldExitFollowBottom({
       ...exiting,
       autoscrolling: true,
-    })).toBe(false)
+    })).toBe(true)
   })
 
   it('keeps follow when the last scroll was not up', () => {
