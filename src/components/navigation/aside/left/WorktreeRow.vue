@@ -129,7 +129,7 @@ const handleConfirmRemove = async (): Promise<void> => {
 
   removing.value = true
   try {
-    const force = forceRemove.value || Boolean(preview.value?.dirty)
+    const force = forceRemove.value
     const result = await confirmRemoveWorktree({
       projectId: props.project.id,
       slug: props.project.slug,
