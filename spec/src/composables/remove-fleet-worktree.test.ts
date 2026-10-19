@@ -225,6 +225,23 @@ describe('remove-fleet-worktree', () => {
     expect(result).toEqual({ ok: true })
   })
 
+  it('unregisters when git says the checkout is already gone', async () => {
+    gitWorktreeRemove.mockRejectedValue(
+      new Error('Path is not a worktree of this repository'),
+    )
+    const result = await confirmRemoveWorktree({
+      projectId: 'proj-wt',
+      slug: 'feature',
+      parentRoot: '/tmp/demo',
+      worktreeRoot: '/tmp/worktrees/demo/feature',
+      force: false,
+    })
+
+    expect(registryRemoveProject).toHaveBeenCalledWith('proj-wt')
+    expect(refreshFleetProjects).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ ok: true })
+  })
+
   it('returns ok with a warning when unregister fails after git remove', async () => {
     registryRemoveProject.mockRejectedValue(new Error('busy'))
     const result = await confirmRemoveWorktree({

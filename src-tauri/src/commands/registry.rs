@@ -355,6 +355,7 @@ pub(crate) fn add_or_update_project(
         upsert_fleet_project_occupied_inner(&mut registry.projects, name, root_path, &occupied);
     let vixl = user_vixl_dir(app).ok();
     sync_project_worktree_link(&mut registry.projects, &project.id, vixl.as_deref());
+    link_registered_worktree_children(&mut registry.projects, &project.id, vixl.as_deref());
     write_registry(app, &registry)?;
     registry
         .projects
@@ -635,6 +636,46 @@ pub fn sync_project_worktree_link(
         None => {
             project.worktree = None;
         }
+    }
+}
+
+pub fn link_registered_worktree_children(
+    projects: &mut [FleetProject],
+    parent_id: &str,
+    user_vixl_dir: Option<&Path>,
+) {
+    let Some(parent) = projects.iter().find(|project| project.id == parent_id) else {
+        return;
+    };
+    if parent.worktree.is_some() {
+        return;
+    }
+    let parent_root = parent.root_path.clone();
+    let parent_id = parent.id.clone();
+    let Ok(entries) = super::worktree::git_worktree_list(parent_root.clone()) else {
+        return;
+    };
+    for entry in entries {
+        if roots_match(&entry.path, &parent_root) {
+            continue;
+        }
+        let Some(index) = projects.iter().position(|project| {
+            project.id != parent_id && roots_match(&project.root_path, &entry.path)
+        }) else {
+            continue;
+        };
+        let managed = match user_vixl_dir {
+            Some(dir) => super::worktree::is_managed_worktree_path(&projects[index].root_path, dir),
+            None => projects[index]
+                .worktree
+                .as_ref()
+                .is_some_and(|link| link.managed && link.parent_id == parent_id),
+        };
+        projects[index].worktree = Some(WorktreeLink {
+            parent_id: parent_id.clone(),
+            branch: entry.branch.unwrap_or_default(),
+            managed,
+        });
     }
 }
 

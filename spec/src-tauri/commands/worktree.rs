@@ -1,7 +1,7 @@
 use app_lib::commands::git_binary::git_binary;
 use app_lib::commands::registry::{
-    apply_project_root_update, clear_worktree_links_to_parent, sync_project_worktree_link,
-    FleetProject, WorktreeLink,
+    apply_project_root_update, clear_worktree_links_to_parent, link_registered_worktree_children,
+    sync_project_worktree_link, FleetProject, WorktreeLink,
 };
 use app_lib::commands::worktree::{
     detect_worktree_parent_among, git_worktree_add_in_dir, git_worktree_list, git_worktree_remove,
@@ -407,6 +407,67 @@ fn sync_marks_managed_from_vixl_worktrees_location() {
         projects[1].worktree.as_ref().map(|link| link.managed),
         Some(true)
     );
+}
+
+#[test]
+fn registering_main_checkout_links_existing_children() {
+    let repo = init_repo();
+    let vixl = tempfile::tempdir().expect("vixl dir");
+    let added =
+        git_worktree_add_in_dir(&path_str(repo.path()), "feature", None, vixl.path(), "demo")
+            .expect("add worktree");
+
+    let mut projects = vec![sample_project("child-1", "feature", Path::new(&added.path))];
+    sync_project_worktree_link(&mut projects, "child-1", Some(vixl.path()));
+    assert_eq!(projects[0].worktree, None);
+
+    projects.push(sample_project("parent-1", "demo", repo.path()));
+    sync_project_worktree_link(&mut projects, "parent-1", Some(vixl.path()));
+    link_registered_worktree_children(&mut projects, "parent-1", Some(vixl.path()));
+
+    let child = projects
+        .iter()
+        .find(|project| project.id == "child-1")
+        .expect("child");
+    assert_eq!(
+        child.worktree.as_ref(),
+        Some(&WorktreeLink {
+            parent_id: "parent-1".to_string(),
+            branch: "vixl/feature".to_string(),
+            managed: true,
+        })
+    );
+}
+
+#[test]
+fn worktree_child_does_not_scan_siblings_as_children() {
+    let repo = init_repo();
+    let vixl = tempfile::tempdir().expect("vixl dir");
+    let feature =
+        git_worktree_add_in_dir(&path_str(repo.path()), "feature", None, vixl.path(), "demo")
+            .expect("feature worktree");
+    let review =
+        git_worktree_add_in_dir(&path_str(repo.path()), "review", None, vixl.path(), "demo")
+            .expect("review worktree");
+
+    let mut feature_project = sample_project("child-feature", "feature", Path::new(&feature.path));
+    feature_project.worktree = Some(WorktreeLink {
+        parent_id: "parent-1".to_string(),
+        branch: "vixl/feature".to_string(),
+        managed: true,
+    });
+    let mut projects = vec![
+        sample_project("parent-1", "demo", repo.path()),
+        feature_project,
+        sample_project("child-review", "review", Path::new(&review.path)),
+    ];
+
+    link_registered_worktree_children(&mut projects, "child-feature", Some(vixl.path()));
+    let review_project = projects
+        .iter()
+        .find(|project| project.id == "child-review")
+        .expect("review child");
+    assert_eq!(review_project.worktree, None);
 }
 
 #[test]

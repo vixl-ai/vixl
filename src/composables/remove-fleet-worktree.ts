@@ -85,7 +85,10 @@ export const confirmRemoveWorktree = async (args: {
   try {
     await gitWorktreeRemove(args.parentRoot, args.worktreeRoot, args.force)
   } catch (error) {
-    return { ok: false, reason: 'error', message: invokeErrorMessage(error) }
+    const message = invokeErrorMessage(error)
+    if (!message.includes('not a worktree')) {
+      return { ok: false, reason: 'error', message }
+    }
   }
 
   try {
