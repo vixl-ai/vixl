@@ -10,6 +10,7 @@ import {
   itemIdsEqual,
   resolveViewportHeight,
   resolveWindowScrollTop,
+  shouldAdvanceFollowChaseBaseline,
   shouldAnchorOnContentChange,
   shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
@@ -428,6 +429,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   let pendingScrollToMessage: PendingScrollToMessage | null = null
   let stateFrame: number | null = null
   let visibilityFrame: number | null = null
+  let followChaseRecheckFrame: number | null = null
   let pendingScrollFrame: number | null = null
   let autoscrollingTimeout: number | null = null
   let visibilityObserver: IntersectionObserver | null = null
@@ -601,6 +603,8 @@ function createEngine(props: MessageScrollerProviderProps) {
         viewport.scrollTop += delta
     }
     recomputeWindow()
+    if (mode === "following-bottom" && autoScroll())
+      scheduleFollowChaseRecheck()
   }
 
   function commitScrollState() {
@@ -978,79 +982,91 @@ function createEngine(props: MessageScrollerProviderProps) {
       lastClientWidth = clientWidth
   }
 
-  function applyResize(source: "content" | "viewport") {
-    syncItemHeightsToViewportWidth()
+  function evaluateFollowChase(source: "content" | "viewport") {
+    // Already-at-bottom and zero-height resizes must not call scrollToEnd:
+    // that retriggers ResizeObserver through autoscroll and remounts.
+    // Viewport resizes still chase when off the live edge. Content resizes
+    // chase only when scrollHeight grew and itemHeights match the DOM
+    // (late images, code blocks, fonts after reportItemHeight). Shrink,
+    // unchanged, and stale-placeholder growth only recomputeWindow so the
+    // clamp cycle cannot pump. Trust-blocked content frames keep the growth
+    // baseline so a later row-height recheck can still chase.
     const scrollHeight = viewport?.scrollHeight ?? 0
     const previousScrollHeight = lastScrollHeight
-    lastScrollHeight = scrollHeight
-    if (mode === "following-bottom" && autoScroll()) {
-      // Already-at-bottom and zero-height resizes must not call scrollToEnd:
-      // that retriggers ResizeObserver through autoscroll and remounts.
-      // Viewport resizes still chase when off the live edge. Content resizes
-      // chase only when scrollHeight grew and itemHeights match the DOM
-      // (late images, code blocks, fonts after reportItemHeight). Shrink,
-      // unchanged, and stale-placeholder growth only recomputeWindow so the
-      // clamp cycle cannot pump.
-      const { gap, padding } = layoutMetrics()
-      const estimatedHeight = estimateItemsHeight({
+    const { gap, padding } = layoutMetrics()
+    const estimatedHeight = estimateItemsHeight({
+      gap,
+      heights: itemHeights,
+      itemIds: windowItemIds,
+      paddingEnd: padding.end,
+      paddingStart: padding.start,
+    }) + spacerHeight
+    const observedHeight = content?.scrollHeight ?? scrollHeight
+    const grew = source === "content" && shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight,
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollHeight,
+    })
+    let extraChildrenHeight = 0
+    if (grew && content) {
+      const windowedIds = new Set(windowItemIds)
+      extraChildrenHeight = extraNonWindowedChildrenHeight({
+        children: getMessageChildren(content, spacer).map((child) => ({
+          height: child.getBoundingClientRect().height,
+          messageId: child.dataset.messageId,
+        })),
         gap,
-        heights: itemHeights,
-        itemIds: windowItemIds,
-        paddingEnd: padding.end,
-        paddingStart: padding.start,
-      }) + spacerHeight
-      const observedHeight = content?.scrollHeight ?? scrollHeight
-      const contentGrew = source === "content" && shouldChaseFollowBottomOnContentGrowth({
-        previousScrollHeight,
-        scrollEpsilon: SCROLL_EPSILON,
-        scrollHeight,
+        windowItemIds: windowedIds,
       })
-      let extraChildrenHeight = 0
-      if (contentGrew && content) {
-        const windowedIds = new Set(windowItemIds)
-        extraChildrenHeight = extraNonWindowedChildrenHeight({
-          children: getMessageChildren(content, spacer).map((child) => ({
-            height: child.getBoundingClientRect().height,
-            messageId: child.dataset.messageId,
-          })),
-          gap,
-          windowItemIds: windowedIds,
-        })
-      }
-      let measuredCount = 0
-      for (const id of windowItemIds) {
-        if (itemHeights.has(id))
-          measuredCount += 1
-      }
-      if (
-        viewport
-        && shouldChaseFollowBottomOnResize({
-          clientHeight: viewport.clientHeight,
-          maxScrollTop: maxScrollTop(viewport),
-          scrollEpsilon: SCROLL_EPSILON,
-          scrollTop: viewport.scrollTop,
-        })
-        && (
-          source === "viewport"
-          || (
-            contentGrew
-            && shouldTrustFollowBottomContentMeasurements({
-              estimatedHeight,
-              extraChildrenHeight,
-              measuredCount,
-              scrollEpsilon: SCROLL_EPSILON,
-              scrollHeight: observedHeight,
-            })
-          )
-        )
-      ) {
-        scrollToEnd({ behavior: "auto" })
-      }
-      else {
-        recomputeWindow()
-      }
+    }
+    let measuredCount = 0
+    for (const id of windowItemIds) {
+      if (itemHeights.has(id))
+        measuredCount += 1
+    }
+    const trust = shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight,
+      extraChildrenHeight,
+      measuredCount,
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollHeight: observedHeight,
+    })
+    const offEnd = Boolean(
+      viewport
+      && shouldChaseFollowBottomOnResize({
+        clientHeight: viewport.clientHeight,
+        maxScrollTop: maxScrollTop(viewport),
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollTop: viewport.scrollTop,
+      }),
+    )
+    const chased = offEnd && (source === "viewport" || (grew && trust))
+    if (chased) {
+      scrollToEnd({ behavior: "auto" })
       return
     }
+    recomputeWindow()
+    if (source === "viewport" || shouldAdvanceFollowChaseBaseline({ chased, trust }))
+      lastScrollHeight = scrollHeight
+  }
+
+  function scheduleFollowChaseRecheck() {
+    if (followChaseRecheckFrame !== null)
+      return
+    followChaseRecheckFrame = window.requestAnimationFrame(() => {
+      followChaseRecheckFrame = null
+      if (mode === "following-bottom" && autoScroll())
+        evaluateFollowChase("content")
+    })
+  }
+
+  function applyResize(source: "content" | "viewport") {
+    syncItemHeightsToViewportWidth()
+    if (mode === "following-bottom" && autoScroll()) {
+      evaluateFollowChase(source)
+      return
+    }
+    lastScrollHeight = viewport?.scrollHeight ?? 0
     const previousSpacerHeight = spacerHeight
     if (reanchorToAnchoredMessage()) {
       // The reply streaming below the anchor consumes the tail spacer as it
@@ -1218,6 +1234,10 @@ function createEngine(props: MessageScrollerProviderProps) {
     if (visibilityFrame !== null) {
       window.cancelAnimationFrame(visibilityFrame)
       visibilityFrame = null
+    }
+    if (followChaseRecheckFrame !== null) {
+      window.cancelAnimationFrame(followChaseRecheckFrame)
+      followChaseRecheckFrame = null
     }
     if (autoscrollingTimeout !== null) {
       window.clearTimeout(autoscrollingTimeout)
