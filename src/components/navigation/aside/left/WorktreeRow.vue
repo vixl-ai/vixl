@@ -150,9 +150,7 @@ const handleConfirmRemove = async (): Promise<void> => {
     if (route.params.slug === props.project.slug) {
       await router.push('/')
     }
-    toast.success(`Removed worktree ${branchLabel.value}`, {
-      ...(result.warning ? { description: result.warning } : {}),
-    })
+    toast.success(`Removed worktree ${branchLabel.value}`, (result.warning ? { description: result.warning } : {}))
   } catch (error) {
     toast.error('Could not remove worktree', {
       description: error instanceof Error ? error.message : 'Unknown error',
