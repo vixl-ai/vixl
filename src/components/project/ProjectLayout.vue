@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import ProjectNav from '@/components/project/ProjectNav.vue'
 import ProjectChatsSection from '@/components/project/sections/ChatsSection.vue'
 import ProjectCodeGraphSection from '@/components/project/sections/CodeGraphSection.vue'
@@ -8,7 +9,10 @@ import PlansSection from '@/components/settings/sections/PlansSection.vue'
 import SkillsSection from '@/components/settings/sections/SkillsSection.vue'
 import AgentsSection from '@/components/settings/sections/AgentsSection.vue'
 import RulesSection from '@/components/settings/sections/RulesSection.vue'
+import useFleetRegistry from '@/composables/use-fleet-registry'
 import type { ProjectSectionId } from '@/types/project/project-section'
+import projectRouteFor from '@/utils/project-route-for'
+import worktreeBannerFor from '@/utils/worktree-banner-for'
 
 const props = defineProps<{
   projectName: string
@@ -20,6 +24,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:section': [ProjectSectionId]
 }>()
+
+const fleet = useFleetRegistry()
+const worktreeBanner = computed(() => {
+  const project = fleet.projects.value.find((item) => item.slug === props.projectSlug)
+  return worktreeBannerFor(project, fleet.projects.value)
+})
 
 const sectionComponent = computed(() => {
   switch (props.activeSection) {
@@ -66,6 +76,24 @@ const sectionProps = computed(() => {
           :title="memberNames.join(', ')"
         >
           Members: {{ memberNames.join(', ') }}
+        </p>
+        <p
+          v-if="worktreeBanner"
+          class="mt-1 truncate text-sm text-muted-foreground"
+        >
+          <template v-if="worktreeBanner.parentSlug && worktreeBanner.parentName">
+            Worktree of
+            <RouterLink
+              :to="projectRouteFor(worktreeBanner.parentSlug)"
+              class="underline underline-offset-2 hover:text-foreground"
+            >
+              {{ worktreeBanner.parentName }}
+            </RouterLink>
+            on {{ worktreeBanner.branch }}
+          </template>
+          <template v-else>
+            Worktree on {{ worktreeBanner.branch }}
+          </template>
         </p>
       </div>
     </div>

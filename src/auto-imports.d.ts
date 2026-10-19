@@ -30,6 +30,7 @@ declare global {
   const computedEager: typeof import('@vueuse/core').computedEager
   const computedInject: typeof import('@vueuse/core').computedInject
   const computedWithControl: typeof import('@vueuse/core').computedWithControl
+  const confirmRemoveWorktree: typeof import('./composables/remove-fleet-worktree').confirmRemoveWorktree
   const controlledComputed: typeof import('@vueuse/core').controlledComputed
   const controlledRef: typeof import('@vueuse/core').controlledRef
   const createApp: typeof import('vue').createApp
@@ -73,6 +74,7 @@ declare global {
   const isRef: typeof import('vue').isRef
   const isShallow: typeof import('vue').isShallow
   const lastVixlFileChange: typeof import('./composables/use-vixl-live-sync').lastVixlFileChange
+  const loadWorktreeRemovePreview: typeof import('./composables/remove-fleet-worktree').loadWorktreeRemovePreview
   const makeDestructurable: typeof import('@vueuse/core').makeDestructurable
   const markRaw: typeof import('vue').markRaw
   const nextTick: typeof import('vue').nextTick
@@ -120,6 +122,7 @@ declare global {
   const resetAgentHarnessCacheForTests: typeof import('./composables/use-agent-harness').resetAgentHarnessCacheForTests
   const resetChatSessionsForTests: typeof import('./composables/use-chat-store').resetChatSessionsForTests
   const resolveComponent: typeof import('vue').resolveComponent
+  const resolveProjectRowWorkspace: typeof import('./composables/resolve-project-row-workspace').default
   const runAtomicFlip: typeof import('./composables/use-theme-flip').runAtomicFlip
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
@@ -381,6 +384,12 @@ declare global {
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
+  export type { WorktreeRemovePreview, ConfirmRemoveWorktreeResult } from './composables/remove-fleet-worktree'
+  import('./composables/remove-fleet-worktree')
+  // @ts-ignore
+  export type { ProjectRowWorkspace } from './composables/resolve-project-row-workspace'
+  import('./composables/resolve-project-row-workspace')
+  // @ts-ignore
   export type { AgentHarnessOptions, ToolRun, SubagentEntry, ApprovalResolution, PendingApprovalView, McpAuthResolution, PendingMcpAuthView } from './composables/use-agent-harness'
   import('./composables/use-agent-harness')
   // @ts-ignore
@@ -439,6 +448,7 @@ declare module 'vue' {
     readonly computedEager: UnwrapRef<typeof import('@vueuse/core')['computedEager']>
     readonly computedInject: UnwrapRef<typeof import('@vueuse/core')['computedInject']>
     readonly computedWithControl: UnwrapRef<typeof import('@vueuse/core')['computedWithControl']>
+    readonly confirmRemoveWorktree: UnwrapRef<typeof import('./composables/remove-fleet-worktree')['confirmRemoveWorktree']>
     readonly controlledComputed: UnwrapRef<typeof import('@vueuse/core')['controlledComputed']>
     readonly controlledRef: UnwrapRef<typeof import('@vueuse/core')['controlledRef']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
@@ -482,6 +492,7 @@ declare module 'vue' {
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
     readonly isShallow: UnwrapRef<typeof import('vue')['isShallow']>
     readonly lastVixlFileChange: UnwrapRef<typeof import('./composables/use-vixl-live-sync')['lastVixlFileChange']>
+    readonly loadWorktreeRemovePreview: UnwrapRef<typeof import('./composables/remove-fleet-worktree')['loadWorktreeRemovePreview']>
     readonly makeDestructurable: UnwrapRef<typeof import('@vueuse/core')['makeDestructurable']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
@@ -529,6 +540,7 @@ declare module 'vue' {
     readonly resetAgentHarnessCacheForTests: UnwrapRef<typeof import('./composables/use-agent-harness')['resetAgentHarnessCacheForTests']>
     readonly resetChatSessionsForTests: UnwrapRef<typeof import('./composables/use-chat-store')['resetChatSessionsForTests']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
+    readonly resolveProjectRowWorkspace: UnwrapRef<typeof import('./composables/resolve-project-row-workspace')['default']>
     readonly runAtomicFlip: UnwrapRef<typeof import('./composables/use-theme-flip')['runAtomicFlip']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>

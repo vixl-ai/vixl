@@ -53,6 +53,7 @@ import { dropPlanExecutionSession } from '@/services/harness/plan-execution-sess
 import { killShellsForChat } from '@/services/harness/shell/registry'
 import { deleteChat, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import chatRouteFor from '@/utils/chat-route-for'
+import { findSidebarProject } from '@/utils/find-sidebar-project'
 import projectRouteFor from '@/utils/project-route-for'
 
 type ChatStatusKind =
@@ -81,8 +82,9 @@ const deleting = ref(false)
 const activeChat = ref<FleetSidebarChat | null>(null)
 
 const chats = computed((): FleetSidebarChat[] => {
-  const project = fleetSidebar.sidebarProjects.value.find(
-    (item) => item.slug === props.projectSlug,
+  const project = findSidebarProject(
+    fleetSidebar.sidebarProjects.value,
+    props.projectSlug,
   )
   return project?.chats ?? []
 })

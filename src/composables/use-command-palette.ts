@@ -5,6 +5,7 @@ import {
   SECTION_LABELS,
 } from '@/types/settings/settings-section'
 import type { CommandPaletteItem } from '@/types/navigation/command-palette-item'
+import { flattenSidebarProjects } from '@/utils/find-sidebar-project'
 
 const open = ref(false)
 
@@ -39,7 +40,7 @@ export default () => {
       },
     ]
 
-    for (const project of sidebarProjects.value) {
+    for (const project of flattenSidebarProjects(sidebarProjects.value)) {
       result.push({
         id: `project-${project.slug}`,
         group: 'Projects',
