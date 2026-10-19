@@ -76,15 +76,21 @@ export function extraNonWindowedChildrenHeight({
 export function shouldTrustFollowBottomContentMeasurements({
   estimatedHeight,
   extraChildrenHeight = 0,
+  measuredCount = 0,
   scrollEpsilon,
   scrollHeight,
 }: {
   estimatedHeight: number
   extraChildrenHeight?: number
+  measuredCount?: number
   scrollEpsilon: number
   scrollHeight: number
 }): boolean {
-  return Math.abs(scrollHeight - (estimatedHeight + extraChildrenHeight)) <= scrollEpsilon
+  // reportItemHeight stores rounded px while the DOM keeps fractions, so
+  // estimatedHeight can drift by up to 0.5px per measured item.
+  const roundingTolerance = 0.5 * Math.max(0, measuredCount)
+  return Math.abs(scrollHeight - (estimatedHeight + extraChildrenHeight))
+    <= scrollEpsilon + roundingTolerance
 }
 
 export function shouldInvalidateItemHeightsOnWidthChange({

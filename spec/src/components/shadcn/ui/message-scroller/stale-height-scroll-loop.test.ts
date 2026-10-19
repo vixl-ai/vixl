@@ -46,8 +46,12 @@ interface SimulatorOptions {
   lateTrueHeightFromFrame?: number
   oldHeight: number
   overscanPx: number
+  placeholderRefreshFrame?: number
   reportPolicy: 'raceUnmount' | 'allMounted'
+  roundReportedHeights?: boolean
+  staleUnmountedHeight?: number
   trueHeight: number
+  useMeasuredCount?: boolean
   viewportHeight: number
 }
 
@@ -70,6 +74,19 @@ function ids(count: number): string[] {
 
 function windowKey(mounted: ReadonlySet<string>): string {
   return [...mounted].join(',')
+}
+
+function measuredItemCount(itemIds: readonly string[], heights: ReadonlyMap<string, number>): number {
+  let count = 0
+  for (const id of itemIds) {
+    if (heights.has(id))
+      count += 1
+  }
+  return count
+}
+
+function reportedHeight(height: number, roundReportedHeights: boolean): number {
+  return roundReportedHeights ? Math.round(height) : height
 }
 
 function applyFixedGuards(): Pick<SimulatorOptions, 'chasePolicy' | 'invalidateOnWidthChange'> {
@@ -115,8 +132,12 @@ function simulateFollowBottomWidthChange({
   lateTrueHeightFromFrame,
   oldHeight,
   overscanPx,
+  placeholderRefreshFrame,
   reportPolicy,
+  roundReportedHeights = false,
+  staleUnmountedHeight,
   trueHeight,
+  useMeasuredCount = true,
   viewportHeight,
 }: SimulatorOptions) {
   const itemIds = ids(itemCount)
@@ -157,7 +178,7 @@ function simulateFollowBottomWidthChange({
     ) {
       liveTrueHeight = lateTrueHeight
       for (const id of mounted)
-        heights.set(id, liveTrueHeight)
+        heights.set(id, reportedHeight(liveTrueHeight, roundReportedHeights))
     }
 
     if (
@@ -175,11 +196,15 @@ function simulateFollowBottomWidthChange({
     const windowItemIdSet = new Set(itemIds)
     const children: Array<{ height: number, messageId?: string }> = []
     let Hdom = 0
+    const placeholdersStale = staleUnmountedHeight !== undefined
+      && (placeholderRefreshFrame === undefined || frame < placeholderRefreshFrame)
     for (let index = 0; index < itemCount; index += 1) {
       const id = itemIds[index]
       if (!id)
         continue
-      const height = mounted.has(id) ? liveTrueHeight : (heights.get(id) ?? DEFAULT_ITEM_HEIGHT)
+      const unmountedHeight = heights.get(id)
+        ?? (placeholdersStale ? staleUnmountedHeight : DEFAULT_ITEM_HEIGHT)
+      const height = mounted.has(id) ? liveTrueHeight : unmountedHeight
       children.push({ height, messageId: id })
       Hdom += height
       if (index < itemCount - 1)
@@ -208,6 +233,7 @@ function simulateFollowBottomWidthChange({
     const trusted = shouldTrustFollowBottomContentMeasurements({
       estimatedHeight: estimated(),
       extraChildrenHeight,
+      measuredCount: useMeasuredCount ? measuredItemCount(itemIds, heights) : 0,
       scrollEpsilon: SCROLL_EPSILON,
       scrollHeight: Hdom,
     })
@@ -252,12 +278,12 @@ function simulateFollowBottomWidthChange({
 
     if (reportPolicy === 'allMounted') {
       for (const id of nextMounted)
-        heights.set(id, liveTrueHeight)
+        heights.set(id, reportedHeight(liveTrueHeight, roundReportedHeights))
     }
     else {
       for (const id of nextMounted) {
         if (mounted.has(id))
-          heights.set(id, liveTrueHeight)
+          heights.set(id, reportedHeight(liveTrueHeight, roundReportedHeights))
       }
     }
 
@@ -684,6 +710,145 @@ describe('stale-height follow-bottom resize loop', () => {
       expect(lateGrowth?.source).toBe('content')
       expect(lateGrowth?.chase).toBe(true)
       expect(isTwoCycle(framesOut.slice(8))).toBe(false)
+    })
+  })
+
+  describe('rounding drift and post-drag placeholder identity', () => {
+    function simulateRoundedHeightGrowth({
+      growth,
+      itemCount,
+      trueHeight,
+      useMeasuredCount,
+      viewportHeight,
+    }: {
+      growth: number
+      itemCount: number
+      trueHeight: number
+      useMeasuredCount: boolean
+      viewportHeight: number
+    }) {
+      const itemIds = ids(itemCount)
+      const heights = new Map(itemIds.map((id) => [id, Math.round(trueHeight)]))
+      const estimatedHeight = estimateItemsHeight({
+        gap: 0,
+        heights,
+        itemIds,
+      })
+      const Hdom = trueHeight * itemCount
+      const previousScrollHeight = Hdom - growth
+      const maxScrollTop = Math.max(0, Hdom - viewportHeight)
+      let scrollTop = Math.max(0, previousScrollHeight - viewportHeight)
+      const grew = shouldChaseFollowBottomOnContentGrowth({
+        previousScrollHeight,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollHeight: Hdom,
+      })
+      const trusted = shouldTrustFollowBottomContentMeasurements({
+        estimatedHeight,
+        measuredCount: useMeasuredCount ? measuredItemCount(itemIds, heights) : 0,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollHeight: Hdom,
+      })
+      const chase = grew && trusted && shouldChaseFollowBottomOnResize({
+        clientHeight: viewportHeight,
+        maxScrollTop,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollTop,
+      })
+      if (chase)
+        scrollTop = maxScrollTop
+      return {
+        chase,
+        distanceFromEnd: maxScrollTop - scrollTop,
+        estimatedHeight,
+        Hdom,
+        trusted,
+      }
+    }
+
+    it('pre-fix rounding drift stalls the content chase above the bottom', () => {
+      const result = simulateRoundedHeightGrowth({
+        growth: 10,
+        itemCount: 10,
+        trueHeight: 332.4,
+        useMeasuredCount: false,
+        viewportHeight: 800,
+      })
+
+      expect(result.Hdom - result.estimatedHeight).toBeCloseTo(4)
+      expect(result.trusted).toBe(false)
+      expect(result.chase).toBe(false)
+      expect(result.distanceFromEnd).toBe(10)
+    })
+
+    it('post-fix rounding drift still converges to the live edge', () => {
+      const result = simulateRoundedHeightGrowth({
+        growth: 10,
+        itemCount: 10,
+        trueHeight: 332.4,
+        useMeasuredCount: true,
+        viewportHeight: 800,
+      })
+
+      expect(result.trusted).toBe(true)
+      expect(result.chase).toBe(true)
+      expect(result.distanceFromEnd).toBe(0)
+    })
+
+    it('post-drag stale placeholders stall until they re-render at default height', () => {
+      const stalled = simulateFollowBottomWidthChange({
+        frames: 16,
+        lateTrueHeight: 280,
+        lateTrueHeightFromFrame: 8,
+        reportPolicy: 'raceUnmount',
+        staleUnmountedHeight: scenario20.oldHeight,
+        ...applyFixedGuards(),
+        ...scenario20,
+      })
+      expect(stalled[8]?.source).toBe('content')
+      expect(stalled[8]?.chase).toBe(false)
+      expect(stalled.at(-1)?.distanceFromEnd).toBeGreaterThan(0)
+
+      const recovered = simulateFollowBottomWidthChange({
+        frames: 16,
+        lateTrueHeight: 280,
+        lateTrueHeightFromFrame: 8,
+        placeholderRefreshFrame: 1,
+        reportPolicy: 'raceUnmount',
+        staleUnmountedHeight: scenario20.oldHeight,
+        ...applyFixedGuards(),
+        ...scenario20,
+      })
+      expect(recovered[0]?.source).toBe('viewport')
+      expect(recovered[8]?.source).toBe('content')
+      expect(recovered[8]?.chase).toBe(true)
+      expectConverged(recovered)
+      expect(recovered.at(-1)?.distanceFromEnd).toBe(0)
+    })
+
+    it('scaled tolerance still rejects the stale-height pump', () => {
+      const measuredCount = 11
+      const perItemMismatch = 100
+      const estimatedHeight = measuredCount * DEFAULT_ITEM_HEIGHT
+      expect(shouldTrustFollowBottomContentMeasurements({
+        estimatedHeight,
+        measuredCount,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollHeight: estimatedHeight + perItemMismatch * measuredCount,
+      })).toBe(false)
+
+      const framesOut = simulateFollowBottomWidthChange({
+        chasePolicy: 'content-growth',
+        frames: 8,
+        invalidateOnWidthChange: false,
+        reportPolicy: 'raceUnmount',
+        useMeasuredCount: true,
+        ...scenario20,
+      })
+      expect(framesOut.at(-1)).toMatchObject({
+        distanceFromEnd: 1000,
+        settle: false,
+      })
     })
   })
 })

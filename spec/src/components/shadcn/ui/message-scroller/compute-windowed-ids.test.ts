@@ -300,6 +300,41 @@ describe('shouldTrustFollowBottomContentMeasurements', () => {
       scrollHeight,
     })).toBe(true)
   })
+
+  it('trusts accumulated rounding drift within 0.5px per measured item', () => {
+    const measuredCount = 10
+    const rounded = 332
+    const fractional = 332.4
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight: rounded * measuredCount,
+      measuredCount,
+      scrollEpsilon: 0.5,
+      scrollHeight: fractional * measuredCount,
+    })).toBe(true)
+  })
+
+  it('rejects rounding drift when measuredCount is omitted', () => {
+    const measuredCount = 10
+    const rounded = 332
+    const fractional = 332.4
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight: rounded * measuredCount,
+      scrollEpsilon: 0.5,
+      scrollHeight: fractional * measuredCount,
+    })).toBe(false)
+  })
+
+  it('rejects a stale-height pump even with scaled rounding tolerance', () => {
+    const measuredCount = 14
+    const perItemMismatch = 100
+    const estimatedHeight = measuredCount * DEFAULT_ITEM_HEIGHT
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight,
+      measuredCount,
+      scrollEpsilon: 0.5,
+      scrollHeight: estimatedHeight + perItemMismatch * measuredCount,
+    })).toBe(false)
+  })
 })
 
 describe('shouldInvalidateItemHeightsOnWidthChange', () => {
