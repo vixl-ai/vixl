@@ -104,6 +104,10 @@ name = "commands_worktree"
 path = "../spec/src-tauri/commands/worktree.rs"
 
 [[test]]
+name = "commands_copy_active_plan"
+path = "../spec/src-tauri/commands/copy_active_plan.rs"
+
+[[test]]
 name = "commands_http"
 path = "../spec/src-tauri/commands/http.rs"
 

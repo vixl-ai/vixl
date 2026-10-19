@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
+use super::copy_active_plan::copy_active_plan_to_root;
 use super::meta::{now_iso, ChatMeta};
 use super::paths::chat_dir_path;
 use super::rewrite_checkpoints::rewrite_file_checkpoints_for_root;
@@ -163,6 +164,12 @@ pub fn move_chat_to_workspace(
     if let Err(error) = rewrite_file_checkpoints_for_root(&dest_dir, &old_root, &project.root_path)
     {
         log::warn!("Failed to rewrite file checkpoints after workspace move: {error}");
+    }
+
+    if let Some(plan_path) = meta.active_plan_path.as_deref() {
+        if let Err(error) = copy_active_plan_to_root(&old_root, &project.root_path, plan_path) {
+            log::warn!("Failed to copy active plan after workspace move: {error}");
+        }
     }
 
     Ok(MoveChatToWorkspaceResult {

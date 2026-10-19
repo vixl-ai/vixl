@@ -29,6 +29,9 @@ vi.mock('@/composables/agent-harness/cache', () => ({
 
 vi.mock('@/services/harness/plan-execution-session', () => ({
   rekeyPlanExecutionSession: vi.fn<(...args: unknown[]) => void>(),
+  getPlanExecutionSession: vi
+    .fn<(...args: unknown[]) => { activePlanPath: string | null }>()
+    .mockReturnValue({ activePlanPath: null }),
 }))
 
 import { toast } from 'vue-sonner'

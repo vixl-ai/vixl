@@ -1,4 +1,5 @@
 mod append;
+mod copy_active_plan;
 mod create;
 mod delete;
 mod fork;
@@ -17,6 +18,8 @@ mod update;
 mod usage;
 
 pub use append::append_chat_line;
+pub use copy_active_plan::copy_active_plan_to_root;
+pub(crate) use copy_active_plan::copy_tree_skip_existing;
 pub use create::create_chat;
 pub use delete::delete_chat;
 pub use fork::fork_chat;

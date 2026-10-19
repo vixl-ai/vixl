@@ -181,6 +181,32 @@ fn detect_parent_returns_null_for_non_git_path() {
 }
 
 #[test]
+fn add_copies_parent_vixl_plans_into_checkout() {
+    let repo = init_repo();
+    let vixl = tempfile::tempdir().expect("vixl dir");
+    let plan_dir = repo.path().join(".vixl").join("plans").join("ship-it");
+    fs::create_dir_all(&plan_dir).expect("plan dir");
+    fs::write(plan_dir.join("PLAN.md"), "uncommitted plan\n").expect("write plan");
+    fs::write(plan_dir.join("notes.md"), "sibling\n").expect("write notes");
+
+    let added = git_worktree_add_in_dir(&path_str(repo.path()), "plans", None, vixl.path(), "demo")
+        .expect("add worktree");
+
+    let dest = Path::new(&added.path)
+        .join(".vixl")
+        .join("plans")
+        .join("ship-it");
+    assert_eq!(
+        fs::read_to_string(dest.join("PLAN.md")).expect("copied plan"),
+        "uncommitted plan\n"
+    );
+    assert_eq!(
+        fs::read_to_string(dest.join("notes.md")).expect("copied notes"),
+        "sibling\n"
+    );
+}
+
+#[test]
 fn add_creates_vixl_branch_and_dir_under_user_vixl() {
     let repo = init_repo();
     let vixl = tempfile::tempdir().expect("vixl dir");

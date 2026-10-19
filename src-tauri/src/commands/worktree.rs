@@ -9,6 +9,9 @@ use super::git_binary::git_binary;
 use super::paths::user_vixl_dir;
 use super::registry::{fleet_projects, roots_match, slugify_or_fallback, FleetProject};
 
+#[path = "worktree_copy_plans.rs"]
+mod worktree_copy_plans;
+
 const WORKTREE_NAME_MAX_LEN: usize = 64;
 const WORKTREES_DIR: &str = "worktrees";
 
@@ -312,6 +315,10 @@ pub fn git_worktree_add_in_dir(
         root_path,
         &["worktree", "add", "-b", &branch, &target_str, &base],
     )?;
+
+    if let Err(error) = worktree_copy_plans::copy_vixl_plans_into(root_path, &target) {
+        log::warn!("Failed to copy .vixl/plans into worktree: {error}");
+    }
 
     let path = dunce::canonicalize(&target)
         .unwrap_or(target)
