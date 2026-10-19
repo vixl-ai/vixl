@@ -20,6 +20,7 @@ import {
   shouldInvalidateItemHeightsOnWidthChange,
   shouldSampleClientWidthBaseline,
   shouldExitFollowBottom,
+  shouldExitFollowBottomOnUserTouch,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
 } from '@/components/shadcn/ui/message-scroller/compute-windowed-ids'
@@ -831,6 +832,40 @@ describe('shouldExitFollowBottom', () => {
     expect(shouldExitFollowBottom({
       ...exiting,
       scrolledUp: false,
+    })).toBe(false)
+  })
+})
+
+describe('shouldExitFollowBottomOnUserTouch', () => {
+  const exiting = {
+    distanceFromEnd: 24,
+    pendingUserTouchScroll: true,
+    scrolledUp: true,
+    threshold: 8,
+  }
+
+  it('exits follow when a touch drag moved upward past the threshold', () => {
+    expect(shouldExitFollowBottomOnUserTouch(exiting)).toBe(true)
+  })
+
+  it('keeps follow when no user touch is pending, including autoscroll clamps', () => {
+    expect(shouldExitFollowBottomOnUserTouch({
+      ...exiting,
+      pendingUserTouchScroll: false,
+    })).toBe(false)
+  })
+
+  it('keeps follow when the touch did not move scroll upward', () => {
+    expect(shouldExitFollowBottomOnUserTouch({
+      ...exiting,
+      scrolledUp: false,
+    })).toBe(false)
+  })
+
+  it('keeps follow when the touch stayed within the edge threshold', () => {
+    expect(shouldExitFollowBottomOnUserTouch({
+      ...exiting,
+      distanceFromEnd: 8,
     })).toBe(false)
   })
 })

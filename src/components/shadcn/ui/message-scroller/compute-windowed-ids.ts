@@ -254,6 +254,20 @@ export function shouldExitFollowBottom({
   return scrolledUp && !autoscrolling && distanceFromEnd > threshold
 }
 
+export function shouldExitFollowBottomOnUserTouch({
+  distanceFromEnd,
+  pendingUserTouchScroll,
+  scrolledUp,
+  threshold,
+}: {
+  distanceFromEnd: number
+  pendingUserTouchScroll: boolean
+  scrolledUp: boolean
+  threshold: number
+}): boolean {
+  return pendingUserTouchScroll && scrolledUp && distanceFromEnd > threshold
+}
+
 export function itemIdsEqual(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length)
     return false

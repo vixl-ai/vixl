@@ -19,6 +19,7 @@ const {
   setPreserveScrollOnPrepend,
   setViewportElement,
   syncAfterScroll,
+  markUserTouchScrollIntent,
   userScrollIntent,
 } = useMessageScrollerContext()
 
@@ -31,13 +32,29 @@ function onKeyDown(event: KeyboardEvent) {
     userScrollIntent()
 }
 
-function onPointerScrollIntent() {
-  // Wheel and touch at the live edge must not leave follow. @scroll ->
-  // syncAfterScroll -> updateModeFromScroll exits only once the view is
-  // actually above the edge threshold. Anchored and settling jumps still
-  // treat a gesture as user intent.
-  if (!isFollowingLive())
-    userScrollIntent()
+function onWheel(event: WheelEvent) {
+  // Upward wheel (deltaY < 0, toward older messages) leaves follow
+  // immediately, even during autoscroll. Downward or zero deltaY must
+  // not: trackpad noise at the live edge would drop a live turn.
+  // Anchored and settling jumps still treat any wheel as user intent.
+  if (isFollowingLive()) {
+    if (event.deltaY < 0)
+      userScrollIntent()
+    return
+  }
+  userScrollIntent()
+}
+
+function onTouchMove() {
+  // Touch at the live edge does not call userScrollIntent. Arm a one-shot
+  // flag so updateModeFromScroll can exit if the drag actually moved
+  // scrollTop upward past the edge threshold. A touch that does not
+  // move scroll must not leave follow.
+  if (isFollowingLive()) {
+    markUserTouchScrollIntent()
+    return
+  }
+  userScrollIntent()
 }
 
 let resizeObserver: ResizeObserver | null = null
@@ -77,8 +94,8 @@ onBeforeUnmount(() => {
       props.class,
     )"
     @scroll="syncAfterScroll()"
-    @wheel="onPointerScrollIntent()"
-    @touchmove="onPointerScrollIntent()"
+    @wheel="onWheel"
+    @touchmove="onTouchMove"
     @keydown="onKeyDown"
   >
     <slot />

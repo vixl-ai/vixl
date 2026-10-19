@@ -19,6 +19,7 @@ import {
   shouldChaseFollowOnViewportResize,
   shouldTrustFollowBottomContentMeasurements,
   shouldExitFollowBottom,
+  shouldExitFollowBottomOnUserTouch,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
   windowedIdSetsEqual,
@@ -389,6 +390,7 @@ export interface MessageScrollerContext {
   setViewportElement: (element: HTMLElement | null) => void
   setPreserveScrollOnPrepend: (value: boolean) => void
   syncAfterScroll: () => void
+  markUserTouchScrollIntent: () => void
   userScrollIntent: () => void
   windowedMessageIds: Readonly<ShallowRef<Set<string> | null>>
   itemPlaceholderHeight: (messageId: string) => number
@@ -423,6 +425,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   let firstItem: HTMLElement | null = null
   let itemCount = 0
   let lastScrollTop = 0
+  let pendingUserTouchScroll = false
   let defaultScrollPositionApplied = false
   let preserveScrollOnPrepend = true
   let prependRestore: PrependRestore | null = null
@@ -474,15 +477,25 @@ function createEngine(props: MessageScrollerProviderProps) {
       const distanceFromEnd = viewport
         ? maxScrollTop(viewport) - viewport.scrollTop
         : Number.POSITIVE_INFINITY
-      if (shouldExitFollowBottom({
-        autoscrolling: autoscrolling.value,
-        distanceFromEnd,
-        scrolledUp,
-        threshold: scrollEdgeThreshold(),
-      })) {
+      const threshold = scrollEdgeThreshold()
+      if (
+        shouldExitFollowBottomOnUserTouch({
+          distanceFromEnd,
+          pendingUserTouchScroll,
+          scrolledUp,
+          threshold,
+        })
+        || shouldExitFollowBottom({
+          autoscrolling: autoscrolling.value,
+          distanceFromEnd,
+          scrolledUp,
+          threshold,
+        })
+      ) {
         mode = "free-scrolling"
       }
     }
+    pendingUserTouchScroll = false
   }
 
   function layoutMetrics() {
@@ -1157,6 +1170,11 @@ function createEngine(props: MessageScrollerProviderProps) {
 
   // --- user intent + element setters -----------------------------------------
 
+  function markUserTouchScrollIntent() {
+    if (mode === "following-bottom")
+      pendingUserTouchScroll = true
+  }
+
   function userScrollIntent() {
     if (
       mode === "following-bottom"
@@ -1252,6 +1270,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     setViewportElement,
     setPreserveScrollOnPrepend,
     syncAfterScroll,
+    markUserTouchScrollIntent,
     userScrollIntent,
     windowedMessageIds,
     itemPlaceholderHeight,
