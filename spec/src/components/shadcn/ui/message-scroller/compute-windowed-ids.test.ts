@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
+  clampReadingWindowScrollTop,
   computeWindowedIds,
   DEFAULT_ITEM_HEIGHT,
   estimateItemsHeight,
   extraNonWindowedChildrenHeight,
   FALLBACK_VIEWPORT_HEIGHT,
+  resolveFollowWindowScrollTop,
   resolveViewportHeight,
   resolveWindowScrollTop,
   shouldAnchorOnContentChange,
   shouldAdvanceFollowChaseBaseline,
   shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
+  shouldChaseFollowBottomOnSizeChange,
+  shouldChaseFollowOnViewportResize,
   shouldTrustFollowBottomContentMeasurements,
   shouldEstimateFollowBottomScrollTop,
   shouldInvalidateItemHeightsOnWidthChange,
@@ -193,6 +197,71 @@ describe('shouldChaseFollowBottomOnContentGrowth', () => {
       previousScrollHeight: 1400,
       scrollEpsilon: 0.5,
       scrollHeight: 1000,
+    })).toBe(false)
+  })
+})
+
+describe('shouldChaseFollowBottomOnSizeChange', () => {
+  it('chases when scrollHeight grew beyond epsilon', () => {
+    expect(shouldChaseFollowBottomOnSizeChange({
+      previousScrollHeight: 1000,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000.6,
+    })).toBe(true)
+  })
+
+  it('chases when scrollHeight shrank beyond epsilon', () => {
+    expect(shouldChaseFollowBottomOnSizeChange({
+      previousScrollHeight: 1400,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000,
+    })).toBe(true)
+  })
+
+  it('skips chase when scrollHeight is unchanged', () => {
+    expect(shouldChaseFollowBottomOnSizeChange({
+      previousScrollHeight: 1000,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000,
+    })).toBe(false)
+  })
+
+  it('skips chase when growth is within epsilon', () => {
+    expect(shouldChaseFollowBottomOnSizeChange({
+      previousScrollHeight: 1000,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000.4,
+    })).toBe(false)
+  })
+
+  it('skips chase when shrink is within epsilon', () => {
+    expect(shouldChaseFollowBottomOnSizeChange({
+      previousScrollHeight: 1000,
+      scrollEpsilon: 0.5,
+      scrollHeight: 999.6,
+    })).toBe(false)
+  })
+})
+
+describe('shouldChaseFollowOnViewportResize', () => {
+  it('chases when off the end and measurements are trusted', () => {
+    expect(shouldChaseFollowOnViewportResize({
+      offEnd: true,
+      trust: true,
+    })).toBe(true)
+  })
+
+  it('skips chase when measurements are not trusted', () => {
+    expect(shouldChaseFollowOnViewportResize({
+      offEnd: true,
+      trust: false,
+    })).toBe(false)
+  })
+
+  it('skips chase when already at the end', () => {
+    expect(shouldChaseFollowOnViewportResize({
+      offEnd: false,
+      trust: true,
     })).toBe(false)
   })
 })
@@ -410,12 +479,12 @@ describe('shouldInvalidateItemHeightsOnWidthChange', () => {
     })).toBe(false)
   })
 
-  it('invalidates when rounded CSS pixel widths differ', () => {
+  it('does not invalidate when rounded CSS pixel widths differ', () => {
     expect(shouldInvalidateItemHeightsOnWidthChange({
       clientHeight: 800,
       clientWidth: 640.6,
       lastClientWidth: 640.4,
-    })).toBe(true)
+    })).toBe(false)
   })
 
   it('does not invalidate when integer CSS pixel width is unchanged', () => {
@@ -426,12 +495,12 @@ describe('shouldInvalidateItemHeightsOnWidthChange', () => {
     })).toBe(false)
   })
 
-  it('invalidates when the viewport width changes after a prior measure', () => {
+  it('does not invalidate when the viewport width changes after a prior measure', () => {
     expect(shouldInvalidateItemHeightsOnWidthChange({
       clientHeight: 800,
       clientWidth: 480,
       lastClientWidth: 640,
-    })).toBe(true)
+    })).toBe(false)
   })
 })
 
@@ -643,6 +712,92 @@ describe('resolveWindowScrollTop', () => {
 
     expect([...inflated]).toEqual(['f'])
     expect([...adjusted]).toEqual(['d', 'e', 'f'])
+  })
+})
+
+describe('resolveFollowWindowScrollTop', () => {
+  it('pins the window to the cached document end', () => {
+    expect(resolveFollowWindowScrollTop({
+      estimatedHeight: 1400,
+      viewportHeight: 400,
+    })).toBe(1000)
+  })
+
+  it('does not drop below zero when the cache is shorter than the viewport', () => {
+    expect(resolveFollowWindowScrollTop({
+      estimatedHeight: 200,
+      viewportHeight: 400,
+    })).toBe(0)
+  })
+
+  it('does not collapse the window when live scrollTop is past the cache', () => {
+    const itemIds = ids('a', 'b', 'c', 'd', 'e', 'f')
+    const heights = new Map(itemIds.map((id) => [id, 100]))
+    const estimatedHeight = estimateItemsHeight({
+      gap: 0,
+      heights,
+      itemIds,
+    })
+    const viewportHeight = 200
+    const liveScrollTop = 2000
+    const collapsed = computeWindowedIds({
+      gap: 0,
+      heights,
+      itemIds,
+      overscanPx: 0,
+      pinnedIds: ['f'],
+      scrollTop: liveScrollTop,
+      viewportHeight,
+    })
+    const followed = computeWindowedIds({
+      gap: 0,
+      heights,
+      itemIds,
+      overscanPx: 0,
+      pinnedIds: ['f'],
+      scrollTop: resolveFollowWindowScrollTop({
+        estimatedHeight,
+        viewportHeight,
+      }),
+      viewportHeight,
+    })
+
+    expect([...collapsed]).toEqual(['f'])
+    expect([...followed]).toEqual(['d', 'e', 'f'])
+  })
+})
+
+describe('clampReadingWindowScrollTop', () => {
+  it('passes through a scrollTop inside the cached document', () => {
+    expect(clampReadingWindowScrollTop({
+      estimatedHeight: 1400,
+      scrollTop: 400,
+      viewportHeight: 400,
+    })).toBe(400)
+  })
+
+  it('clamps a DOM scrollTop past the cache to the cached end', () => {
+    expect(clampReadingWindowScrollTop({
+      estimatedHeight: 800,
+      scrollTop: 2000,
+      viewportHeight: 400,
+    })).toBe(400)
+  })
+
+  it('does not drop below zero', () => {
+    expect(clampReadingWindowScrollTop({
+      estimatedHeight: 800,
+      scrollTop: -20,
+      viewportHeight: 400,
+    })).toBe(0)
+  })
+
+  it('clamps to zero when the cache is shorter than the viewport', () => {
+    expect(clampReadingWindowScrollTop({
+      estimatedHeight: 200,
+      scrollTop: 80,
+      viewportHeight: 400,
+    })).toBe(0)
   })
 })
 
