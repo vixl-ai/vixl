@@ -7,6 +7,9 @@ import {
   estimateItemsHeight,
   FALLBACK_VIEWPORT_HEIGHT,
   itemIdsEqual,
+  resolveViewportHeight,
+  shouldChaseFollowBottomOnResize,
+  shouldEstimateFollowBottomScrollTop,
   windowedIdSetsEqual,
 } from "./compute-windowed-ids"
 
@@ -436,6 +439,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   const itemHeights = new Map<string, number>()
   let windowItemIds: string[] = []
   let pinnedMessageIds: string[] = []
+  let lastPositiveClientHeight = 0
   const scrollableAttr = computed(() => {
     const attr = [scrollable.value.start && "start", scrollable.value.end && "end"]
       .filter(Boolean)
@@ -499,20 +503,22 @@ function createEngine(props: MessageScrollerProviderProps) {
       setWindowed(null)
       return
     }
-    const measuredViewport = viewport && viewport.clientHeight >= 1
-      ? viewport.clientHeight
-      : 0
-    const viewportHeight = measuredViewport > 0
-      ? measuredViewport
-      : (autoScroll() ? FALLBACK_VIEWPORT_HEIGHT : 0)
+    const clientHeight = viewport?.clientHeight ?? 0
+    if (clientHeight >= 1)
+      lastPositiveClientHeight = clientHeight
+    const viewportHeight = resolveViewportHeight({
+      clientHeight,
+      fallbackHeight: autoScroll() ? FALLBACK_VIEWPORT_HEIGHT : 0,
+      lastPositiveClientHeight,
+    })
     if (viewportHeight < 1) {
       setWindowed(null)
       return
     }
     const { gap, padding } = layoutMetrics()
-    const followBottom = mode === "following-bottom" || (!viewport && autoScroll())
+    const followingBottom = mode === "following-bottom" || (!viewport && autoScroll())
     let scrollTop = viewport?.scrollTop ?? 0
-    if (followBottom) {
+    if (shouldEstimateFollowBottomScrollTop({ clientHeight, followingBottom })) {
       const total = estimateItemsHeight({
         gap,
         heights: itemHeights,
@@ -911,7 +917,22 @@ function createEngine(props: MessageScrollerProviderProps) {
 
   function handleResize() {
     if (mode === "following-bottom" && autoScroll()) {
-      scrollToEnd({ behavior: "auto" })
+      // Already-at-bottom and zero-height resizes must not call scrollToEnd:
+      // that retriggers ResizeObserver through autoscroll and remounts.
+      if (
+        viewport
+        && shouldChaseFollowBottomOnResize({
+          clientHeight: viewport.clientHeight,
+          maxScrollTop: maxScrollTop(viewport),
+          scrollEpsilon: SCROLL_EPSILON,
+          scrollTop: viewport.scrollTop,
+        })
+      ) {
+        scrollToEnd({ behavior: "auto" })
+      }
+      else {
+        recomputeWindow()
+      }
       return
     }
     const previousSpacerHeight = spacerHeight
