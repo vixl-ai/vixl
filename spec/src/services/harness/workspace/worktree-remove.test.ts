@@ -3,6 +3,7 @@ import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { FleetProject } from '@/types/fleet/fleet-project'
 import type { ChatMetaRecord } from '@/services/vixl/vixl-tauri/types'
+import type { SubagentRecord } from '@/types/harness/subagent-record'
 
 const gateWorkspaceMovePermission = vi.hoisted(() =>
   vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
@@ -36,6 +37,10 @@ const refreshFleetProjects = vi.hoisted(() =>
   vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 )
 
+const activeSubagentsForWorkspace = vi.hoisted(() =>
+  vi.fn<(slug: string, rootPath?: string) => SubagentRecord[]>().mockReturnValue([]),
+)
+
 vi.mock('@/services/harness/permission', () => ({
   gateWorkspaceMovePermission,
 }))
@@ -52,6 +57,10 @@ vi.mock('@/composables/use-fleet-registry', () => ({
   getFleetProjects,
   ensureFleetLoaded,
   refreshFleetProjects,
+}))
+
+vi.mock('@/services/harness/subagent/active-for-workspace', () => ({
+  activeSubagentsForWorkspace,
 }))
 
 import worktreeRemove from '@/services/harness/workspace/worktree-remove'
@@ -135,6 +144,7 @@ describe('worktree_remove tool', () => {
     getFleetProjects.mockReturnValue([parentProject, worktreeProject])
     listChats.mockResolvedValue([idleChat('feature')])
     gitStatus.mockResolvedValue({ branch: 'vixl/feature', entries: [] })
+    activeSubagentsForWorkspace.mockReturnValue([])
   })
 
   it('refuses on a subagent without prompting', async () => {
@@ -170,6 +180,36 @@ describe('worktree_remove tool', () => {
 
     expect(result).toEqual({
       error: 'Cannot remove worktree while 1 chat(s) are running on feature',
+    })
+    expect(gateWorkspaceMovePermission).not.toHaveBeenCalled()
+    expect(gitWorktreeRemove).not.toHaveBeenCalled()
+    expect(registryRemoveProject).not.toHaveBeenCalled()
+  })
+
+  it('refuses when an active implementer targets the worktree', async () => {
+    activeSubagentsForWorkspace.mockReturnValue([
+      {
+        subagentId: 'sub-1',
+        chatId: 'chat-parent',
+        toolCallId: 'tc-1',
+        agentName: 'implementer',
+        status: 'running',
+        startedAt: '2026-01-01T00:00:00.000Z',
+        workspace: {
+          projectRoot: '/tmp/worktrees/demo/feature',
+          projectSlug: 'feature',
+        },
+      },
+    ])
+    const result = await execute({ rootPath: '/tmp/worktrees/demo/feature' })
+
+    expect(activeSubagentsForWorkspace).toHaveBeenCalledWith(
+      'feature',
+      '/tmp/worktrees/demo/feature',
+    )
+    expect(result).toEqual({
+      error:
+        'Cannot remove worktree while 1 active implementer(s) are running on feature',
     })
     expect(gateWorkspaceMovePermission).not.toHaveBeenCalled()
     expect(gitWorktreeRemove).not.toHaveBeenCalled()

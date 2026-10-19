@@ -222,7 +222,8 @@ const handleConfirmRemove = async (): Promise<void> => {
         <AlertDialogDescription>
           Branch: {{ preview?.branch ?? branchLabel }}. Dirty:
           {{ preview?.dirtyLabel ?? 'unknown' }}. Chats:
-          {{ preview?.chatCount ?? 0 }}.
+          {{ preview?.chatCount ?? 0 }}. Active implementers:
+          {{ preview?.activeSubagentCount ?? 0 }}.
         </AlertDialogDescription>
       </AlertDialogHeader>
       <div class="flex items-center gap-2">

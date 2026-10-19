@@ -7,6 +7,7 @@ import {
 } from '@/composables/use-fleet-registry'
 import { gateWorkspaceMovePermission } from '@/services/harness/permission'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
+import { activeSubagentsForWorkspace } from '@/services/harness/subagent/active-for-workspace'
 import {
   gitStatus,
   gitWorktreeRemove,
@@ -71,6 +72,13 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
       if (runningCount > 0) {
         return {
           error: `Cannot remove worktree while ${runningCount} chat(s) are running on ${project.slug}`,
+        }
+      }
+
+      const activeImplementers = activeSubagentsForWorkspace(project.slug, targetPath)
+      if (activeImplementers.length > 0) {
+        return {
+          error: `Cannot remove worktree while ${activeImplementers.length} active implementer(s) are running on ${project.slug}`,
         }
       }
 

@@ -1,4 +1,5 @@
 import { refreshFleetProjects } from '@/composables/use-fleet-registry'
+import { activeSubagentsForWorkspace } from '@/services/harness/subagent/active-for-workspace'
 import {
   gitStatus,
   gitWorktreeRemove,
@@ -13,6 +14,7 @@ export type WorktreeRemovePreview = {
   dirtyLabel: 'yes' | 'no' | 'unknown'
   chatCount: number
   runningCount: number
+  activeSubagentCount: number
 }
 
 export type ConfirmRemoveWorktreeResult =
@@ -26,6 +28,10 @@ export const loadWorktreeRemovePreview = async (args: {
 }): Promise<WorktreeRemovePreview> => {
   const chats = await listChats(args.slug)
   const runningCount = chats.filter((chat) => chat.status === 'running').length
+  const activeSubagentCount = activeSubagentsForWorkspace(
+    args.slug,
+    args.rootPath,
+  ).length
   let dirty = false
   let dirtyLabel: WorktreeRemovePreview['dirtyLabel'] = 'unknown'
   try {
@@ -43,6 +49,7 @@ export const loadWorktreeRemovePreview = async (args: {
     dirtyLabel,
     chatCount: chats.length,
     runningCount,
+    activeSubagentCount,
   }
 }
 
@@ -60,6 +67,18 @@ export const confirmRemoveWorktree = async (args: {
       ok: false,
       reason: 'running',
       message: `Cannot remove worktree while ${runningCount} chat(s) are running on ${args.slug}`,
+    }
+  }
+
+  const activeImplementers = activeSubagentsForWorkspace(
+    args.slug,
+    args.worktreeRoot,
+  )
+  if (activeImplementers.length > 0) {
+    return {
+      ok: false,
+      reason: 'running',
+      message: `Cannot remove worktree while ${activeImplementers.length} active implementer(s) are running on ${args.slug}`,
     }
   }
 

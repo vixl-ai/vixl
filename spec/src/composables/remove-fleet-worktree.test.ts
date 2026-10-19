@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatMetaRecord } from '@/services/vixl/vixl-tauri/types'
+import type { SubagentRecord } from '@/types/harness/subagent-record'
 import { mockVixlTauri } from '../test-utils/mocks/vixl-tauri'
 
 const gitWorktreeRemove = vi.hoisted(() =>
@@ -22,6 +23,10 @@ const refreshFleetProjects = vi.hoisted(() =>
   vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 )
 
+const activeSubagentsForWorkspace = vi.hoisted(() =>
+  vi.fn<(slug: string, rootPath?: string) => SubagentRecord[]>().mockReturnValue([]),
+)
+
 vi.mock('@/services/vixl/vixl-tauri', () =>
   mockVixlTauri({
     gitWorktreeRemove,
@@ -33,6 +38,10 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
 
 vi.mock('@/composables/use-fleet-registry', () => ({
   refreshFleetProjects,
+}))
+
+vi.mock('@/services/harness/subagent/active-for-workspace', () => ({
+  activeSubagentsForWorkspace,
 }))
 
 import {
@@ -69,6 +78,7 @@ describe('remove-fleet-worktree', () => {
     refreshFleetProjects.mockResolvedValue(undefined)
     listChats.mockResolvedValue([idleChat('feature')])
     gitStatus.mockResolvedValue({ branch: 'vixl/feature', entries: [] })
+    activeSubagentsForWorkspace.mockReturnValue([])
   })
 
   it('loads branch, dirty state, and chat count for the confirm dialog', async () => {
@@ -90,7 +100,52 @@ describe('remove-fleet-worktree', () => {
       dirtyLabel: 'yes',
       chatCount: 2,
       runningCount: 0,
+      activeSubagentCount: 0,
     })
+  })
+
+  it('includes the active implementer count in the confirm dialog preview', async () => {
+    activeSubagentsForWorkspace.mockReturnValue([
+      {
+        subagentId: 'sub-1',
+        chatId: 'chat-parent',
+        toolCallId: 'tc-1',
+        agentName: 'implementer',
+        status: 'running',
+        startedAt: '2026-01-01T00:00:00.000Z',
+        workspace: {
+          projectRoot: '/tmp/worktrees/demo/feature',
+          projectSlug: 'feature',
+        },
+      },
+      {
+        subagentId: 'sub-2',
+        chatId: 'chat-parent',
+        toolCallId: 'tc-2',
+        agentName: 'implementer',
+        status: 'running',
+        startedAt: '2026-01-01T00:00:00.000Z',
+        workspace: {
+          projectRoot: '/tmp/worktrees/demo/feature',
+          projectSlug: 'feature',
+        },
+      },
+    ])
+
+    await expect(
+      loadWorktreeRemovePreview({
+        slug: 'feature',
+        rootPath: '/tmp/worktrees/demo/feature',
+        branch: 'vixl/feature',
+      }),
+    ).resolves.toMatchObject({
+      activeSubagentCount: 2,
+      runningCount: 0,
+    })
+    expect(activeSubagentsForWorkspace).toHaveBeenCalledWith(
+      'feature',
+      '/tmp/worktrees/demo/feature',
+    )
   })
 
   it('refuses to remove when a chat on the slug is running', async () => {
@@ -109,6 +164,44 @@ describe('remove-fleet-worktree', () => {
       reason: 'running',
       message: 'Cannot remove worktree while 1 chat(s) are running on feature',
     })
+    expect(gitWorktreeRemove).not.toHaveBeenCalled()
+    expect(registryRemoveProject).not.toHaveBeenCalled()
+  })
+
+  it('refuses to remove when an active implementer targets the worktree', async () => {
+    activeSubagentsForWorkspace.mockReturnValue([
+      {
+        subagentId: 'sub-1',
+        chatId: 'chat-parent',
+        toolCallId: 'tc-1',
+        agentName: 'implementer',
+        status: 'running',
+        startedAt: '2026-01-01T00:00:00.000Z',
+        workspace: {
+          projectRoot: '/tmp/worktrees/demo/feature',
+          projectSlug: 'feature',
+        },
+      },
+    ])
+
+    const result = await confirmRemoveWorktree({
+      projectId: 'proj-wt',
+      slug: 'feature',
+      parentRoot: '/tmp/demo',
+      worktreeRoot: '/tmp/worktrees/demo/feature',
+      force: false,
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'running',
+      message:
+        'Cannot remove worktree while 1 active implementer(s) are running on feature',
+    })
+    expect(activeSubagentsForWorkspace).toHaveBeenCalledWith(
+      'feature',
+      '/tmp/worktrees/demo/feature',
+    )
     expect(gitWorktreeRemove).not.toHaveBeenCalled()
     expect(registryRemoveProject).not.toHaveBeenCalled()
   })
