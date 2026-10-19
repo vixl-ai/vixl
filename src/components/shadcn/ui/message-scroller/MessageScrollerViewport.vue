@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<{
 
 const {
   autoscrolling,
-  handleResize,
+  handleViewportResize,
   scrollableAttr,
   setPreserveScrollOnPrepend,
   setViewportElement,
@@ -40,7 +40,7 @@ onMounted(() => {
     return
   resizeObserver = new ResizeObserver(() => {
     window.cancelAnimationFrame(resizeFrame)
-    resizeFrame = window.requestAnimationFrame(handleResize)
+    resizeFrame = window.requestAnimationFrame(handleViewportResize)
   })
   resizeObserver.observe(viewport)
 })

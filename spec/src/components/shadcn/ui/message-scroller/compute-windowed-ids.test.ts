@@ -7,8 +7,10 @@ import {
   resolveViewportHeight,
   resolveWindowScrollTop,
   shouldAnchorOnContentChange,
+  shouldChaseFollowBottomForResizeSource,
   shouldChaseFollowBottomOnResize,
   shouldEstimateFollowBottomScrollTop,
+  shouldInvalidateItemHeightsOnWidthChange,
   shouldExitFollowBottom,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
@@ -153,6 +155,90 @@ describe('shouldChaseFollowBottomOnResize', () => {
       maxScrollTop: 400,
       scrollEpsilon: 0.5,
       scrollTop: 399.4,
+    })).toBe(true)
+  })
+})
+
+describe('shouldChaseFollowBottomForResizeSource', () => {
+  it('allows chase for viewport resize', () => {
+    expect(shouldChaseFollowBottomForResizeSource({ source: 'viewport' })).toBe(true)
+  })
+
+  it('blocks chase for content resize (the stale-height loop pump)', () => {
+    expect(shouldChaseFollowBottomForResizeSource({ source: 'content' })).toBe(false)
+  })
+})
+
+describe('shouldInvalidateItemHeightsOnWidthChange', () => {
+  it('skips the first positive width observation', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 640,
+      lastClientWidth: 0,
+    })).toBe(false)
+  })
+
+  it('skips a sub-1 lastClientWidth as an unmeasured first sample', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 640,
+      lastClientWidth: 0.4,
+    })).toBe(false)
+  })
+
+  it('skips when clientWidth is below 1', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 0,
+      lastClientWidth: 720,
+    })).toBe(false)
+  })
+
+  it('skips when the viewport has no usable height (estimate path)', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 0,
+      clientWidth: 640,
+      lastClientWidth: 720,
+    })).toBe(false)
+  })
+
+  it('skips when clientHeight is positive but still below 1', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 0.4,
+      clientWidth: 640,
+      lastClientWidth: 720,
+    })).toBe(false)
+  })
+
+  it('skips subpixel jitter at the same CSS pixel width', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 640.4,
+      lastClientWidth: 640.1,
+    })).toBe(false)
+  })
+
+  it('invalidates when rounded CSS pixel widths differ', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 640.6,
+      lastClientWidth: 640.4,
+    })).toBe(true)
+  })
+
+  it('does not invalidate when integer CSS pixel width is unchanged', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 640,
+      lastClientWidth: 640,
+    })).toBe(false)
+  })
+
+  it('invalidates when the viewport width changes after a prior measure', () => {
+    expect(shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight: 800,
+      clientWidth: 480,
+      lastClientWidth: 640,
     })).toBe(true)
   })
 })

@@ -10,8 +10,10 @@ import {
   resolveViewportHeight,
   resolveWindowScrollTop,
   shouldAnchorOnContentChange,
+  shouldChaseFollowBottomForResizeSource,
   shouldChaseFollowBottomOnResize,
   shouldEstimateFollowBottomScrollTop,
+  shouldInvalidateItemHeightsOnWidthChange,
   shouldExitFollowBottom,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
@@ -371,7 +373,9 @@ export interface MessageScrollerContext {
   acquireVisibility: () => void
   releaseVisibility: () => void
   handleContentChange: () => void
+  handleContentResize: () => void
   handleResize: () => void
+  handleViewportResize: () => void
   isFollowingLive: () => boolean
   scrollToEnd: (options?: { behavior?: ScrollBehavior }) => boolean
   scrollToMessage: (messageId: string, options?: MessageScrollerScrollOptions) => boolean
@@ -437,6 +441,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   let windowItemIds: string[] = []
   let pinnedMessageIds: string[] = []
   let lastPositiveClientHeight = 0
+  let lastClientWidth = 0
   const scrollableAttr = computed(() => {
     const attr = [scrollable.value.start && "start", scrollable.value.end && "end"]
       .filter(Boolean)
@@ -950,12 +955,30 @@ function createEngine(props: MessageScrollerProviderProps) {
     recomputeWindow()
   }
 
-  function handleResize() {
+  function syncItemHeightsToViewportWidth() {
+    const clientHeight = viewport?.clientHeight ?? 0
+    const clientWidth = viewport?.clientWidth ?? 0
+    if (shouldInvalidateItemHeightsOnWidthChange({
+      clientHeight,
+      clientWidth,
+      lastClientWidth,
+    })) {
+      itemHeights.clear()
+    }
+    if (clientWidth >= 1)
+      lastClientWidth = clientWidth
+  }
+
+  function applyResize(source: "content" | "viewport") {
+    syncItemHeightsToViewportWidth()
     if (mode === "following-bottom" && autoScroll()) {
       // Already-at-bottom and zero-height resizes must not call scrollToEnd:
       // that retriggers ResizeObserver through autoscroll and remounts.
+      // Content resize at rest is the stale-height loop pump; chase only
+      // when the viewport itself changed. Streaming growth uses followLiveOutput.
       if (
         viewport
+        && shouldChaseFollowBottomForResizeSource({ source })
         && shouldChaseFollowBottomOnResize({
           clientHeight: viewport.clientHeight,
           maxScrollTop: maxScrollTop(viewport),
@@ -986,6 +1009,18 @@ function createEngine(props: MessageScrollerProviderProps) {
     scheduleStateCommit()
     scheduleVisibilitySync()
     recomputeWindow()
+  }
+
+  function handleViewportResize() {
+    applyResize("viewport")
+  }
+
+  function handleContentResize() {
+    applyResize("content")
+  }
+
+  function handleResize() {
+    applyResize("viewport")
   }
 
   // --- visibility observation ------------------------------------------------
@@ -1146,7 +1181,9 @@ function createEngine(props: MessageScrollerProviderProps) {
     acquireVisibility,
     releaseVisibility,
     handleContentChange,
+    handleContentResize,
     handleResize,
+    handleViewportResize,
     isFollowingLive,
     scrollToEnd,
     scrollToMessage,

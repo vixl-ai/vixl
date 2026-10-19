@@ -34,6 +34,28 @@ export function shouldChaseFollowBottomOnResize({
   return Math.abs(maxScrollTop - scrollTop) > scrollEpsilon
 }
 
+export function shouldChaseFollowBottomForResizeSource({
+  source,
+}: {
+  source: "content" | "viewport"
+}): boolean {
+  return source === "viewport"
+}
+
+export function shouldInvalidateItemHeightsOnWidthChange({
+  clientHeight,
+  clientWidth,
+  lastClientWidth,
+}: {
+  clientHeight: number
+  clientWidth: number
+  lastClientWidth: number
+}): boolean {
+  if (clientWidth < 1 || clientHeight < 1 || lastClientWidth < 1)
+    return false
+  return Math.round(clientWidth) !== Math.round(lastClientWidth)
+}
+
 export function shouldEstimateFollowBottomScrollTop({
   clientHeight,
   followingBottom,
