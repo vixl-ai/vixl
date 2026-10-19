@@ -505,15 +505,15 @@ function createEngine(props: MessageScrollerProviderProps) {
     return itemHeights.get(messageId) ?? DEFAULT_ITEM_HEIGHT
   }
 
-  function setWindowed(next: Set<string> | null) {
-    if (windowedIdSetsEqual(windowedMessageIds.value, next))
+  function setWindowed(next: Set<string> | null, forceIdentity = false) {
+    if (!forceIdentity && windowedIdSetsEqual(windowedMessageIds.value, next))
       return
     windowedMessageIds.value = next
   }
 
-  function recomputeWindow() {
+  function recomputeWindow(forceIdentity = false) {
     if (windowItemIds.length === 0) {
-      setWindowed(null)
+      setWindowed(null, forceIdentity)
       return
     }
     const clientHeight = viewport?.clientHeight ?? 0
@@ -525,7 +525,7 @@ function createEngine(props: MessageScrollerProviderProps) {
       lastPositiveClientHeight,
     })
     if (viewportHeight < 1) {
-      setWindowed(null)
+      setWindowed(null, forceIdentity)
       return
     }
     const { gap, padding } = layoutMetrics()
@@ -559,7 +559,7 @@ function createEngine(props: MessageScrollerProviderProps) {
       pinnedIds: pinnedMessageIds,
       scrollTop,
       viewportHeight,
-    }))
+    }), forceIdentity)
   }
 
   function setItemIds(ids: string[]) {
@@ -970,6 +970,9 @@ function createEngine(props: MessageScrollerProviderProps) {
       lastClientWidth,
     })) {
       itemHeights.clear()
+      // Force a new windowed set identity so placeholders re-render at
+      // DEFAULT_ITEM_HEIGHT and estimates match the DOM after the clear.
+      recomputeWindow(true)
     }
     if (shouldSampleClientWidthBaseline({ clientHeight, clientWidth }))
       lastClientWidth = clientWidth
@@ -1014,6 +1017,11 @@ function createEngine(props: MessageScrollerProviderProps) {
           windowItemIds: windowedIds,
         })
       }
+      let measuredCount = 0
+      for (const id of windowItemIds) {
+        if (itemHeights.has(id))
+          measuredCount += 1
+      }
       if (
         viewport
         && shouldChaseFollowBottomOnResize({
@@ -1029,6 +1037,7 @@ function createEngine(props: MessageScrollerProviderProps) {
             && shouldTrustFollowBottomContentMeasurements({
               estimatedHeight,
               extraChildrenHeight,
+              measuredCount,
               scrollEpsilon: SCROLL_EPSILON,
               scrollHeight: observedHeight,
             })
