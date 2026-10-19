@@ -29,7 +29,7 @@ A blocking spawn waits until that worker finishes, then returns its summary. A b
 
 For parallel todos, prefer background. The plan-orchestrate handoff does that: one background worker per todo.
 
-`agentName` is a catalog custom-agent name, or any other label (a short verb phrase) for a generic helper. `prompt` is the task. `capabilities` is `read-only` (default) or `write`.
+`agentName` is a catalog custom-agent name, or any other label (a short verb phrase) for a generic helper. `prompt` is the task. `capabilities` is `read-only` (default) or `write`. `workspaceSlug` is optional: a [worktree](/using/worktrees) child of this project, or a member of the current group, so that worker runs in that checkout.
 
 ## What a sub-agent can do
 
