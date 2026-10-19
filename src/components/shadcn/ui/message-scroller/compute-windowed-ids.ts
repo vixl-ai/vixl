@@ -46,16 +46,45 @@ export function shouldChaseFollowBottomOnContentGrowth({
   return scrollHeight - previousScrollHeight > scrollEpsilon
 }
 
+export function extraNonWindowedChildrenHeight({
+  children,
+  gap = 0,
+  windowItemIds,
+}: {
+  children: readonly { height: number, messageId?: string }[]
+  gap?: number
+  windowItemIds: ReadonlySet<string>
+}): number {
+  let extraCount = 0
+  let extraHeight = 0
+  let windowedCount = 0
+  for (const child of children) {
+    const id = child.messageId
+    if (id && windowItemIds.has(id)) {
+      windowedCount += 1
+      continue
+    }
+    extraCount += 1
+    extraHeight += child.height
+  }
+  if (extraCount === 0)
+    return 0
+  const extraGaps = windowedCount > 0 ? extraCount : extraCount - 1
+  return extraHeight + extraGaps * gap
+}
+
 export function shouldTrustFollowBottomContentMeasurements({
   estimatedHeight,
+  extraChildrenHeight = 0,
   scrollEpsilon,
   scrollHeight,
 }: {
   estimatedHeight: number
+  extraChildrenHeight?: number
   scrollEpsilon: number
   scrollHeight: number
 }): boolean {
-  return Math.abs(scrollHeight - estimatedHeight) <= scrollEpsilon
+  return Math.abs(scrollHeight - (estimatedHeight + extraChildrenHeight)) <= scrollEpsilon
 }
 
 export function shouldInvalidateItemHeightsOnWidthChange({

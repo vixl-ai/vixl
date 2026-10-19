@@ -5,6 +5,7 @@ import {
   DEFAULT_ITEM_HEIGHT,
   DEFAULT_OVERSCAN_PX,
   estimateItemsHeight,
+  extraNonWindowedChildrenHeight,
   FALLBACK_VIEWPORT_HEIGHT,
   itemIdsEqual,
   resolveViewportHeight,
@@ -996,6 +997,23 @@ function createEngine(props: MessageScrollerProviderProps) {
         paddingStart: padding.start,
       }) + spacerHeight
       const observedHeight = content?.scrollHeight ?? scrollHeight
+      const contentGrew = source === "content" && shouldChaseFollowBottomOnContentGrowth({
+        previousScrollHeight,
+        scrollEpsilon: SCROLL_EPSILON,
+        scrollHeight,
+      })
+      let extraChildrenHeight = 0
+      if (contentGrew && content) {
+        const windowedIds = new Set(windowItemIds)
+        extraChildrenHeight = extraNonWindowedChildrenHeight({
+          children: getMessageChildren(content, spacer).map((child) => ({
+            height: child.getBoundingClientRect().height,
+            messageId: child.dataset.messageId,
+          })),
+          gap,
+          windowItemIds: windowedIds,
+        })
+      }
       if (
         viewport
         && shouldChaseFollowBottomOnResize({
@@ -1007,13 +1025,10 @@ function createEngine(props: MessageScrollerProviderProps) {
         && (
           source === "viewport"
           || (
-            shouldChaseFollowBottomOnContentGrowth({
-              previousScrollHeight,
-              scrollEpsilon: SCROLL_EPSILON,
-              scrollHeight,
-            })
+            contentGrew
             && shouldTrustFollowBottomContentMeasurements({
               estimatedHeight,
+              extraChildrenHeight,
               scrollEpsilon: SCROLL_EPSILON,
               scrollHeight: observedHeight,
             })

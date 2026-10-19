@@ -3,6 +3,7 @@ import {
   computeWindowedIds,
   DEFAULT_ITEM_HEIGHT,
   estimateItemsHeight,
+  extraNonWindowedChildrenHeight,
   FALLBACK_VIEWPORT_HEIGHT,
   resolveViewportHeight,
   resolveWindowScrollTop,
@@ -195,6 +196,65 @@ describe('shouldChaseFollowBottomOnContentGrowth', () => {
   })
 })
 
+describe('extraNonWindowedChildrenHeight', () => {
+  it('adds extra child height plus one row gap when windowed items exist', () => {
+    expect(extraNonWindowedChildrenHeight({
+      children: [
+        { height: 180, messageId: '0' },
+        { height: 96 },
+      ],
+      gap: 24,
+      windowItemIds: new Set(['0']),
+    })).toBe(120)
+  })
+
+  it('adds a gap between two extra children after windowed items', () => {
+    expect(extraNonWindowedChildrenHeight({
+      children: [
+        { height: 180, messageId: '0' },
+        { height: 96 },
+        { height: 48 },
+      ],
+      gap: 24,
+      windowItemIds: new Set(['0']),
+    })).toBe(192)
+  })
+
+  it('uses extraCount minus one gaps when no windowed items are present', () => {
+    expect(extraNonWindowedChildrenHeight({
+      children: [
+        { height: 96 },
+        { height: 48 },
+      ],
+      gap: 24,
+      windowItemIds: new Set(),
+    })).toBe(168)
+  })
+
+  it('ignores live-activity when it is in windowItemIds', () => {
+    expect(extraNonWindowedChildrenHeight({
+      children: [
+        { height: 180, messageId: '0' },
+        { height: 20, messageId: 'live-activity' },
+        { height: 96 },
+      ],
+      gap: 24,
+      windowItemIds: new Set(['0', 'live-activity']),
+    })).toBe(120)
+  })
+
+  it('returns 0 when every child is windowed', () => {
+    expect(extraNonWindowedChildrenHeight({
+      children: [
+        { height: 180, messageId: '0' },
+        { height: 20, messageId: 'live-activity' },
+      ],
+      gap: 24,
+      windowItemIds: new Set(['0', 'live-activity']),
+    })).toBe(0)
+  })
+})
+
 describe('shouldTrustFollowBottomContentMeasurements', () => {
   it('trusts when estimated height matches the DOM within epsilon', () => {
     expect(shouldTrustFollowBottomContentMeasurements({
@@ -210,6 +270,35 @@ describe('shouldTrustFollowBottomContentMeasurements', () => {
       scrollEpsilon: 0.5,
       scrollHeight: 3200,
     })).toBe(false)
+  })
+
+  it('trusts when extra non-windowed children are counted on the estimate', () => {
+    const estimatedHeight = estimateItemsHeight({
+      gap: 24,
+      heights: new Map([['0', 180]]),
+      itemIds: ['0'],
+    })
+    const extraChildrenHeight = extraNonWindowedChildrenHeight({
+      children: [
+        { height: 180, messageId: '0' },
+        { height: 96 },
+      ],
+      gap: 24,
+      windowItemIds: new Set(['0']),
+    })
+    const scrollHeight = estimatedHeight + extraChildrenHeight
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight,
+      extraChildrenHeight: 0,
+      scrollEpsilon: 0.5,
+      scrollHeight,
+    })).toBe(false)
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight,
+      extraChildrenHeight,
+      scrollEpsilon: 0.5,
+      scrollHeight,
+    })).toBe(true)
   })
 })
 

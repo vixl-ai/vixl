@@ -4,6 +4,7 @@ import {
   DEFAULT_ITEM_HEIGHT,
   DEFAULT_OVERSCAN_PX,
   estimateItemsHeight,
+  extraNonWindowedChildrenHeight,
   shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
   shouldTrustFollowBottomContentMeasurements,
@@ -36,6 +37,7 @@ type ChasePolicy = 'all-content' | 'content-growth' | 'viewport-only'
 interface SimulatorOptions {
   applyGuardsFromFrame?: number
   chasePolicy?: ChasePolicy
+  extraChildHeight?: number
   frames: number
   gap: number
   itemCount: number
@@ -104,6 +106,7 @@ function syncItemHeightsToViewportWidth({
 function simulateFollowBottomWidthChange({
   applyGuardsFromFrame,
   chasePolicy = 'all-content',
+  extraChildHeight = 0,
   frames,
   gap,
   itemCount,
@@ -169,15 +172,27 @@ function simulateFollowBottomWidthChange({
       shouldClearHeightsOnWidth = false
     }
 
+    const windowItemIdSet = new Set(itemIds)
+    const children: Array<{ height: number, messageId?: string }> = []
     let Hdom = 0
     for (let index = 0; index < itemCount; index += 1) {
       const id = itemIds[index]
       if (!id)
         continue
-      Hdom += mounted.has(id) ? liveTrueHeight : (heights.get(id) ?? DEFAULT_ITEM_HEIGHT)
+      const height = mounted.has(id) ? liveTrueHeight : (heights.get(id) ?? DEFAULT_ITEM_HEIGHT)
+      children.push({ height, messageId: id })
+      Hdom += height
       if (index < itemCount - 1)
         Hdom += gap
     }
+    if (extraChildHeight > 0)
+      children.push({ height: extraChildHeight })
+    const extraChildrenHeight = extraNonWindowedChildrenHeight({
+      children,
+      gap,
+      windowItemIds: windowItemIdSet,
+    })
+    Hdom += extraChildrenHeight
 
     const maxScrollTop = Math.max(0, Hdom - viewportHeight)
     const beforeClamp = scrollTop
@@ -192,6 +207,7 @@ function simulateFollowBottomWidthChange({
     })
     const trusted = shouldTrustFollowBottomContentMeasurements({
       estimatedHeight: estimated(),
+      extraChildrenHeight,
       scrollEpsilon: SCROLL_EPSILON,
       scrollHeight: Hdom,
     })
@@ -264,9 +280,15 @@ function simulateFollowBottomWidthChange({
 }
 
 function simulatePinnedContentHeightChanges({
+  countExtraInTrust = true,
+  extraChildHeight = 0,
+  gap = 0,
   heightsSequence,
   viewportHeight,
 }: {
+  countExtraInTrust?: boolean
+  extraChildHeight?: number
+  gap?: number
   heightsSequence: readonly number[]
   viewportHeight: number
 }) {
@@ -274,8 +296,17 @@ function simulatePinnedContentHeightChanges({
   if (firstHeight === undefined)
     return []
 
-  let scrollTop = Math.max(0, firstHeight - viewportHeight)
-  let previousScrollHeight = firstHeight
+  const extraChildrenHeight = extraNonWindowedChildrenHeight({
+    children: extraChildHeight > 0
+      ? [{ height: firstHeight, messageId: '0' }, { height: extraChildHeight }]
+      : [{ height: firstHeight, messageId: '0' }],
+    gap,
+    windowItemIds: new Set(['0']),
+  })
+  const observed = (itemHeight: number) => itemHeight + extraChildrenHeight
+
+  let scrollTop = Math.max(0, observed(firstHeight) - viewportHeight)
+  let previousScrollHeight = observed(firstHeight)
   const framesOut: Array<{
     chase: boolean
     distanceFromEnd: number
@@ -284,9 +315,10 @@ function simulatePinnedContentHeightChanges({
   }> = []
 
   for (let index = 1; index < heightsSequence.length; index += 1) {
-    const Hdom = heightsSequence[index]
-    if (Hdom === undefined)
+    const itemHeight = heightsSequence[index]
+    if (itemHeight === undefined)
       continue
+    const Hdom = observed(itemHeight)
     const maxScrollTop = Math.max(0, Hdom - viewportHeight)
     if (scrollTop > maxScrollTop)
       scrollTop = maxScrollTop
@@ -295,7 +327,13 @@ function simulatePinnedContentHeightChanges({
       scrollEpsilon: SCROLL_EPSILON,
       scrollHeight: Hdom,
     })
-    const chase = grew && shouldChaseFollowBottomOnResize({
+    const trusted = shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight: itemHeight,
+      extraChildrenHeight: countExtraInTrust ? extraChildrenHeight : 0,
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollHeight: Hdom,
+    })
+    const chase = grew && trusted && shouldChaseFollowBottomOnResize({
       clientHeight: viewportHeight,
       maxScrollTop,
       scrollEpsilon: SCROLL_EPSILON,
@@ -580,6 +618,72 @@ describe('stale-height follow-bottom resize loop', () => {
       expect(lateGrowth?.chase).toBe(true)
       expectConverged(framesOut)
       expect(framesOut.at(-1)?.distanceFromEnd).toBe(0)
+    })
+
+    it('does not ignite a 2-cycle when a non-windowed question card is present', () => {
+      const extraChildHeight = 120
+      const framesOut = simulateFollowBottomWidthChange({
+        extraChildHeight,
+        frames: 8,
+        reportPolicy: 'raceUnmount',
+        ...applyFixedGuards(),
+        ...scenario20,
+      })
+
+      expect(isTwoCycle(framesOut)).toBe(false)
+      expectConverged(framesOut)
+      expect(framesOut.at(-1)?.Hdom).toBe(3776 + extraChildHeight + scenario20.gap)
+    })
+
+    it('chases pinned growth with a non-windowed question card counted in trust', () => {
+      const extraChildHeight = 120
+      const gap = 24
+      const extraChildrenHeight = extraChildHeight + gap
+      const framesOut = simulatePinnedContentHeightChanges({
+        extraChildHeight,
+        gap,
+        heightsSequence: [1000, 1400],
+        viewportHeight: 400,
+      })
+
+      expect(framesOut).toEqual([{
+        chase: true,
+        distanceFromEnd: 0,
+        Hdom: 1400 + extraChildrenHeight,
+        scrollTop: 1000 + extraChildrenHeight,
+      }])
+
+      const withoutExtraInTrust = simulatePinnedContentHeightChanges({
+        countExtraInTrust: false,
+        extraChildHeight,
+        gap,
+        heightsSequence: [1000, 1400],
+        viewportHeight: 400,
+      })
+      expect(withoutExtraInTrust).toEqual([{
+        chase: false,
+        distanceFromEnd: 400,
+        Hdom: 1400 + extraChildrenHeight,
+        scrollTop: 600 + extraChildrenHeight,
+      }])
+    })
+
+    it('does not re-ignite after narrowing plus late growth with a question card present', () => {
+      const framesOut = simulateFollowBottomWidthChange({
+        extraChildHeight: 120,
+        frames: 16,
+        lateTrueHeight: 280,
+        lateTrueHeightFromFrame: 8,
+        reportPolicy: 'raceUnmount',
+        ...applyFixedGuards(),
+        ...scenario20,
+      })
+
+      expect(isTwoCycle(framesOut)).toBe(false)
+      const lateGrowth = framesOut[8]
+      expect(lateGrowth?.source).toBe('content')
+      expect(lateGrowth?.chase).toBe(true)
+      expect(isTwoCycle(framesOut.slice(8))).toBe(false)
     })
   })
 })
