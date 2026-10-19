@@ -3,6 +3,10 @@ import {
   computeWindowedIds,
   DEFAULT_ITEM_HEIGHT,
   estimateItemsHeight,
+  FALLBACK_VIEWPORT_HEIGHT,
+  resolveViewportHeight,
+  shouldChaseFollowBottomOnResize,
+  shouldEstimateFollowBottomScrollTop,
 } from '@/components/shadcn/ui/message-scroller/compute-windowed-ids'
 
 const ids = (...values: string[]): string[] => values
@@ -86,6 +90,88 @@ describe('computeWindowedIds', () => {
     })
 
     expect([...mounted]).toEqual(['a'])
+  })
+})
+
+describe('resolveViewportHeight', () => {
+  it('uses the live clientHeight when it is at least 1', () => {
+    expect(resolveViewportHeight({
+      clientHeight: 640,
+      lastPositiveClientHeight: 800,
+    })).toBe(640)
+  })
+
+  it('reuses the last positive height when the viewport measures 0', () => {
+    expect(resolveViewportHeight({
+      clientHeight: 0,
+      lastPositiveClientHeight: 720,
+    })).toBe(720)
+  })
+
+  it('uses FALLBACK_VIEWPORT_HEIGHT before any positive measurement', () => {
+    expect(resolveViewportHeight({
+      clientHeight: 0,
+    })).toBe(FALLBACK_VIEWPORT_HEIGHT)
+  })
+
+  it('accepts a custom fallback for the pre-measure case', () => {
+    expect(resolveViewportHeight({
+      clientHeight: 0.4,
+      fallbackHeight: 0,
+      lastPositiveClientHeight: 0,
+    })).toBe(0)
+  })
+})
+
+describe('shouldChaseFollowBottomOnResize', () => {
+  it('skips chase when clientHeight is below 1', () => {
+    expect(shouldChaseFollowBottomOnResize({
+      clientHeight: 0,
+      maxScrollTop: 400,
+      scrollEpsilon: 0.5,
+      scrollTop: 0,
+    })).toBe(false)
+  })
+
+  it('skips chase when already within epsilon of maxScrollTop', () => {
+    expect(shouldChaseFollowBottomOnResize({
+      clientHeight: 800,
+      maxScrollTop: 400,
+      scrollEpsilon: 0.5,
+      scrollTop: 400.4,
+    })).toBe(false)
+  })
+
+  it('chases when the viewport has height and is not at the bottom', () => {
+    expect(shouldChaseFollowBottomOnResize({
+      clientHeight: 800,
+      maxScrollTop: 400,
+      scrollEpsilon: 0.5,
+      scrollTop: 399.4,
+    })).toBe(true)
+  })
+})
+
+describe('shouldEstimateFollowBottomScrollTop', () => {
+  it('estimates the tail when following the bottom with a zero-height viewport', () => {
+    expect(shouldEstimateFollowBottomScrollTop({
+      clientHeight: 0,
+      followingBottom: true,
+    })).toBe(true)
+  })
+
+  it('uses the real scrollTop when the viewport has a positive height', () => {
+    expect(shouldEstimateFollowBottomScrollTop({
+      clientHeight: 800,
+      followingBottom: true,
+    })).toBe(false)
+  })
+
+  it('uses the real scrollTop when not following the bottom', () => {
+    expect(shouldEstimateFollowBottomScrollTop({
+      clientHeight: 0,
+      followingBottom: false,
+    })).toBe(false)
   })
 })
 

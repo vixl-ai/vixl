@@ -2,6 +2,48 @@ export const DEFAULT_ITEM_HEIGHT = 160
 export const DEFAULT_OVERSCAN_PX = 800
 export const FALLBACK_VIEWPORT_HEIGHT = 800
 
+export function resolveViewportHeight({
+  clientHeight,
+  fallbackHeight = FALLBACK_VIEWPORT_HEIGHT,
+  lastPositiveClientHeight = 0,
+}: {
+  clientHeight: number
+  fallbackHeight?: number
+  lastPositiveClientHeight?: number
+}): number {
+  if (clientHeight >= 1)
+    return clientHeight
+  if (lastPositiveClientHeight >= 1)
+    return lastPositiveClientHeight
+  return fallbackHeight
+}
+
+export function shouldChaseFollowBottomOnResize({
+  clientHeight,
+  maxScrollTop,
+  scrollEpsilon,
+  scrollTop,
+}: {
+  clientHeight: number
+  maxScrollTop: number
+  scrollEpsilon: number
+  scrollTop: number
+}): boolean {
+  if (clientHeight < 1)
+    return false
+  return Math.abs(maxScrollTop - scrollTop) > scrollEpsilon
+}
+
+export function shouldEstimateFollowBottomScrollTop({
+  clientHeight,
+  followingBottom,
+}: {
+  clientHeight: number
+  followingBottom: boolean
+}): boolean {
+  return followingBottom && clientHeight < 1
+}
+
 export function itemIdsEqual(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length)
     return false
