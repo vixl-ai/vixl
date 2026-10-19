@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { GitBranch, Trash2 } from '@lucide/vue'
+import { FolderCog, GitBranch, Trash2 } from '@lucide/vue'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
 import {
   AlertDialog,
@@ -177,7 +177,6 @@ const handleConfirmRemove = async (): Promise<void> => {
               size="sm"
               :tooltip="branchLabel"
               :is-active="project.isActiveProject"
-              @click="handleOpenProject"
             >
               <GitBranch class="size-4 shrink-0" />
               <span class="min-w-0 flex-1 truncate">{{ branchLabel }}</span>
@@ -189,6 +188,10 @@ const handleConfirmRemove = async (): Promise<void> => {
           </CollapsibleTrigger>
         </ContextMenuTrigger>
         <ContextMenuContent class="w-52">
+          <ContextMenuItem @select="handleOpenProject">
+            <FolderCog />
+            Open Project
+          </ContextMenuItem>
           <ContextMenuItem
             variant="destructive"
             :disabled="loadingPreview || removing"
