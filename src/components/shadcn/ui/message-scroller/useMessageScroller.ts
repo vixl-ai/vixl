@@ -18,7 +18,6 @@ import {
   shouldChaseFollowBottomOnSizeChange,
   shouldChaseFollowOnViewportResize,
   shouldTrustFollowBottomContentMeasurements,
-  shouldSampleClientWidthBaseline,
   shouldExitFollowBottom,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
@@ -447,7 +446,6 @@ function createEngine(props: MessageScrollerProviderProps) {
   let windowItemIds: string[] = []
   let pinnedMessageIds: string[] = []
   let lastPositiveClientHeight = 0
-  let lastClientWidth = 0
   let lastScrollHeight = 0
   const scrollableAttr = computed(() => {
     const attr = [scrollable.value.start && "start", scrollable.value.end && "end"]
@@ -964,13 +962,6 @@ function createEngine(props: MessageScrollerProviderProps) {
     recomputeWindow()
   }
 
-  function syncItemHeightsToViewportWidth() {
-    const clientHeight = viewport?.clientHeight ?? 0
-    const clientWidth = viewport?.clientWidth ?? 0
-    if (shouldSampleClientWidthBaseline({ clientHeight, clientWidth }))
-      lastClientWidth = clientWidth
-  }
-
   function evaluateFollowChase(source: "content" | "viewport") {
     // Already-at-bottom and zero-height resizes must not call scrollToEnd:
     // that retriggers ResizeObserver through autoscroll and remounts.
@@ -1052,7 +1043,6 @@ function createEngine(props: MessageScrollerProviderProps) {
   }
 
   function applyResize(source: "content" | "viewport") {
-    syncItemHeightsToViewportWidth()
     if (mode === "following-bottom" && autoScroll()) {
       evaluateFollowChase(source)
       return
