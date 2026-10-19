@@ -116,6 +116,8 @@ export const primaryProjectForSlug = (slug: string): FleetProject | null =>
 
 export const isFleetLoaded = (): boolean => loaded.value
 
+export const refreshFleetProjects = (): Promise<void> => refresh()
+
 export const ensureFleetLoaded = async (): Promise<void> => {
   if (loaded.value) {
     return

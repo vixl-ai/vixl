@@ -1,6 +1,11 @@
 import type { ModelMessage } from 'ai'
 import { ref } from 'vue'
-import type { SubagentRecord, SubagentResult, SubagentStatus } from '@/types/harness/subagent-record'
+import type {
+  SubagentRecord,
+  SubagentResult,
+  SubagentStatus,
+  SubagentWorkspace,
+} from '@/types/harness/subagent-record'
 import {
   forgetBackgroundResultTracking,
   isBackgroundResultDelivered,
@@ -67,6 +72,7 @@ export const register = (
     prompt?: string
     model?: string
     capabilities?: 'read-only' | 'write'
+    workspace?: SubagentWorkspace
   },
   options?: { pendingResume?: boolean },
 ): SubagentRecord => {
@@ -80,6 +86,7 @@ export const register = (
     prompt: meta.prompt,
     model: meta.model,
     capabilities: meta.capabilities,
+    workspace: meta.workspace,
   }
 
   subagents.set(subagentId, record)

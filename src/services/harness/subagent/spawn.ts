@@ -1,5 +1,9 @@
 import { tool } from 'ai'
 import { z } from 'zod'
+import {
+  ensureFleetLoaded,
+  getFleetProjects,
+} from '@/composables/use-fleet-registry'
 import { noPoll, visibleStatus } from '@/services/harness/guidance'
 import { getPlanExecutionSession } from '@/services/harness/plan-execution-session'
 import {
@@ -16,7 +20,39 @@ import runSubagentGenerate from '@/services/harness/subagent/run-generate'
 import resolveAgentDefinition from '@/services/agents/resolve-agent-definition'
 import { READ_ONLY_SPAWN_MODES } from '@/services/harness/subagent/constants'
 import linkAbortSignal from '@/utils/link-abort-signal'
+import pathsEqual from '@/utils/paths-equal'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import type { SubagentWorkspace } from '@/types/harness/subagent-record'
+
+const resolveSpawnWorkspace = async (
+  ctx: HarnessToolContext,
+  workspaceSlug: string | undefined,
+): Promise<SubagentWorkspace | undefined> => {
+  const slug = workspaceSlug?.trim()
+  if (!slug) {
+    return undefined
+  }
+
+  await ensureFleetLoaded()
+  const projects = getFleetProjects()
+  const target = projects.find((project) => project.slug === slug)
+  if (!target) {
+    throw new Error(`Unknown workspace slug: ${slug}`)
+  }
+
+  const current =
+    projects.find((project) => pathsEqual(project.rootPath, ctx.projectRoot)) ??
+    projects.find((project) => project.slug === ctx.projectSlug)
+  const isWorktreeChild = Boolean(current && target.worktree?.parentId === current.id)
+  const isGroupMember = Boolean(ctx.members?.some((member) => member.slug === slug))
+  if (!isWorktreeChild && !isGroupMember) {
+    throw new Error(
+      `workspaceSlug ${slug} is not a worktree of this project or a member of the current group`,
+    )
+  }
+
+  return { projectRoot: target.rootPath, projectSlug: target.slug }
+}
 
 const spawnSubagent = (ctx: HarnessToolContext) =>
   tool({
@@ -36,9 +72,15 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         .describe(
           'read-only runs tests, lint, git log, git diff, and gh in a sandbox with the project read-only; write can edit files',
         ),
+      workspaceSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Fleet project slug of a worktree child of this project, or a member of the current group',
+        ),
     }),
     execute: async (
-      { agentName, prompt, mode, model: callModel, capabilities },
+      { agentName, prompt, mode, model: callModel, capabilities, workspaceSlug },
       { toolCallId },
     ): Promise<
       | { subagentId: string; name: string; summary: string }
@@ -62,6 +104,8 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
           `Write-capable subagents are not allowed in ${ctx.mode} mode. Spawn with capabilities: "read-only" (the default).`,
         )
       }
+
+      const workspace = await resolveSpawnWorkspace(ctx, workspaceSlug)
 
       const subagentId = crypto.randomUUID()
       const lockedSubagentModel = getPlanExecutionSession(
@@ -95,6 +139,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
           prompt,
           model,
           capabilities: resolvedCapabilities,
+          ...(workspace ? { workspace } : {}),
         },
         {
           pendingResume: !blocking,
@@ -132,6 +177,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
               signal: controller.signal,
               model,
               capabilities: resolvedCapabilities,
+              ...(workspace ? { workspace } : {}),
             })
 
             resolveSubagent(subagentId, {
@@ -183,6 +229,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
           signal: controller.signal,
           model,
           capabilities: resolvedCapabilities,
+          ...(workspace ? { workspace } : {}),
         })
 
         resolveSubagent(subagentId, {

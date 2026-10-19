@@ -53,7 +53,7 @@ Plan is Ask plus plan tools. It still cannot mutate source. Research first (read
 
 ## Orchestrator
 
-Orchestrator coordinates through sub-agents. The parent has no file-write tools and no git mutations, so it cannot edit source itself. It does have the shell suite. The built-in skill says to use that shell only for validation (CI, tests, lint, typecheck, `gh`), not for mutating commands. After a folder or worktree exists, the parent may `move_workspace` before spawning implementers.
+Orchestrator coordinates through sub-agents. The parent has no file-write tools and no git mutations, so it cannot edit source itself. It does have the shell suite. The built-in skill says to use that shell only for validation (CI, tests, lint, typecheck, `gh`), not for mutating commands. The parent can call `worktree_create` once per implementer and spawn with `workspaceSlug`. After a folder or worktree exists, the parent may also `move_workspace` if this chat itself should continue there.
 
 Background spawns are preferred. The parent leaves a short status and ends the turn. The harness resumes the parent when a sub-agent finishes. `terminal_output` is not how that wait works. Network goes through `web_fetch`, user MCP, or validation shell commands such as `gh`.
 

@@ -6,6 +6,8 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   delete_file: 'Delete a file from the workspace',
   move_file: 'Move or rename a workspace file',
   move_workspace: 'Move this chat onto a different project folder (always user-approved)',
+  worktree_create: 'Create a git worktree as a fleet sub-project (always user-approved)',
+  worktree_remove: 'Remove a registered git worktree from the fleet (always user-approved)',
   list_dir: 'List directory contents',
   glob_files: 'Find files by glob pattern',
   grep: 'Search file contents with regex',

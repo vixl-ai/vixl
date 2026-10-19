@@ -54,7 +54,7 @@ describe('load-prompt', () => {
       "Subagents run on anthropic::claude-sonnet-4, locked by the harness to the user's choice, so spawn_subagent takes no model argument.",
     )
     expect(rendered).toContain(
-      'When an early todo creates a worktree or folder, create it first, then call move_workspace, then spawn implementers.',
+      'Call worktree_create once per implementer, then spawn_subagent with that workspaceSlug. Merge via git tools on the parent project.',
     )
     expect(rendered).toContain(
       'After spawning, leave a one-line visible status: what was spawned, what is still running, what happens next.',

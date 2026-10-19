@@ -501,6 +501,44 @@ describe('runSubagentGenerate agent definition', () => {
     expect(config.system).toContain('Search without a path filter covers all projects.')
   })
 
+  it('overrides nested project root when workspace is set and clears members', async () => {
+    const ctx = {
+      ...baseCtx(),
+      members: [
+        { slug: 'api', name: 'API', rootPath: '/tmp/api' },
+        { slug: 'web', name: 'Web', rootPath: '/tmp/web' },
+      ],
+    }
+    await runSubagentGenerate({
+      ctx,
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'implement the change',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'write',
+      workspace: {
+        projectRoot: '/tmp/worktrees/demo/feature',
+        projectSlug: 'feature',
+      },
+    })
+
+    expect(ctx.projectRoot).toBe('/tmp/project')
+    expect(ctx.projectSlug).toBe('project')
+    expect(ctx.members).toHaveLength(2)
+    const nestedCtx = buildHarnessTools.mock.calls[0]?.[0] as HarnessToolContext
+    expect(nestedCtx.projectRoot).toBe('/tmp/worktrees/demo/feature')
+    expect(nestedCtx.projectSlug).toBe('feature')
+    expect(nestedCtx.members).toBeUndefined()
+    expect(resolveAgentDefinition).toHaveBeenCalledWith(
+      '/tmp/worktrees/demo/feature',
+      'explore',
+    )
+    const config = streamText.mock.calls[0]?.[0] as GenerateConfig
+    expect(config.system).not.toContain('Projects (slug, name, path):')
+  })
+
   it('omits the member project table in a single-project chat', async () => {
     await runSubagentGenerate({
       ctx: {

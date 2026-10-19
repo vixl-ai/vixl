@@ -114,6 +114,7 @@ declare global {
   const refManualReset: typeof import('@vueuse/core').refManualReset
   const refThrottled: typeof import('@vueuse/core').refThrottled
   const refWithControl: typeof import('@vueuse/core').refWithControl
+  const refreshFleetProjects: typeof import('./composables/use-fleet-registry').refreshFleetProjects
   const refreshFleetSidebar: typeof import('./composables/use-fleet-sidebar').refreshFleetSidebar
   const rekeyAgentHarness: typeof import('./composables/use-agent-harness').rekeyAgentHarness
   const resetAgentHarnessCacheForTests: typeof import('./composables/use-agent-harness').resetAgentHarnessCacheForTests
@@ -522,6 +523,7 @@ declare module 'vue' {
     readonly refManualReset: UnwrapRef<typeof import('@vueuse/core')['refManualReset']>
     readonly refThrottled: UnwrapRef<typeof import('@vueuse/core')['refThrottled']>
     readonly refWithControl: UnwrapRef<typeof import('@vueuse/core')['refWithControl']>
+    readonly refreshFleetProjects: UnwrapRef<typeof import('./composables/use-fleet-registry')['refreshFleetProjects']>
     readonly refreshFleetSidebar: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['refreshFleetSidebar']>
     readonly rekeyAgentHarness: UnwrapRef<typeof import('./composables/use-agent-harness')['rekeyAgentHarness']>
     readonly resetAgentHarnessCacheForTests: UnwrapRef<typeof import('./composables/use-agent-harness')['resetAgentHarnessCacheForTests']>

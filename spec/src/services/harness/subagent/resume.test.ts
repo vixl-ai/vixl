@@ -327,4 +327,34 @@ describe('resumeSubagent', () => {
       })
     },
   )
+
+  it('passes a stored workspace override into generate', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+      prompt: 'first task',
+      model: 'local::qwen',
+      capabilities: 'write',
+      workspace: {
+        projectRoot: '/tmp/worktrees/demo/feature',
+        projectSlug: 'feature',
+      },
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'first summary',
+    })
+
+    await resumeSubagent(baseCtx(), 'sub-1', 'keep going')
+
+    expect(runSubagentGenerate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: {
+          projectRoot: '/tmp/worktrees/demo/feature',
+          projectSlug: 'feature',
+        },
+      }),
+    )
+  })
 })

@@ -142,6 +142,7 @@
     "refManualReset": true,
     "refThrottled": true,
     "refWithControl": true,
+    "refreshFleetProjects": true,
     "refreshFleetSidebar": true,
     "rekeyAgentHarness": true,
     "resetAgentHarnessCacheForTests": true,
