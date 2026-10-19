@@ -607,8 +607,14 @@ function createEngine(props: MessageScrollerProviderProps) {
     if (previous !== undefined && viewport) {
       const delta = rounded - previous
       const offset = itemOffsetTop(messageId)
-      if (delta !== 0 && offset !== null && offset < viewport.scrollTop - SCROLL_EPSILON)
+      if (
+        mode !== "settling-jump"
+        && delta !== 0
+        && offset !== null
+        && offset < viewport.scrollTop - SCROLL_EPSILON
+      ) {
         viewport.scrollTop += delta
+      }
     }
     recomputeWindow()
     if (mode === "following-bottom" && autoScroll())
