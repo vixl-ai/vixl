@@ -232,6 +232,16 @@ describe('spawn_subagent workspaceSlug', () => {
     )
   })
 
+  it('resolves the agent definition from the worktree root when workspaceSlug is set', async () => {
+    await expect(execute(baseCtx(), 'feature')).resolves.toMatchObject({
+      summary: 'ok summary',
+    })
+    expect(resolveAgentDefinition).toHaveBeenCalledWith(
+      '/tmp/worktrees/demo/feature',
+      'Implement auth',
+    )
+  })
+
   it('accepts a sibling worktree when the chat is already on a child', async () => {
     const ctx = baseCtx({
       projectRoot: worktreeChild.rootPath,

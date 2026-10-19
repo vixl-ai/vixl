@@ -125,7 +125,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         ctx.chatId,
       ).subagentModel
       const agentDefinition = await resolveAgentDefinition(
-        ctx.projectRoot,
+        workspace?.projectRoot ?? ctx.projectRoot,
         agentName,
       ).catch(() => null)
       const model = await resolveSpawnModel({
