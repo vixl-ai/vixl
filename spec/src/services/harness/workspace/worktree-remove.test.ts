@@ -314,29 +314,74 @@ describe('worktree_remove tool', () => {
     )
   })
 
-  it('resolves a /tmp vs /private/tmp alias via git worktree list', async () => {
-    const canonical = '/private/tmp/worktrees/demo/feature'
+  it('resolves when fleet stores /tmp and git reports /private/tmp', async () => {
+    const tmpPath = '/tmp/worktrees/demo/feature'
+    const privatePath = '/private/tmp/worktrees/demo/feature'
     getFleetProjects.mockReturnValue([
       parentProject,
-      { ...worktreeProject, rootPath: canonical },
+      { ...worktreeProject, rootPath: tmpPath },
     ])
     gitWorktreeList.mockResolvedValue([
       {
-        path: canonical,
+        path: privatePath,
         branch: 'vixl/feature',
         bare: false,
         detached: false,
       },
     ])
-    const result = await execute({ rootPath: '/tmp/worktrees/demo/feature' })
+    const result = await execute({ rootPath: tmpPath })
 
-    expect(gitWorktreeList).toHaveBeenCalledWith('/tmp/project')
+    expect(result).toMatchObject({ ok: true })
+    expect(gitWorktreeRemove).toHaveBeenCalledWith('/tmp/project', tmpPath, false)
+    expect(registryRemoveProject).toHaveBeenCalledWith('proj-wt')
+  })
+
+  it('resolves when the caller passes /private/tmp and fleet stores /tmp', async () => {
+    const tmpPath = '/tmp/worktrees/demo/feature'
+    const privatePath = '/private/tmp/worktrees/demo/feature'
+    getFleetProjects.mockReturnValue([
+      parentProject,
+      { ...worktreeProject, rootPath: tmpPath },
+    ])
+    gitWorktreeList.mockResolvedValue([
+      {
+        path: privatePath,
+        branch: 'vixl/feature',
+        bare: false,
+        detached: false,
+      },
+    ])
+    const result = await execute({ rootPath: privatePath })
+
+    expect(result).toMatchObject({ ok: true })
+    expect(gitWorktreeRemove).toHaveBeenCalledWith('/tmp/project', tmpPath, false)
+    expect(registryRemoveProject).toHaveBeenCalledWith('proj-wt')
+  })
+
+  it('resolves when fleet stores /private/tmp and the caller passes /tmp', async () => {
+    const tmpPath = '/tmp/worktrees/demo/feature'
+    const privatePath = '/private/tmp/worktrees/demo/feature'
+    getFleetProjects.mockReturnValue([
+      parentProject,
+      { ...worktreeProject, rootPath: privatePath },
+    ])
+    gitWorktreeList.mockResolvedValue([
+      {
+        path: privatePath,
+        branch: 'vixl/feature',
+        bare: false,
+        detached: false,
+      },
+    ])
+    const result = await execute({ rootPath: tmpPath })
+
     expect(result).toMatchObject({ ok: true })
     expect(gitWorktreeRemove).toHaveBeenCalledWith(
       '/tmp/project',
-      canonical,
+      privatePath,
       false,
     )
+    expect(registryRemoveProject).toHaveBeenCalledWith('proj-wt')
   })
 
   it('does not match a suffix-only rootPath to a longer worktree path', async () => {

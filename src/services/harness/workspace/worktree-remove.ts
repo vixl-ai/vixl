@@ -19,7 +19,7 @@ import {
   type GitWorktreeEntry,
 } from '@/services/vixl/vixl-tauri'
 import invokeErrorMessage from '@/utils/invoke-error-message'
-import pathsEqual from '@/utils/paths-equal'
+import { pathsEqualCanonical } from '@/utils/paths-equal'
 import type { FleetProject } from '@/types/fleet/fleet-project'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
@@ -42,18 +42,11 @@ const occupancyError = (
 const UNREGISTER_WARNING =
   'Checkout is gone. Remove the row from the sidebar if it lingers.'
 
-const collapsePrivatePrefix = (value: string): string =>
-  value.replace(/\\/g, '/').replace(/\/+$/, '').replace(/^\/private(?=\/)/, '')
-
-const gitPathMatchesTarget = (gitPath: string, targetPath: string): boolean =>
-  pathsEqual(gitPath, targetPath) ||
-  collapsePrivatePrefix(gitPath) === collapsePrivatePrefix(targetPath)
-
 const projectForRoot = (
   projects: FleetProject[],
   rootPath: string,
 ): FleetProject | undefined =>
-  projects.find((entry) => pathsEqual(entry.rootPath, rootPath))
+  projects.find((entry) => pathsEqualCanonical(entry.rootPath, rootPath))
 
 const resolveFleetProject = async (
   projects: FleetProject[],
@@ -72,7 +65,7 @@ const resolveFleetProject = async (
     return undefined
   }
 
-  const reported = entries.find((entry) => gitPathMatchesTarget(entry.path, targetPath))
+  const reported = entries.find((entry) => pathsEqualCanonical(entry.path, targetPath))
   if (!reported) {
     return undefined
   }
@@ -95,7 +88,7 @@ const worktreeRemove = (ctx: HarnessToolContext) =>
       if (!targetPath) {
         return { error: 'rootPath is required' }
       }
-      if (pathsEqual(targetPath, ctx.projectRoot)) {
+      if (pathsEqualCanonical(targetPath, ctx.projectRoot)) {
         return {
           error:
             'worktree_remove cannot remove the current chat workspace; pass a different rootPath',
