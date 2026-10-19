@@ -146,6 +146,7 @@ declare global {
   const unref: typeof import('vue').unref
   const unrefElement: typeof import('@vueuse/core').unrefElement
   const until: typeof import('@vueuse/core').until
+  const upsertFleetProject: typeof import('./composables/use-fleet-registry').upsertFleetProject
   const useActiveElement: typeof import('@vueuse/core').useActiveElement
   const useAddProject: typeof import('./composables/use-add-project').default
   const useAgentHarness: typeof import('./composables/use-agent-harness').default
@@ -564,6 +565,7 @@ declare module 'vue' {
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
     readonly unrefElement: UnwrapRef<typeof import('@vueuse/core')['unrefElement']>
     readonly until: UnwrapRef<typeof import('@vueuse/core')['until']>
+    readonly upsertFleetProject: UnwrapRef<typeof import('./composables/use-fleet-registry')['upsertFleetProject']>
     readonly useActiveElement: UnwrapRef<typeof import('@vueuse/core')['useActiveElement']>
     readonly useAddProject: UnwrapRef<typeof import('./composables/use-add-project')['default']>
     readonly useAgentHarness: UnwrapRef<typeof import('./composables/use-agent-harness')['default']>

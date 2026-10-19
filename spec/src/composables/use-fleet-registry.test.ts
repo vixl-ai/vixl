@@ -60,7 +60,10 @@ vi.mock('@/services/mcp/mcp-runtime', () => ({
   },
 }))
 
-import useFleetRegistry from '@/composables/use-fleet-registry'
+import useFleetRegistry, {
+  getFleetProjects,
+  upsertFleetProject,
+} from '@/composables/use-fleet-registry'
 
 const projectA = {
   id: 'proj-a',
@@ -264,5 +267,54 @@ describe('useFleetRegistry worktreesOf', () => {
       worktreeOtherParent.id,
     ])
     expect(fleet.worktreesOf('missing')).toEqual([])
+  })
+})
+
+describe('useFleetRegistry upsertFleetProject', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    const fleet = useFleetRegistry()
+    fleet.projects.value = [
+      {
+        id: projectA.id,
+        name: projectA.name,
+        slug: projectA.slug,
+        rootPath: projectA.root_path,
+        lastOpened: projectA.last_opened,
+      },
+    ]
+  })
+
+  it('inserts or replaces by id and sorts lastOpened desc', () => {
+    upsertFleetProject(worktreeChildOlder)
+    expect(getFleetProjects().map((project) => project.id)).toEqual([
+      worktreeChildOlder.id,
+      projectA.id,
+    ])
+
+    upsertFleetProject(worktreeChildNewer)
+    expect(getFleetProjects().map((project) => project.id)).toEqual([
+      worktreeChildNewer.id,
+      worktreeChildOlder.id,
+      projectA.id,
+    ])
+
+    upsertFleetProject({
+      ...worktreeChildNewer,
+      root_path: '/tmp/worktrees/alpha/feature-renamed',
+      last_opened: '2026-01-06T00:00:00.000Z',
+    })
+    const projects = getFleetProjects()
+    expect(projects.filter((project) => project.id === worktreeChildNewer.id)).toHaveLength(1)
+    expect(projects[0]).toMatchObject({
+      id: worktreeChildNewer.id,
+      rootPath: '/tmp/worktrees/alpha/feature-renamed',
+      lastOpened: '2026-01-06T00:00:00.000Z',
+      worktree: {
+        parentId: projectA.id,
+        branch: 'feature',
+        managed: true,
+      },
+    })
   })
 })

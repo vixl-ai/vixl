@@ -3,6 +3,7 @@ import { z } from 'zod'
 import {
   ensureFleetLoaded,
   getFleetProjects,
+  refreshFleetProjects,
 } from '@/composables/use-fleet-registry'
 import { noPoll, visibleStatus } from '@/services/harness/guidance'
 import { getPlanExecutionSession } from '@/services/harness/plan-execution-session'
@@ -38,8 +39,13 @@ const resolveSpawnWorkspace = async (
   }
 
   await ensureFleetLoaded()
-  const projects = getFleetProjects()
-  const target = projects.find((project) => project.slug === slug)
+  let projects = getFleetProjects()
+  let target = projects.find((project) => project.slug === slug)
+  if (!target) {
+    await refreshFleetProjects()
+    projects = getFleetProjects()
+    target = projects.find((project) => project.slug === slug)
+  }
   if (!target) {
     throw new Error(`Unknown workspace slug: ${slug}`)
   }

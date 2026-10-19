@@ -50,14 +50,19 @@ vi.mock('@/services/codegraph/ensure-codegraph', () => ({
   default: (root: string) => ensureCodeGraph(root),
 }))
 
-vi.mock('@/composables/use-fleet-registry', () => ({
-  refreshFleetProjects,
-}))
+vi.mock('@/composables/use-fleet-registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/composables/use-fleet-registry')>()
+  return {
+    ...actual,
+    refreshFleetProjects,
+  }
+})
 
 vi.mock('@/services/config/is-home-workspace-root', () => ({
   isHomeWorkspaceRoot: (root: string) => isHomeWorkspaceRoot(root),
 }))
 
+import useFleetRegistry, { getFleetProjects } from '@/composables/use-fleet-registry'
 import worktreeCreate from '@/services/harness/workspace/worktree-create'
 
 const createdWorktree = {
@@ -111,6 +116,7 @@ describe('worktree_create tool', () => {
     registryAddProject.mockResolvedValue(registeredProject)
     ensureCodeGraph.mockResolvedValue(undefined)
     refreshFleetProjects.mockResolvedValue(undefined)
+    useFleetRegistry().projects.value = []
   })
 
   it('refuses on a subagent without prompting', async () => {
@@ -190,5 +196,6 @@ describe('worktree_create tool', () => {
       message:
         'Worktree created and registered. Call move_workspace with this rootPath if the current chat should continue inside it, or pass this slug as workspaceSlug to spawn_subagent for an isolated implementer. Sidebar may need a reload.',
     })
+    expect(getFleetProjects().some((project) => project.slug === 'feature')).toBe(true)
   })
 })

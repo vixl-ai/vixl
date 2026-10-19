@@ -1,6 +1,9 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { refreshFleetProjects } from '@/composables/use-fleet-registry'
+import {
+  refreshFleetProjects,
+  upsertFleetProject,
+} from '@/composables/use-fleet-registry'
 import { isHomeChatSlug } from '@/constants/home-chat'
 import ensureCodeGraph from '@/services/codegraph/ensure-codegraph'
 import { isHomeWorkspaceRoot } from '@/services/config/is-home-workspace-root'
@@ -64,8 +67,9 @@ const worktreeCreate = (ctx: HarnessToolContext) =>
       }
 
       let slug = created.name
+      let registered: Awaited<ReturnType<typeof registryAddProject>>
       try {
-        const registered = await registryAddProject(created.name, created.path)
+        registered = await registryAddProject(created.name, created.path)
         slug = registered.slug
       } catch (error) {
         let rollbackNote = `Removed the checkout; delete branch ${created.branch} before retrying`
@@ -78,6 +82,7 @@ const worktreeCreate = (ctx: HarnessToolContext) =>
           error: `Worktree created at ${created.path} but registration failed: ${invokeErrorMessage(error)}. ${rollbackNote}.`,
         }
       }
+      upsertFleetProject(registered)
       let message =
         'Worktree created and registered. Call move_workspace with this rootPath if the current chat should continue inside it, or pass this slug as workspaceSlug to spawn_subagent for an isolated implementer.'
       try {

@@ -31,7 +31,7 @@ const hasProjectVixlFlag = ref(false)
 const loaded = ref(false)
 let bootstrapPromise: Promise<void> | null = null
 
-const mapProject = (record: {
+type FleetProjectSnakeRecord = {
   id: string
   name: string
   slug: string
@@ -42,7 +42,9 @@ const mapProject = (record: {
     branch: string
     managed: boolean
   }
-}): FleetProject => ({
+}
+
+const mapProject = (record: FleetProjectSnakeRecord): FleetProject => ({
   id: record.id,
   name: record.name,
   slug: record.slug,
@@ -117,6 +119,14 @@ export const primaryProjectForSlug = (slug: string): FleetProject | null =>
 export const isFleetLoaded = (): boolean => loaded.value
 
 export const refreshFleetProjects = (): Promise<void> => refresh()
+
+export const upsertFleetProject = (record: FleetProjectSnakeRecord): void => {
+  const mapped = mapProject(record)
+  const next = projects.value.filter((entry) => entry.id !== mapped.id)
+  next.push(mapped)
+  next.sort((left, right) => right.lastOpened.localeCompare(left.lastOpened))
+  projects.value = next
+}
 
 export const ensureFleetLoaded = async (): Promise<void> => {
   if (loaded.value) {

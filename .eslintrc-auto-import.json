@@ -177,6 +177,7 @@
     "unref": true,
     "unrefElement": true,
     "until": true,
+    "upsertFleetProject": true,
     "useActiveElement": true,
     "useAddProject": true,
     "useAgentHarness": true,

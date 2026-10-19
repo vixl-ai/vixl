@@ -28,6 +28,9 @@ const getFleetProjects = vi.hoisted(() => vi.fn<() => FleetProject[]>())
 const ensureFleetLoaded = vi.hoisted(() =>
   vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 )
+const refreshFleetProjects = vi.hoisted(() =>
+  vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+)
 
 vi.mock('@/services/agents/resolve-agent-definition', () => ({
   default: (...args: unknown[]) => resolveAgentDefinition(...args),
@@ -70,6 +73,7 @@ vi.mock('@/utils/link-abort-signal', () => ({
 vi.mock('@/composables/use-fleet-registry', () => ({
   getFleetProjects: () => getFleetProjects(),
   ensureFleetLoaded: () => ensureFleetLoaded(),
+  refreshFleetProjects: () => refreshFleetProjects(),
 }))
 
 import spawnSubagent from '@/services/harness/subagent/spawn'
@@ -178,13 +182,33 @@ describe('spawn_subagent workspaceSlug', () => {
       unrelatedProject,
       webMember,
     ])
+    refreshFleetProjects.mockResolvedValue(undefined)
   })
 
-  it('rejects an unknown slug', async () => {
+  it('rejects an unknown slug after one refresh retry', async () => {
     await expect(execute(baseCtx(), 'missing')).rejects.toThrow(
       'Unknown workspace slug: missing',
     )
+    expect(refreshFleetProjects).toHaveBeenCalledTimes(1)
     expect(runSubagentGenerate).not.toHaveBeenCalled()
+  })
+
+  it('refreshes once and accepts a slug that appears after reload', async () => {
+    getFleetProjects
+      .mockReturnValueOnce([parentProject])
+      .mockReturnValueOnce([parentProject, worktreeChild])
+    await expect(execute(baseCtx(), 'feature')).resolves.toMatchObject({
+      summary: 'ok summary',
+    })
+    expect(refreshFleetProjects).toHaveBeenCalledTimes(1)
+    expect(runSubagentGenerate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: {
+          projectRoot: '/tmp/worktrees/demo/feature',
+          projectSlug: 'feature',
+        },
+      }),
+    )
   })
 
   it('rejects an unrelated project slug', async () => {
