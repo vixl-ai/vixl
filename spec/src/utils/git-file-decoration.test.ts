@@ -6,6 +6,7 @@ import buildGitDecorationMaps, {
   decorationNameClass,
   hasDecorationLetter,
   resolvePathDecoration,
+  rollupDecoration,
 } from '@/utils/git-file-decoration'
 
 const entry = (
@@ -38,6 +39,17 @@ describe('decorationFromEntry', () => {
     ).toBe('ignored')
     expect(hasDecorationLetter('ignored')).toBe(false)
     expect(decorationNameClass('ignored')).toContain('foreground/40')
+  })
+
+  it('rolls up the highest non-ignored decoration', () => {
+    expect(
+      rollupDecoration([
+        entry({ path: 'a.ts', unstagedStatus: 'M' }),
+        entry({ path: 'b.ts', isUntracked: true, unstagedStatus: '?' }),
+        entry({ path: 'skip/', isIgnored: true, unstagedStatus: '!' }),
+      ]),
+    ).toBe('modified')
+    expect(rollupDecoration([entry({ path: 'skip/', isIgnored: true })])).toBeNull()
   })
 
   it('prefers conflicted over modified', () => {

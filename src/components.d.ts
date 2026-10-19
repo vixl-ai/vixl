@@ -529,5 +529,6 @@ declare module 'vue' {
     WorkspaceSearchHitReplace: typeof import('./components/workbench/search/WorkspaceSearchHitReplace.vue')['default']
     WorkspaceSearchPanel: typeof import('./components/workbench/search/WorkspaceSearchPanel.vue')['default']
     WorkspaceSearchResults: typeof import('./components/workbench/search/WorkspaceSearchResults.vue')['default']
+    WorktreeRow: typeof import('./components/navigation/aside/left/WorktreeRow.vue')['default']
   }
 }

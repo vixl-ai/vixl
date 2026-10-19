@@ -60,13 +60,18 @@ const filterProject = (
     query,
     runningOnlyValue,
   )
-  if (chats === null) {
+  const worktrees = (project.worktrees ?? [])
+    .map((worktree) => filterProject(worktree, query, runningOnlyValue))
+    .filter((worktree): worktree is FleetSidebarProject => worktree !== null)
+
+  if (chats === null && worktrees.length === 0) {
     return null
   }
 
   return {
     ...project,
-    chats,
+    chats: chats ?? [],
+    ...(project.worktrees ? { worktrees } : {}),
   }
 }
 

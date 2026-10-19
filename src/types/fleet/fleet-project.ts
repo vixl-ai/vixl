@@ -1,9 +1,16 @@
+export type WorktreeLink = {
+  parentId: string
+  branch: string
+  managed: boolean
+}
+
 export type FleetProject = {
   id: string
   name: string
   slug: string
   rootPath: string
   lastOpened: string
+  worktree?: WorktreeLink
 }
 
 export type FleetProjectsRegistry = {

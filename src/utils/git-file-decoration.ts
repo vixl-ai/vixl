@@ -100,6 +100,20 @@ export const decorationFromEntry = (
   )
 }
 
+export const rollupDecoration = (
+  entries: GitStatusEntry[],
+): GitFileDecoration | null => {
+  let best: GitFileDecoration | null = null
+  for (const entry of entries) {
+    const next = decorationFromEntry(entry)
+    if (!next || next === 'ignored') {
+      continue
+    }
+    best = preferDecoration(best, next)
+  }
+  return best
+}
+
 export const decorationClass = (decoration: GitFileDecoration): string =>
   DECORATION_CLASS[decoration]
 

@@ -78,6 +78,7 @@ const ORCHESTRATOR_TOOLS = [
   'steer_subagent',
   'resolve_models',
   'move_workspace',
+  'worktree_create',
 ] as const
 
 export const MODE_TOOL_ALLOWLIST: Record<VixlChatMode, string[]> = {
@@ -91,6 +92,8 @@ export const MODE_TOOL_ALLOWLIST: Record<VixlChatMode, string[]> = {
     'delete_file',
     'move_file',
     'move_workspace',
+    'worktree_create',
+    'worktree_remove',
     'grep',
     'glob_files',
     'list_dir',

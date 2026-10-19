@@ -1,5 +1,10 @@
 import { tool } from 'ai'
 import { z } from 'zod'
+import {
+  ensureFleetLoaded,
+  getFleetProjects,
+  refreshFleetProjects,
+} from '@/composables/use-fleet-registry'
 import { noPoll, visibleStatus } from '@/services/harness/guidance'
 import { getPlanExecutionSession } from '@/services/harness/plan-execution-session'
 import {
@@ -16,7 +21,52 @@ import runSubagentGenerate from '@/services/harness/subagent/run-generate'
 import resolveAgentDefinition from '@/services/agents/resolve-agent-definition'
 import { READ_ONLY_SPAWN_MODES } from '@/services/harness/subagent/constants'
 import linkAbortSignal from '@/utils/link-abort-signal'
+import pathsEqual from '@/utils/paths-equal'
+import type { FleetProject } from '@/types/fleet/fleet-project'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import type { SubagentWorkspace } from '@/types/harness/subagent-record'
+
+const ancestorOf = (project: FleetProject): string =>
+  project.worktree?.parentId ?? project.id
+
+const resolveSpawnWorkspace = async (
+  ctx: HarnessToolContext,
+  workspaceSlug: string | undefined,
+): Promise<SubagentWorkspace | undefined> => {
+  const slug = workspaceSlug?.trim()
+  if (!slug) {
+    return undefined
+  }
+
+  await ensureFleetLoaded()
+  let projects = getFleetProjects()
+  let target = projects.find((project) => project.slug === slug)
+  if (!target) {
+    await refreshFleetProjects()
+    projects = getFleetProjects()
+    target = projects.find((project) => project.slug === slug)
+  }
+  if (!target) {
+    throw new Error(`Unknown workspace slug: ${slug}`)
+  }
+
+  const current =
+    projects.find((project) => pathsEqual(project.rootPath, ctx.projectRoot)) ??
+    projects.find((project) => project.slug === ctx.projectSlug)
+  const isWorktreeChild = Boolean(
+    current &&
+      target.worktree &&
+      ancestorOf(target) === ancestorOf(current),
+  )
+  const isGroupMember = Boolean(ctx.members?.some((member) => member.slug === slug))
+  if (!isWorktreeChild && !isGroupMember) {
+    throw new Error(
+      `workspaceSlug ${slug} is not a worktree of this project or a member of the current group`,
+    )
+  }
+
+  return { projectRoot: target.rootPath, projectSlug: target.slug }
+}
 
 const spawnSubagent = (ctx: HarnessToolContext) =>
   tool({
@@ -36,9 +86,13 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         .describe(
           'read-only runs tests, lint, git log, git diff, and gh in a sandbox with the project read-only; write can edit files',
         ),
+      workspaceSlug: z
+        .string()
+        .optional()
+        .describe('Worktree child or group-member slug'),
     }),
     execute: async (
-      { agentName, prompt, mode, model: callModel, capabilities },
+      { agentName, prompt, mode, model: callModel, capabilities, workspaceSlug },
       { toolCallId },
     ): Promise<
       | { subagentId: string; name: string; summary: string }
@@ -63,13 +117,15 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         )
       }
 
+      const workspace = await resolveSpawnWorkspace(ctx, workspaceSlug)
+
       const subagentId = crypto.randomUUID()
       const lockedSubagentModel = getPlanExecutionSession(
         ctx.projectSlug,
         ctx.chatId,
       ).subagentModel
       const agentDefinition = await resolveAgentDefinition(
-        ctx.projectRoot,
+        workspace?.projectRoot ?? ctx.projectRoot,
         agentName,
       ).catch(() => null)
       const model = await resolveSpawnModel({
@@ -95,6 +151,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
           prompt,
           model,
           capabilities: resolvedCapabilities,
+          ...(workspace ? { workspace } : {}),
         },
         {
           pendingResume: !blocking,
@@ -132,6 +189,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
               signal: controller.signal,
               model,
               capabilities: resolvedCapabilities,
+              ...(workspace ? { workspace } : {}),
             })
 
             resolveSubagent(subagentId, {
@@ -183,6 +241,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
           signal: controller.signal,
           model,
           capabilities: resolvedCapabilities,
+          ...(workspace ? { workspace } : {}),
         })
 
         resolveSubagent(subagentId, {

@@ -799,6 +799,79 @@ describe('subagent-registry', () => {
     expect(waiting.value).toBe(false)
   })
 
+  it('lists only running subagents whose workspace matches slug or root', async () => {
+    const { abortOne, fail, register, resolve } = await import(
+      '@/services/harness/subagent/registry'
+    )
+    const { activeSubagentsForWorkspace } = await import(
+      '@/services/harness/subagent/active-for-workspace'
+    )
+
+    const workspace = {
+      projectRoot: '/tmp/worktrees/demo/feature',
+      projectSlug: 'feature',
+    }
+    register('chat-parent', 'sub-running', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'implementer',
+      workspace,
+    })
+    register('chat-parent', 'sub-completed', new AbortController(), {
+      toolCallId: 'tc-2',
+      agentName: 'implementer',
+      workspace,
+    })
+    register('chat-parent', 'sub-failed', new AbortController(), {
+      toolCallId: 'tc-3',
+      agentName: 'implementer',
+      workspace,
+    })
+    register('chat-parent', 'sub-aborted', new AbortController(), {
+      toolCallId: 'tc-4',
+      agentName: 'implementer',
+      workspace,
+    })
+    register('chat-parent', 'sub-other', new AbortController(), {
+      toolCallId: 'tc-5',
+      agentName: 'implementer',
+      workspace: {
+        projectRoot: '/tmp/worktrees/demo/other',
+        projectSlug: 'other',
+      },
+    })
+    register('chat-parent', 'sub-no-workspace', new AbortController(), {
+      toolCallId: 'tc-6',
+      agentName: 'implementer',
+    })
+    register('chat-parent', 'sub-path-only', new AbortController(), {
+      toolCallId: 'tc-7',
+      agentName: 'implementer',
+      workspace: {
+        projectRoot: '/tmp/worktrees/demo/feature/',
+        projectSlug: 'renamed',
+      },
+    })
+
+    resolve('sub-completed', {
+      subagentId: 'sub-completed',
+      name: 'implementer',
+      summary: 'done',
+    })
+    fail('sub-failed', 'boom')
+    abortOne('sub-aborted')
+
+    expect(
+      activeSubagentsForWorkspace('feature').map((record) => record.subagentId),
+    ).toEqual(['sub-running'])
+    expect(
+      activeSubagentsForWorkspace(
+        'feature',
+        '/tmp/worktrees/demo/feature',
+      ).map((record) => record.subagentId),
+    ).toEqual(['sub-running', 'sub-path-only'])
+    expect(activeSubagentsForWorkspace('missing')).toEqual([])
+  })
+
   it('clears leftover pending resume on abort when the chat has no subagent ids', async () => {
     const {
       abort,

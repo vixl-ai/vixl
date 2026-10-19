@@ -74,6 +74,7 @@ const resumeSubagent = async (
         signal: controller.signal,
         model,
         capabilities: record.capabilities ?? 'read-only',
+        ...(record.workspace ? { workspace: record.workspace } : {}),
         messages: nextMessages,
       })
 

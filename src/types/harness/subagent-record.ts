@@ -8,6 +8,11 @@ export type SubagentResult = {
   summary: string
 }
 
+export type SubagentWorkspace = {
+  projectRoot: string
+  projectSlug: string
+}
+
 export type SubagentRecord = {
   subagentId: string
   chatId: string
@@ -19,5 +24,6 @@ export type SubagentRecord = {
   prompt?: string
   model?: string
   capabilities?: 'read-only' | 'write'
+  workspace?: SubagentWorkspace
   messages?: ModelMessage[]
 }

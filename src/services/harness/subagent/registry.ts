@@ -1,6 +1,11 @@
 import type { ModelMessage } from 'ai'
 import { ref } from 'vue'
-import type { SubagentRecord, SubagentResult, SubagentStatus } from '@/types/harness/subagent-record'
+import type {
+  SubagentRecord,
+  SubagentResult,
+  SubagentStatus,
+  SubagentWorkspace,
+} from '@/types/harness/subagent-record'
 import {
   forgetBackgroundResultTracking,
   isBackgroundResultDelivered,
@@ -67,6 +72,7 @@ export const register = (
     prompt?: string
     model?: string
     capabilities?: 'read-only' | 'write'
+    workspace?: SubagentWorkspace
   },
   options?: { pendingResume?: boolean },
 ): SubagentRecord => {
@@ -80,6 +86,7 @@ export const register = (
     prompt: meta.prompt,
     model: meta.model,
     capabilities: meta.capabilities,
+    workspace: meta.workspace,
   }
 
   subagents.set(subagentId, record)
@@ -160,15 +167,20 @@ export const listSubagentsForChat = (chatId: string): SubagentRecord[] => {
     .filter((record): record is SubagentRecord => record !== undefined)
 }
 
+export const listSubagents = (): SubagentRecord[] => [...subagents.values()]
+
+export const isRunningSubagent = (record: SubagentRecord): boolean =>
+  record.status === 'running'
+
 export const hasRunningSubagentsForChat = (chatId: string): boolean =>
-  listSubagentsForChat(chatId).some((record) => record.status === 'running')
+  listSubagentsForChat(chatId).some(isRunningSubagent)
 
 export const isRunningBackgroundSubagent = (subagentId: string): boolean =>
   subagents.get(subagentId)?.status === 'running' &&
   !blockingSubagents.has(subagentId)
 
 export const getRunningSubagentForChat = (chatId: string): SubagentRecord | null =>
-  listSubagentsForChat(chatId).find((record) => record.status === 'running') ?? null
+  listSubagentsForChat(chatId).find(isRunningSubagent) ?? null
 
 export const isBackgroundSubagent = (subagentId: string): boolean =>
   backgroundSubagents.has(subagentId)

@@ -3,6 +3,7 @@ import { toast } from 'vue-sonner'
 import { listen } from '@tauri-apps/api/event'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useChatStore from '@/composables/use-chat-store'
+import type { FleetProject } from '@/types/fleet/fleet-project'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
 import type { FleetSidebarChat } from '@/types/fleet/fleet-sidebar-chat'
 import type { ChatMeta } from '@/types/chat/chat-meta'
@@ -62,19 +63,69 @@ export default () => {
   const chatStore = useChatStore()
 
   const sidebarProjects = computed<FleetSidebarProject[]>(() => {
-    const projectRows: FleetSidebarProject[] = fleet.projects.value.map((project) => ({
-      slug: project.slug,
-      displayName: project.name,
-      kind: 'project',
-      isActiveProject: fleet.activeProjectId.value === project.id,
-      defaultExpanded: fleet.activeProjectId.value === project.id,
-      chats: (chatsBySlug.value[project.slug] ?? []).map((chat) => ({
+    const mapChats = (slug: string): FleetSidebarChat[] =>
+      (chatsBySlug.value[slug] ?? []).map((chat) => ({
         id: chat.id,
         title: chat.title,
         status: chat.status,
         attention: chat.attention ?? null,
-      })),
-    }))
+      }))
+
+    const toProjectRow = (
+      project: FleetProject,
+      options?: { nested?: boolean },
+    ): FleetSidebarProject => {
+      const isActive = fleet.activeProjectId.value === project.id
+      return {
+        slug: project.slug,
+        displayName:
+          options?.nested && project.worktree
+            ? project.worktree.branch
+            : project.name,
+        kind: 'project',
+        isActiveProject: isActive,
+        defaultExpanded: isActive,
+        chats: mapChats(project.slug),
+        id: project.id,
+        rootPath: project.rootPath,
+        worktree: project.worktree,
+      }
+    }
+
+    const fleetProjects = fleet.projects.value
+    const byId = new Map(fleetProjects.map((project) => [project.id, project]))
+    const nestedIds = new Set<string>()
+    const childrenByParent = new Map<string, FleetProject[]>()
+
+    for (const project of fleetProjects) {
+      const parentId = project.worktree?.parentId
+      if (!parentId || !byId.has(parentId)) {
+        continue
+      }
+      nestedIds.add(project.id)
+      const existing = childrenByParent.get(parentId) ?? []
+      existing.push(project)
+      childrenByParent.set(parentId, existing)
+    }
+
+    for (const children of childrenByParent.values()) {
+      children.sort((a, b) => b.lastOpened.localeCompare(a.lastOpened))
+    }
+
+    const projectRows: FleetSidebarProject[] = fleetProjects
+      .filter((project) => !nestedIds.has(project.id))
+      .map((project) => {
+        const children = childrenByParent.get(project.id) ?? []
+        const childActive = children.some(
+          (child) => fleet.activeProjectId.value === child.id,
+        )
+        const row = toProjectRow(project)
+        return {
+          ...row,
+          defaultExpanded: Boolean(row.defaultExpanded) || childActive,
+          worktrees: children.map((child) => toProjectRow(child, { nested: true })),
+        }
+      })
 
     const groupRows: FleetSidebarProject[] = (fleet.groups?.value ?? []).map((group) => ({
       slug: group.slug,
@@ -82,12 +133,7 @@ export default () => {
       kind: 'group',
       isActiveProject: false,
       defaultExpanded: false,
-      chats: (chatsBySlug.value[group.slug] ?? []).map((chat) => ({
-        id: chat.id,
-        title: chat.title,
-        status: chat.status,
-        attention: chat.attention ?? null,
-      })),
+      chats: mapChats(group.slug),
     }))
 
     return [...projectRows, ...groupRows]

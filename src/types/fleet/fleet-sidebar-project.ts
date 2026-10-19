@@ -1,3 +1,4 @@
+import type { WorktreeLink } from './fleet-project'
 import type { FleetSidebarChat } from './fleet-sidebar-chat'
 
 export interface FleetSidebarProject {
@@ -9,4 +10,8 @@ export interface FleetSidebarProject {
   chats: FleetSidebarChat[]
   hiddenChatCount?: number
   hiddenChats?: FleetSidebarChat[]
+  id?: string
+  rootPath?: string
+  worktree?: WorktreeLink
+  worktrees?: FleetSidebarProject[]
 }

@@ -4,7 +4,13 @@ import {
   isHomeWorkspaceRoot,
 } from '@/services/config/is-home-workspace-root'
 import { call } from './helpers'
-import type { ConfigScope, FleetProjectGroupRecord, ProjectFileEntry, VixlFilesKind } from './types'
+import type {
+  ConfigScope,
+  FleetProjectGroupRecord,
+  FleetProjectWorktreeRecord,
+  ProjectFileEntry,
+  VixlFilesKind,
+} from './types'
 
 export const getUserVixlDir = (): Promise<string> => call('get_user_vixl_dir')
 
@@ -122,6 +128,7 @@ export const registryListProjects = (): Promise<
     slug: string
     root_path: string
     last_opened: string
+    worktree?: FleetProjectWorktreeRecord
   }>
 > => call('registry_list_projects')
 
@@ -134,6 +141,7 @@ export const registryAddProject = (
   slug: string
   root_path: string
   last_opened: string
+  worktree?: FleetProjectWorktreeRecord
 }> => call('registry_add_project', { name, rootPath })
 
 export const openProjectAtPath = (
@@ -144,6 +152,7 @@ export const openProjectAtPath = (
   slug: string
   root_path: string
   last_opened: string
+  worktree?: FleetProjectWorktreeRecord
 }> => call('open_project_at_path', { rootPath })
 
 export const registrySetActiveProject = (projectId: string | null): Promise<void> =>
@@ -158,6 +167,7 @@ export const registryUpdateProjectRoot = (
   slug: string
   root_path: string
   last_opened: string
+  worktree?: FleetProjectWorktreeRecord
 }> => call('registry_update_project_root', { projectId, rootPath })
 
 export const registryRemoveProject = (projectId: string): Promise<void> =>

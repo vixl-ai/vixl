@@ -9,7 +9,14 @@ const listProjectChats = vi.hoisted(
 )
 
 const fleetProjects = vi.hoisted(() => ({
-  value: [] as Array<{ id: string; slug: string; name: string }>,
+  value: [] as Array<{
+    id: string
+    slug: string
+    name: string
+    rootPath?: string
+    lastOpened?: string
+    worktree?: { parentId: string; branch: string; managed: boolean }
+  }>,
 }))
 
 const fleetGroups = vi.hoisted(() => ({
@@ -247,5 +254,230 @@ describe('use-fleet-sidebar activityItems', () => {
         item.kind === 'home' ? 'home' : item.project.slug,
       ),
     ).toEqual(['api-web', 'alpha'])
+  })
+})
+
+describe('use-fleet-sidebar worktree nesting', () => {
+  beforeEach(() => {
+    listProjectChats.mockReset()
+    listProjectChats.mockResolvedValue([])
+    fleetGroups.value = []
+    activeProjectId.value = null
+  })
+
+  it('nests worktree projects under the parent with chats, sorted by lastOpened desc', async () => {
+    fleetProjects.value = [
+      {
+        id: 'proj-parent',
+        slug: 'demo',
+        name: 'Demo',
+        rootPath: '/tmp/demo',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'proj-wt-old',
+        slug: 'demo-fix',
+        name: 'fix',
+        rootPath: '/tmp/worktrees/demo/fix',
+        lastOpened: '2026-01-02T00:00:00.000Z',
+        worktree: { parentId: 'proj-parent', branch: 'vixl/fix', managed: true },
+      },
+      {
+        id: 'proj-wt-new',
+        slug: 'demo-feature',
+        name: 'feature',
+        rootPath: '/tmp/worktrees/demo/feature',
+        lastOpened: '2026-01-04T00:00:00.000Z',
+        worktree: { parentId: 'proj-parent', branch: 'vixl/feature', managed: true },
+      },
+    ]
+
+    const sidebar = await seedSidebar({
+      demo: [
+        makeChat({
+          id: 'p1',
+          title: 'Parent chat',
+          projectSlug: 'demo',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      'demo-feature': [
+        makeChat({
+          id: 'w1',
+          title: 'Feature chat',
+          projectSlug: 'demo-feature',
+          updatedAt: '2026-01-05T00:00:00.000Z',
+        }),
+      ],
+      'demo-fix': [
+        makeChat({
+          id: 'w2',
+          title: 'Fix chat',
+          projectSlug: 'demo-fix',
+          updatedAt: '2026-01-03T00:00:00.000Z',
+        }),
+      ],
+      [HOME_CHAT_SLUG]: [],
+    })
+
+    expect(sidebar.sidebarProjects.value.map((item) => item.slug)).toEqual(['demo'])
+    const parent = sidebar.sidebarProjects.value[0]
+    expect(parent?.worktrees?.map((item) => item.slug)).toEqual([
+      'demo-feature',
+      'demo-fix',
+    ])
+    expect(parent?.worktrees?.map((item) => item.displayName)).toEqual([
+      'vixl/feature',
+      'vixl/fix',
+    ])
+    expect(parent?.worktrees?.[0]?.chats.map((chat) => chat.id)).toEqual(['w1'])
+    expect(parent?.chats.map((chat) => chat.id)).toEqual(['p1'])
+    expect(
+      sidebar.activityItems.value.map((item) =>
+        item.kind === 'home' ? 'home' : item.project.slug,
+      ),
+    ).toEqual(['demo'])
+  })
+
+  it('keeps an orphan worktree link as a top-level project', async () => {
+    fleetProjects.value = [
+      {
+        id: 'proj-orphan',
+        slug: 'orphan',
+        name: 'Orphan',
+        rootPath: '/tmp/orphan',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+        worktree: { parentId: 'missing-parent', branch: 'vixl/orphan', managed: true },
+      },
+    ]
+
+    const sidebar = await seedSidebar({
+      orphan: [
+        makeChat({
+          id: 'o1',
+          title: 'Orphan chat',
+          projectSlug: 'orphan',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      [HOME_CHAT_SLUG]: [],
+    })
+
+    expect(sidebar.sidebarProjects.value.map((item) => item.slug)).toEqual(['orphan'])
+    expect(sidebar.sidebarProjects.value[0]?.displayName).toBe('Orphan')
+    expect(sidebar.sidebarProjects.value[0]?.worktrees).toEqual([])
+    expect(sidebar.sidebarProjects.value[0]?.chats.map((chat) => chat.id)).toEqual(['o1'])
+  })
+
+  it('leaves group rows unchanged when worktrees exist', async () => {
+    fleetProjects.value = [
+      {
+        id: 'proj-parent',
+        slug: 'alpha',
+        name: 'Alpha',
+        rootPath: '/tmp/alpha',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'proj-wt',
+        slug: 'alpha-wt',
+        name: 'wt',
+        rootPath: '/tmp/worktrees/alpha/wt',
+        lastOpened: '2026-01-02T00:00:00.000Z',
+        worktree: { parentId: 'proj-parent', branch: 'vixl/wt', managed: true },
+      },
+    ]
+    fleetGroups.value = [
+      {
+        id: 'grp-1',
+        slug: 'api-web',
+        name: 'api, web',
+        memberSlugs: ['alpha', 'beta'],
+      },
+    ]
+
+    const sidebar = await seedSidebar({
+      alpha: [],
+      'alpha-wt': [],
+      'api-web': [
+        makeChat({
+          id: 'g1',
+          title: 'Group chat',
+          projectSlug: 'api-web',
+          updatedAt: '2026-01-06T00:00:00.000Z',
+        }),
+      ],
+      [HOME_CHAT_SLUG]: [],
+    })
+
+    const groupRow = sidebar.sidebarProjects.value.find((item) => item.slug === 'api-web')
+    expect(groupRow?.kind).toBe('group')
+    expect(groupRow?.worktrees).toBeUndefined()
+    expect(groupRow?.chats.map((chat) => chat.id)).toEqual(['g1'])
+    expect(sidebar.sidebarProjects.value.map((item) => item.slug)).toEqual([
+      'alpha',
+      'api-web',
+    ])
+  })
+
+  it('does not change top-level sort of non-worktree rows', async () => {
+    fleetProjects.value = [
+      {
+        id: 'proj-1',
+        slug: 'alpha',
+        name: 'Alpha',
+        rootPath: '/tmp/alpha',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'proj-2',
+        slug: 'beta',
+        name: 'Beta',
+        rootPath: '/tmp/beta',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'proj-wt',
+        slug: 'alpha-wt',
+        name: 'wt',
+        rootPath: '/tmp/worktrees/alpha/wt',
+        lastOpened: '2026-01-08T00:00:00.000Z',
+        worktree: { parentId: 'proj-1', branch: 'vixl/wt', managed: true },
+      },
+    ]
+
+    const sidebar = await seedSidebar({
+      alpha: [
+        makeChat({
+          id: 'a1',
+          title: 'Alpha chat',
+          projectSlug: 'alpha',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      beta: [
+        makeChat({
+          id: 'b1',
+          title: 'Beta chat',
+          projectSlug: 'beta',
+          updatedAt: '2026-01-04T00:00:00.000Z',
+        }),
+      ],
+      'alpha-wt': [
+        makeChat({
+          id: 'w1',
+          title: 'Worktree chat',
+          projectSlug: 'alpha-wt',
+          updatedAt: '2026-01-09T00:00:00.000Z',
+        }),
+      ],
+      [HOME_CHAT_SLUG]: [],
+    })
+
+    expect(
+      sidebar.activityItems.value.map((item) =>
+        item.kind === 'home' ? 'home' : item.project.slug,
+      ),
+    ).toEqual(['beta', 'alpha'])
   })
 })

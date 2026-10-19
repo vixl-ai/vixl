@@ -31,18 +31,34 @@ const hasProjectVixlFlag = ref(false)
 const loaded = ref(false)
 let bootstrapPromise: Promise<void> | null = null
 
-const mapProject = (record: {
+type FleetProjectSnakeRecord = {
   id: string
   name: string
   slug: string
   root_path: string
   last_opened: string
-}): FleetProject => ({
+  worktree?: {
+    parent_id: string
+    branch: string
+    managed: boolean
+  }
+}
+
+const mapProject = (record: FleetProjectSnakeRecord): FleetProject => ({
   id: record.id,
   name: record.name,
   slug: record.slug,
   rootPath: record.root_path,
   lastOpened: record.last_opened,
+  ...(record.worktree
+    ? {
+        worktree: {
+          parentId: record.worktree.parent_id,
+          branch: record.worktree.branch,
+          managed: record.worktree.managed,
+        },
+      }
+    : {}),
 })
 
 const mapGroup = (record: {
@@ -86,6 +102,12 @@ const refresh = async (): Promise<void> => {
 
 export const getFleetProjects = (): FleetProject[] => projects.value
 
+export const worktreesOf = (projectId: string): FleetProject[] =>
+  projects.value
+    .filter((project) => project.worktree?.parentId === projectId)
+    .slice()
+    .sort((a, b) => b.lastOpened.localeCompare(a.lastOpened))
+
 export const getFleetGroups = (): FleetProjectGroup[] => groups.value
 
 export const isFleetGroupSlug = (slug: string): boolean =>
@@ -95,6 +117,16 @@ export const primaryProjectForSlug = (slug: string): FleetProject | null =>
   resolvePrimaryProjectForSlug(slug, projects.value, groups.value)
 
 export const isFleetLoaded = (): boolean => loaded.value
+
+export const refreshFleetProjects = (): Promise<void> => refresh()
+
+export const upsertFleetProject = (record: FleetProjectSnakeRecord): void => {
+  const mapped = mapProject(record)
+  const next = projects.value.filter((entry) => entry.id !== mapped.id)
+  next.push(mapped)
+  next.sort((left, right) => right.lastOpened.localeCompare(left.lastOpened))
+  projects.value = next
+}
 
 export const ensureFleetLoaded = async (): Promise<void> => {
   if (loaded.value) {
@@ -235,5 +267,6 @@ export default () => {
     updateGroup,
     removeGroup,
     ensureDefaultProject,
+    worktreesOf,
   }
 }

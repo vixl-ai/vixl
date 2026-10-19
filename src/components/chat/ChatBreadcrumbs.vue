@@ -14,6 +14,7 @@ import useFleetRegistry from '@/composables/use-fleet-registry'
 import useFleetSidebar from '@/composables/use-fleet-sidebar'
 import { HOME_CHAT_SLUG, isHomeChatSlug } from '@/constants/home-chat'
 import chatRouteFor from '@/utils/chat-route-for'
+import { findSidebarProject } from '@/utils/find-sidebar-project'
 import projectRouteFor from '@/utils/project-route-for'
 import formatModelLabelFromRef from '@/utils/format-model-label-from-ref'
 
@@ -76,8 +77,9 @@ const chatTitle = computed(() => {
     }
   }
 
-  const sidebarProject = fleetSidebar.sidebarProjects.value.find(
-    (item) => item.slug === projectSlug.value,
+  const sidebarProject = findSidebarProject(
+    fleetSidebar.sidebarProjects.value,
+    projectSlug.value,
   )
   const sidebarChat = sidebarProject?.chats.find((item) => item.id === chatId.value)
   if (sidebarChat?.title) {

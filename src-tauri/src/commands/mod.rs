@@ -17,9 +17,9 @@ pub mod mcp;
 pub mod oauth;
 pub mod paths;
 pub mod registry;
-mod sandbox_protect;
 #[cfg(target_os = "macos")]
 pub mod sandbox;
+mod sandbox_protect;
 pub mod search;
 pub mod shell;
 mod skip_dirs;
@@ -27,6 +27,7 @@ pub mod watch;
 pub mod web_fetch;
 pub mod workbench;
 pub mod workspace_watch;
+pub mod worktree;
 pub use chat::{
     append_chat_line, create_chat, delete_chat, fork_chat, list_chats, list_pinned_chats,
     move_chat_to_workspace, pin_chat, read_chat_messages, read_chat_meta, read_chat_usage,
@@ -86,4 +87,7 @@ pub use workbench::{
 };
 pub use workspace_watch::{
     unwatch_workspace, watch_workspace, watch_workspace_paths, WorkspaceWatchState,
+};
+pub use worktree::{
+    git_worktree_add, git_worktree_list, git_worktree_remove, worktree_detect_parent,
 };

@@ -79,7 +79,7 @@ Build starts (or resumes) that chat in Agent mode, copies the plan todos into th
 
 There is no fresh-chat checkbox. Chat reuse is the same as Build without the checkbox: last build chat, else the source Plan chat, else a new chat titled with the plan title.
 
-Orchestrate starts (or resumes) that chat in Orchestrator mode, locks the nested sub-agent model on the chat, and sends a handoff that tells the parent to spawn one background sub-agent per todo. The parent updates plan todos as results come back, and may revise the plan body if scope changes.
+Orchestrate starts (or resumes) that chat in Orchestrator mode, locks the nested sub-agent model on the chat, and sends a handoff that tells the parent to spawn one background sub-agent per todo. The parent creates a [worktree](/using/worktrees) per implementer and spawns with that `workspaceSlug`, so workers do not share a checkout. The parent updates plan todos as results come back, and may revise the plan body if scope changes.
 
 ## After a start
 

@@ -30,6 +30,7 @@ import {
   SidebarMenuSubItem,
 } from '@/components/shadcn/ui/sidebar'
 import NavigationAsideLeftChatListItem from '@/components/navigation/aside/left/ChatListItem.vue'
+import NavigationAsideLeftWorktreeRow from '@/components/navigation/aside/left/WorktreeRow.vue'
 import GroupStackIcon from '@/components/navigation/aside/left/GroupStackIcon.vue'
 import useChatStore from '@/composables/use-chat-store'
 import useFleetRegistry from '@/composables/use-fleet-registry'
@@ -37,6 +38,7 @@ import useWorkbenchStore from '@/composables/use-workbench-store'
 import useProjectsExpansion from '@/composables/use-projects-expansion'
 import useVixlConfig from '@/composables/use-vixl-config'
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
+import resolveProjectRowWorkspace from '@/composables/resolve-project-row-workspace'
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
 import chatRouteFor from '@/utils/chat-route-for'
 import projectRouteFor from '@/utils/project-route-for'
@@ -56,43 +58,9 @@ const startingChat = ref(false)
 const removingProject = ref(false)
 const manualOpen = ref<boolean | null>(null)
 const isGroup = computed(() => props.project.kind === 'group')
-
-const resolveRowWorkspace = (): {
-  slug: string
-  projectRoot: string
-  activateId: string
-  remove: () => Promise<void>
-} | null => {
-  if (isGroup.value) {
-    const group = fleet.groups.value.find((item) => item.slug === props.project.slug)
-    const primarySlug = group?.memberSlugs[0]
-    const primary = primarySlug
-      ? fleet.projects.value.find((item) => item.slug === primarySlug)
-      : undefined
-    if (!group || !primary) {
-      return null
-    }
-    return {
-      slug: group.slug,
-      projectRoot: primary.rootPath,
-      activateId: primary.id,
-      remove: () => fleet.removeGroup(group.id),
-    }
-  }
-
-  const fleetProject = fleet.projects.value.find(
-    (item) => item.slug === props.project.slug,
-  )
-  if (!fleetProject) {
-    return null
-  }
-  return {
-    slug: fleetProject.slug,
-    projectRoot: fleetProject.rootPath,
-    activateId: fleetProject.id,
-    remove: () => fleet.removeProject(fleetProject.id),
-  }
-}
+const resolveRowWorkspace = () => resolveProjectRowWorkspace(props.project, fleet)
+const parentRootPath = computed(() => resolveRowWorkspace()?.projectRoot ?? null)
+const worktrees = computed(() => props.project.worktrees ?? [])
 
 const projectOpen = computed({
   get: (): boolean =>
@@ -300,6 +268,17 @@ const handleOpenTerminal = async (): Promise<void> => {
         class="overflow-hidden data-[state=closed]:animate-sidebar-collapsible-up data-[state=open]:animate-sidebar-collapsible-down"
       >
         <div class="min-w-0 max-h-42 scroll-fade-b scrollbar-none overflow-x-hidden overflow-y-auto pl-3.5">
+          <SidebarMenuSub
+            v-if="worktrees.length > 0 && parentRootPath"
+            class="mx-0 gap-0.5"
+          >
+            <NavigationAsideLeftWorktreeRow
+              v-for="worktree in worktrees"
+              :key="worktree.slug"
+              :project="worktree"
+              :parent-root-path="parentRootPath"
+            />
+          </SidebarMenuSub>
           <SidebarMenuSub class="mx-0 gap-0.5">
             <SidebarMenuSubItem
               v-for="chat in project.chats"

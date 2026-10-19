@@ -167,6 +167,29 @@ describe('mode allowlists move_workspace', () => {
   })
 })
 
+describe('mode allowlists worktree tools', () => {
+  it('includes worktree_create in agent and orchestrator, not ask or plan', () => {
+    expect(MODE_TOOL_ALLOWLIST.agent).toContain('worktree_create')
+    expect(MODE_TOOL_ALLOWLIST.orchestrator).toContain('worktree_create')
+    expect(MODE_TOOL_ALLOWLIST.ask).not.toContain('worktree_create')
+    expect(MODE_TOOL_ALLOWLIST.plan).not.toContain('worktree_create')
+  })
+
+  it('includes worktree_remove in agent only', () => {
+    expect(MODE_TOOL_ALLOWLIST.agent).toContain('worktree_remove')
+    expect(MODE_TOOL_ALLOWLIST.orchestrator).not.toContain('worktree_remove')
+    expect(MODE_TOOL_ALLOWLIST.ask).not.toContain('worktree_remove')
+    expect(MODE_TOOL_ALLOWLIST.plan).not.toContain('worktree_remove')
+  })
+
+  it('does not include worktree tools in subagent tool sets', () => {
+    expect(SUBAGENT_READ_ONLY_TOOLS).not.toContain('worktree_create')
+    expect(SUBAGENT_WRITE_TOOLS).not.toContain('worktree_create')
+    expect(SUBAGENT_READ_ONLY_TOOLS).not.toContain('worktree_remove')
+    expect(SUBAGENT_WRITE_TOOLS).not.toContain('worktree_remove')
+  })
+})
+
 describe('mode allowlists web_fetch', () => {
   it('includes web_fetch in ask, plan, agent, and orchestrator', () => {
     expect(MODE_TOOL_ALLOWLIST.ask).toContain('web_fetch')

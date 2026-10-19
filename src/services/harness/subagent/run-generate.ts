@@ -41,6 +41,7 @@ import repairToolCall from '@/services/harness/orchestrator/repair-tool-call'
 import { formatMemberProjectSection } from '@/services/context/system-prompt-parts/format-project-section'
 import { hasGroupMembers } from '@/utils/parse-member-qualified-name'
 import type { HarnessEvent } from '@/types/harness/harness-event'
+import type { SubagentWorkspace } from '@/types/harness/subagent-record'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const SUBAGENT_UNTRUSTED_TAIL =
@@ -65,12 +66,16 @@ const runSubagentGenerate = async (args: {
   signal: AbortSignal
   model: string
   capabilities: 'read-only' | 'write'
+  workspace?: SubagentWorkspace
   messages?: ModelMessage[]
 }): Promise<SubagentGenerateResult> => {
   const { ctx, subagentId, agentName, prompt, toolCallId, signal, model: serializedModel } = args
+  const nestedProjectRoot = args.workspace?.projectRoot ?? ctx.projectRoot
+  const nestedProjectSlug = args.workspace?.projectSlug ?? ctx.projectSlug
+  const nestedMembers = args.workspace ? undefined : ctx.members
 
   const session = getPlanExecutionSession(ctx.projectSlug, ctx.chatId)
-  const agentDefinition = await resolveAgentDefinition(ctx.projectRoot, agentName).catch(
+  const agentDefinition = await resolveAgentDefinition(nestedProjectRoot, agentName).catch(
     () => null,
   )
 
@@ -115,6 +120,9 @@ const runSubagentGenerate = async (args: {
   const safeName = sanitizeSubagentName(agentName)
   const nestedCtx: HarnessToolContext = {
     ...ctx,
+    projectRoot: nestedProjectRoot,
+    projectSlug: nestedProjectSlug,
+    members: nestedMembers,
     supportsVision,
     // Subagents opt out of image staging: nested runs have no stage drain.
     stageImage: undefined,
@@ -149,8 +157,8 @@ const runSubagentGenerate = async (args: {
     : definitionInstructions
       ? `Workspace read-only subagent named ${safeName}. ${SUBAGENT_FOLLOW_DEFINITION} ${SUBAGENT_READ_ONLY_CONSTRAINT} ${SUBAGENT_UNTRUSTED_TAIL}\n\nAgent definition:\n${definitionInstructions}`
       : `Workspace read-only subagent. Explore the codebase. ${SUBAGENT_READ_ONLY_CONSTRAINT} ${SUBAGENT_UNTRUSTED_TAIL}`
-  const system = hasGroupMembers(ctx.members)
-    ? `${identity}\n\n${formatMemberProjectSection(ctx.members)}`
+  const system = hasGroupMembers(nestedMembers)
+    ? `${identity}\n\n${formatMemberProjectSection(nestedMembers)}`
     : identity
 
   const formattedPrompt = formatSubagentUserPrompt(safeName, prompt)

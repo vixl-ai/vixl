@@ -280,6 +280,7 @@ export default defineUserConfig({
             text: 'Orchestrate sub-agents',
             link: '/using/orchestrate-sub-agents',
           },
+          { text: 'Worktrees', link: '/using/worktrees' },
           { text: 'Best practices', link: '/using/best-practices' },
           { text: 'Use the workbench', link: '/using/use-the-workbench' },
           {
