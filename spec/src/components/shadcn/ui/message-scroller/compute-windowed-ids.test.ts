@@ -8,6 +8,7 @@ import {
   resolveViewportHeight,
   resolveWindowScrollTop,
   shouldAnchorOnContentChange,
+  shouldAdvanceFollowChaseBaseline,
   shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
   shouldTrustFollowBottomContentMeasurements,
@@ -333,6 +334,29 @@ describe('shouldTrustFollowBottomContentMeasurements', () => {
       measuredCount,
       scrollEpsilon: 0.5,
       scrollHeight: estimatedHeight + perItemMismatch * measuredCount,
+    })).toBe(false)
+  })
+})
+
+describe('shouldAdvanceFollowChaseBaseline', () => {
+  it('advances when the chase fired', () => {
+    expect(shouldAdvanceFollowChaseBaseline({
+      chased: true,
+      trust: false,
+    })).toBe(true)
+  })
+
+  it('advances when estimates were consistent with the DOM', () => {
+    expect(shouldAdvanceFollowChaseBaseline({
+      chased: false,
+      trust: true,
+    })).toBe(true)
+  })
+
+  it('keeps the growth baseline on a trust-blocked frame', () => {
+    expect(shouldAdvanceFollowChaseBaseline({
+      chased: false,
+      trust: false,
     })).toBe(false)
   })
 })

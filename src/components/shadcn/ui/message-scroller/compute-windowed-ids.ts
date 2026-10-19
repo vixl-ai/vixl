@@ -93,6 +93,16 @@ export function shouldTrustFollowBottomContentMeasurements({
     <= scrollEpsilon + roundingTolerance
 }
 
+export function shouldAdvanceFollowChaseBaseline({
+  chased,
+  trust,
+}: {
+  chased: boolean
+  trust: boolean
+}): boolean {
+  return chased || trust
+}
+
 export function shouldInvalidateItemHeightsOnWidthChange({
   clientHeight,
   clientWidth,
