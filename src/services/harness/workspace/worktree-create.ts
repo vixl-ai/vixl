@@ -12,18 +12,20 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const WORKTREE_NAME_RE = /^[a-z0-9-]+$/
 
+const warmCodeGraph = async (root: string): Promise<void> => {
+  try {
+    await ensureCodeGraph(root)
+  } catch {
+    return
+  }
+}
+
 const worktreeCreate = (ctx: HarnessToolContext) =>
   tool({
-    description:
-      'Create a git worktree as a fleet sub-project (always user-approved). Does not move this chat.',
+    description: 'Create a git worktree (always user-approved).',
     inputSchema: z.object({
-      name: z
-        .string()
-        .describe('Lowercase slug for the worktree and branch vixl/<name>'),
-      baseRef: z
-        .string()
-        .optional()
-        .describe('Git ref to base the new branch on (default HEAD)'),
+      name: z.string().describe('Lowercase slug (branch vixl/<name>)'),
+      baseRef: z.string().optional().describe('Base git ref'),
     }),
     execute: async ({ name, baseRef }, { toolCallId }) => {
       if (ctx.subagentId) {
@@ -68,7 +70,7 @@ const worktreeCreate = (ctx: HarnessToolContext) =>
         }
       }
 
-      void ensureCodeGraph(created.path).catch(() => undefined)
+      void warmCodeGraph(created.path)
 
       return {
         ok: true,

@@ -75,9 +75,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
       workspaceSlug: z
         .string()
         .optional()
-        .describe(
-          'Fleet project slug of a worktree child of this project, or a member of the current group',
-        ),
+        .describe('Worktree child or group-member slug'),
     }),
     execute: async (
       { agentName, prompt, mode, model: callModel, capabilities, workspaceSlug },

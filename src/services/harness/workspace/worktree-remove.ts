@@ -20,14 +20,10 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const worktreeRemove = (ctx: HarnessToolContext) =>
   tool({
-    description:
-      'Remove a registered git worktree from the fleet (always user-approved). Cannot remove the current chat root.',
+    description: 'Remove a git worktree (always user-approved).',
     inputSchema: z.object({
-      rootPath: z
-        .string()
-        .optional()
-        .describe('Absolute path of the worktree to remove (must differ from this chat root)'),
-      force: z.boolean().optional().describe('Force-remove a dirty worktree'),
+      rootPath: z.string().optional().describe('Worktree path (not this chat root)'),
+      force: z.boolean().optional().describe('Force if dirty'),
     }),
     execute: async ({ rootPath, force }, { toolCallId }) => {
       if (ctx.subagentId) {
