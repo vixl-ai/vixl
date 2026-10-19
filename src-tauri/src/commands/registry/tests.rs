@@ -4,9 +4,10 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 use super::{
-    apply_group_update, default_group_name, normalize_root_path, remove_fleet_group,
-    unique_group_slug, unique_project_slug, upsert_fleet_group, upsert_fleet_project,
-    upsert_fleet_project_occupied, FleetProject, FleetProjectGroup,
+    apply_group_update, apply_project_root_update, default_group_name, normalize_root_path,
+    remove_fleet_group, unique_group_slug, unique_project_slug, upsert_fleet_group,
+    upsert_fleet_project, upsert_fleet_project_occupied, FleetProject, FleetProjectGroup,
+    WorktreeLink,
 };
 
 struct TempRoot {
@@ -34,6 +35,7 @@ fn sample(id: &str, name: &str, slug: &str, root: &str) -> FleetProject {
         slug: slug.to_string(),
         root_path: root.to_string(),
         last_opened: "1".to_string(),
+        worktree: None,
     }
 }
 
@@ -347,6 +349,27 @@ fn remove_group_drops_matching_id_and_ignores_unknown() {
     remove_fleet_group(&mut groups, &first.id);
     assert_eq!(groups.len(), 1);
     assert_eq!(groups[0].id, second.id);
+}
+
+#[test]
+fn root_update_clears_worktree_link_for_non_worktree_root() {
+    let root = TempRoot::new("plain");
+    let root_str = root.path.to_string_lossy().to_string();
+    let mut projects = vec![sample("child-1", "Child", "child", "/tmp/old-worktree")];
+    projects[0].worktree = Some(WorktreeLink {
+        parent_id: "parent-1".to_string(),
+        branch: "vixl/feature".to_string(),
+        managed: false,
+    });
+    let updated =
+        apply_project_root_update(&mut projects, "child-1", root_str.clone()).expect("update root");
+    assert_eq!(updated.root_path, root_str);
+    assert_eq!(updated.worktree, None);
+    assert_eq!(projects[0].worktree, None);
+    assert_eq!(
+        apply_project_root_update(&mut projects, "missing", root_str).unwrap_err(),
+        "Project not found"
+    );
 }
 
 #[cfg(windows)]

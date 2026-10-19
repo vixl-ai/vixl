@@ -7,6 +7,13 @@ use uuid::Uuid;
 
 use super::paths::user_vixl_dir;
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct WorktreeLink {
+    pub parent_id: String,
+    pub branch: String,
+    pub managed: bool,
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct FleetProject {
     pub id: String,
@@ -14,6 +21,8 @@ pub struct FleetProject {
     pub slug: String,
     pub root_path: String,
     pub last_opened: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree: Option<WorktreeLink>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -98,7 +107,7 @@ fn write_groups_registry(app: &AppHandle, registry: &GroupsRegistry) -> Result<(
     fs::write(path, content).map_err(|e| e.to_string())
 }
 
-fn slugify(name: &str) -> String {
+pub(crate) fn slugify(name: &str) -> String {
     name.to_lowercase()
         .chars()
         .map(|c| if c.is_alphanumeric() { c } else { '-' })
@@ -107,6 +116,15 @@ fn slugify(name: &str) -> String {
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("-")
+}
+
+pub(crate) fn slugify_or_fallback(name: &str, fallback: &str) -> String {
+    let slug = slugify(name);
+    if slug.is_empty() {
+        fallback.to_string()
+    } else {
+        slug
+    }
 }
 
 #[cfg(test)]
@@ -139,12 +157,7 @@ fn unique_fleet_slug<'a>(
     occupied: impl IntoIterator<Item = &'a str>,
 ) -> String {
     let occupied: HashSet<&str> = occupied.into_iter().collect();
-    let base = slugify(name);
-    let base = if base.is_empty() {
-        empty_fallback.to_string()
-    } else {
-        base
-    };
+    let base = slugify_or_fallback(name, empty_fallback);
     if base != "_home_" && !occupied.contains(base.as_str()) {
         return base;
     }
@@ -221,7 +234,7 @@ fn validate_member_slugs(member_slugs: &[String], projects: &[FleetProject]) -> 
     Ok(())
 }
 
-fn roots_match(left: &str, right: &str) -> bool {
+pub(crate) fn roots_match(left: &str, right: &str) -> bool {
     if left == right {
         return true;
     }
@@ -291,6 +304,7 @@ fn upsert_fleet_project_occupied_inner(
         ),
         root_path,
         last_opened: chrono_now(),
+        worktree: None,
     };
     projects.push(project.clone());
     projects.sort_by(|a, b| b.last_opened.cmp(&a.last_opened));
@@ -339,8 +353,14 @@ pub(crate) fn add_or_update_project(
         .collect();
     let project =
         upsert_fleet_project_occupied_inner(&mut registry.projects, name, root_path, &occupied);
+    sync_project_worktree_link(&mut registry.projects, &project.id);
     write_registry(app, &registry)?;
-    Ok(project)
+    registry
+        .projects
+        .iter()
+        .find(|entry| entry.id == project.id)
+        .cloned()
+        .ok_or_else(|| "Project not found after upsert".to_string())
 }
 
 pub fn open_project_at_path(app: &AppHandle, root_path: PathBuf) -> Result<FleetProject, String> {
@@ -373,6 +393,27 @@ pub fn registry_add_project(
     add_or_update_project(&app, name, root_path)
 }
 
+pub fn apply_project_root_update(
+    projects: &mut [FleetProject],
+    project_id: &str,
+    root_path: String,
+) -> Result<FleetProject, String> {
+    {
+        let project = projects
+            .iter_mut()
+            .find(|project| project.id == project_id)
+            .ok_or_else(|| "Project not found".to_string())?;
+        project.root_path = root_path;
+        project.last_opened = chrono_now();
+    }
+    sync_project_worktree_link(projects, project_id);
+    projects
+        .iter()
+        .find(|project| project.id == project_id)
+        .cloned()
+        .ok_or_else(|| "Project not found".to_string())
+}
+
 #[tauri::command]
 pub fn registry_update_project_root(
     app: AppHandle,
@@ -380,14 +421,7 @@ pub fn registry_update_project_root(
     root_path: String,
 ) -> Result<FleetProject, String> {
     let mut registry = read_registry(&app)?;
-    let project = registry
-        .projects
-        .iter_mut()
-        .find(|p| p.id == project_id)
-        .ok_or_else(|| "Project not found".to_string())?;
-    project.root_path = root_path;
-    project.last_opened = chrono_now();
-    let updated = project.clone();
+    let updated = apply_project_root_update(&mut registry.projects, &project_id, root_path)?;
     write_registry(&app, &registry)?;
     Ok(updated)
 }
@@ -396,6 +430,7 @@ pub fn registry_update_project_root(
 pub fn registry_remove_project(app: AppHandle, project_id: String) -> Result<(), String> {
     let mut registry = read_registry(&app)?;
     registry.projects.retain(|p| p.id != project_id);
+    clear_worktree_links_to_parent(&mut registry.projects, &project_id);
     write_registry(&app, &registry)?;
 
     let active = get_active_project(app.clone())?;
@@ -557,6 +592,47 @@ pub fn get_active_project(app: AppHandle) -> Result<Option<String>, String> {
     let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
     let active: ActiveProject = serde_json::from_str(&content).map_err(|e| e.to_string())?;
     Ok(active.project_id)
+}
+
+pub fn sync_project_worktree_link(projects: &mut [FleetProject], project_id: &str) {
+    let Some(project) = projects.iter().find(|project| project.id == project_id) else {
+        return;
+    };
+    let root = project.root_path.clone();
+    let detected = super::worktree::detect_worktree_parent_among(&root, projects)
+        .ok()
+        .flatten();
+    let Some(project) = projects.iter_mut().find(|project| project.id == project_id) else {
+        return;
+    };
+    match detected {
+        Some(parent) => {
+            let managed = project
+                .worktree
+                .as_ref()
+                .is_some_and(|link| link.managed && link.parent_id == parent.parent_project_id);
+            project.worktree = Some(WorktreeLink {
+                parent_id: parent.parent_project_id,
+                branch: parent.branch,
+                managed,
+            });
+        }
+        None => {
+            project.worktree = None;
+        }
+    }
+}
+
+pub fn clear_worktree_links_to_parent(projects: &mut [FleetProject], parent_id: &str) {
+    for project in projects.iter_mut() {
+        if project
+            .worktree
+            .as_ref()
+            .is_some_and(|link| link.parent_id == parent_id)
+        {
+            project.worktree = None;
+        }
+    }
 }
 
 fn chrono_now() -> String {

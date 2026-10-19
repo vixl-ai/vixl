@@ -207,6 +207,7 @@ fn resolve_project_id_home_and_registry() {
         slug: "demo".to_string(),
         root_path: "/tmp/demo".to_string(),
         last_opened: "now".to_string(),
+        worktree: None,
     }];
     assert_eq!(
         resolve_project_id(HOME_PROJECT_ID, "/anywhere", &projects, &[]),
