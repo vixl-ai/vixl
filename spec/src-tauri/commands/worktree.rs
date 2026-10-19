@@ -1,7 +1,7 @@
 use app_lib::commands::git_binary::git_binary;
 use app_lib::commands::registry::{
-    apply_project_root_update, clear_worktree_links_to_parent, link_registered_worktree_children,
-    sync_project_worktree_link, FleetProject, WorktreeLink,
+    apply_detected_worktree_link, apply_project_root_update, clear_worktree_links_to_parent,
+    link_registered_worktree_children, sync_project_worktree_link, FleetProject, WorktreeLink,
 };
 use app_lib::commands::worktree::{
     detect_worktree_parent_among, git_worktree_add_in_dir, git_worktree_list, git_worktree_remove,
@@ -468,6 +468,50 @@ fn worktree_child_does_not_scan_siblings_as_children() {
         .find(|project| project.id == "child-review")
         .expect("review child");
     assert_eq!(review_project.worktree, None);
+}
+
+#[test]
+fn sync_keeps_link_when_detection_fails() {
+    let dir = tempfile::tempdir().expect("child root");
+    let mut child = sample_project("child-1", "feature", dir.path());
+    let link = WorktreeLink {
+        parent_id: "parent-1".to_string(),
+        branch: "vixl/feature".to_string(),
+        managed: true,
+    };
+    child.worktree = Some(link.clone());
+    let mut projects = vec![child];
+
+    apply_detected_worktree_link(
+        &mut projects,
+        "child-1",
+        None,
+        Err("git was not found on PATH or common install locations".to_string()),
+    );
+    assert_eq!(projects[0].worktree.as_ref(), Some(&link));
+}
+
+#[test]
+fn sync_clears_link_when_detection_finds_no_parent() {
+    let dir = tempfile::tempdir().expect("plain root");
+    let mut child = sample_project("child-1", "feature", dir.path());
+    child.worktree = Some(WorktreeLink {
+        parent_id: "parent-1".to_string(),
+        branch: "vixl/feature".to_string(),
+        managed: true,
+    });
+    let mut projects = vec![child];
+
+    apply_detected_worktree_link(&mut projects, "child-1", None, Ok(None));
+    assert_eq!(projects[0].worktree, None);
+
+    projects[0].worktree = Some(WorktreeLink {
+        parent_id: "parent-1".to_string(),
+        branch: "vixl/feature".to_string(),
+        managed: true,
+    });
+    sync_project_worktree_link(&mut projects, "child-1", None);
+    assert_eq!(projects[0].worktree, None);
 }
 
 #[test]

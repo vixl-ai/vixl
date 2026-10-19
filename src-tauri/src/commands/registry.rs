@@ -6,6 +6,7 @@ use tauri::AppHandle;
 use uuid::Uuid;
 
 use super::paths::user_vixl_dir;
+use super::worktree::WorktreeParentMatch;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct WorktreeLink {
@@ -612,14 +613,25 @@ pub fn sync_project_worktree_link(
         return;
     };
     let root = project.root_path.clone();
-    let detected = super::worktree::detect_worktree_parent_among(&root, projects)
-        .ok()
-        .flatten();
+    let detected = super::worktree::detect_worktree_parent_among(&root, projects);
+    apply_detected_worktree_link(projects, project_id, user_vixl_dir, detected);
+}
+
+pub fn apply_detected_worktree_link(
+    projects: &mut [FleetProject],
+    project_id: &str,
+    user_vixl_dir: Option<&Path>,
+    detected: Result<Option<WorktreeParentMatch>, String>,
+) {
+    let Some(project) = projects.iter().find(|project| project.id == project_id) else {
+        return;
+    };
+    let root = project.root_path.clone();
     let Some(project) = projects.iter_mut().find(|project| project.id == project_id) else {
         return;
     };
     match detected {
-        Some(parent) => {
+        Ok(Some(parent)) => {
             let managed = match user_vixl_dir {
                 Some(dir) => super::worktree::is_managed_worktree_path(&root, dir),
                 None => project
@@ -633,9 +645,10 @@ pub fn sync_project_worktree_link(
                 managed,
             });
         }
-        None => {
+        Ok(None) => {
             project.worktree = None;
         }
+        Err(_) => {}
     }
 }
 

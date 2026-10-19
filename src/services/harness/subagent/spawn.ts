@@ -21,8 +21,12 @@ import resolveAgentDefinition from '@/services/agents/resolve-agent-definition'
 import { READ_ONLY_SPAWN_MODES } from '@/services/harness/subagent/constants'
 import linkAbortSignal from '@/utils/link-abort-signal'
 import pathsEqual from '@/utils/paths-equal'
+import type { FleetProject } from '@/types/fleet/fleet-project'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import type { SubagentWorkspace } from '@/types/harness/subagent-record'
+
+const ancestorOf = (project: FleetProject): string =>
+  project.worktree?.parentId ?? project.id
 
 const resolveSpawnWorkspace = async (
   ctx: HarnessToolContext,
@@ -43,7 +47,11 @@ const resolveSpawnWorkspace = async (
   const current =
     projects.find((project) => pathsEqual(project.rootPath, ctx.projectRoot)) ??
     projects.find((project) => project.slug === ctx.projectSlug)
-  const isWorktreeChild = Boolean(current && target.worktree?.parentId === current.id)
+  const isWorktreeChild = Boolean(
+    current &&
+      target.worktree &&
+      ancestorOf(target) === ancestorOf(current),
+  )
   const isGroupMember = Boolean(ctx.members?.some((member) => member.slug === slug))
   if (!isWorktreeChild && !isGroupMember) {
     throw new Error(

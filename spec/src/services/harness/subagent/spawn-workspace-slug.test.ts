@@ -95,6 +95,19 @@ const worktreeChild: FleetProject = {
   },
 }
 
+const worktreeSibling: FleetProject = {
+  id: 'proj-wt-b',
+  name: 'review',
+  slug: 'review',
+  rootPath: '/tmp/worktrees/demo/review',
+  lastOpened: '2026-01-01T00:00:00.000Z',
+  worktree: {
+    parentId: 'proj-parent',
+    branch: 'vixl/review',
+    managed: true,
+  },
+}
+
 const unrelatedProject: FleetProject = {
   id: 'proj-other',
   name: 'other',
@@ -161,6 +174,7 @@ describe('spawn_subagent workspaceSlug', () => {
     getFleetProjects.mockReturnValue([
       parentProject,
       worktreeChild,
+      worktreeSibling,
       unrelatedProject,
       webMember,
     ])
@@ -192,6 +206,46 @@ describe('spawn_subagent workspaceSlug', () => {
         },
       }),
     )
+  })
+
+  it('accepts a sibling worktree when the chat is already on a child', async () => {
+    const ctx = baseCtx({
+      projectRoot: worktreeChild.rootPath,
+      projectSlug: worktreeChild.slug,
+    })
+    await expect(execute(ctx, 'review')).resolves.toMatchObject({
+      summary: 'ok summary',
+    })
+    expect(runSubagentGenerate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: {
+          projectRoot: '/tmp/worktrees/demo/review',
+          projectSlug: 'review',
+        },
+      }),
+    )
+  })
+
+  it('rejects the main checkout as a target when the chat is on a child', async () => {
+    const ctx = baseCtx({
+      projectRoot: worktreeChild.rootPath,
+      projectSlug: worktreeChild.slug,
+    })
+    await expect(execute(ctx, 'demo')).rejects.toThrow(
+      'workspaceSlug demo is not a worktree of this project or a member of the current group',
+    )
+    expect(runSubagentGenerate).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unrelated project when the chat is on a child', async () => {
+    const ctx = baseCtx({
+      projectRoot: worktreeChild.rootPath,
+      projectSlug: worktreeChild.slug,
+    })
+    await expect(execute(ctx, 'other')).rejects.toThrow(
+      'workspaceSlug other is not a worktree of this project or a member of the current group',
+    )
+    expect(runSubagentGenerate).not.toHaveBeenCalled()
   })
 
   it('accepts a group member when members are set', async () => {

@@ -259,19 +259,38 @@ fn branch_exists(root_path: &str, branch: &str) -> bool {
     run_git(root_path, &["show-ref", "--verify", "--quiet", &spec]).is_ok()
 }
 
+fn git_error_means_not_a_repo(error: &str) -> bool {
+    error.to_lowercase().contains("not a git repository")
+}
+
+fn rev_parse_path(root: &str, args: &[&str]) -> Result<Option<String>, String> {
+    match run_git(root, args) {
+        Ok(value) if !value.is_empty() => Ok(Some(value)),
+        Ok(_) => Ok(None),
+        Err(error) if git_error_means_not_a_repo(&error) => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
 fn resolve_worktree_parent_checkout(path: &str) -> Result<Option<(PathBuf, String)>, String> {
     let cwd = PathBuf::from(path);
-    let git_dir = match run_git(path, &["rev-parse", "--absolute-git-dir"]) {
-        Ok(value) if !value.is_empty() => resolve_reported_path(&cwd, &value),
-        _ => match run_git(path, &["rev-parse", "--git-dir"]) {
-            Ok(value) if !value.is_empty() => resolve_reported_path(&cwd, &value),
-            _ => return Ok(None),
+    let git_dir_raw = match run_git(path, &["rev-parse", "--absolute-git-dir"]) {
+        Ok(value) if !value.is_empty() => value,
+        Ok(_) => match rev_parse_path(path, &["rev-parse", "--git-dir"])? {
+            Some(value) => value,
+            None => return Ok(None),
+        },
+        Err(error) if git_error_means_not_a_repo(&error) => return Ok(None),
+        Err(_) => match rev_parse_path(path, &["rev-parse", "--git-dir"])? {
+            Some(value) => value,
+            None => return Ok(None),
         },
     };
-    let common_dir = match run_git(path, &["rev-parse", "--git-common-dir"]) {
-        Ok(value) if !value.is_empty() => resolve_reported_path(&cwd, &value),
-        _ => return Ok(None),
+    let git_dir = resolve_reported_path(&cwd, &git_dir_raw);
+    let Some(common_raw) = rev_parse_path(path, &["rev-parse", "--git-common-dir"])? else {
+        return Ok(None);
     };
+    let common_dir = resolve_reported_path(&cwd, &common_raw);
 
     if paths_equal(&git_dir.to_string_lossy(), &common_dir.to_string_lossy()) {
         return Ok(None);
