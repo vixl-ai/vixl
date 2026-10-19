@@ -7,8 +7,9 @@ import {
   resolveViewportHeight,
   resolveWindowScrollTop,
   shouldAnchorOnContentChange,
-  shouldChaseFollowBottomForResizeSource,
+  shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
+  shouldTrustFollowBottomContentMeasurements,
   shouldEstimateFollowBottomScrollTop,
   shouldInvalidateItemHeightsOnWidthChange,
   shouldSampleClientWidthBaseline,
@@ -160,13 +161,55 @@ describe('shouldChaseFollowBottomOnResize', () => {
   })
 })
 
-describe('shouldChaseFollowBottomForResizeSource', () => {
-  it('allows chase for viewport resize', () => {
-    expect(shouldChaseFollowBottomForResizeSource({ source: 'viewport' })).toBe(true)
+describe('shouldChaseFollowBottomOnContentGrowth', () => {
+  it('chases when scrollHeight grew beyond epsilon', () => {
+    expect(shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight: 1000,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000.6,
+    })).toBe(true)
   })
 
-  it('blocks chase for content resize (the stale-height loop pump)', () => {
-    expect(shouldChaseFollowBottomForResizeSource({ source: 'content' })).toBe(false)
+  it('skips chase when scrollHeight is unchanged', () => {
+    expect(shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight: 1000,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000,
+    })).toBe(false)
+  })
+
+  it('skips chase when growth is within epsilon', () => {
+    expect(shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight: 1000,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000.4,
+    })).toBe(false)
+  })
+
+  it('skips chase when scrollHeight shrank', () => {
+    expect(shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight: 1400,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1000,
+    })).toBe(false)
+  })
+})
+
+describe('shouldTrustFollowBottomContentMeasurements', () => {
+  it('trusts when estimated height matches the DOM within epsilon', () => {
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight: 1400.4,
+      scrollEpsilon: 0.5,
+      scrollHeight: 1400,
+    })).toBe(true)
+  })
+
+  it('rejects when mounted content is taller than the height map', () => {
+    expect(shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight: 1600,
+      scrollEpsilon: 0.5,
+      scrollHeight: 3200,
+    })).toBe(false)
   })
 })
 

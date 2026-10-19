@@ -34,12 +34,28 @@ export function shouldChaseFollowBottomOnResize({
   return Math.abs(maxScrollTop - scrollTop) > scrollEpsilon
 }
 
-export function shouldChaseFollowBottomForResizeSource({
-  source,
+export function shouldChaseFollowBottomOnContentGrowth({
+  previousScrollHeight,
+  scrollEpsilon,
+  scrollHeight,
 }: {
-  source: "content" | "viewport"
+  previousScrollHeight: number
+  scrollEpsilon: number
+  scrollHeight: number
 }): boolean {
-  return source === "viewport"
+  return scrollHeight - previousScrollHeight > scrollEpsilon
+}
+
+export function shouldTrustFollowBottomContentMeasurements({
+  estimatedHeight,
+  scrollEpsilon,
+  scrollHeight,
+}: {
+  estimatedHeight: number
+  scrollEpsilon: number
+  scrollHeight: number
+}): boolean {
+  return Math.abs(scrollHeight - estimatedHeight) <= scrollEpsilon
 }
 
 export function shouldInvalidateItemHeightsOnWidthChange({

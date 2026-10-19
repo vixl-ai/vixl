@@ -10,8 +10,9 @@ import {
   resolveViewportHeight,
   resolveWindowScrollTop,
   shouldAnchorOnContentChange,
-  shouldChaseFollowBottomForResizeSource,
+  shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
+  shouldTrustFollowBottomContentMeasurements,
   shouldEstimateFollowBottomScrollTop,
   shouldInvalidateItemHeightsOnWidthChange,
   shouldSampleClientWidthBaseline,
@@ -443,6 +444,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   let pinnedMessageIds: string[] = []
   let lastPositiveClientHeight = 0
   let lastClientWidth = 0
+  let lastScrollHeight = 0
   const scrollableAttr = computed(() => {
     const attr = [scrollable.value.start && "start", scrollable.value.end && "end"]
       .filter(Boolean)
@@ -731,6 +733,7 @@ function createEngine(props: MessageScrollerProviderProps) {
       scrollTop: viewport.scrollTop,
       spacerHeight,
     })) {
+      lastScrollHeight = viewport.scrollHeight
       return true
     }
     setSpacerHeight(0)
@@ -739,6 +742,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     scrollTo(maxScrollTop(viewport), { autoscrolling: true, behavior })
     scheduleVisibilitySync()
     recomputeWindow()
+    lastScrollHeight = viewport.scrollHeight
     return true
   }
 
@@ -972,20 +976,49 @@ function createEngine(props: MessageScrollerProviderProps) {
 
   function applyResize(source: "content" | "viewport") {
     syncItemHeightsToViewportWidth()
+    const scrollHeight = viewport?.scrollHeight ?? 0
+    const previousScrollHeight = lastScrollHeight
+    lastScrollHeight = scrollHeight
     if (mode === "following-bottom" && autoScroll()) {
       // Already-at-bottom and zero-height resizes must not call scrollToEnd:
       // that retriggers ResizeObserver through autoscroll and remounts.
-      // Content resize at rest is the stale-height loop pump; chase only
-      // when the viewport itself changed. Streaming growth uses followLiveOutput.
+      // Viewport resizes still chase when off the live edge. Content resizes
+      // chase only when scrollHeight grew and itemHeights match the DOM
+      // (late images, code blocks, fonts after reportItemHeight). Shrink,
+      // unchanged, and stale-placeholder growth only recomputeWindow so the
+      // clamp cycle cannot pump.
+      const { gap, padding } = layoutMetrics()
+      const estimatedHeight = estimateItemsHeight({
+        gap,
+        heights: itemHeights,
+        itemIds: windowItemIds,
+        paddingEnd: padding.end,
+        paddingStart: padding.start,
+      }) + spacerHeight
+      const observedHeight = content?.scrollHeight ?? scrollHeight
       if (
         viewport
-        && shouldChaseFollowBottomForResizeSource({ source })
         && shouldChaseFollowBottomOnResize({
           clientHeight: viewport.clientHeight,
           maxScrollTop: maxScrollTop(viewport),
           scrollEpsilon: SCROLL_EPSILON,
           scrollTop: viewport.scrollTop,
         })
+        && (
+          source === "viewport"
+          || (
+            shouldChaseFollowBottomOnContentGrowth({
+              previousScrollHeight,
+              scrollEpsilon: SCROLL_EPSILON,
+              scrollHeight,
+            })
+            && shouldTrustFollowBottomContentMeasurements({
+              estimatedHeight,
+              scrollEpsilon: SCROLL_EPSILON,
+              scrollHeight: observedHeight,
+            })
+          )
+        )
       ) {
         scrollToEnd({ behavior: "auto" })
       }

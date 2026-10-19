@@ -4,8 +4,9 @@ import {
   DEFAULT_ITEM_HEIGHT,
   DEFAULT_OVERSCAN_PX,
   estimateItemsHeight,
-  shouldChaseFollowBottomForResizeSource,
+  shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
+  shouldTrustFollowBottomContentMeasurements,
   shouldExitFollowBottom,
   shouldInvalidateItemHeightsOnWidthChange,
   shouldSampleClientWidthBaseline,
@@ -19,25 +20,31 @@ import {
  * scrollHeight, the browser clamps scrollTop, the window expands, remounts
  * grow scrollHeight, content ResizeObserver chases again.
  *
- * Production guards (width invalidation plus viewport-only chase) must
+ * Production guards (width invalidation plus measured growth-gated chase) must
  * converge without streaming and without widening the pane after ignition.
+ * Growth-only chase never fires on shrink or clamp frames. Chase also requires
+ * itemHeights to match the DOM, so stale-placeholder remount growth cannot
+ * pump. Width invalidation still clears heights after a real width change.
  */
 
 const SCROLL_EPSILON = 0.5
 const SCROLL_EDGE_THRESHOLD = 8
 
 type ResizeSource = 'content' | 'viewport'
+type ChasePolicy = 'all-content' | 'content-growth' | 'viewport-only'
 
 interface SimulatorOptions {
-  chaseContentResize?: boolean
+  applyGuardsFromFrame?: number
+  chasePolicy?: ChasePolicy
   frames: number
   gap: number
   itemCount: number
   invalidateOnWidthChange?: boolean
+  lateTrueHeight?: number
+  lateTrueHeightFromFrame?: number
   oldHeight: number
   overscanPx: number
   reportPolicy: 'raceUnmount' | 'allMounted'
-  stopContentChaseAfterFrames?: number
   trueHeight: number
   viewportHeight: number
 }
@@ -63,9 +70,9 @@ function windowKey(mounted: ReadonlySet<string>): string {
   return [...mounted].join(',')
 }
 
-function applyFixedGuards(): Pick<SimulatorOptions, 'chaseContentResize' | 'invalidateOnWidthChange'> {
+function applyFixedGuards(): Pick<SimulatorOptions, 'chasePolicy' | 'invalidateOnWidthChange'> {
   return {
-    chaseContentResize: false,
+    chasePolicy: 'content-growth',
     invalidateOnWidthChange: true,
   }
 }
@@ -95,15 +102,17 @@ function syncItemHeightsToViewportWidth({
 }
 
 function simulateFollowBottomWidthChange({
-  chaseContentResize = true,
+  applyGuardsFromFrame,
+  chasePolicy = 'all-content',
   frames,
   gap,
   itemCount,
   invalidateOnWidthChange = false,
+  lateTrueHeight,
+  lateTrueHeightFromFrame,
   oldHeight,
   overscanPx,
   reportPolicy,
-  stopContentChaseAfterFrames,
   trueHeight,
   viewportHeight,
 }: SimulatorOptions) {
@@ -124,17 +133,28 @@ function simulateFollowBottomWidthChange({
     scrollTop,
     viewportHeight,
   })
-  let allowContentChase = chaseContentResize
+  let policy = chasePolicy
+  let liveTrueHeight = trueHeight
   let shouldClearHeightsOnWidth = invalidateOnWidthChange
+  let previousScrollHeight = 0
 
   const framesOut: FrameOut[] = []
 
   for (let frame = 0; frame < frames; frame += 1) {
+    if (applyGuardsFromFrame !== undefined && frame === applyGuardsFromFrame) {
+      policy = 'content-growth'
+      heights.clear()
+      shouldClearHeightsOnWidth = false
+    }
+
     if (
-      stopContentChaseAfterFrames !== undefined
-      && frame === stopContentChaseAfterFrames
+      lateTrueHeight !== undefined
+      && lateTrueHeightFromFrame !== undefined
+      && frame === lateTrueHeightFromFrame
     ) {
-      allowContentChase = false
+      liveTrueHeight = lateTrueHeight
+      for (const id of mounted)
+        heights.set(id, liveTrueHeight)
     }
 
     if (
@@ -154,7 +174,7 @@ function simulateFollowBottomWidthChange({
       const id = itemIds[index]
       if (!id)
         continue
-      Hdom += mounted.has(id) ? trueHeight : (heights.get(id) ?? DEFAULT_ITEM_HEIGHT)
+      Hdom += mounted.has(id) ? liveTrueHeight : (heights.get(id) ?? DEFAULT_ITEM_HEIGHT)
       if (index < itemCount - 1)
         Hdom += gap
     }
@@ -165,8 +185,19 @@ function simulateFollowBottomWidthChange({
       scrollTop = maxScrollTop
     const clamped = scrollTop !== beforeClamp
     const source: ResizeSource = frame === 0 ? 'viewport' : 'content'
-    const allowChase = allowContentChase
-      || shouldChaseFollowBottomForResizeSource({ source })
+    const grew = shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight,
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollHeight: Hdom,
+    })
+    const trusted = shouldTrustFollowBottomContentMeasurements({
+      estimatedHeight: estimated(),
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollHeight: Hdom,
+    })
+    const allowChase = source === 'viewport'
+      || policy === 'all-content'
+      || (policy === 'content-growth' && grew && trusted)
     const chase = allowChase && shouldChaseFollowBottomOnResize({
       clientHeight: viewportHeight,
       maxScrollTop,
@@ -190,6 +221,7 @@ function simulateFollowBottomWidthChange({
       threshold: SCROLL_EDGE_THRESHOLD,
     })
 
+    previousScrollHeight = Hdom
     if (chase)
       scrollTop = maxScrollTop
 
@@ -204,12 +236,12 @@ function simulateFollowBottomWidthChange({
 
     if (reportPolicy === 'allMounted') {
       for (const id of nextMounted)
-        heights.set(id, trueHeight)
+        heights.set(id, liveTrueHeight)
     }
     else {
       for (const id of nextMounted) {
         if (mounted.has(id))
-          heights.set(id, trueHeight)
+          heights.set(id, liveTrueHeight)
       }
     }
 
@@ -226,6 +258,58 @@ function simulateFollowBottomWidthChange({
       source,
     })
     mounted = nextMounted
+  }
+
+  return framesOut
+}
+
+function simulatePinnedContentHeightChanges({
+  heightsSequence,
+  viewportHeight,
+}: {
+  heightsSequence: readonly number[]
+  viewportHeight: number
+}) {
+  const firstHeight = heightsSequence[0]
+  if (firstHeight === undefined)
+    return []
+
+  let scrollTop = Math.max(0, firstHeight - viewportHeight)
+  let previousScrollHeight = firstHeight
+  const framesOut: Array<{
+    chase: boolean
+    distanceFromEnd: number
+    Hdom: number
+    scrollTop: number
+  }> = []
+
+  for (let index = 1; index < heightsSequence.length; index += 1) {
+    const Hdom = heightsSequence[index]
+    if (Hdom === undefined)
+      continue
+    const maxScrollTop = Math.max(0, Hdom - viewportHeight)
+    if (scrollTop > maxScrollTop)
+      scrollTop = maxScrollTop
+    const grew = shouldChaseFollowBottomOnContentGrowth({
+      previousScrollHeight,
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollHeight: Hdom,
+    })
+    const chase = grew && shouldChaseFollowBottomOnResize({
+      clientHeight: viewportHeight,
+      maxScrollTop,
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollTop,
+    })
+    previousScrollHeight = Hdom
+    if (chase)
+      scrollTop = maxScrollTop
+    framesOut.push({
+      chase,
+      distanceFromEnd: maxScrollTop - scrollTop,
+      Hdom,
+      scrollTop,
+    })
   }
 
   return framesOut
@@ -327,7 +411,7 @@ describe('stale-height follow-bottom resize loop', () => {
     })
   })
 
-  describe('fixed guards (width invalidation plus viewport-only chase)', () => {
+  describe('fixed guards (width invalidation plus growth-gated chase)', () => {
     it('converges for 20 items at rest after narrowing', () => {
       const framesOut = simulateFollowBottomWidthChange({
         frames: 8,
@@ -339,7 +423,6 @@ describe('stale-height follow-bottom resize loop', () => {
       expectConverged(framesOut)
       expect(framesOut[0]?.source).toBe('viewport')
       expect(framesOut.slice(1).every((frame) => frame.source === 'content')).toBe(true)
-      expect(framesOut.slice(1).every((frame) => frame.chase === false)).toBe(true)
       expect(framesOut.at(-1)).toMatchObject({
         Hdom: 3776,
         distanceFromEnd: 0,
@@ -349,7 +432,7 @@ describe('stale-height follow-bottom resize loop', () => {
       })
 
       const withoutInvalidation = simulateFollowBottomWidthChange({
-        chaseContentResize: false,
+        chasePolicy: 'content-growth',
         frames: 8,
         invalidateOnWidthChange: false,
         reportPolicy: 'raceUnmount',
@@ -372,7 +455,6 @@ describe('stale-height follow-bottom resize loop', () => {
       })
 
       expectConverged(framesOut)
-      expect(framesOut.slice(1).every((frame) => frame.chase === false)).toBe(true)
       expect(framesOut.at(-1)).toMatchObject({
         Hdom: 8456,
         mountedKey: '33,34,35,36,37,38,39',
@@ -400,9 +482,9 @@ describe('stale-height follow-bottom resize loop', () => {
 
     it('stops an already ignited loop at the same narrow width', () => {
       const framesOut = simulateFollowBottomWidthChange({
+        applyGuardsFromFrame: 8,
         frames: 16,
         reportPolicy: 'raceUnmount',
-        stopContentChaseAfterFrames: 8,
         ...scenario20,
       })
 
@@ -412,7 +494,6 @@ describe('stale-height follow-bottom resize loop', () => {
       const afterFix = framesOut.slice(8)
       expectConverged(afterFix)
       expect(afterFix.every((frame) => frame.source === 'content')).toBe(true)
-      expect(afterFix.every((frame) => frame.chase === false)).toBe(true)
     })
 
     it('invalidates after a width change that occurred while the viewport had no height', () => {
@@ -453,6 +534,52 @@ describe('stale-height follow-bottom resize loop', () => {
         scrollTop: 3376,
         settle: true,
       })
+    })
+
+    it('chases content growth while pinned and lands at the new bottom', () => {
+      const framesOut = simulatePinnedContentHeightChanges({
+        heightsSequence: [1000, 1400],
+        viewportHeight: 400,
+      })
+
+      expect(framesOut).toEqual([{
+        chase: true,
+        distanceFromEnd: 0,
+        Hdom: 1400,
+        scrollTop: 1000,
+      }])
+    })
+
+    it('does not chase when content shrinks', () => {
+      const framesOut = simulatePinnedContentHeightChanges({
+        heightsSequence: [1400, 1000],
+        viewportHeight: 400,
+      })
+
+      expect(framesOut).toEqual([{
+        chase: false,
+        distanceFromEnd: 0,
+        Hdom: 1000,
+        scrollTop: 600,
+      }])
+    })
+
+    it('does not re-ignite after a narrowing drag plus late content growth', () => {
+      const framesOut = simulateFollowBottomWidthChange({
+        frames: 16,
+        lateTrueHeight: 280,
+        lateTrueHeightFromFrame: 8,
+        reportPolicy: 'raceUnmount',
+        ...applyFixedGuards(),
+        ...scenario20,
+      })
+
+      expect(isTwoCycle(framesOut)).toBe(false)
+      const lateGrowth = framesOut[8]
+      expect(lateGrowth?.source).toBe('content')
+      expect(lateGrowth?.chase).toBe(true)
+      expectConverged(framesOut)
+      expect(framesOut.at(-1)?.distanceFromEnd).toBe(0)
     })
   })
 })
