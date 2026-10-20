@@ -146,6 +146,15 @@ describe('worktree_create tool', () => {
     const ctx = baseCtx()
     const result = await execute({ name: 'feature' }, ctx)
 
+    expect(gateWorkspaceMovePermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'worktree_create',
+        title: 'Create worktree vixl/feature?',
+        detail: '/tmp/project',
+        allowedScopes: ['once', 'session'],
+        sessionKey: 'workspace.worktree_create',
+      }),
+    )
     expect(gitWorktreeAdd).toHaveBeenCalledWith('/tmp/project', 'feature', undefined)
     expect(registryAddProject).toHaveBeenCalledWith(
       'feature',

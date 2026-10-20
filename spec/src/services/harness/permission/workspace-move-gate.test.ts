@@ -8,6 +8,7 @@ import gateWorkspaceMovePermission from '@/services/harness/permission/workspace
 import type {
   PermissionCapabilityKey,
   PermissionLevel,
+  PermissionScope,
 } from '@/types/harness/permission'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
@@ -43,12 +44,18 @@ describe('gateWorkspaceMovePermission', () => {
   const startGate = (
     ctx: ReturnType<typeof makeCtx>,
     toolCallId = 'tc-move',
+    extras?: {
+      allowedScopes?: PermissionScope[]
+      sessionKey?: string
+    },
   ) =>
     gateWorkspaceMovePermission({
       ctx,
       toolCallId,
       name: 'move_workspace',
       title: 'Move this workspace',
+      allowedScopes: extras?.allowedScopes,
+      sessionKey: extras?.sessionKey,
     })
 
   const waitForPending = async (toolCallId: string): Promise<void> => {
@@ -166,6 +173,76 @@ describe('gateWorkspaceMovePermission', () => {
     expect(ctx.onPendingApproval).toHaveBeenCalledTimes(2)
     resolveApproval('tc-move-b', { approved: true, scope: 'once' })
     await expect(second).resolves.toBe(true)
+    expect(ctx.persistPermission).not.toHaveBeenCalled()
+  })
+
+  it('stores a sessionKey on session approve and skips the next prompt', async () => {
+    const ctx = makeCtx()
+    const first = startGate(ctx, 'tc-move-a', {
+      allowedScopes: ['once', 'session'],
+      sessionKey: 'worktree.create',
+    })
+    await waitForPending('tc-move-a')
+    resolveApproval('tc-move-a', { approved: true, scope: 'session' })
+    await expect(first).resolves.toBe(true)
+    expect(ctx.sessionAllows.has('worktree.create')).toBe(true)
+    expect(ctx.persistPermission).not.toHaveBeenCalled()
+
+    const second = startGate(ctx, 'tc-move-b', {
+      allowedScopes: ['once', 'session'],
+      sessionKey: 'worktree.create',
+    })
+    await expect(second).resolves.toBe(true)
+    expect(ctx.onPendingApproval).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not store a sessionKey on once approve and still prompts next', async () => {
+    const ctx = makeCtx()
+    const first = startGate(ctx, 'tc-move-a', {
+      allowedScopes: ['once', 'session'],
+      sessionKey: 'worktree.create',
+    })
+    await waitForPending('tc-move-a')
+    resolveApproval('tc-move-a', { approved: true, scope: 'once' })
+    await expect(first).resolves.toBe(true)
+    expect(ctx.sessionAllows.has('worktree.create')).toBe(false)
+
+    const second = startGate(ctx, 'tc-move-b', {
+      allowedScopes: ['once', 'session'],
+      sessionKey: 'worktree.create',
+    })
+    await waitForPending('tc-move-b')
+    expect(ctx.onPendingApproval).toHaveBeenCalledTimes(2)
+    resolveApproval('tc-move-b', { approved: true, scope: 'once' })
+    await expect(second).resolves.toBe(true)
+  })
+
+  it('does not skip when sessionAllows has workspace.move and a different sessionKey is used', async () => {
+    const ctx = makeCtx({
+      sessionAllows: new Set(['workspace.move']),
+    })
+    const pending = startGate(ctx, 'tc-move', {
+      allowedScopes: ['once', 'session'],
+      sessionKey: 'worktree.create',
+    })
+    await waitForPending('tc-move')
+    expect(ctx.onPendingApproval).toHaveBeenCalledTimes(1)
+    resolveApproval('tc-move', { approved: true, scope: 'once' })
+    await expect(pending).resolves.toBe(true)
+    expect(ctx.sessionAllows.has('worktree.create')).toBe(false)
+  })
+
+  it('returns false on deny with a sessionKey and does not store the key', async () => {
+    const ctx = makeCtx()
+    const pending = startGate(ctx, 'tc-move', {
+      allowedScopes: ['once', 'session'],
+      sessionKey: 'worktree.create',
+    })
+    await waitForPending('tc-move')
+    resolveApproval('tc-move', { approved: false, scope: 'once' })
+    await expect(pending).resolves.toBe(false)
+    expect(ctx.sessionAllows.has('worktree.create')).toBe(false)
+    expect(ctx.sessionDenies.has('worktree.create')).toBe(false)
     expect(ctx.persistPermission).not.toHaveBeenCalled()
   })
 })

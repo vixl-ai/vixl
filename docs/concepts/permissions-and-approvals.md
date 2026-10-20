@@ -34,7 +34,7 @@ Home chats have no project, so a workspace persist is refused.
 
 Shell, including network and unsandboxed hops, only offers once, session, and never. Those records do not persist as workspace or always. Approving once for `shell.network` or `shell.unsandboxed` sticks onto the session. A session allow of `shell` does not cover network or unsandboxed. A session allow of `shell.unsandboxed` covers network and sandboxed shell.
 
-`move_workspace` is once only. Bypass does not auto-allow it.
+`move_workspace` is once only. Bypass does not auto-allow it. `worktree_create` offers Allow once, Allow session, and Deny. Session covers later worktree creates in this chat only. It does not cover `move_workspace` or `worktree_remove`. Those stay once per call.
 
 ## What still asks
 

@@ -45,6 +45,8 @@ const worktreeCreate = (ctx: HarnessToolContext) =>
         name: 'worktree_create',
         title: `Create worktree vixl/${trimmed}?`,
         detail: ctx.projectRoot,
+        allowedScopes: ['once', 'session'],
+        sessionKey: 'workspace.worktree_create',
       })
       if (!allowed) {
         return { rejected: true, error: 'User declined creating the worktree' }

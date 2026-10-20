@@ -10,8 +10,16 @@ const gateWorkspaceMovePermission = async (args: {
   name: string
   title: string
   detail?: string
+  allowedScopes?: PermissionScope[]
+  sessionKey?: string
 }): Promise<boolean> => {
-  const allowedScopes: PermissionScope[] = [...WORKSPACE_MOVE_SCOPES]
+  if (args.sessionKey && args.ctx.sessionAllows.has(args.sessionKey)) {
+    return true
+  }
+
+  const allowedScopes: PermissionScope[] = args.allowedScopes
+    ? [...args.allowedScopes]
+    : [...WORKSPACE_MOVE_SCOPES]
 
   args.ctx.onPendingApproval({
     toolCallId: args.toolCallId,
@@ -37,6 +45,10 @@ const gateWorkspaceMovePermission = async (args: {
     subagentId: args.ctx.subagentId,
     subagentLabel: args.ctx.subagentLabel,
   })
+
+  if (result.approved && result.scope === 'session' && args.sessionKey) {
+    args.ctx.sessionAllows.add(args.sessionKey)
+  }
 
   return result.approved
 }

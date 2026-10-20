@@ -15,7 +15,7 @@ The home pseudo-project cannot host worktrees.
 
 In [Agent](/concepts/chat-modes) or Orchestrator, ask for a worktree, then the work: for example, "create a worktree, then implement the auth todos there." The parent calls `worktree_create`. Nested sub-agents cannot.
 
-Vixl always asks first (`Create worktree vixl/<name>?`). After you approve, it:
+The first create in a chat asks (`Create worktree vixl/<name>?`). The prompt offers Allow once, Allow session, and Deny. Allow session covers later creates in this chat only, so those skip the prompt. Move and remove stay once per call. After you approve, it:
 
 1. Creates the git worktree and branch (optional `baseRef`, default `HEAD`).
 2. Copies the parent's `.vixl/plans/` into the new checkout (plans only; existing files in the checkout are not overwritten).
