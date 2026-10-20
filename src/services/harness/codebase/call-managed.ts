@@ -14,7 +14,7 @@ import {
 } from '@/types/codegraph/managed-codegraph'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import { getMcpAuthMode } from '@/types/vixl/mcp-config'
-import pathsEqual from '@/utils/paths-equal'
+import { pathsEqualCanonical } from '@/utils/paths-equal'
 
 type ManagedCodegraphCallResult =
   | { ok: true; result: unknown }
@@ -28,13 +28,13 @@ const shouldEnsureCodeGraph = (ctx: HarnessToolContext, projectRoot: string): bo
   const activeId = getActiveFleetProjectId()
   if (activeId) {
     const active = projects.find((project) => project.id === activeId)
-    if (!active || pathsEqual(active.rootPath, projectRoot)) {
+    if (!active || pathsEqualCanonical(active.rootPath, projectRoot)) {
       return false
     }
-    return projects.some((project) => pathsEqual(project.rootPath, projectRoot))
+    return projects.some((project) => pathsEqualCanonical(project.rootPath, projectRoot))
   }
   return projects.some(
-    (project) => Boolean(project.worktree) && pathsEqual(project.rootPath, projectRoot),
+    (project) => Boolean(project.worktree) && pathsEqualCanonical(project.rootPath, projectRoot),
   )
 }
 
