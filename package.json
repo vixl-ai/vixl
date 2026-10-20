@@ -148,7 +148,7 @@
     "node": "^26.7.0"
   },
   "overrides": {
-    "vue": "beta",
+    "vue": "$vue",
     "@vue/compiler-core": "beta",
     "@vue/compiler-dom": "beta",
     "@vue/compiler-sfc": "beta",
@@ -172,6 +172,7 @@
     "source-map-js": "1.2.2",
     "proxy-addr": "2.0.8",
     "postcss-selector-parser": "7.1.6",
-    "tinypool": "2.1.2"
+    "tinypool": "2.1.2",
+    "hono": "4.13.13"
   }
 }
