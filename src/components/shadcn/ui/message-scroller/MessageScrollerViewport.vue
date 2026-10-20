@@ -20,7 +20,10 @@ const {
   setViewportElement,
   syncAfterScroll,
   markUserTouchScrollIntent,
-  clearUserTouchScrollIntent,
+  markUserWheelScrollIntent,
+  markUserScrollbarScrollIntent,
+  releaseUserScrollbarScrollIntent,
+  clearUserScrollbarScrollIntent,
   userScrollIntent,
 } = useMessageScrollerContext()
 
@@ -36,27 +39,23 @@ function onKeyDown(event: KeyboardEvent) {
 function onWheel() {
   // While following, do not leave on the wheel event itself. Trackpad
   // noise reports an upward delta without leaving the live edge, and the
-  // next message then grows below the reader. The scroll handler exits
-  // only after scrollTop is actually above the edge. Anchored and
-  // settling jumps still treat any wheel as user intent.
-  if (isFollowingLive())
+  // next message then grows below the reader. Arm a settle window so the
+  // scroll handler can exit after scrollTop is actually above the edge.
+  // Inertia keeps that window alive until scroll events stop. Anchored
+  // and settling jumps still treat any wheel as user intent.
+  if (isFollowingLive()) {
+    markUserWheelScrollIntent()
     return
+  }
   userScrollIntent()
 }
 
-let touchClearFrame = 0
-
-function cancelPendingTouchClear() {
-  window.cancelAnimationFrame(touchClearFrame)
-  touchClearFrame = 0
-}
-
 function onTouchMove() {
-  // Touch at the live edge does not call userScrollIntent. Arm a one-shot
-  // flag so updateModeFromScroll can exit if the drag actually moved
-  // scrollTop upward past the edge threshold. A touch that does not
-  // move scroll must not leave follow.
-  cancelPendingTouchClear()
+  // Touch at the live edge does not call userScrollIntent. Arm a settle
+  // window so updateModeFromScroll can exit if the drag actually moved
+  // scrollTop upward past the edge threshold. Inertia keeps that window
+  // alive until scroll events stop. A touch that does not move scroll
+  // must not leave follow.
   if (isFollowingLive()) {
     markUserTouchScrollIntent()
     return
@@ -64,14 +63,45 @@ function onTouchMove() {
   userScrollIntent()
 }
 
-function onTouchEnd() {
-  // Do not clear synchronously: a scroll event in this turn must be able
-  // to consume the flag first. The next frame drops a touch that never
-  // scrolled so a later programmatic write cannot treat it as user intent.
-  cancelPendingTouchClear()
-  touchClearFrame = window.requestAnimationFrame(() => {
-    touchClearFrame = 0
-    clearUserTouchScrollIntent()
+let scrollbarClearFrame = 0
+
+function cancelPendingScrollbarClear() {
+  window.cancelAnimationFrame(scrollbarClearFrame)
+  scrollbarClearFrame = 0
+}
+
+function isScrollbarGutterPointer(event: PointerEvent) {
+  const viewport = event.currentTarget
+  if (!(viewport instanceof HTMLElement))
+    return false
+  // Message content is a child, so a pointerdown whose target is the
+  // viewport is the scrollbar, including an overlay bar inside the
+  // client box.
+  return event.target === viewport
+}
+
+function onPointerDown(event: PointerEvent) {
+  if (!isScrollbarGutterPointer(event))
+    return
+  cancelPendingScrollbarClear()
+  if (!isFollowingLive())
+    return
+  markUserScrollbarScrollIntent()
+  const viewport = event.currentTarget
+  if (viewport instanceof HTMLElement)
+    viewport.setPointerCapture(event.pointerId)
+}
+
+function onPointerUp() {
+  // Pointer is no longer held. Keep the one-shot latch through this
+  // turn so a drag that moved scrollTop can consume it. The next
+  // frame drops a click that never scrolled so a later layout write
+  // cannot treat it as a gesture.
+  releaseUserScrollbarScrollIntent()
+  cancelPendingScrollbarClear()
+  scrollbarClearFrame = window.requestAnimationFrame(() => {
+    scrollbarClearFrame = 0
+    clearUserScrollbarScrollIntent()
   })
 }
 
@@ -92,7 +122,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.cancelAnimationFrame(resizeFrame)
-  cancelPendingTouchClear()
+  cancelPendingScrollbarClear()
   resizeObserver?.disconnect()
   resizeObserver = null
   setViewportElement(null)
@@ -114,9 +144,11 @@ onBeforeUnmount(() => {
     )"
     @scroll="syncAfterScroll()"
     @wheel="onWheel"
+    @pointerdown="onPointerDown"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerUp"
+    @lostpointercapture="onPointerUp"
     @touchmove="onTouchMove"
-    @touchend="onTouchEnd"
-    @touchcancel="onTouchEnd"
     @keydown="onKeyDown"
   >
     <slot />

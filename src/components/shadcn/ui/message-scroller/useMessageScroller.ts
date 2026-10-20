@@ -16,7 +16,10 @@ import {
   shouldChaseFollowBottom,
   shouldChaseFollowBottomOnResize,
   shouldExitFollowBottom,
+  shouldExitFollowBottomOnUnarmedScroll,
   shouldExitFollowBottomOnUserTouch,
+  shouldRecoverFollowAfterLayoutScroll,
+  shouldTreatUpwardScrollAsLayoutClamp,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
   windowedIdSetsEqual,
@@ -63,6 +66,7 @@ const DEFAULT_SCROLL_PREVIOUS_ITEM_PEEK = 64
 const DEFAULT_SCROLL_MARGIN = 0
 const SCROLL_EPSILON = 0.5
 const AUTOSCROLLING_TIMEOUT = 180
+const USER_SCROLL_SETTLE_TIMEOUT = 160
 
 const SCROLL_KEYS = new Set([
   "ArrowDown",
@@ -389,6 +393,11 @@ export interface MessageScrollerContext {
   syncAfterScroll: () => void
   markUserTouchScrollIntent: () => void
   clearUserTouchScrollIntent: () => void
+  markUserWheelScrollIntent: () => void
+  clearUserWheelScrollIntent: () => void
+  markUserScrollbarScrollIntent: () => void
+  releaseUserScrollbarScrollIntent: () => void
+  clearUserScrollbarScrollIntent: () => void
   userScrollIntent: () => void
   windowedMessageIds: Readonly<ShallowRef<Set<string> | null>>
   itemPlaceholderHeight: (messageId: string) => number
@@ -423,7 +432,11 @@ function createEngine(props: MessageScrollerProviderProps) {
   let firstItem: HTMLElement | null = null
   let itemCount = 0
   let lastScrollTop = 0
+  let lastScrollHeight = 0
   let pendingUserTouchScroll = false
+  let pendingUserWheelScroll = false
+  let pendingUserScrollbarScroll = false
+  let userScrollbarPointerHeld = false
   let programmaticScrollDepth = 0
   let defaultScrollPositionApplied = false
   let preserveScrollOnPrepend = true
@@ -434,6 +447,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   let followChaseRecheckFrame: number | null = null
   let pendingScrollFrame: number | null = null
   let autoscrollingTimeout: number | null = null
+  let userScrollSettleTimeout: number | null = null
   let visibilityObserver: IntersectionObserver | null = null
   let visibilityConsumers = 0
   const messageElements = new Map<string, HTMLElement>()
@@ -457,10 +471,23 @@ function createEngine(props: MessageScrollerProviderProps) {
 
   // --- scroll-state commit / visibility scheduling ---------------------------
 
+  function isLayoutClampScroll(): boolean {
+    if (!viewport)
+      return false
+    return shouldTreatUpwardScrollAsLayoutClamp({
+      scrollHeightDelta: lastScrollHeight - viewport.scrollHeight,
+      scrollTopDelta: lastScrollTop - viewport.scrollTop,
+      threshold: scrollEdgeThreshold(),
+    })
+  }
+
   function updateModeFromScroll(next: MessageScrollerScrollable) {
     const scrollTop = viewport?.scrollTop ?? 0
+    const scrollHeight = viewport?.scrollHeight ?? 0
     const scrolledUp = scrollTop < lastScrollTop - SCROLL_EPSILON
+    const layoutClamp = isLayoutClampScroll()
     lastScrollTop = scrollTop
+    lastScrollHeight = scrollHeight
     if (
       autoScroll()
       && !next.end
@@ -476,25 +503,59 @@ function createEngine(props: MessageScrollerProviderProps) {
         ? maxScrollTop(viewport) - viewport.scrollTop
         : Number.POSITIVE_INFINITY
       const threshold = scrollEdgeThreshold()
+      const programmatic = programmaticScrollDepth > 0
+      const wheelOrTouchGesture = !layoutClamp
+        && (pendingUserTouchScroll || pendingUserWheelScroll)
+      const userGesture = wheelOrTouchGesture || (pendingUserScrollbarScroll && !layoutClamp)
       if (
         shouldExitFollowBottomOnUserTouch({
           distanceFromEnd,
-          pendingUserTouchScroll,
+          pendingUserTouchScroll: pendingUserTouchScroll && !layoutClamp,
           scrolledUp,
           threshold,
         })
         || shouldExitFollowBottom({
           autoscrolling: autoscrolling.value,
           distanceFromEnd,
-          programmatic: programmaticScrollDepth > 0,
+          programmatic,
           scrolledUp,
           threshold,
+          userGesture,
         })
       ) {
         mode = "free-scrolling"
+        clearUserInertiaScrollIntent()
+      }
+      else if (shouldRecoverFollowAfterLayoutScroll({
+        distanceFromEnd,
+        followingBottom: true,
+        layoutClamp,
+        programmatic,
+        scrolledUp,
+        threshold,
+        userGesture,
+      })) {
+        scheduleFollowChaseRecheck()
+      }
+      else if (shouldExitFollowBottomOnUnarmedScroll({
+        distanceFromEnd,
+        layoutClamp,
+        programmatic,
+        scrolledUp,
+        threshold,
+        userGesture,
+      })) {
+        // Scrollbar drag whose pointerdown missed the viewport, or any
+        // other unarmed reader scroll. Do not chase. Staying in
+        // following-bottom would let the next stream tick yank them down.
+        mode = "free-scrolling"
+        clearUserInertiaScrollIntent()
       }
     }
-    pendingUserTouchScroll = false
+    // Do not clear wheel or touch here. Inertia after a trackpad or
+    // touch gesture keeps emitting scroll, and those events must stay
+    // a reader gesture until the settle timer fires. A layout clamp
+    // must not count as that gesture.
   }
 
   function layoutMetrics() {
@@ -698,8 +759,12 @@ function createEngine(props: MessageScrollerProviderProps) {
       return
     const next = Math.max(0, Math.ceil(height))
     if (spacerHeight !== next) {
-      // Drop leftover touch intent before layout shifts scrollTop.
-      clearUserTouchScrollIntent()
+      // A programmatic layout write must not count as inertia. Keep an
+      // armed wheel or touch settle window so a chase cannot disarm the
+      // reader. A stale scrollbar latch drops only when the pointer is
+      // not held.
+      if (!userScrollbarPointerHeld)
+        clearUserScrollbarScrollIntent()
       setAutoscrolling(true)
       spacerHeight = next
       programmaticScrollDepth += 1
@@ -777,8 +842,11 @@ function createEngine(props: MessageScrollerProviderProps) {
     })) {
       return true
     }
-    // Drop leftover touch intent before this write moves scrollTop.
-    clearUserTouchScrollIntent()
+    // A programmatic chase must not count as inertia and must not
+    // restart the wheel or touch settle window. A stale scrollbar
+    // latch drops only when the pointer is not held.
+    if (!userScrollbarPointerHeld)
+      clearUserScrollbarScrollIntent()
     setAutoscrolling(true)
     setSpacerHeight(0)
     streamingTurn = null
@@ -986,7 +1054,10 @@ function createEngine(props: MessageScrollerProviderProps) {
     }
     const previousIndex = previousFirst ? children.indexOf(previousFirst) : -1
     if (preserveScrollOnPrepend && previousIndex > 0) {
-      applyPrependRestore()
+      if (mode === "following-bottom" && autoScroll())
+        scrollToEnd({ behavior: "auto" })
+      else
+        applyPrependRestore()
       return
     }
     if (children.length > previousCount) {
@@ -1196,13 +1267,67 @@ function createEngine(props: MessageScrollerProviderProps) {
 
   // --- user intent + element setters -----------------------------------------
 
+  function clearUserScrollSettleTimeout() {
+    if (userScrollSettleTimeout !== null) {
+      window.clearTimeout(userScrollSettleTimeout)
+      userScrollSettleTimeout = null
+    }
+  }
+
+  function armUserScrollSettleTimeout() {
+    clearUserScrollSettleTimeout()
+    userScrollSettleTimeout = window.setTimeout(() => {
+      userScrollSettleTimeout = null
+      pendingUserTouchScroll = false
+      pendingUserWheelScroll = false
+    }, USER_SCROLL_SETTLE_TIMEOUT)
+  }
+
+  function clearUserInertiaScrollIntent() {
+    pendingUserTouchScroll = false
+    pendingUserWheelScroll = false
+    clearUserScrollSettleTimeout()
+  }
+
   function markUserTouchScrollIntent() {
-    if (mode === "following-bottom")
-      pendingUserTouchScroll = true
+    if (mode !== "following-bottom")
+      return
+    pendingUserTouchScroll = true
+    armUserScrollSettleTimeout()
   }
 
   function clearUserTouchScrollIntent() {
     pendingUserTouchScroll = false
+    if (!pendingUserWheelScroll)
+      clearUserScrollSettleTimeout()
+  }
+
+  function markUserWheelScrollIntent() {
+    if (mode !== "following-bottom")
+      return
+    pendingUserWheelScroll = true
+    armUserScrollSettleTimeout()
+  }
+
+  function clearUserWheelScrollIntent() {
+    pendingUserWheelScroll = false
+    if (!pendingUserTouchScroll)
+      clearUserScrollSettleTimeout()
+  }
+
+  function markUserScrollbarScrollIntent() {
+    userScrollbarPointerHeld = true
+    if (mode === "following-bottom")
+      pendingUserScrollbarScroll = true
+  }
+
+  function releaseUserScrollbarScrollIntent() {
+    userScrollbarPointerHeld = false
+  }
+
+  function clearUserScrollbarScrollIntent() {
+    pendingUserScrollbarScroll = false
+    userScrollbarPointerHeld = false
   }
 
   function userScrollIntent() {
@@ -1213,6 +1338,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     ) {
       streamingTurn = null
       mode = "free-scrolling"
+      clearUserInertiaScrollIntent()
     }
   }
 
@@ -1241,7 +1367,20 @@ function createEngine(props: MessageScrollerProviderProps) {
   }
 
   function syncAfterScroll() {
+    const layoutClamp = isLayoutClampScroll()
     commitScrollState()
+    // Do not drop wheel or touch after a scroll commit. Trackpad and
+    // touch inertia keep emitting scroll after the originating gesture.
+    // A programmatic write must not count as inertia. A content shrink
+    // clamp must not extend the settle window. Restart it only while a
+    // wheel or touch flag is still armed and the scroll is not a clamp.
+    if (
+      programmaticScrollDepth === 0
+      && (pendingUserTouchScroll || pendingUserWheelScroll)
+      && !layoutClamp
+    ) {
+      armUserScrollSettleTimeout()
+    }
     scheduleVisibilitySync()
     capturePrependAnchor()
     recomputeWindow()
@@ -1272,6 +1411,7 @@ function createEngine(props: MessageScrollerProviderProps) {
       window.clearTimeout(autoscrollingTimeout)
       autoscrollingTimeout = null
     }
+    clearUserScrollSettleTimeout()
     if (pendingScrollFrame !== null) {
       window.cancelAnimationFrame(pendingScrollFrame)
       pendingScrollFrame = null
@@ -1302,6 +1442,11 @@ function createEngine(props: MessageScrollerProviderProps) {
     syncAfterScroll,
     markUserTouchScrollIntent,
     clearUserTouchScrollIntent,
+    markUserWheelScrollIntent,
+    clearUserWheelScrollIntent,
+    markUserScrollbarScrollIntent,
+    releaseUserScrollbarScrollIntent,
+    clearUserScrollbarScrollIntent,
     userScrollIntent,
     windowedMessageIds,
     itemPlaceholderHeight,

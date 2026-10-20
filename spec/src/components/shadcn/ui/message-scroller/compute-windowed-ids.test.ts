@@ -22,7 +22,10 @@ import {
   shouldInvalidateItemHeightsOnWidthChange,
   shouldSampleClientWidthBaseline,
   shouldExitFollowBottom,
+  shouldExitFollowBottomOnUnarmedScroll,
   shouldExitFollowBottomOnUserTouch,
+  shouldRecoverFollowAfterLayoutScroll,
+  shouldTreatUpwardScrollAsLayoutClamp,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
 } from '@/components/shadcn/ui/message-scroller/compute-windowed-ids'
@@ -853,6 +856,7 @@ describe('shouldExitFollowBottom', () => {
     distanceFromEnd: 24,
     scrolledUp: true,
     threshold: 8,
+    userGesture: true,
   }
 
   it('keeps follow when distance from end is within the threshold', () => {
@@ -862,11 +866,18 @@ describe('shouldExitFollowBottom', () => {
     })).toBe(false)
   })
 
-  it('exits follow when the user has scrolled past the threshold', () => {
+  it('exits follow when a reader gesture scrolled up past the threshold', () => {
     expect(shouldExitFollowBottom(exiting)).toBe(true)
   })
 
-  it('exits follow when the user scrolled up past the threshold even while autoscrolling', () => {
+  it('keeps follow when scrollTop moved up without a reader gesture', () => {
+    expect(shouldExitFollowBottom({
+      ...exiting,
+      userGesture: false,
+    })).toBe(false)
+  })
+
+  it('exits follow when a reader gesture scrolled up past the threshold even while autoscrolling', () => {
     expect(shouldExitFollowBottom({
       ...exiting,
       autoscrolling: true,
@@ -884,6 +895,169 @@ describe('shouldExitFollowBottom', () => {
     expect(shouldExitFollowBottom({
       ...exiting,
       scrolledUp: false,
+    })).toBe(false)
+  })
+})
+
+describe('shouldRecoverFollowAfterLayoutScroll', () => {
+  const recovering = {
+    distanceFromEnd: 24,
+    followingBottom: true,
+    layoutClamp: true,
+    scrolledUp: true,
+    threshold: 8,
+    userGesture: false,
+  }
+
+  it('recovers follow when layout moved scrollTop off the live edge', () => {
+    expect(shouldRecoverFollowAfterLayoutScroll(recovering)).toBe(true)
+  })
+
+  it('does not recover when the upward scroll is not a layout clamp', () => {
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...recovering,
+      layoutClamp: false,
+    })).toBe(false)
+  })
+
+  it('does not recover when the reader is not following', () => {
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...recovering,
+      followingBottom: false,
+    })).toBe(false)
+  })
+
+  it('does not recover when a reader gesture is armed', () => {
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...recovering,
+      userGesture: true,
+    })).toBe(false)
+  })
+
+  it('does not recover when the write is already programmatic', () => {
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...recovering,
+      programmatic: true,
+    })).toBe(false)
+  })
+
+  it('does not recover when scrollTop did not move up', () => {
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...recovering,
+      scrolledUp: false,
+    })).toBe(false)
+  })
+
+  it('does not recover when the viewport is still within the edge threshold', () => {
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...recovering,
+      distanceFromEnd: 8,
+    })).toBe(false)
+  })
+})
+
+describe('shouldExitFollowBottomOnUnarmedScroll', () => {
+  const exiting = {
+    distanceFromEnd: 24,
+    layoutClamp: false,
+    scrolledUp: true,
+    threshold: 8,
+    userGesture: false,
+  }
+
+  it('exits follow when an unarmed reader scroll moves off the live edge', () => {
+    expect(shouldExitFollowBottomOnUnarmedScroll(exiting)).toBe(true)
+  })
+
+  it('keeps follow when the upward scroll is a layout clamp', () => {
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...exiting,
+      layoutClamp: true,
+    })).toBe(false)
+  })
+
+  it('keeps follow when a reader gesture is armed', () => {
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...exiting,
+      userGesture: true,
+    })).toBe(false)
+  })
+
+  it('keeps follow when the write is already programmatic', () => {
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...exiting,
+      programmatic: true,
+    })).toBe(false)
+  })
+
+  it('keeps follow when scrollTop did not move up', () => {
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...exiting,
+      scrolledUp: false,
+    })).toBe(false)
+  })
+
+  it('keeps follow when the viewport is still within the edge threshold', () => {
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...exiting,
+      distanceFromEnd: 8,
+    })).toBe(false)
+  })
+})
+
+describe('shouldTreatUpwardScrollAsLayoutClamp', () => {
+  const threshold = 8
+
+  it('treats an upward drop within the shrink plus threshold as a layout clamp', () => {
+    expect(shouldTreatUpwardScrollAsLayoutClamp({
+      scrollHeightDelta: 40,
+      scrollTopDelta: 40,
+      threshold,
+    })).toBe(true)
+  })
+
+  it('treats an upward drop equal to shrink plus threshold as a layout clamp', () => {
+    expect(shouldTreatUpwardScrollAsLayoutClamp({
+      scrollHeightDelta: 40,
+      scrollTopDelta: 48,
+      threshold,
+    })).toBe(true)
+  })
+
+  it('does not treat a larger upward drop than shrink plus threshold as a layout clamp', () => {
+    expect(shouldTreatUpwardScrollAsLayoutClamp({
+      scrollHeightDelta: 40,
+      scrollTopDelta: 49,
+      threshold,
+    })).toBe(false)
+  })
+
+  it('does not treat an upward scroll with stable height as a layout clamp', () => {
+    expect(shouldTreatUpwardScrollAsLayoutClamp({
+      scrollHeightDelta: 0,
+      scrollTopDelta: 24,
+      threshold,
+    })).toBe(false)
+  })
+
+  it('does not treat an upward scroll with grown height as a layout clamp', () => {
+    expect(shouldTreatUpwardScrollAsLayoutClamp({
+      scrollHeightDelta: -20,
+      scrollTopDelta: 24,
+      threshold,
+    })).toBe(false)
+  })
+
+  it('does not treat a downward or unchanged scrollTop as a layout clamp', () => {
+    expect(shouldTreatUpwardScrollAsLayoutClamp({
+      scrollHeightDelta: 40,
+      scrollTopDelta: 0,
+      threshold,
+    })).toBe(false)
+    expect(shouldTreatUpwardScrollAsLayoutClamp({
+      scrollHeightDelta: 40,
+      scrollTopDelta: -10,
+      threshold,
     })).toBe(false)
   })
 })
