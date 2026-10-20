@@ -68,6 +68,17 @@ export function shouldChaseFollowOnViewportResize({
   return offEnd && trust
 }
 
+// While the reader is stuck to the bottom, any gap from the live edge is
+// enough to scroll. Row estimates often lag a streaming message, and waiting
+// for them to match the DOM leaves the reader above the new text.
+export function shouldChaseFollowBottom({
+  offEnd,
+}: {
+  offEnd: boolean
+}): boolean {
+  return offEnd
+}
+
 export function extraNonWindowedChildrenHeight({
   children,
   gap = 0,

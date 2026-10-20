@@ -33,16 +33,14 @@ function onKeyDown(event: KeyboardEvent) {
     userScrollIntent()
 }
 
-function onWheel(event: WheelEvent) {
-  // Upward wheel (deltaY < 0, toward older messages) leaves follow
-  // immediately, even during autoscroll. Downward or zero deltaY must
-  // not: trackpad noise at the live edge would drop a live turn.
-  // Anchored and settling jumps still treat any wheel as user intent.
-  if (isFollowingLive()) {
-    if (event.deltaY < 0)
-      userScrollIntent()
+function onWheel() {
+  // While following, do not leave on the wheel event itself. Trackpad
+  // noise reports an upward delta without leaving the live edge, and the
+  // next message then grows below the reader. The scroll handler exits
+  // only after scrollTop is actually above the edge. Anchored and
+  // settling jumps still treat any wheel as user intent.
+  if (isFollowingLive())
     return
-  }
   userScrollIntent()
 }
 
@@ -111,7 +109,7 @@ onBeforeUnmount(() => {
     :data-scrollable="scrollableAttr"
     :data-autoscrolling="autoscrolling ? '' : undefined"
     :class="cn(
-      'size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain [overflow-anchor:none] data-autoscrolling:scrollbar-none',
+      'size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain [overflow-anchor:none]',
       props.class,
     )"
     @scroll="syncAfterScroll()"

@@ -11,6 +11,7 @@ import {
   resolveWindowScrollTop,
   shouldAnchorOnContentChange,
   shouldAdvanceFollowChaseBaseline,
+  shouldChaseFollowBottom,
   shouldChaseFollowBottomOnContentGrowth,
   shouldChaseFollowBottomOnResize,
   shouldChaseFollowBottomOnSizeChange,
@@ -241,6 +242,16 @@ describe('shouldChaseFollowBottomOnSizeChange', () => {
       scrollEpsilon: 0.5,
       scrollHeight: 999.6,
     })).toBe(false)
+  })
+})
+
+describe('shouldChaseFollowBottom', () => {
+  it('chases whenever the reader is off the live edge', () => {
+    expect(shouldChaseFollowBottom({ offEnd: true })).toBe(true)
+  })
+
+  it('stays put when the reader is already at the live edge', () => {
+    expect(shouldChaseFollowBottom({ offEnd: false })).toBe(false)
   })
 })
 
