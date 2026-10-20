@@ -1,3 +1,4 @@
+import { getActiveFleetProjectId, getFleetProjects } from '@/composables/use-fleet-registry'
 import { requestMcpAuth } from '@/services/mcp/mcp-auth-gate'
 import { setMcpElicitationHandler } from '@/services/mcp/mcp-http-client'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
@@ -13,10 +14,31 @@ import {
 } from '@/types/codegraph/managed-codegraph'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import { getMcpAuthMode } from '@/types/vixl/mcp-config'
+import { pathsEqualCanonical } from '@/utils/paths-equal'
 
 type ManagedCodegraphCallResult =
   | { ok: true; result: unknown }
   | { ok: false; payload: Record<string, unknown> }
+
+const shouldEnsureCodeGraph = (ctx: HarnessToolContext, projectRoot: string): boolean => {
+  if (ctx.members && ctx.members.length > 0) {
+    return true
+  }
+  const projects = getFleetProjects()
+  const activeId = getActiveFleetProjectId()
+  const active = activeId
+    ? projects.find((project) => project.id === activeId)
+    : undefined
+  if (active) {
+    if (pathsEqualCanonical(active.rootPath, projectRoot)) {
+      return false
+    }
+    return projects.some((project) => pathsEqualCanonical(project.rootPath, projectRoot))
+  }
+  return projects.some(
+    (project) => Boolean(project.worktree) && pathsEqualCanonical(project.rootPath, projectRoot),
+  )
+}
 
 const callManagedCodegraphTool = async (
   ctx: HarnessToolContext,
@@ -32,7 +54,10 @@ const callManagedCodegraphTool = async (
   const projectRoot = args.projectRoot
   // Product-owned CodeGraph tools skip user MCP trust and per-tool permission cards.
   // Lifecycle is owned by ensureCodeGraph + the status chip runtime path.
-  if (ctx.members && ctx.members.length > 0) {
+  // Group members already need a graph. A worktree implementer does too when the
+  // call root is a registered worktree child, including when no fleet project is
+  // marked active after load or refresh, or the active id is absent from the list.
+  if (shouldEnsureCodeGraph(ctx, projectRoot)) {
     try {
       const ensureCodeGraph = (await import('@/services/codegraph/ensure-codegraph')).default
       await ensureCodeGraph(projectRoot)

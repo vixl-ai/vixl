@@ -388,12 +388,14 @@ pub fn open_project_at_path_command(
 }
 
 #[tauri::command]
-pub fn registry_add_project(
+pub async fn registry_add_project(
     app: AppHandle,
     name: String,
     root_path: String,
 ) -> Result<FleetProject, String> {
-    add_or_update_project(&app, name, root_path)
+    tokio::task::spawn_blocking(move || add_or_update_project(&app, name, root_path))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 pub fn apply_project_root_update(

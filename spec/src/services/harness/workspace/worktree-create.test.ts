@@ -152,7 +152,7 @@ describe('worktree_create tool', () => {
       '/tmp/worktrees/demo/feature',
     )
     expect(refreshFleetProjects).toHaveBeenCalledTimes(1)
-    expect(ensureCodeGraph).toHaveBeenCalledWith('/tmp/worktrees/demo/feature')
+    expect(ensureCodeGraph).not.toHaveBeenCalled()
     expect(moveChatToWorkspace).not.toHaveBeenCalled()
     expect(ctx.projectRoot).toBe('/tmp/project')
     expect(ctx.projectSlug).toBe('project')

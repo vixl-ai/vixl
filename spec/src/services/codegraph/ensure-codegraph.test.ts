@@ -85,4 +85,40 @@ describe('ensureCodeGraph', () => {
     expect(codegraphCli).toHaveBeenCalledWith('/project-missing', 'init')
     expect(fsStat).not.toHaveBeenCalled()
   })
+
+  it('does not overlap startup for different roots', async () => {
+    const entered: string[] = []
+    let releaseFirst: () => void = () => {}
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+
+    codegraphStoreStat.mockImplementation(async (projectRoot: string) => {
+      entered.push(projectRoot)
+      if (projectRoot === '/root-a') {
+        await firstGate
+      }
+      return storeStat(true)
+    })
+
+    const ensureCodeGraph = (await import('@/services/codegraph/ensure-codegraph')).default
+    const first = ensureCodeGraph('/root-a')
+    await vi.waitFor(() => {
+      expect(entered).toEqual(['/root-a'])
+    })
+
+    let secondSettled = false
+    const second = ensureCodeGraph('/root-b').then((value) => {
+      secondSettled = true
+      return value
+    })
+    await Promise.resolve()
+    expect(entered).toEqual(['/root-a'])
+    expect(secondSettled).toBe(false)
+
+    releaseFirst()
+    await Promise.all([first, second])
+    expect(entered).toEqual(['/root-a', '/root-b'])
+    expect(secondSettled).toBe(true)
+  })
 })

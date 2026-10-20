@@ -89,5 +89,6 @@ pub use workspace_watch::{
     unwatch_workspace, watch_workspace, watch_workspace_paths, WorkspaceWatchState,
 };
 pub use worktree::{
-    git_worktree_add, git_worktree_list, git_worktree_remove, worktree_detect_parent,
+    git_worktree_add, git_worktree_list, git_worktree_list_command, git_worktree_remove,
+    git_worktree_remove_command, worktree_detect_parent,
 };

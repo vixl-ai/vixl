@@ -86,6 +86,7 @@
     "effectScope": true,
     "ensureFleetLoaded": true,
     "extendRef": true,
+    "getActiveFleetProjectId": true,
     "getCurrentInstance": true,
     "getCurrentScope": true,
     "getCurrentWatcher": true,

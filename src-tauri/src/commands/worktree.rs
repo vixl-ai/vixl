@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
 
 use serde::Serialize;
 use tauri::AppHandle;
@@ -16,6 +17,9 @@ mod worktree_copy_plans;
 const WORKTREE_NAME_MAX_LEN: usize = 64;
 const WORKTREES_DIR: &str = "worktrees";
 const PARENT_SLUG_WALK_LIMIT: usize = 32;
+
+// Serialize git worktree add so parallel creates do not share one git dir.
+static WORKTREE_ADD_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -333,6 +337,9 @@ pub fn git_worktree_add_in_dir(
     user_vixl_dir: &Path,
     parent_slug: &str,
 ) -> Result<GitWorktreeAddResult, String> {
+    let _guard = WORKTREE_ADD_LOCK
+        .lock()
+        .map_err(|_| "Worktree add lock was poisoned".to_string())?;
     let name = validate_worktree_name(name)?;
     let base = match base_ref {
         Some(value) => validate_base_ref(value)?.to_string(),
@@ -376,25 +383,34 @@ pub fn git_worktree_add_in_dir(
     Ok(GitWorktreeAddResult { path, branch, name })
 }
 
-#[tauri::command]
 pub fn git_worktree_list(root_path: String) -> Result<Vec<GitWorktreeEntry>, String> {
     let output = run_git(&root_path, &["worktree", "list", "--porcelain"])?;
     Ok(parse_worktree_porcelain(&output))
 }
 
+#[tauri::command(rename = "git_worktree_list")]
+pub async fn git_worktree_list_command(root_path: String) -> Result<Vec<GitWorktreeEntry>, String> {
+    tokio::task::spawn_blocking(move || git_worktree_list(root_path))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
-pub fn git_worktree_add(
+pub async fn git_worktree_add(
     app: AppHandle,
     root_path: String,
     name: String,
     base_ref: Option<String>,
 ) -> Result<GitWorktreeAddResult, String> {
-    let vixl = user_vixl_dir(&app)?;
-    let parent_slug = parent_slug_for_root(&app, &root_path);
-    git_worktree_add_in_dir(&root_path, &name, base_ref.as_deref(), &vixl, &parent_slug)
+    tokio::task::spawn_blocking(move || {
+        let vixl = user_vixl_dir(&app)?;
+        let parent_slug = parent_slug_for_root(&app, &root_path);
+        git_worktree_add_in_dir(&root_path, &name, base_ref.as_deref(), &vixl, &parent_slug)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
-#[tauri::command]
 pub fn git_worktree_remove(
     root_path: String,
     worktree_path: String,
@@ -417,11 +433,26 @@ pub fn git_worktree_remove(
     Ok(())
 }
 
+#[tauri::command(rename = "git_worktree_remove")]
+pub async fn git_worktree_remove_command(
+    root_path: String,
+    worktree_path: String,
+    force: bool,
+) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || git_worktree_remove(root_path, worktree_path, force))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
-pub fn worktree_detect_parent(
+pub async fn worktree_detect_parent(
     app: AppHandle,
     path: String,
 ) -> Result<Option<WorktreeParentMatch>, String> {
-    let projects = fleet_projects(&app).unwrap_or_default();
-    detect_worktree_parent_among(&path, &projects)
+    tokio::task::spawn_blocking(move || {
+        let projects = fleet_projects(&app).unwrap_or_default();
+        detect_worktree_parent_among(&path, &projects)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }

@@ -23,6 +23,16 @@ import {
 import invokeErrorMessage from '@/utils/invoke-error-message'
 
 const inFlightByRoot = new Map<string, Promise<void>>()
+let exclusive = Promise.resolve()
+
+const runExclusive = (task: () => Promise<void>): Promise<void> => {
+  const run = exclusive.then(task)
+  exclusive = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
+}
 
 const wait = (ms: number): Promise<void> =>
   new Promise((resolve) => {
@@ -111,6 +121,7 @@ const ensureCodeGraphOnce = async (root: string): Promise<void> => {
  * Ensure CodeGraph is initialized and started for the project root.
  * Config lives in memory only; never writes CodeGraph into user MCP JSON.
  * Concurrent calls for the same root share one in-flight start.
+ * Different roots run one at a time (init, MCP config, connect).
  */
 export default async (projectRoot: string): Promise<void> => {
   if (!isTauri()) {
@@ -128,15 +139,15 @@ export default async (projectRoot: string): Promise<void> => {
     return
   }
 
-  const pending = (async () => {
+  const pending = runExclusive(async () => {
     try {
       await ensureCodeGraphOnce(root)
     } catch (error) {
       throw error instanceof Error ? error : new Error(invokeErrorMessage(error))
-    } finally {
-      inFlightByRoot.delete(root)
     }
-  })()
+  }).finally(() => {
+    inFlightByRoot.delete(root)
+  })
 
   inFlightByRoot.set(root, pending)
   await pending

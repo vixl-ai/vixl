@@ -5,7 +5,6 @@ import {
   upsertFleetProject,
 } from '@/composables/use-fleet-registry'
 import { isHomeChatSlug } from '@/constants/home-chat'
-import ensureCodeGraph from '@/services/codegraph/ensure-codegraph'
 import { isHomeWorkspaceRoot } from '@/services/config/is-home-workspace-root'
 import { gateWorkspaceMovePermission } from '@/services/harness/permission'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
@@ -18,14 +17,6 @@ import invokeErrorMessage from '@/utils/invoke-error-message'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const WORKTREE_NAME_RE = /^[a-z0-9-]+$/
-
-const warmCodeGraph = async (root: string): Promise<void> => {
-  try {
-    await ensureCodeGraph(root)
-  } catch {
-    return
-  }
-}
 
 const worktreeCreate = (ctx: HarnessToolContext) =>
   tool({
@@ -90,8 +81,6 @@ const worktreeCreate = (ctx: HarnessToolContext) =>
       } catch {
         message = `${message} Sidebar may need a reload.`
       }
-
-      void warmCodeGraph(created.path)
 
       return {
         ok: true,
