@@ -323,7 +323,7 @@ describe('Reasoning duration', () => {
     expect(mounted.emitted('update:duration')).toBeUndefined()
   })
 
-  it('holds auto-close while content is still revealing, then closes without persisting', async () => {
+  it('closes after the reasoning phase ends while the step message is still streaming', async () => {
     vi.useFakeTimers()
     const store = createChatTurnOpenState()
     const key = chatTurnOpenKeys.reasoning('turn-1', 'step-1')
@@ -353,17 +353,9 @@ describe('Reasoning duration', () => {
     await vi.advanceTimersByTimeAsync(1100)
     await flushPromises()
 
-    expect(collapsibleOpen(mounted)).toBe(true)
-    expect(mounted.text()).toContain('Thought for 4 seconds')
-    expect(mounted.text()).not.toContain('Thinking...')
-    expect(store.size()).toBe(0)
-
-    await mounted.setProps({ contentStreaming: false })
-    await vi.advanceTimersByTimeAsync(1100)
-    await flushPromises()
-
     expect(collapsibleOpen(mounted)).toBe(false)
     expect(mounted.text()).toContain('Thought for 4 seconds')
+    expect(mounted.text()).not.toContain('Thinking...')
     expect(store.size()).toBe(0)
   })
 

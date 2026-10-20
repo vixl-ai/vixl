@@ -68,8 +68,8 @@ watch(() => props.duration, (newVal) => {
 })
 
 watch(
-  () => [props.isStreaming, props.contentStreaming] as const,
-  ([streaming, revealing], previous, onCleanup) => {
+  () => props.isStreaming,
+  (streaming, previous, onCleanup) => {
     if (streaming) {
       wasStreaming.value = true
       setProgrammatic(true)
@@ -80,8 +80,7 @@ watch(
       return
     }
 
-    const wasIsStreaming = previous?.[0] === true
-    if (wasIsStreaming && startTime.value !== null) {
+    if (previous === true && startTime.value !== null) {
       if (props.duration === undefined) {
         const calculatedDuration = Math.ceil((Date.now() - startTime.value) / MS_IN_S)
         updateDuration(calculatedDuration)
@@ -89,10 +88,8 @@ watch(
       startTime.value = null
     }
 
-    if (revealing) {
-      return
-    }
-
+    // The message or the next tool can still be streaming. Close once this
+    // thought phase has ended, instead of waiting for the whole step.
     if (!wasStreaming.value) {
       return
     }
