@@ -194,12 +194,32 @@ export function shouldSettleScrollToEnd({
   return spacerHeight === 0 && !hasStreamingTurn && mode === nextMode && atEnd
 }
 
-export function shouldAnchorOnContentChange({
+// Stick when the reader is following, or when the viewport is still on the
+// live edge after follow mode was dropped. A reader who scrolled away stays
+// where they are. Aligning the new row to the top instead shows only the
+// bottom of the sent message and parks the next turn over an empty viewport.
+export function shouldStickContentChangeToEnd({
+  atLiveEdge,
   followingLive,
 }: {
+  atLiveEdge: boolean
   followingLive: boolean
 }): boolean {
-  return !followingLive
+  return followingLive || atLiveEdge
+}
+
+export function wasReaderAtLiveEdge({
+  previousEnd,
+  scrollTop,
+  threshold,
+  viewportHeight,
+}: {
+  previousEnd: number
+  scrollTop: number
+  threshold: number
+  viewportHeight: number
+}): boolean {
+  return scrollTop + viewportHeight + threshold >= previousEnd
 }
 
 export function shouldTreatAnchorAsUnhandled({

@@ -31,7 +31,7 @@ import {
  * clear the height map. The mounted window stays on the cached tail.
  *
  * Send while stuck to the bottom is scrollToEnd, not align-start: see
- * shouldAnchorOnContentChange in compute-windowed-ids.test.ts.
+ * shouldStickContentChangeToEnd in compute-windowed-ids.test.ts.
  */
 
 const SCROLL_EPSILON = 0.5

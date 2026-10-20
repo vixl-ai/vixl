@@ -9,7 +9,8 @@ import {
   resolveFollowWindowScrollTop,
   resolveViewportHeight,
   resolveWindowScrollTop,
-  shouldAnchorOnContentChange,
+  shouldStickContentChangeToEnd,
+  wasReaderAtLiveEdge,
   shouldAdvanceFollowChaseBaseline,
   shouldChaseFollowBottom,
   shouldChaseFollowBottomOnContentGrowth,
@@ -627,13 +628,46 @@ describe('shouldSettleScrollToEnd', () => {
   })
 })
 
-describe('shouldAnchorOnContentChange', () => {
-  it('keeps the keep-previous-peek path when the user is not following live', () => {
-    expect(shouldAnchorOnContentChange({ followingLive: false })).toBe(true)
+describe('shouldStickContentChangeToEnd', () => {
+  it('sticks while following live', () => {
+    expect(shouldStickContentChangeToEnd({
+      atLiveEdge: false,
+      followingLive: true,
+    })).toBe(true)
   })
 
-  it('skips the anchored-to-message path while following live', () => {
-    expect(shouldAnchorOnContentChange({ followingLive: true })).toBe(false)
+  it('sticks when follow mode was dropped but the viewport is still on the live edge', () => {
+    expect(shouldStickContentChangeToEnd({
+      atLiveEdge: true,
+      followingLive: false,
+    })).toBe(true)
+  })
+
+  it('leaves a reader who scrolled away from the live edge where they are', () => {
+    expect(shouldStickContentChangeToEnd({
+      atLiveEdge: false,
+      followingLive: false,
+    })).toBe(false)
+  })
+})
+
+describe('wasReaderAtLiveEdge', () => {
+  it('is true when the viewport bottom still reaches the previous end', () => {
+    expect(wasReaderAtLiveEdge({
+      previousEnd: 1000,
+      scrollTop: 600,
+      threshold: 8,
+      viewportHeight: 400,
+    })).toBe(true)
+  })
+
+  it('is false after the reader scrolls above the previous end', () => {
+    expect(wasReaderAtLiveEdge({
+      previousEnd: 1000,
+      scrollTop: 500,
+      threshold: 8,
+      viewportHeight: 400,
+    })).toBe(false)
   })
 })
 

@@ -11,7 +11,8 @@ import {
   resolveFollowWindowScrollTop,
   resolveViewportHeight,
   resolveWindowScrollTop,
-  shouldAnchorOnContentChange,
+  shouldStickContentChangeToEnd,
+  wasReaderAtLiveEdge,
   shouldChaseFollowBottom,
   shouldChaseFollowBottomOnResize,
   shouldExitFollowBottom,
@@ -910,6 +911,33 @@ function createEngine(props: MessageScrollerProviderProps) {
 
   // --- content / resize handling ---------------------------------------------
 
+  function isViewportAtLiveEdge(): boolean {
+    if (!viewport || !content)
+      return false
+    return wasReaderAtLiveEdge({
+      previousEnd: measureContentHeight({ content, spacer, viewport }),
+      scrollTop: viewport.scrollTop,
+      threshold: scrollEdgeThreshold(),
+      viewportHeight: viewport.clientHeight,
+    })
+  }
+
+  function appendedWhileAtLiveEdge(children: HTMLElement[], previousCount: number): boolean {
+    if (!viewport || !content)
+      return false
+    const paddingEnd = getPadding(content).end
+    const previous = previousCount > 0 ? children[previousCount - 1] : null
+    const previousEnd = previous
+      ? getElementOffsetTop(previous, viewport) + previous.getBoundingClientRect().height + paddingEnd
+      : paddingEnd
+    return wasReaderAtLiveEdge({
+      previousEnd,
+      scrollTop: viewport.scrollTop,
+      threshold: scrollEdgeThreshold(),
+      viewportHeight: viewport.clientHeight,
+    })
+  }
+
   function applyContentChange(
     children: HTMLElement[],
     previousCount: number,
@@ -937,11 +965,19 @@ function createEngine(props: MessageScrollerProviderProps) {
       const anchor = findFirstAnchorFrom(children, previousCount)
       if (anchor) {
         markAnchorHandled(anchor)
-        if (shouldAnchorOnContentChange({ followingLive: isFollowingLive() })) {
-          scrollToElement(anchor, { align: "start" }, { keepPreviousPeek: true })
+        // Do not align the new row to the top. That shows only the bottom
+        // of the message you just sent and parks the next turn up high.
+        // Stay on the end when this append happened at the live edge.
+        // A reader who scrolled up keeps their place.
+        if (shouldStickContentChangeToEnd({
+          atLiveEdge: appendedWhileAtLiveEdge(children, previousCount),
+          followingLive: isFollowingLive(),
+        })) {
+          scrollToEnd({ behavior: "auto" })
           return
         }
-        scrollToEnd({ behavior: "auto" })
+        commitScrollState()
+        scheduleVisibilitySync()
         return
       }
     }
@@ -949,11 +985,15 @@ function createEngine(props: MessageScrollerProviderProps) {
       const anchor = findFirstUnhandledAnchor(children, handledScrollAnchors)
       if (anchor) {
         markAnchorHandled(anchor)
-        if (shouldAnchorOnContentChange({ followingLive: isFollowingLive() })) {
-          scrollToElement(anchor, { align: "start" }, { keepPreviousPeek: true })
+        if (shouldStickContentChangeToEnd({
+          atLiveEdge: isViewportAtLiveEdge(),
+          followingLive: isFollowingLive(),
+        })) {
+          scrollToEnd({ behavior: "auto" })
           return
         }
-        scrollToEnd({ behavior: "auto" })
+        commitScrollState()
+        scheduleVisibilitySync()
         return
       }
     }
