@@ -26,9 +26,11 @@ const shouldEnsureCodeGraph = (ctx: HarnessToolContext, projectRoot: string): bo
   }
   const projects = getFleetProjects()
   const activeId = getActiveFleetProjectId()
-  if (activeId) {
-    const active = projects.find((project) => project.id === activeId)
-    if (!active || pathsEqualCanonical(active.rootPath, projectRoot)) {
+  const active = activeId
+    ? projects.find((project) => project.id === activeId)
+    : undefined
+  if (active) {
+    if (pathsEqualCanonical(active.rootPath, projectRoot)) {
       return false
     }
     return projects.some((project) => pathsEqualCanonical(project.rootPath, projectRoot))
@@ -54,7 +56,7 @@ const callManagedCodegraphTool = async (
   // Lifecycle is owned by ensureCodeGraph + the status chip runtime path.
   // Group members already need a graph. A worktree implementer does too when the
   // call root is a registered worktree child, including when no fleet project is
-  // marked active after load or refresh.
+  // marked active after load or refresh, or the active id is absent from the list.
   if (shouldEnsureCodeGraph(ctx, projectRoot)) {
     try {
       const ensureCodeGraph = (await import('@/services/codegraph/ensure-codegraph')).default

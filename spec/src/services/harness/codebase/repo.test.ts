@@ -459,6 +459,52 @@ describe('codebase tool repo resolution', () => {
     )
     expect(result).not.toHaveProperty('repo')
   })
+
+  it('starts CodeGraph for a registered worktree root when the active fleet id is missing from the list', async () => {
+    fleetState.activeProjectId.value = 'missing'
+    fleetState.projects = [
+      {
+        id: 'parent',
+        name: 'Parent',
+        slug: 'parent',
+        rootPath: '/tmp/parent',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'worktree',
+        name: 'feature',
+        slug: 'feature',
+        rootPath: '/tmp/worktrees/parent/feature',
+        lastOpened: '2026-01-02T00:00:00.000Z',
+        worktree: {
+          parentId: 'parent',
+          branch: 'vixl/feature',
+          managed: true,
+        },
+      },
+    ]
+
+    const result = await execute(
+      codebaseStatus(
+        baseCtx({
+          members: undefined,
+          projectSlug: 'feature',
+          projectRoot: '/tmp/worktrees/parent/feature',
+        }),
+      ),
+      {},
+    )
+
+    expect(ensureCodeGraph).toHaveBeenCalledWith('/tmp/worktrees/parent/feature')
+    expect(mcpCallTool).toHaveBeenCalledWith(
+      'codegraph',
+      'codegraph_status',
+      {},
+      undefined,
+      '/tmp/worktrees/parent/feature',
+    )
+    expect(result).not.toHaveProperty('repo')
+  })
 })
 
 describe('repoScopeSummary', () => {
