@@ -16,7 +16,24 @@ const mcpCallTool = vi.fn<
 
 const ensureCodeGraph = vi.fn<(root: string) => Promise<void>>(async () => undefined)
 
+const fleetState = vi.hoisted(() => ({
+  activeProjectId: { value: null as string | null },
+  projects: [] as Array<{
+    id: string
+    name: string
+    slug: string
+    rootPath: string
+    lastOpened: string
+    worktree?: { parentId: string; branch: string; managed: boolean }
+  }>,
+}))
+
 vi.mock('@/services/vixl/vixl-tauri', () => mockVixlTauri({}))
+
+vi.mock('@/composables/use-fleet-registry', () => ({
+  getActiveFleetProjectId: () => fleetState.activeProjectId.value,
+  getFleetProjects: () => fleetState.projects,
+}))
 
 vi.mock('@/services/mcp/mcp-runtime', () => ({
   default: {
@@ -90,6 +107,8 @@ const execute = async (
 describe('codebase tool repo resolution', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    fleetState.activeProjectId.value = null
+    fleetState.projects = []
     mcpCallTool.mockResolvedValue({
       content: [{ type: 'text', text: '**CodeGraph Status**\n\n**Files indexed:** 1' }],
     })
@@ -299,6 +318,52 @@ describe('codebase tool repo resolution', () => {
       {},
       undefined,
       '/tmp/api',
+    )
+    expect(result).not.toHaveProperty('repo')
+  })
+
+  it('starts CodeGraph for a registered worktree root that is not the active fleet project', async () => {
+    fleetState.activeProjectId.value = 'parent'
+    fleetState.projects = [
+      {
+        id: 'parent',
+        name: 'Parent',
+        slug: 'parent',
+        rootPath: '/tmp/parent',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'worktree',
+        name: 'feature',
+        slug: 'feature',
+        rootPath: '/tmp/worktrees/parent/feature',
+        lastOpened: '2026-01-02T00:00:00.000Z',
+        worktree: {
+          parentId: 'parent',
+          branch: 'vixl/feature',
+          managed: true,
+        },
+      },
+    ]
+
+    const result = await execute(
+      codebaseStatus(
+        baseCtx({
+          members: undefined,
+          projectSlug: 'feature',
+          projectRoot: '/tmp/worktrees/parent/feature',
+        }),
+      ),
+      {},
+    )
+
+    expect(ensureCodeGraph).toHaveBeenCalledWith('/tmp/worktrees/parent/feature')
+    expect(mcpCallTool).toHaveBeenCalledWith(
+      'codegraph',
+      'codegraph_status',
+      {},
+      undefined,
+      '/tmp/worktrees/parent/feature',
     )
     expect(result).not.toHaveProperty('repo')
   })

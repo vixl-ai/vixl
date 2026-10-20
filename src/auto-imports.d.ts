@@ -55,6 +55,7 @@ declare global {
   const effectScope: typeof import('vue').effectScope
   const ensureFleetLoaded: typeof import('./composables/use-fleet-registry').ensureFleetLoaded
   const extendRef: typeof import('@vueuse/core').extendRef
+  const getActiveFleetProjectId: typeof import('./composables/use-fleet-registry').getActiveFleetProjectId
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
@@ -474,6 +475,7 @@ declare module 'vue' {
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly ensureFleetLoaded: UnwrapRef<typeof import('./composables/use-fleet-registry')['ensureFleetLoaded']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
+    readonly getActiveFleetProjectId: UnwrapRef<typeof import('./composables/use-fleet-registry')['getActiveFleetProjectId']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>

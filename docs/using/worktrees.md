@@ -20,7 +20,7 @@ Vixl always asks first (`Create worktree vixl/<name>?`). After you approve, it:
 1. Creates the git worktree and branch (optional `baseRef`, default `HEAD`).
 2. Copies the parent's `.vixl/plans/` into the new checkout (plans only; existing files in the checkout are not overwritten).
 3. Registers it as a fleet project.
-4. The [code graph](/concepts/code-graphs) for that root starts when that checkout is opened or when a codebase tool needs it. Only one index runs at a time.
+4. The [code graph](/concepts/code-graphs) for that root starts when that checkout is opened or when a codebase tool needs it, including the first codebase tool from an implementer spawned with workspaceSlug. Only one index runs at a time.
 
 `worktree_create` does not move the current chat. The new row appears nested under the parent in the sidebar, with the branch name and a dirty indicator. The worktree project page shows a **Worktree of {parent} on {branch}** banner. That row has its own chat list.
 

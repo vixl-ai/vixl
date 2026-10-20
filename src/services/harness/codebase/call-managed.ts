@@ -1,3 +1,4 @@
+import { getActiveFleetProjectId, getFleetProjects } from '@/composables/use-fleet-registry'
 import { requestMcpAuth } from '@/services/mcp/mcp-auth-gate'
 import { setMcpElicitationHandler } from '@/services/mcp/mcp-http-client'
 import mcpRuntime from '@/services/mcp/mcp-runtime'
@@ -13,10 +14,27 @@ import {
 } from '@/types/codegraph/managed-codegraph'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import { getMcpAuthMode } from '@/types/vixl/mcp-config'
+import pathsEqual from '@/utils/paths-equal'
 
 type ManagedCodegraphCallResult =
   | { ok: true; result: unknown }
   | { ok: false; payload: Record<string, unknown> }
+
+const shouldEnsureCodeGraph = (ctx: HarnessToolContext, projectRoot: string): boolean => {
+  if (ctx.members && ctx.members.length > 0) {
+    return true
+  }
+  const activeId = getActiveFleetProjectId()
+  if (!activeId) {
+    return false
+  }
+  const projects = getFleetProjects()
+  const active = projects.find((project) => project.id === activeId)
+  if (!active || pathsEqual(active.rootPath, projectRoot)) {
+    return false
+  }
+  return projects.some((project) => pathsEqual(project.rootPath, projectRoot))
+}
 
 const callManagedCodegraphTool = async (
   ctx: HarnessToolContext,
@@ -32,7 +50,9 @@ const callManagedCodegraphTool = async (
   const projectRoot = args.projectRoot
   // Product-owned CodeGraph tools skip user MCP trust and per-tool permission cards.
   // Lifecycle is owned by ensureCodeGraph + the status chip runtime path.
-  if (ctx.members && ctx.members.length > 0) {
+  // Group members already need a graph. A worktree implementer does too when the
+  // parent stays the active fleet project, so the call root is registered and inactive.
+  if (shouldEnsureCodeGraph(ctx, projectRoot)) {
     try {
       const ensureCodeGraph = (await import('@/services/codegraph/ensure-codegraph')).default
       await ensureCodeGraph(projectRoot)

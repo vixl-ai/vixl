@@ -102,6 +102,8 @@ const refresh = async (): Promise<void> => {
 
 export const getFleetProjects = (): FleetProject[] => projects.value
 
+export const getActiveFleetProjectId = (): string | null => activeProjectId.value
+
 export const worktreesOf = (projectId: string): FleetProject[] =>
   projects.value
     .filter((project) => project.worktree?.parentId === projectId)
