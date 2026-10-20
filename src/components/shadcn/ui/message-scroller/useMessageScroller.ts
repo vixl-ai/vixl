@@ -424,6 +424,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   let itemCount = 0
   let lastScrollTop = 0
   let pendingUserTouchScroll = false
+  let programmaticScrollDepth = 0
   let defaultScrollPositionApplied = false
   let preserveScrollOnPrepend = true
   let prependRestore: PrependRestore | null = null
@@ -485,6 +486,7 @@ function createEngine(props: MessageScrollerProviderProps) {
         || shouldExitFollowBottom({
           autoscrolling: autoscrolling.value,
           distanceFromEnd,
+          programmatic: programmaticScrollDepth > 0,
           scrolledUp,
           threshold,
         })
@@ -611,7 +613,13 @@ function createEngine(props: MessageScrollerProviderProps) {
         && offset !== null
         && offset < viewport.scrollTop - SCROLL_EPSILON
       ) {
-        viewport.scrollTop += delta
+        programmaticScrollDepth += 1
+        try {
+          viewport.scrollTop += delta
+        }
+        finally {
+          programmaticScrollDepth -= 1
+        }
       }
     }
     recomputeWindow()
@@ -694,9 +702,15 @@ function createEngine(props: MessageScrollerProviderProps) {
       clearUserTouchScrollIntent()
       setAutoscrolling(true)
       spacerHeight = next
-      spacer.hidden = next === 0
-      spacer.style.height = `${next}px`
-      spacer.style.marginTop = next > 0 ? `${-spacerGap}px` : ""
+      programmaticScrollDepth += 1
+      try {
+        spacer.hidden = next === 0
+        spacer.style.height = `${next}px`
+        spacer.style.marginTop = next > 0 ? `${-spacerGap}px` : ""
+      }
+      finally {
+        programmaticScrollDepth -= 1
+      }
     }
   }
 
@@ -709,13 +723,21 @@ function createEngine(props: MessageScrollerProviderProps) {
     const target = Math.max(0, top)
     if (isAutoscrolling)
       setAutoscrolling(true)
-    if (Math.abs(viewport.scrollTop - target) <= SCROLL_EPSILON) {
-      viewport.scrollTop = target
-      commitScrollState()
-      return
+    programmaticScrollDepth += 1
+    try {
+      // Assign scrollTop for an instant jump so the scroll event stays
+      // inside this write. A smooth scroll is left to the browser.
+      if (behavior === "auto" || Math.abs(viewport.scrollTop - target) <= SCROLL_EPSILON) {
+        viewport.scrollTop = target
+        commitScrollState()
+        return
+      }
+      viewport.scrollTo({ top: target, behavior })
+      scheduleStateCommit()
     }
-    viewport.scrollTo({ top: target, behavior })
-    scheduleStateCommit()
+    finally {
+      programmaticScrollDepth -= 1
+    }
   }
 
   function scrollToStart({ behavior = "auto" }: { behavior?: ScrollBehavior } = {}): boolean {
@@ -847,7 +869,13 @@ function createEngine(props: MessageScrollerProviderProps) {
     const delta = getRelativeTop(prependRestore.element, viewport) - prependRestore.viewportTop
     if (Math.abs(delta) <= SCROLL_EPSILON)
       return false
-    viewport.scrollTop += delta
+    programmaticScrollDepth += 1
+    try {
+      viewport.scrollTop += delta
+    }
+    finally {
+      programmaticScrollDepth -= 1
+    }
     prependRestore.viewportTop = getRelativeTop(prependRestore.element, viewport)
     scheduleStateCommit()
     scheduleVisibilitySync()
@@ -1020,12 +1048,12 @@ function createEngine(props: MessageScrollerProviderProps) {
     recomputeWindow()
   }
 
-  function evaluateFollowChase() {
+  function evaluateFollowChase(recheck = false) {
     // Already at the bottom must not call scrollToEnd: that retriggers
     // ResizeObserver. The window is chosen from the cached end, so scrolling
     // the viewport to the real DOM end does not collapse rows into
-    // placeholders. Waiting for the height cache to match the DOM skips
-    // streaming text and leaves the reader above the new message.
+    // placeholders. One follow-up frame catches a line that lands after
+    // this measurement. The follow-up does not schedule another frame.
     const offEnd = Boolean(
       viewport
       && shouldChaseFollowBottomOnResize({
@@ -1037,6 +1065,8 @@ function createEngine(props: MessageScrollerProviderProps) {
     )
     if (shouldChaseFollowBottom({ offEnd })) {
       scrollToEnd({ behavior: "auto" })
+      if (!recheck)
+        scheduleFollowChaseRecheck()
       return
     }
     recomputeWindow()
@@ -1048,7 +1078,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     followChaseRecheckFrame = window.requestAnimationFrame(() => {
       followChaseRecheckFrame = null
       if (mode === "following-bottom" && autoScroll())
-        evaluateFollowChase()
+        evaluateFollowChase(true)
     })
   }
 

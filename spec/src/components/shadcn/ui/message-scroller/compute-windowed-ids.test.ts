@@ -873,6 +873,13 @@ describe('shouldExitFollowBottom', () => {
     })).toBe(true)
   })
 
+  it('keeps follow when a layout write moved scrollTop', () => {
+    expect(shouldExitFollowBottom({
+      ...exiting,
+      programmatic: true,
+    })).toBe(false)
+  })
+
   it('keeps follow when the last scroll was not up', () => {
     expect(shouldExitFollowBottom({
       ...exiting,

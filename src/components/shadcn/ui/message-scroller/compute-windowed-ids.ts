@@ -273,14 +273,21 @@ export function clampReadingWindowScrollTop({
 
 export function shouldExitFollowBottom({
   distanceFromEnd,
+  programmatic,
   scrolledUp,
   threshold,
 }: {
   autoscrolling: boolean
   distanceFromEnd: number
+  programmatic?: boolean
   scrolledUp: boolean
   threshold: number
 }): boolean {
+  // A step growing or a row above the viewport can move scrollTop without
+  // the reader asking. That used to drop follow, leave the next line below
+  // the fold, and make the reader scroll back down to catch up.
+  if (programmatic)
+    return false
   return scrolledUp && distanceFromEnd > threshold
 }
 
