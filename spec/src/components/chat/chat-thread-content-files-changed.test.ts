@@ -572,4 +572,42 @@ describe('ChatThreadContent stream scroll coalescing', () => {
     expect(scroller.scrollToEnd).toHaveBeenCalledTimes(1)
     expect(scroller.scrollToEnd).toHaveBeenCalledWith({ behavior: 'auto' })
   })
+
+  it('calls scrollToEnd once when status becomes ready while still following', async () => {
+    const timeline = [
+      userItem('u1', 'edit'),
+      agentTurn('t1', [editRun('t1-tool', 'a.ts')]),
+    ]
+    const mounted = mountContent(timeline, 'streaming')
+    scroller.scrollToEnd.mockClear()
+
+    await mounted.setProps({ status: 'ready' })
+    await flushPromises()
+
+    const turns = agentTurns(mounted)
+    expect(turns).toHaveLength(1)
+    expect(turns[0]?.props('status')).toBe('ready')
+    expect(turns[0]?.props('chatFileChanges')).toEqual([
+      { path: 'a.ts', operation: 'update', additions: 1, deletions: 0 },
+    ])
+    expect(scroller.handleContentChange).not.toHaveBeenCalled()
+    expect(scroller.scrollToEnd).toHaveBeenCalledTimes(1)
+    expect(scroller.scrollToEnd).toHaveBeenCalledWith({ behavior: 'auto' })
+  })
+
+  it('does not call scrollToEnd when status becomes ready after follow was released', async () => {
+    scroller.isFollowingLive.mockReturnValue(false)
+    const timeline = [
+      userItem('u1', 'edit'),
+      agentTurn('t1', [editRun('t1-tool', 'a.ts')]),
+    ]
+    const mounted = mountContent(timeline, 'streaming')
+    scroller.scrollToEnd.mockClear()
+
+    await mounted.setProps({ status: 'ready' })
+    await flushPromises()
+
+    expect(scroller.handleContentChange).not.toHaveBeenCalled()
+    expect(scroller.scrollToEnd).not.toHaveBeenCalled()
+  })
 })

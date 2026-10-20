@@ -276,19 +276,84 @@ export function shouldExitFollowBottom({
   programmatic,
   scrolledUp,
   threshold,
+  userGesture,
 }: {
   autoscrolling: boolean
   distanceFromEnd: number
   programmatic?: boolean
   scrolledUp: boolean
   threshold: number
+  userGesture: boolean
 }): boolean {
   // A step growing or a row above the viewport can move scrollTop without
   // the reader asking. That used to drop follow, leave the next line below
   // the fold, and make the reader scroll back down to catch up.
   if (programmatic)
     return false
-  return scrolledUp && distanceFromEnd > threshold
+  return userGesture && scrolledUp && distanceFromEnd > threshold
+}
+
+export function shouldRecoverFollowAfterLayoutScroll({
+  distanceFromEnd,
+  followingBottom,
+  layoutClamp,
+  programmatic,
+  scrolledUp,
+  threshold,
+  userGesture,
+}: {
+  distanceFromEnd: number
+  followingBottom: boolean
+  layoutClamp: boolean
+  programmatic?: boolean
+  scrolledUp: boolean
+  threshold: number
+  userGesture: boolean
+}): boolean {
+  // Recovery is only for a layout clamp: scrollHeight shrank and that
+  // shrink explains the scrollTop drop. An unarmed reader scroll is not
+  // a clamp and must not chase.
+  if (!layoutClamp || !followingBottom || userGesture || programmatic || !scrolledUp)
+    return false
+  return distanceFromEnd > threshold
+}
+
+export function shouldExitFollowBottomOnUnarmedScroll({
+  distanceFromEnd,
+  layoutClamp,
+  programmatic,
+  scrolledUp,
+  threshold,
+  userGesture,
+}: {
+  distanceFromEnd: number
+  layoutClamp: boolean
+  programmatic?: boolean
+  scrolledUp: boolean
+  threshold: number
+  userGesture: boolean
+}): boolean {
+  if (layoutClamp || userGesture || programmatic || !scrolledUp)
+    return false
+  return distanceFromEnd > threshold
+}
+
+export function shouldTreatUpwardScrollAsLayoutClamp({
+  scrollHeightDelta,
+  scrollTopDelta,
+  threshold,
+}: {
+  scrollHeightDelta: number
+  scrollTopDelta: number
+  threshold: number
+}): boolean {
+  // Deltas are previous minus current. A positive scrollTopDelta is an
+  // upward drop. A positive scrollHeightDelta is a content shrink. The
+  // browser clamp after a placeholder remount drops scrollTop by about
+  // the shrink, so that event is layout, not a reader gesture.
+  if (scrollTopDelta <= 0 || scrollHeightDelta <= 0)
+    return false
+  return scrollTopDelta <= scrollHeightDelta + threshold
 }
 
 export function shouldExitFollowBottomOnUserTouch({

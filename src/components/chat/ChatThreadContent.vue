@@ -542,8 +542,13 @@ watch(
   { immediate: true },
 )
 
-const followLiveOutput = async (): Promise<void> => {
-  if (!isLive.value && !activityLabel.value && !props.compacting) {
+const followLiveOutput = async (settleReady = false): Promise<void> => {
+  if (
+    !settleReady &&
+    !isLive.value &&
+    !activityLabel.value &&
+    !props.compacting
+  ) {
     return
   }
   try {
@@ -601,9 +606,18 @@ watch(
 
 watch(
   () => props.status,
-  (status) => {
+  (status, previous) => {
     if (status === 'streaming' || status === 'submitted' || activityLabel.value) {
       followLiveOutput()
+      return
+    }
+    // Ready unmounts the activity row and mounts files-changed after the last
+    // stick. Follow once more so that render is included.
+    if (
+      (previous === 'streaming' || previous === 'submitted') &&
+      isFollowingLive()
+    ) {
+      followLiveOutput(true)
     }
   },
 )
