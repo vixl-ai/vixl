@@ -78,10 +78,10 @@ jobs:
 
       - run: npm ci
 
-      # Fork pull requests cannot read repository secrets, and the bundler
-      # fails when the updater key is missing, so build those unsigned.
+      # Fork and Dependabot pull requests cannot read repository secrets, and
+      # the bundler fails when the updater key is missing, so build those unsigned.
       - name: Build unsigned
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.actor == 'dependabot[bot]')
         uses: tauri-apps/tauri-action@v1
         env:
           NO_STRIP: 'true'
@@ -91,7 +91,7 @@ jobs:
           uploadWorkflowArtifacts: true
 
       - name: Build signed
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
         uses: tauri-apps/tauri-action@v1
         env:
           NO_STRIP: 'true'
