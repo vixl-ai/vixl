@@ -38,13 +38,13 @@ const handleToggle = (id: ChatStackId): void => {
 <template>
   <div
     v-if="pills.length > 0"
-    class="flex flex-wrap items-center gap-1.5"
+    class="flex min-w-0 w-full flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain scroll-fade-x no-scrollbar"
   >
     <button
       v-for="pill in pills"
       :key="pill.id"
       type="button"
-      class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+      class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
       :class="
         pill.id === openStack
           ? 'border-border bg-accent text-accent-foreground'

@@ -171,7 +171,7 @@ const pills = computed(() => {
     <div
       class="shrink-0 px-4 pb-4 pt-2"
     >
-      <div class="mx-auto flex w-full max-w-3xl flex-col">
+      <div class="mx-auto flex w-full min-w-0 max-w-3xl flex-col">
         <template v-if="!isSubagentView">
           <div
             v-if="openStack"
