@@ -58,18 +58,22 @@ const maxUpdatedAt = (chats: ChatMeta[]): string => {
   )
 }
 
+const toSidebarChat = (chat: ChatMeta): FleetSidebarChat => ({
+  id: chat.id,
+  title: chat.title,
+  status: chat.status,
+  attention: chat.attention ?? null,
+  updatedAt: chat.updatedAt,
+  pinned: chat.pinned,
+})
+
 export default () => {
   const fleet = useFleetRegistry()
   const chatStore = useChatStore()
 
   const sidebarProjects = computed<FleetSidebarProject[]>(() => {
     const mapChats = (slug: string): FleetSidebarChat[] =>
-      (chatsBySlug.value[slug] ?? []).map((chat) => ({
-        id: chat.id,
-        title: chat.title,
-        status: chat.status,
-        attention: chat.attention ?? null,
-      }))
+      (chatsBySlug.value[slug] ?? []).map(toSidebarChat)
 
     const toProjectRow = (
       project: FleetProject,
@@ -123,7 +127,17 @@ export default () => {
         return {
           ...row,
           defaultExpanded: Boolean(row.defaultExpanded) || childActive,
-          worktrees: children.map((child) => toProjectRow(child, { nested: true })),
+          worktrees: children.map((child) => {
+            const nested = toProjectRow(child, { nested: true })
+            const childChats = chatsBySlug.value[child.slug] ?? []
+            return {
+              ...nested,
+              activityAt:
+                childChats.length > 0
+                  ? maxUpdatedAt(childChats)
+                  : child.lastOpened,
+            }
+          }),
         }
       })
 
@@ -156,12 +170,7 @@ export default () => {
     if (standaloneChats.value.length > 0) {
       items.push({
         kind: 'home',
-        chats: standaloneChats.value.map((chat) => ({
-          id: chat.id,
-          title: chat.title,
-          status: chat.status,
-          attention: chat.attention ?? null,
-        })),
+        chats: standaloneChats.value.map(toSidebarChat),
         updatedAt: maxUpdatedAt(standaloneChats.value),
       })
     }
