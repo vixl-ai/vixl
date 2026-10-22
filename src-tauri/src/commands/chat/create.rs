@@ -31,6 +31,7 @@ pub fn create_chat(
         attention: None,
         created_at: now.clone(),
         updated_at: now,
+        last_user_message_at: None,
         forked_from: None,
         pinned: false,
         pinned_at: None,

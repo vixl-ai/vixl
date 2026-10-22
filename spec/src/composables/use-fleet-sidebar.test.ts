@@ -122,6 +122,7 @@ describe('use-fleet-sidebar activityItems', () => {
           title: 'Second home',
           projectSlug: HOME_CHAT_SLUG,
           updatedAt: '2026-01-03T00:00:00.000Z',
+          pinned: true,
         }),
       ],
     })
@@ -129,6 +130,18 @@ describe('use-fleet-sidebar activityItems', () => {
     const homeItems = sidebar.activityItems.value.filter((item) => item.kind === 'home')
     expect(homeItems).toHaveLength(1)
     expect(homeItems[0]?.chats.map((chat) => chat.id)).toEqual(['h1', 'h2'])
+    expect(homeItems[0]?.chats).toEqual([
+      expect.objectContaining({
+        id: 'h1',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        pinned: false,
+      }),
+      expect.objectContaining({
+        id: 'h2',
+        updatedAt: '2026-01-03T00:00:00.000Z',
+        pinned: true,
+      }),
+    ])
   })
 
   it('omits the home item when there are no home chats', async () => {
@@ -307,6 +320,7 @@ describe('use-fleet-sidebar worktree nesting', () => {
           title: 'Feature chat',
           projectSlug: 'demo-feature',
           updatedAt: '2026-01-05T00:00:00.000Z',
+          pinned: true,
         }),
       ],
       'demo-fix': [
@@ -330,8 +344,205 @@ describe('use-fleet-sidebar worktree nesting', () => {
       'vixl/feature',
       'vixl/fix',
     ])
-    expect(parent?.worktrees?.[0]?.chats.map((chat) => chat.id)).toEqual(['w1'])
-    expect(parent?.chats.map((chat) => chat.id)).toEqual(['p1'])
+    expect(parent?.chats).toEqual([
+      expect.objectContaining({
+        id: 'p1',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        pinned: false,
+      }),
+    ])
+    expect(parent?.worktrees?.[0]?.chats).toEqual([
+      expect.objectContaining({
+        id: 'w1',
+        updatedAt: '2026-01-05T00:00:00.000Z',
+        pinned: true,
+      }),
+    ])
+    expect(parent?.worktrees?.[1]?.chats).toEqual([
+      expect.objectContaining({
+        id: 'w2',
+        updatedAt: '2026-01-03T00:00:00.000Z',
+        pinned: false,
+      }),
+    ])
+    expect(parent?.worktrees?.[0]?.activityAt).toBe('2026-01-05T00:00:00.000Z')
+    expect(parent?.worktrees?.[1]?.activityAt).toBe('2026-01-03T00:00:00.000Z')
+    expect(
+      sidebar.activityItems.value.map((item) =>
+        item.kind === 'home' ? 'home' : item.project.slug,
+      ),
+    ).toEqual(['demo'])
+  })
+
+  it('sets worktree activityAt to the newest nested chat, not lastOpened', async () => {
+    fleetProjects.value = [
+      {
+        id: 'proj-parent',
+        slug: 'demo',
+        name: 'Demo',
+        rootPath: '/tmp/demo',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'proj-wt-later',
+        slug: 'demo-later',
+        name: 'later',
+        rootPath: '/tmp/worktrees/demo/later',
+        lastOpened: '2026-01-10T00:00:00.000Z',
+        worktree: { parentId: 'proj-parent', branch: 'vixl/later', managed: true },
+      },
+      {
+        id: 'proj-wt-earlier',
+        slug: 'demo-earlier',
+        name: 'earlier',
+        rootPath: '/tmp/worktrees/demo/earlier',
+        lastOpened: '2026-01-08T00:00:00.000Z',
+        worktree: { parentId: 'proj-parent', branch: 'vixl/earlier', managed: true },
+      },
+    ]
+
+    const sidebar = await seedSidebar({
+      demo: [
+        makeChat({
+          id: 'p1',
+          title: 'Parent chat',
+          projectSlug: 'demo',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      'demo-later': [
+        makeChat({
+          id: 'w-old',
+          title: 'Older later chat',
+          projectSlug: 'demo-later',
+          updatedAt: '2026-01-03T00:00:00.000Z',
+        }),
+        makeChat({
+          id: 'w-new',
+          title: 'Newer later chat',
+          projectSlug: 'demo-later',
+          updatedAt: '2026-01-05T00:00:00.000Z',
+        }),
+      ],
+      'demo-earlier': [
+        makeChat({
+          id: 'w-hot',
+          title: 'Hot earlier chat',
+          projectSlug: 'demo-earlier',
+          updatedAt: '2026-01-09T00:00:00.000Z',
+        }),
+      ],
+      [HOME_CHAT_SLUG]: [],
+    })
+
+    const parent = sidebar.sidebarProjects.value[0]
+    expect(parent?.worktrees?.map((item) => item.slug)).toEqual([
+      'demo-later',
+      'demo-earlier',
+    ])
+    expect(parent?.worktrees?.[0]?.activityAt).toBe('2026-01-05T00:00:00.000Z')
+    expect(parent?.worktrees?.[1]?.activityAt).toBe('2026-01-09T00:00:00.000Z')
+    expect(
+      sidebar.activityItems.value.map((item) =>
+        item.kind === 'home' ? 'home' : item.project.slug,
+      ),
+    ).toEqual(['demo'])
+  })
+
+  it('sets worktree activityAt from last user message, not a newer agent updatedAt', async () => {
+    fleetProjects.value = [
+      {
+        id: 'proj-parent',
+        slug: 'demo',
+        name: 'Demo',
+        rootPath: '/tmp/demo',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'proj-wt',
+        slug: 'demo-feature',
+        name: 'feature',
+        rootPath: '/tmp/worktrees/demo/feature',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+        worktree: { parentId: 'proj-parent', branch: 'vixl/feature', managed: true },
+      },
+    ]
+
+    const sidebar = await seedSidebar({
+      demo: [
+        makeChat({
+          id: 'p1',
+          title: 'Parent chat',
+          projectSlug: 'demo',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      'demo-feature': [
+        makeChat({
+          id: 'w-old-user',
+          title: 'Older user',
+          projectSlug: 'demo-feature',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-20T00:00:00.000Z',
+          lastUserMessageAt: '2026-01-03T00:00:00.000Z',
+        }),
+        makeChat({
+          id: 'w-new-user',
+          title: 'Newer user',
+          projectSlug: 'demo-feature',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-09T00:00:00.000Z',
+          lastUserMessageAt: '2026-01-08T00:00:00.000Z',
+        }),
+      ],
+      [HOME_CHAT_SLUG]: [],
+    })
+
+    const parent = sidebar.sidebarProjects.value[0]
+    expect(parent?.worktrees?.[0]?.activityAt).toBe('2026-01-08T00:00:00.000Z')
+    expect(
+      sidebar.activityItems.value.map((item) =>
+        item.kind === 'home' ? 'home' : item.project.slug,
+      ),
+    ).toEqual(['demo'])
+  })
+
+  it('sets worktree activityAt to lastOpened when the worktree has no chats', async () => {
+    fleetProjects.value = [
+      {
+        id: 'proj-parent',
+        slug: 'demo',
+        name: 'Demo',
+        rootPath: '/tmp/demo',
+        lastOpened: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'proj-wt',
+        slug: 'demo-feature',
+        name: 'feature',
+        rootPath: '/tmp/worktrees/demo/feature',
+        lastOpened: '2026-01-07T00:00:00.000Z',
+        worktree: { parentId: 'proj-parent', branch: 'vixl/feature', managed: true },
+      },
+    ]
+
+    const sidebar = await seedSidebar({
+      demo: [
+        makeChat({
+          id: 'p1',
+          title: 'Parent chat',
+          projectSlug: 'demo',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      'demo-feature': [],
+      [HOME_CHAT_SLUG]: [],
+    })
+
+    const parent = sidebar.sidebarProjects.value[0]
+    expect(parent?.worktrees?.map((item) => item.slug)).toEqual(['demo-feature'])
+    expect(parent?.worktrees?.[0]?.chats).toEqual([])
+    expect(parent?.worktrees?.[0]?.activityAt).toBe('2026-01-07T00:00:00.000Z')
     expect(
       sidebar.activityItems.value.map((item) =>
         item.kind === 'home' ? 'home' : item.project.slug,
@@ -479,5 +690,9 @@ describe('use-fleet-sidebar worktree nesting', () => {
         item.kind === 'home' ? 'home' : item.project.slug,
       ),
     ).toEqual(['beta', 'alpha'])
+    expect(
+      sidebar.sidebarProjects.value.find((item) => item.slug === 'alpha')
+        ?.worktrees?.[0]?.activityAt,
+    ).toBe('2026-01-09T00:00:00.000Z')
   })
 })
