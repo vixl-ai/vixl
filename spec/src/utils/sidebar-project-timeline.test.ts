@@ -87,6 +87,22 @@ describe('sidebar-project-timeline', () => {
     ])
   })
 
+  it('places a unix-seconds activityAt between parent chats', () => {
+    const activityAt = '1767571200'
+    expect(Number(activityAt) * 1000).toBe(
+      Date.parse('2026-01-05T00:00:00.000Z'),
+    )
+    const newer = chat('newer', '2026-01-10T00:00:00.000Z')
+    const older = chat('older', '2026-01-01T00:00:00.000Z')
+    const wt = worktree('empty', activityAt)
+
+    expect(buildSidebarProjectTimeline([newer, older], [wt])).toEqual([
+      { kind: 'chat', chat: newer },
+      { kind: 'worktree', project: wt },
+      { kind: 'chat', chat: older },
+    ])
+  })
+
   it('interleaves worktrees newest first', () => {
     const newer = chat('newer', '2026-01-10T00:00:00.000Z')
     const older = chat('older', '2026-01-06T00:00:00.000Z')

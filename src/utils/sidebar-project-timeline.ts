@@ -5,14 +5,36 @@ export type SidebarProjectTimelineItem =
   | { kind: 'chat'; chat: FleetSidebarChat }
   | { kind: 'worktree'; project: FleetSidebarProject }
 
+const ALL_DIGITS = /^\d+$/
+
+const instantMs = (value?: string): number | null => {
+  if (!value) {
+    return null
+  }
+  if (ALL_DIGITS.test(value)) {
+    const seconds = Number(value)
+    if (!Number.isFinite(seconds)) {
+      return null
+    }
+    return seconds * 1000
+  }
+  const parsed = Date.parse(value)
+  if (Number.isNaN(parsed)) {
+    return null
+  }
+  return parsed
+}
+
 const isNewer = (left?: string, right?: string): boolean => {
-  if (!left) {
+  const leftMs = instantMs(left)
+  if (leftMs === null) {
     return false
   }
-  if (!right) {
+  const rightMs = instantMs(right)
+  if (rightMs === null) {
     return true
   }
-  return left > right
+  return leftMs > rightMs
 }
 
 const sortWorktreesNewestFirst = (
