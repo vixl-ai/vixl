@@ -215,8 +215,19 @@ html::view-transition-new(chat-pane) {
   animation-timing-function: ease;
 }
 
-html::view-transition-old(root),
+/*
+ * The chat pane fade keeps this transition alive for 0.3s. `animation: none`
+ * leaves both root snapshots fully visible, and the titlebar is transparent,
+ * so the previous chat title shows through the next one until the fade ends.
+ */
+html::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+  opacity: 0;
+}
+
 html::view-transition-new(root) {
   animation: none;
+  mix-blend-mode: normal;
 }
 
