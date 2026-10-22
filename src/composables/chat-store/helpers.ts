@@ -124,6 +124,7 @@ export const mapMeta = (record: {
   attention?: ChatMeta['attention']
   createdAt: string
   updatedAt: string
+  lastUserMessageAt?: string
   forkedFrom: string | null
   pinned: boolean
   pinnedAt: string | null
@@ -147,6 +148,7 @@ export const mapMeta = (record: {
     attention: record.attention,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+    lastUserMessageAt: record.lastUserMessageAt,
     forkedFrom: record.forkedFrom,
     pinned: record.pinned,
     pinnedAt: record.pinnedAt,

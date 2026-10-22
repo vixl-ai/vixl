@@ -316,6 +316,7 @@ declare global {
   const useStartHomeChat: typeof import('./composables/use-start-home-chat').default
   const useStartPlanBuild: typeof import('./composables/use-start-plan-build').default
   const useStartVixlFilesChat: typeof import('./composables/use-start-vixl-files-chat').default
+  const useStartWorktreeChat: typeof import('./composables/use-start-worktree-chat').default
   const useStepper: typeof import('@vueuse/core').useStepper
   const useStorage: typeof import('@vueuse/core').useStorage
   const useStorageAsync: typeof import('@vueuse/core').useStorageAsync
@@ -736,6 +737,7 @@ declare module 'vue' {
     readonly useStartHomeChat: UnwrapRef<typeof import('./composables/use-start-home-chat')['default']>
     readonly useStartPlanBuild: UnwrapRef<typeof import('./composables/use-start-plan-build')['default']>
     readonly useStartVixlFilesChat: UnwrapRef<typeof import('./composables/use-start-vixl-files-chat')['default']>
+    readonly useStartWorktreeChat: UnwrapRef<typeof import('./composables/use-start-worktree-chat')['default']>
     readonly useStepper: UnwrapRef<typeof import('@vueuse/core')['useStepper']>
     readonly useStorage: UnwrapRef<typeof import('@vueuse/core')['useStorage']>
     readonly useStorageAsync: UnwrapRef<typeof import('@vueuse/core')['useStorageAsync']>

@@ -347,6 +347,7 @@
     "useStartHomeChat": true,
     "useStartPlanBuild": true,
     "useStartVixlFilesChat": true,
+    "useStartWorktreeChat": true,
     "useStepper": true,
     "useStorage": true,
     "useStorageAsync": true,

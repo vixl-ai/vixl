@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { FolderCog, GitBranch, Trash2 } from '@lucide/vue'
+import { FolderCog, GitBranch, Plus, Trash2 } from '@lucide/vue'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
 import {
   AlertDialog,
@@ -28,6 +28,12 @@ import {
   ContextMenuTrigger,
 } from '@/components/shadcn/ui/context-menu'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
+import {
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuSub,
   SidebarMenuSubItem,
@@ -42,6 +48,7 @@ import {
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import useGitStatus from '@/composables/use-git-status'
 import useProjectsExpansion from '@/composables/use-projects-expansion'
+import useStartWorktreeChat from '@/composables/use-start-worktree-chat'
 import { rollupDecoration } from '@/utils/git-file-decoration'
 import projectRouteFor from '@/utils/project-route-for'
 
@@ -60,6 +67,12 @@ const branchLabel = computed(
   () => props.project.worktree?.branch ?? props.project.displayName,
 )
 const manualOpen = ref<boolean | null>(null)
+const { startingChat, startWorktreeChat } = useStartWorktreeChat({
+  project: () => props.project,
+  openRow: () => {
+    manualOpen.value = true
+  },
+})
 const removeOpen = ref(false)
 const removing = ref(false)
 const loadingPreview = ref(false)
@@ -173,6 +186,7 @@ const handleConfirmRemove = async (): Promise<void> => {
           <CollapsibleTrigger as-child>
             <SidebarMenuButton
               size="sm"
+              class="pr-8"
               :tooltip="branchLabel"
               :is-active="project.isActiveProject"
             >
@@ -186,6 +200,10 @@ const handleConfirmRemove = async (): Promise<void> => {
           </CollapsibleTrigger>
         </ContextMenuTrigger>
         <ContextMenuContent class="w-52">
+          <ContextMenuItem @select="startWorktreeChat">
+            <Plus />
+            New chat
+          </ContextMenuItem>
           <ContextMenuItem @select="handleOpenProject">
             <FolderCog />
             Open Project
@@ -200,6 +218,23 @@ const handleConfirmRemove = async (): Promise<void> => {
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <SidebarMenuAction as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="size-5"
+              :disabled="startingChat"
+              :aria-label="`New chat in ${branchLabel}`"
+              @click.stop="startWorktreeChat"
+            >
+              <Plus class="size-3.5" />
+            </Button>
+          </SidebarMenuAction>
+        </TooltipTrigger>
+        <TooltipContent>{{ `New chat in ${branchLabel}` }}</TooltipContent>
+      </Tooltip>
       <CollapsibleContent
         class="overflow-hidden data-[state=closed]:animate-sidebar-collapsible-up data-[state=open]:animate-sidebar-collapsible-down"
       >

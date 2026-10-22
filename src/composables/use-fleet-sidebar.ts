@@ -10,6 +10,7 @@ import type { ChatMeta } from '@/types/chat/chat-meta'
 import { isTauri, listPinnedChats } from '@/services/vixl/vixl-tauri'
 import type { FleetPinnedChat } from '@/types/fleet/fleet-pinned-chat'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
+import { sidebarChatSortKey } from '@/utils/sidebar-chat-sort-key'
 
 export type FleetSidebarActivityItem =
   | {
@@ -58,18 +59,38 @@ const maxUpdatedAt = (chats: ChatMeta[]): string => {
   )
 }
 
+const maxChatSortKey = (chats: ChatMeta[]): string | undefined => {
+  let latest: string | undefined
+  for (const chat of chats) {
+    const key = sidebarChatSortKey(chat)
+    if (!key) {
+      continue
+    }
+    if (latest === undefined || key > latest) {
+      latest = key
+    }
+  }
+  return latest
+}
+
+const toSidebarChat = (chat: ChatMeta): FleetSidebarChat => ({
+  id: chat.id,
+  title: chat.title,
+  status: chat.status,
+  attention: chat.attention ?? null,
+  updatedAt: chat.updatedAt,
+  createdAt: chat.createdAt,
+  lastUserMessageAt: chat.lastUserMessageAt,
+  pinned: chat.pinned,
+})
+
 export default () => {
   const fleet = useFleetRegistry()
   const chatStore = useChatStore()
 
   const sidebarProjects = computed<FleetSidebarProject[]>(() => {
     const mapChats = (slug: string): FleetSidebarChat[] =>
-      (chatsBySlug.value[slug] ?? []).map((chat) => ({
-        id: chat.id,
-        title: chat.title,
-        status: chat.status,
-        attention: chat.attention ?? null,
-      }))
+      (chatsBySlug.value[slug] ?? []).map(toSidebarChat)
 
     const toProjectRow = (
       project: FleetProject,
@@ -123,7 +144,14 @@ export default () => {
         return {
           ...row,
           defaultExpanded: Boolean(row.defaultExpanded) || childActive,
-          worktrees: children.map((child) => toProjectRow(child, { nested: true })),
+          worktrees: children.map((child) => {
+            const nested = toProjectRow(child, { nested: true })
+            const childChats = chatsBySlug.value[child.slug] ?? []
+            return {
+              ...nested,
+              activityAt: maxChatSortKey(childChats) ?? child.lastOpened,
+            }
+          }),
         }
       })
 
@@ -156,12 +184,7 @@ export default () => {
     if (standaloneChats.value.length > 0) {
       items.push({
         kind: 'home',
-        chats: standaloneChats.value.map((chat) => ({
-          id: chat.id,
-          title: chat.title,
-          status: chat.status,
-          attention: chat.attention ?? null,
-        })),
+        chats: standaloneChats.value.map(toSidebarChat),
         updatedAt: maxUpdatedAt(standaloneChats.value),
       })
     }

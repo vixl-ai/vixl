@@ -14,4 +14,5 @@ export interface FleetSidebarProject {
   rootPath?: string
   worktree?: WorktreeLink
   worktrees?: FleetSidebarProject[]
+  activityAt?: string
 }

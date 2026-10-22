@@ -42,6 +42,7 @@ import resolveProjectRowWorkspace from '@/composables/resolve-project-row-worksp
 import resolveModelForRole from '@/services/models/resolve-model-for-role'
 import chatRouteFor from '@/utils/chat-route-for'
 import projectRouteFor from '@/utils/project-route-for'
+import buildSidebarProjectTimeline from '@/utils/sidebar-project-timeline'
 
 const props = defineProps<{
   project: FleetSidebarProject
@@ -61,6 +62,12 @@ const isGroup = computed(() => props.project.kind === 'group')
 const resolveRowWorkspace = () => resolveProjectRowWorkspace(props.project, fleet)
 const parentRootPath = computed(() => resolveRowWorkspace()?.projectRoot ?? null)
 const worktrees = computed(() => props.project.worktrees ?? [])
+const timeline = computed(() =>
+  buildSidebarProjectTimeline(
+    props.project.chats,
+    parentRootPath.value ? worktrees.value : [],
+  ),
+)
 
 const projectOpen = computed({
   get: (): boolean =>
@@ -268,27 +275,23 @@ const handleOpenTerminal = async (): Promise<void> => {
         class="overflow-hidden data-[state=closed]:animate-sidebar-collapsible-up data-[state=open]:animate-sidebar-collapsible-down"
       >
         <div class="min-w-0 max-h-42 scroll-fade-b scrollbar-none overflow-x-hidden overflow-y-auto pl-3.5">
-          <SidebarMenuSub
-            v-if="worktrees.length > 0 && parentRootPath"
-            class="mx-0 gap-0.5"
-          >
-            <NavigationAsideLeftWorktreeRow
-              v-for="worktree in worktrees"
-              :key="worktree.slug"
-              :project="worktree"
-              :parent-root-path="parentRootPath"
-            />
-          </SidebarMenuSub>
           <SidebarMenuSub class="mx-0 gap-0.5">
-            <SidebarMenuSubItem
-              v-for="chat in project.chats"
-              :key="chat.id"
+            <template
+              v-for="item in timeline"
+              :key="item.kind === 'chat' ? `chat:${item.chat.id}` : `worktree:${item.project.slug}`"
             >
-              <NavigationAsideLeftChatListItem
-                :chat="chat"
-                :project-slug="project.slug"
+              <NavigationAsideLeftWorktreeRow
+                v-if="item.kind === 'worktree' && parentRootPath"
+                :project="item.project"
+                :parent-root-path="parentRootPath"
               />
-            </SidebarMenuSubItem>
+              <SidebarMenuSubItem v-else-if="item.kind === 'chat'">
+                <NavigationAsideLeftChatListItem
+                  :chat="item.chat"
+                  :project-slug="project.slug"
+                />
+              </SidebarMenuSubItem>
+            </template>
           </SidebarMenuSub>
         </div>
       </CollapsibleContent>

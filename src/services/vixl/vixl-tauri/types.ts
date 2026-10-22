@@ -90,6 +90,7 @@ export type ChatMetaRecord = {
 
   createdAt: string
   updatedAt: string
+  lastUserMessageAt?: string
   forkedFrom: string | null
   pinned: boolean
   pinnedAt: string | null
