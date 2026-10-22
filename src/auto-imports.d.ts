@@ -254,6 +254,7 @@ declare global {
   const useLocalStorage: typeof import('@vueuse/core').useLocalStorage
   const useLspStatus: typeof import('./composables/use-lsp-status').default
   const useMagicKeys: typeof import('@vueuse/core').useMagicKeys
+  const useMainPaneTransition: typeof import('./composables/use-main-pane-transition').default
   const useManualRefHistory: typeof import('@vueuse/core').useManualRefHistory
   const useMcpServers: typeof import('./composables/use-mcp-servers').default
   const useMediaControls: typeof import('@vueuse/core').useMediaControls
@@ -675,6 +676,7 @@ declare module 'vue' {
     readonly useLocalStorage: UnwrapRef<typeof import('@vueuse/core')['useLocalStorage']>
     readonly useLspStatus: UnwrapRef<typeof import('./composables/use-lsp-status')['default']>
     readonly useMagicKeys: UnwrapRef<typeof import('@vueuse/core')['useMagicKeys']>
+    readonly useMainPaneTransition: UnwrapRef<typeof import('./composables/use-main-pane-transition')['default']>
     readonly useManualRefHistory: UnwrapRef<typeof import('@vueuse/core')['useManualRefHistory']>
     readonly useMcpServers: UnwrapRef<typeof import('./composables/use-mcp-servers')['default']>
     readonly useMediaControls: UnwrapRef<typeof import('@vueuse/core')['useMediaControls']>

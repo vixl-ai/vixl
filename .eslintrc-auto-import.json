@@ -285,6 +285,7 @@
     "useLocalStorage": true,
     "useLspStatus": true,
     "useMagicKeys": true,
+    "useMainPaneTransition": true,
     "useManualRefHistory": true,
     "useMcpServers": true,
     "useMediaControls": true,

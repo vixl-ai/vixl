@@ -141,6 +141,12 @@ html.transparency-on .chat-prompt-aurora [data-slot='input-group'] {
   .chat-prompt-aurora [data-slot='input-group']::before {
     animation: none;
   }
+
+  html::view-transition-group(chat-pane),
+  html::view-transition-old(chat-pane),
+  html::view-transition-new(chat-pane) {
+    animation: none;
+  }
 }
 
 /* Chat prompt TipTap editor */
@@ -196,5 +202,21 @@ html.transparency-on .chat-prompt-aurora [data-slot='input-group'] {
 .chat-skill-match {
   font-weight: 600;
   color: #86efac;
+}
+
+.chat-pane {
+  view-transition-name: chat-pane;
+}
+
+html::view-transition-group(chat-pane),
+html::view-transition-old(chat-pane),
+html::view-transition-new(chat-pane) {
+  animation-duration: 0.3s;
+  animation-timing-function: ease;
+}
+
+html::view-transition-old(root),
+html::view-transition-new(root) {
+  animation: none;
 }
 
