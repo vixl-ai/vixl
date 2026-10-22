@@ -20,6 +20,7 @@ import { Toaster } from '@/components/shadcn/ui/sonner'
 import useAppearance from '@/composables/use-appearance'
 import useAppUpdater from '@/composables/use-app-updater'
 import useCommandPalette from '@/composables/use-command-palette'
+import useMainPaneTransition from '@/composables/use-main-pane-transition'
 import useVixlLiveSync from '@/composables/use-vixl-live-sync'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useWorkbenchStore from '@/composables/use-workbench-store'
@@ -39,6 +40,7 @@ useFleetRegistry()
 useAppearance()
 const { transparencyEnabled } = useTransparency()
 useVixlLiveSync()
+useMainPaneTransition()
 const updater = useAppUpdater()
 
 const router = useRouter()
@@ -137,7 +139,9 @@ watch(rightSidebarOpen, (open) => {
               :class="transparencyEnabled ? 'bg-transparent' : 'bg-background'"
               style="--titlebar-height: 40px"
             >
-              <RouterView class="min-h-0 flex-1" />
+              <div class="chat-pane min-h-0 flex-1 flex flex-col">
+                <RouterView class="min-h-0 flex-1" />
+              </div>
             </main>
           </ResizablePanel>
           <ResizableHandle v-show="rightSidebarOpen" />
