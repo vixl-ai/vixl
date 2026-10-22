@@ -14,6 +14,8 @@ pub struct ChatMeta {
     pub attention: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_user_message_at: Option<String>,
     pub forked_from: Option<String>,
     pub pinned: bool,
     pub pinned_at: Option<String>,

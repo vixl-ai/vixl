@@ -1,5 +1,6 @@
 import type { FleetSidebarChat } from '@/types/fleet/fleet-sidebar-chat'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
+import { sidebarChatSortKey } from '@/utils/sidebar-chat-sort-key'
 
 export type SidebarProjectTimelineItem =
   | { kind: 'chat'; chat: FleetSidebarChat }
@@ -70,13 +71,23 @@ export default (
     items.push({ kind: 'chat', chat })
   }
 
+  unpinned.sort((left, right) => {
+    if (isNewer(sidebarChatSortKey(left), sidebarChatSortKey(right))) {
+      return -1
+    }
+    if (isNewer(sidebarChatSortKey(right), sidebarChatSortKey(left))) {
+      return 1
+    }
+    return 0
+  })
+
   const pending = sortWorktreesNewestFirst(worktrees)
   let worktreeIndex = 0
 
   for (const chat of unpinned) {
     while (
       worktreeIndex < pending.length &&
-      isNewer(pending[worktreeIndex]?.activityAt, chat.updatedAt)
+      isNewer(pending[worktreeIndex]?.activityAt, sidebarChatSortKey(chat))
     ) {
       items.push({ kind: 'worktree', project: pending[worktreeIndex]! })
       worktreeIndex += 1

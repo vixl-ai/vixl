@@ -10,6 +10,7 @@ import type { ChatMeta } from '@/types/chat/chat-meta'
 import { isTauri, listPinnedChats } from '@/services/vixl/vixl-tauri'
 import type { FleetPinnedChat } from '@/types/fleet/fleet-pinned-chat'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
+import { sidebarChatSortKey } from '@/utils/sidebar-chat-sort-key'
 
 export type FleetSidebarActivityItem =
   | {
@@ -58,12 +59,28 @@ const maxUpdatedAt = (chats: ChatMeta[]): string => {
   )
 }
 
+const maxChatSortKey = (chats: ChatMeta[]): string | undefined => {
+  let latest: string | undefined
+  for (const chat of chats) {
+    const key = sidebarChatSortKey(chat)
+    if (!key) {
+      continue
+    }
+    if (latest === undefined || key > latest) {
+      latest = key
+    }
+  }
+  return latest
+}
+
 const toSidebarChat = (chat: ChatMeta): FleetSidebarChat => ({
   id: chat.id,
   title: chat.title,
   status: chat.status,
   attention: chat.attention ?? null,
   updatedAt: chat.updatedAt,
+  createdAt: chat.createdAt,
+  lastUserMessageAt: chat.lastUserMessageAt,
   pinned: chat.pinned,
 })
 
@@ -132,10 +149,7 @@ export default () => {
             const childChats = chatsBySlug.value[child.slug] ?? []
             return {
               ...nested,
-              activityAt:
-                childChats.length > 0
-                  ? maxUpdatedAt(childChats)
-                  : child.lastOpened,
+              activityAt: maxChatSortKey(childChats) ?? child.lastOpened,
             }
           }),
         }

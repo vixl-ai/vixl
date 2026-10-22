@@ -7,11 +7,13 @@ const chat = (
   id: string,
   updatedAt?: string,
   pinned = false,
+  extras?: Pick<FleetSidebarChat, 'lastUserMessageAt' | 'createdAt'>,
 ): FleetSidebarChat => ({
   id,
   title: id,
   updatedAt,
   pinned,
+  ...extras,
 })
 
 const worktree = (
@@ -100,6 +102,38 @@ describe('sidebar-project-timeline', () => {
       { kind: 'chat', chat: newer },
       { kind: 'worktree', project: wt },
       { kind: 'chat', chat: older },
+    ])
+  })
+
+  it('reorders unpinned chats by last user message, not updatedAt', () => {
+    const olderUser = chat('older-user', '2026-01-10T00:00:00.000Z', false, {
+      lastUserMessageAt: '2026-01-01T00:00:00.000Z',
+    })
+    const newerUser = chat('newer-user', '2026-01-02T00:00:00.000Z', false, {
+      lastUserMessageAt: '2026-01-08T00:00:00.000Z',
+    })
+
+    expect(buildSidebarProjectTimeline([olderUser, newerUser], [])).toEqual([
+      { kind: 'chat', chat: newerUser },
+      { kind: 'chat', chat: olderUser },
+    ])
+  })
+
+  it('places a worktree by last user message, not a newer agent updatedAt', () => {
+    const newerUser = chat('newer-user', '2026-01-01T00:00:00.000Z', false, {
+      lastUserMessageAt: '2026-01-10T00:00:00.000Z',
+    })
+    const olderUser = chat('older-user', '2026-01-12T00:00:00.000Z', false, {
+      lastUserMessageAt: '2026-01-02T00:00:00.000Z',
+    })
+    const wt = worktree('wt', '2026-01-06T00:00:00.000Z')
+
+    expect(
+      buildSidebarProjectTimeline([olderUser, newerUser], [wt]),
+    ).toEqual([
+      { kind: 'chat', chat: newerUser },
+      { kind: 'worktree', project: wt },
+      { kind: 'chat', chat: olderUser },
     ])
   })
 

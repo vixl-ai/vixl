@@ -131,10 +131,32 @@ pub fn chat_exists(conn: &Connection, chat_id: &str) -> Result<bool, String> {
 
 pub fn list_chats_for_slug(conn: &Connection, project_slug: &str) -> Result<Vec<ChatMeta>, String> {
     let sql = format!(
-        "SELECT {CHAT_COLUMNS} FROM chats WHERE project_slug = ?1
-         ORDER BY pinned DESC, updated_at DESC"
+        "SELECT {CHAT_COLUMNS}, last_user.last_user_message_at
+         FROM chats
+         LEFT JOIN (
+             SELECT chat_id, MAX(created_at) AS last_user_message_at
+             FROM chat_messages
+             WHERE role = 'user' AND id NOT LIKE 'background-wake:%'
+             GROUP BY chat_id
+         ) last_user ON last_user.chat_id = chats.id
+         WHERE project_slug = ?1
+         ORDER BY pinned DESC,
+                  COALESCE(last_user.last_user_message_at, created_at, updated_at) DESC,
+                  updated_at DESC"
     );
-    query_metas(conn, &sql, params![project_slug])
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![project_slug], |row| {
+            let mut mapped = map_row(row)?;
+            mapped.last_user_message_at = column_opt_string(row.get_ref("last_user_message_at")?)?;
+            Ok(mapped)
+        })
+        .map_err(|e| e.to_string())?;
+    let mut chats = Vec::new();
+    for row in rows {
+        chats.push(row_to_record(row.map_err(|e| e.to_string())?)?.meta);
+    }
+    Ok(chats)
 }
 
 pub fn list_pinned_chats(conn: &Connection) -> Result<Vec<ChatMeta>, String> {
@@ -194,6 +216,7 @@ struct MappedChat {
     attention: Option<String>,
     created_at: String,
     updated_at: String,
+    last_user_message_at: Option<String>,
     forked_from: Option<String>,
     pinned: i64,
     pinned_at: Option<String>,
@@ -220,6 +243,7 @@ fn map_row(row: &Row<'_>) -> rusqlite::Result<MappedChat> {
         attention: column_opt_string(row.get_ref(8)?)?,
         created_at: row.get(9)?,
         updated_at: row.get(10)?,
+        last_user_message_at: None,
         forked_from: column_opt_string(row.get_ref(11)?)?,
         pinned: row.get(12)?,
         pinned_at: column_opt_string(row.get_ref(13)?)?,
@@ -248,6 +272,7 @@ fn row_to_record(row: MappedChat) -> Result<ChatRecord, String> {
             attention: row.attention,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            last_user_message_at: row.last_user_message_at,
             forked_from: row.forked_from,
             pinned: row.pinned != 0,
             pinned_at: row.pinned_at,

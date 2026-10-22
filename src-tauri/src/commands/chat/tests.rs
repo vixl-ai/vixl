@@ -47,6 +47,7 @@ fn sample_meta(id: &str, slug: &str, title: &str, updated_at: &str) -> ChatMeta 
         attention: None,
         created_at: "2026-01-01T00:00:00Z".to_string(),
         updated_at: updated_at.to_string(),
+        last_user_message_at: None,
         forked_from: None,
         pinned: false,
         pinned_at: None,
@@ -62,11 +63,15 @@ fn sample_meta(id: &str, slug: &str, title: &str, updated_at: &str) -> ChatMeta 
 }
 
 fn user_line(id: &str) -> serde_json::Value {
+    message_line(id, "user", "2026-01-01T00:00:00Z")
+}
+
+fn message_line(id: &str, role: &str, created_at: &str) -> serde_json::Value {
     serde_json::json!({
         "id": id,
-        "role": "user",
+        "role": role,
         "parts": [{"type": "text", "text": "hi"}],
-        "createdAt": "2026-01-01T00:00:00Z",
+        "createdAt": created_at,
         "extraField": "keep-me"
     })
 }
@@ -173,6 +178,160 @@ fn list_and_pin_order() {
     let pins = store::list_pinned_chats(&conn).expect("pinned");
     assert_eq!(pins.len(), 1);
     assert_eq!(pins[0].id, "c3");
+}
+
+#[test]
+fn list_orders_by_last_user_message_not_updated_at() {
+    let (_dir, conn) = open_migrated();
+    let older_user = sample_meta("c-old-user", "slug", "Older user", "2026-01-12T00:00:00Z");
+    let newer_user = sample_meta("c-new-user", "slug", "Newer user", "2026-01-01T00:00:00Z");
+    store::insert_chat(&conn, &older_user, "pid").expect("c-old-user");
+    store::insert_chat(&conn, &newer_user, "pid").expect("c-new-user");
+    store::insert_message_value(
+        &conn,
+        "c-old-user",
+        0,
+        &message_line("u-old", "user", "2026-01-02T00:00:00Z"),
+    )
+    .expect("old user");
+    store::insert_message_value(
+        &conn,
+        "c-new-user",
+        0,
+        &message_line("u-new", "user", "2026-01-10T00:00:00Z"),
+    )
+    .expect("new user");
+
+    let listed = store::list_chats_for_slug(&conn, "slug").expect("list");
+    assert_eq!(
+        listed.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+        vec!["c-new-user", "c-old-user"]
+    );
+    assert_eq!(
+        listed[0].last_user_message_at.as_deref(),
+        Some("2026-01-10T00:00:00Z")
+    );
+    assert_eq!(
+        listed[1].last_user_message_at.as_deref(),
+        Some("2026-01-02T00:00:00Z")
+    );
+    assert!(listed[1].updated_at > listed[0].updated_at);
+}
+
+#[test]
+fn list_ignores_assistant_updated_at_bump() {
+    let (_dir, conn) = open_migrated();
+    let with_newer_user = sample_meta("c-user", "slug", "User", "2026-01-03T00:00:00Z");
+    let with_assistant = sample_meta("c-asst", "slug", "Assistant", "2026-01-01T00:00:00Z");
+    store::insert_chat(&conn, &with_newer_user, "pid").expect("c-user");
+    store::insert_chat(&conn, &with_assistant, "pid").expect("c-asst");
+    store::insert_message_value(
+        &conn,
+        "c-user",
+        0,
+        &message_line("u-new", "user", "2026-01-08T00:00:00Z"),
+    )
+    .expect("newer user");
+    store::insert_message_value(
+        &conn,
+        "c-asst",
+        0,
+        &message_line("u-old", "user", "2026-01-02T00:00:00Z"),
+    )
+    .expect("older user");
+    store::insert_message_value(
+        &conn,
+        "c-asst",
+        1,
+        &message_line("a1", "assistant", "2026-01-12T00:00:00Z"),
+    )
+    .expect("assistant");
+    store::bump_updated_at(&conn, "slug", "c-asst").expect("bump");
+
+    let listed = store::list_chats_for_slug(&conn, "slug").expect("list");
+    assert_eq!(
+        listed.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+        vec!["c-user", "c-asst"]
+    );
+    assert!(listed[1].updated_at > listed[0].updated_at);
+}
+
+#[test]
+fn list_ignores_background_wake_user_line() {
+    let (_dir, conn) = open_migrated();
+    let wake_only = sample_meta("c-wake", "slug", "Wake", "2026-01-12T00:00:00Z");
+    let real_user = sample_meta("c-real", "slug", "Real", "2026-01-02T00:00:00Z");
+    store::insert_chat(&conn, &wake_only, "pid").expect("c-wake");
+    store::insert_chat(&conn, &real_user, "pid").expect("c-real");
+    store::insert_message_value(
+        &conn,
+        "c-wake",
+        0,
+        &message_line(
+            "background-wake:c-wake:tool",
+            "user",
+            "2026-01-12T00:00:00Z",
+        ),
+    )
+    .expect("wake");
+    store::insert_message_value(
+        &conn,
+        "c-real",
+        0,
+        &message_line("u-real", "user", "2026-01-05T00:00:00Z"),
+    )
+    .expect("real user");
+
+    let listed = store::list_chats_for_slug(&conn, "slug").expect("list");
+    assert_eq!(
+        listed.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+        vec!["c-real", "c-wake"]
+    );
+    assert_eq!(
+        listed
+            .iter()
+            .find(|c| c.id == "c-wake")
+            .and_then(|c| c.last_user_message_at.as_deref()),
+        None
+    );
+    assert_eq!(
+        listed
+            .iter()
+            .find(|c| c.id == "c-real")
+            .and_then(|c| c.last_user_message_at.as_deref()),
+        Some("2026-01-05T00:00:00Z")
+    );
+}
+
+#[test]
+fn list_keeps_pinned_first_with_last_user_order() {
+    let (_dir, conn) = open_migrated();
+    let mut pinned = sample_meta("c-pin", "slug", "Pinned", "2026-01-01T00:00:00Z");
+    pinned.pinned = true;
+    pinned.pinned_at = Some("2026-01-01T00:00:00Z".to_string());
+    let unpinned = sample_meta("c-free", "slug", "Unpinned", "2026-01-02T00:00:00Z");
+    store::insert_chat(&conn, &pinned, "pid").expect("c-pin");
+    store::insert_chat(&conn, &unpinned, "pid").expect("c-free");
+    store::insert_message_value(
+        &conn,
+        "c-pin",
+        0,
+        &message_line("u-old", "user", "2026-01-02T00:00:00Z"),
+    )
+    .expect("pinned user");
+    store::insert_message_value(
+        &conn,
+        "c-free",
+        0,
+        &message_line("u-new", "user", "2026-01-10T00:00:00Z"),
+    )
+    .expect("unpinned user");
+
+    let listed = store::list_chats_for_slug(&conn, "slug").expect("list");
+    assert_eq!(
+        listed.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+        vec!["c-pin", "c-free"]
+    );
 }
 
 #[test]

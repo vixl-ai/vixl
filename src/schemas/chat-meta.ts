@@ -52,6 +52,7 @@ export const chatMetaSchema = z.object({
   attention: chatAttentionSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  lastUserMessageAt: z.string().optional(),
   forkedFrom: z.string().nullable(),
   pinned: z.boolean(),
   pinnedAt: z.string().nullable(),

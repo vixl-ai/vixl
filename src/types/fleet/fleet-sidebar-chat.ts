@@ -7,5 +7,7 @@ export interface FleetSidebarChat {
   status?: FleetChatStatus
   attention?: ChatAttention
   updatedAt?: string
+  createdAt?: string
+  lastUserMessageAt?: string
   pinned?: boolean
 }

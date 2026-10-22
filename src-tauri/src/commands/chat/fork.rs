@@ -30,6 +30,7 @@ pub fn fork_chat(
         attention: None,
         created_at: now.clone(),
         updated_at: now,
+        last_user_message_at: None,
         forked_from: Some(source_id.clone()),
         pinned: false,
         pinned_at: None,
