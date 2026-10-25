@@ -106,7 +106,7 @@
     "vue-sonner": "^2.0.9",
     "vue-stick-to-bottom": "^1.0.0",
     "vue-stream-markdown": "^1.0.1",
-    "zod": "^3.25.76"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",
