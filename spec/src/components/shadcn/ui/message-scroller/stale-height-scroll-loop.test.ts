@@ -324,6 +324,8 @@ function simulateFollowBottomWidthChange({
       spacerHeight: 0,
     })
     const distanceFromEnd = maxScrollTop - scrollTop
+    const scrollHeightChanged = previousScrollHeight > 0
+      && Math.abs(previousScrollHeight - Hdom) > SCROLL_EPSILON
     const exitFollowIfScrolledUp = shouldExitFollowBottom({
       autoscrolling: false,
       distanceFromEnd,
@@ -334,7 +336,9 @@ function simulateFollowBottomWidthChange({
       distanceFromEnd,
       layoutClamp,
       programmatic: false,
+      resizePending: false,
       scrolledUp: clamped,
+      scrollHeightChanged,
       threshold: SCROLL_EDGE_THRESHOLD,
       userGesture,
     })
@@ -343,7 +347,9 @@ function simulateFollowBottomWidthChange({
       followingBottom: true,
       layoutClamp,
       programmatic: false,
+      resizePending: false,
       scrolledUp: clamped,
+      scrollHeightChanged,
       threshold: SCROLL_EDGE_THRESHOLD,
       userGesture,
     })
@@ -974,7 +980,9 @@ describe('stale-height follow-bottom resize loop', () => {
         followingBottom: true,
         layoutClamp,
         programmatic: false,
+        resizePending: false,
         scrolledUp: true,
+        scrollHeightChanged: true,
         threshold: SCROLL_EDGE_THRESHOLD,
         userGesture,
       })).toBe(true)
@@ -982,7 +990,9 @@ describe('stale-height follow-bottom resize loop', () => {
         distanceFromEnd: 24,
         layoutClamp,
         programmatic: false,
+        resizePending: false,
         scrolledUp: true,
+        scrollHeightChanged: true,
         threshold: SCROLL_EDGE_THRESHOLD,
         userGesture,
       })).toBe(false)
@@ -1011,7 +1021,9 @@ describe('stale-height follow-bottom resize loop', () => {
         followingBottom: true,
         layoutClamp,
         programmatic: false,
+        resizePending: false,
         scrolledUp: true,
+        scrollHeightChanged: false,
         threshold: SCROLL_EDGE_THRESHOLD,
         userGesture,
       })).toBe(false)
@@ -1019,7 +1031,9 @@ describe('stale-height follow-bottom resize loop', () => {
         distanceFromEnd: 24,
         layoutClamp,
         programmatic: false,
+        resizePending: false,
         scrolledUp: true,
+        scrollHeightChanged: false,
         threshold: SCROLL_EDGE_THRESHOLD,
         userGesture,
       })).toBe(false)
@@ -1045,7 +1059,9 @@ describe('stale-height follow-bottom resize loop', () => {
         followingBottom: true,
         layoutClamp,
         programmatic: false,
+        resizePending: false,
         scrolledUp: true,
+        scrollHeightChanged: false,
         threshold: SCROLL_EDGE_THRESHOLD,
         userGesture,
       })).toBe(false)
@@ -1053,7 +1069,9 @@ describe('stale-height follow-bottom resize loop', () => {
         distanceFromEnd: 24,
         layoutClamp,
         programmatic: false,
+        resizePending: false,
         scrolledUp: true,
+        scrollHeightChanged: false,
         threshold: SCROLL_EDGE_THRESHOLD,
         userGesture,
       })).toBe(true)
@@ -1074,6 +1092,35 @@ describe('stale-height follow-bottom resize loop', () => {
       expect(framesOut[0]?.distanceFromEnd).toBeGreaterThan(SCROLL_EDGE_THRESHOLD)
       expect(framesOut[0]?.recoverFollow).toBe(false)
       expect(framesOut[0]?.exitFollowIfScrolledUp).toBe(true)
+    })
+
+    it('keeps follow and chases to the live edge when content grows and scrollTop drops without a gesture', () => {
+      const framesOut = simulateFollowBottomWidthChange({
+        frames: 8,
+        lateTrueHeight: 280,
+        lateTrueHeightFromFrame: 1,
+        readerJumpFrame: 1,
+        readerJumpPx: 24,
+        reportPolicy: 'allMounted',
+        userGesture: false,
+        ...applyFixedGuards(),
+        gap: 24,
+        itemCount: 20,
+        oldHeight: 180,
+        overscanPx: DEFAULT_OVERSCAN_PX,
+        trueHeight: 180,
+        viewportHeight: 400,
+      })
+
+      const jumped = framesOut[1]
+      expect(jumped?.clamped).toBe(true)
+      expect(jumped?.distanceFromEnd).toBeGreaterThan(SCROLL_EDGE_THRESHOLD)
+      expect(jumped?.exitFollowIfScrolledUp).toBe(false)
+      expect(jumped?.recoverFollow).toBe(true)
+      expect(jumped?.chase).toBe(true)
+      expect(isTwoCycle(framesOut)).toBe(false)
+      expectConverged(framesOut)
+      expect(framesOut.at(-1)?.distanceFromEnd).toBe(0)
     })
 
     it('scaled tolerance still rejects the stale-height pump', () => {

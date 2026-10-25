@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from "vue"
-import { onBeforeUnmount, onMounted, useTemplateRef, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, useTemplateRef, watch } from "vue"
 import { cn } from "@/lib/utils"
+import { wheelPathHasNestedOverflowScroller } from "./compute-windowed-ids"
 import { SCROLL_KEYS, useMessageScrollerContext } from "./useMessageScroller"
 
 const props = withDefaults(defineProps<{
@@ -20,7 +21,7 @@ const {
   setViewportElement,
   syncAfterScroll,
   markUserTouchScrollIntent,
-  markUserWheelScrollIntent,
+  noteFollowWheel,
   markUserScrollbarScrollIntent,
   releaseUserScrollbarScrollIntent,
   clearUserScrollbarScrollIntent,
@@ -29,6 +30,13 @@ const {
 
 const viewportEl = useTemplateRef<HTMLElement>("viewport")
 
+// The bottom fade is a scroll-timeline mask. Programmatic follow updates
+// scrollTop without moving that timeline, so the mask stays over the newest
+// line until a real scroll. Only fade when the reader is actually above the end.
+const showBottomFade = computed(() =>
+  (scrollableAttr.value ?? "").split(" ").includes("end"),
+)
+
 watch(() => props.preserveScrollOnPrepend, setPreserveScrollOnPrepend, { immediate: true })
 
 function onKeyDown(event: KeyboardEvent) {
@@ -36,15 +44,37 @@ function onKeyDown(event: KeyboardEvent) {
     userScrollIntent()
 }
 
-function onWheel() {
-  // While following, do not leave on the wheel event itself. Trackpad
-  // noise reports an upward delta without leaving the live edge, and the
-  // next message then grows below the reader. Arm a settle window so the
-  // scroll handler can exit after scrollTop is actually above the edge.
-  // Inertia keeps that window alive until scroll events stop. Anchored
+function overflowYBetweenTargetAndViewport(
+  event: WheelEvent,
+  viewport: HTMLElement,
+): string[] {
+  const overflowY: string[] = []
+  let current: Element | null = event.target instanceof Element
+    ? event.target
+    : null
+  while (current && current !== viewport) {
+    if (current instanceof HTMLElement)
+      overflowY.push(getComputedStyle(current).overflowY)
+    current = current.parentElement
+  }
+  return overflowY
+}
+
+function onWheel(event: WheelEvent) {
+  // While following, do not leave on the wheel event itself. Accumulate
+  // upward delta past the edge threshold before arming. Nested overflow
+  // wheels arm only if the viewport scrollTop later moves up. Anchored
   // and settling jumps still treat any wheel as user intent.
   if (isFollowingLive()) {
-    markUserWheelScrollIntent()
+    const viewport = viewportEl.value
+    noteFollowWheel({
+      deltaMode: event.deltaMode,
+      deltaY: event.deltaY,
+      nested: viewport
+        ? wheelPathHasNestedOverflowScroller(overflowYBetweenTargetAndViewport(event, viewport))
+        : false,
+      viewportClientHeight: viewport?.clientHeight ?? 0,
+    })
     return
   }
   userScrollIntent()
@@ -139,7 +169,8 @@ onBeforeUnmount(() => {
     :data-scrollable="scrollableAttr"
     :data-autoscrolling="autoscrolling ? '' : undefined"
     :class="cn(
-      'size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain [overflow-anchor:none]',
+      'size-full min-h-0 min-w-0 scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain [overflow-anchor:none]',
+      showBottomFade && 'scroll-fade-b',
       props.class,
     )"
     @scroll="syncAfterScroll()"

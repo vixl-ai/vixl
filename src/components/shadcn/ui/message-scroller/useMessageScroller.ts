@@ -8,9 +8,13 @@ import {
   estimateItemsHeight,
   FALLBACK_VIEWPORT_HEIGHT,
   itemIdsEqual,
+  nextUpwardWheelAccumulator,
+  normalizeWheelDeltaY,
   resolveFollowWindowScrollTop,
   resolveViewportHeight,
   resolveWindowScrollTop,
+  shouldAddToUpwardWheelAccumulator,
+  shouldArmUpwardWheelGesture,
   shouldStickContentChangeToEnd,
   wasReaderAtLiveEdge,
   shouldChaseFollowBottom,
@@ -18,6 +22,7 @@ import {
   shouldExitFollowBottom,
   shouldExitFollowBottomOnUnarmedScroll,
   shouldExitFollowBottomOnUserTouch,
+  shouldPromoteNestedWheelToGesture,
   shouldRecoverFollowAfterLayoutScroll,
   shouldTreatUpwardScrollAsLayoutClamp,
   shouldSettleScrollToEnd,
@@ -395,6 +400,13 @@ export interface MessageScrollerContext {
   clearUserTouchScrollIntent: () => void
   markUserWheelScrollIntent: () => void
   clearUserWheelScrollIntent: () => void
+  noteFollowWheel: (input: {
+    deltaMode: number
+    deltaY: number
+    nested: boolean
+    viewportClientHeight: number
+  }) => void
+  markResizePending: () => void
   markUserScrollbarScrollIntent: () => void
   releaseUserScrollbarScrollIntent: () => void
   clearUserScrollbarScrollIntent: () => void
@@ -437,6 +449,9 @@ function createEngine(props: MessageScrollerProviderProps) {
   let pendingUserWheelScroll = false
   let pendingUserScrollbarScroll = false
   let userScrollbarPointerHeld = false
+  let upwardWheelPx = 0
+  let nestedWheelPending = false
+  let resizePending = false
   let programmaticScrollDepth = 0
   let defaultScrollPositionApplied = false
   let preserveScrollOnPrepend = true
@@ -448,6 +463,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   let pendingScrollFrame: number | null = null
   let autoscrollingTimeout: number | null = null
   let userScrollSettleTimeout: number | null = null
+  let resizePendingClearFrame: number | null = null
   let visibilityObserver: IntersectionObserver | null = null
   let visibilityConsumers = 0
   const messageElements = new Map<string, HTMLElement>()
@@ -486,6 +502,10 @@ function createEngine(props: MessageScrollerProviderProps) {
     const scrollHeight = viewport?.scrollHeight ?? 0
     const scrolledUp = scrollTop < lastScrollTop - SCROLL_EPSILON
     const layoutClamp = isLayoutClampScroll()
+    const scrollHeightChanged = Math.abs(lastScrollHeight - scrollHeight) > SCROLL_EPSILON
+    const pendingResize = resizePending
+    if (programmaticScrollDepth === 0)
+      consumeResizePending()
     lastScrollTop = scrollTop
     lastScrollHeight = scrollHeight
     if (
@@ -504,6 +524,17 @@ function createEngine(props: MessageScrollerProviderProps) {
         : Number.POSITIVE_INFINITY
       const threshold = scrollEdgeThreshold()
       const programmatic = programmaticScrollDepth > 0
+      if (shouldPromoteNestedWheelToGesture({
+        accumulatedUpwardPx: upwardWheelPx,
+        nestedWheelPending,
+        programmatic,
+        scrolledUp,
+        threshold,
+      })) {
+        pendingUserWheelScroll = true
+        nestedWheelPending = false
+        armUserScrollSettleTimeout()
+      }
       const wheelOrTouchGesture = !layoutClamp
         && (pendingUserTouchScroll || pendingUserWheelScroll)
       const userGesture = wheelOrTouchGesture || (pendingUserScrollbarScroll && !layoutClamp)
@@ -531,7 +562,9 @@ function createEngine(props: MessageScrollerProviderProps) {
         followingBottom: true,
         layoutClamp,
         programmatic,
+        resizePending: pendingResize,
         scrolledUp,
+        scrollHeightChanged,
         threshold,
         userGesture,
       })) {
@@ -541,7 +574,9 @@ function createEngine(props: MessageScrollerProviderProps) {
         distanceFromEnd,
         layoutClamp,
         programmatic,
+        resizePending: pendingResize,
         scrolledUp,
+        scrollHeightChanged,
         threshold,
         userGesture,
       })) {
@@ -664,6 +699,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     if (previous === rounded)
       return
     itemHeights.set(messageId, rounded)
+    markResizePending()
     if (previous !== undefined && viewport) {
       const delta = rounded - previous
       const offset = itemOffsetTop(messageId)
@@ -1181,6 +1217,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   }
 
   function handleContentResize() {
+    markResizePending()
     applyResize()
   }
 
@@ -1274,18 +1311,48 @@ function createEngine(props: MessageScrollerProviderProps) {
     }
   }
 
+  function resetFollowWheelAccumulator() {
+    upwardWheelPx = 0
+    nestedWheelPending = false
+  }
+
+  function cancelResizePendingClear() {
+    if (resizePendingClearFrame !== null) {
+      window.cancelAnimationFrame(resizePendingClearFrame)
+      resizePendingClearFrame = null
+    }
+  }
+
+  function consumeResizePending() {
+    if (!resizePending)
+      return
+    resizePending = false
+    cancelResizePendingClear()
+  }
+
+  function markResizePending() {
+    resizePending = true
+    cancelResizePendingClear()
+    resizePendingClearFrame = window.requestAnimationFrame(() => {
+      resizePendingClearFrame = null
+      resizePending = false
+    })
+  }
+
   function armUserScrollSettleTimeout() {
     clearUserScrollSettleTimeout()
     userScrollSettleTimeout = window.setTimeout(() => {
       userScrollSettleTimeout = null
       pendingUserTouchScroll = false
       pendingUserWheelScroll = false
+      resetFollowWheelAccumulator()
     }, USER_SCROLL_SETTLE_TIMEOUT)
   }
 
   function clearUserInertiaScrollIntent() {
     pendingUserTouchScroll = false
     pendingUserWheelScroll = false
+    resetFollowWheelAccumulator()
     clearUserScrollSettleTimeout()
   }
 
@@ -1307,6 +1374,42 @@ function createEngine(props: MessageScrollerProviderProps) {
       return
     pendingUserWheelScroll = true
     armUserScrollSettleTimeout()
+  }
+
+  function noteFollowWheel({
+    deltaMode,
+    deltaY,
+    nested,
+    viewportClientHeight,
+  }: {
+    deltaMode: number
+    deltaY: number
+    nested: boolean
+    viewportClientHeight: number
+  }) {
+    if (mode !== "following-bottom")
+      return
+    const pixelDeltaY = normalizeWheelDeltaY({
+      deltaMode,
+      deltaY,
+      viewportClientHeight,
+    })
+    upwardWheelPx = nextUpwardWheelAccumulator(upwardWheelPx, pixelDeltaY)
+    armUserScrollSettleTimeout()
+    if (nested) {
+      nestedWheelPending = true
+      return
+    }
+    nestedWheelPending = false
+    if (
+      shouldAddToUpwardWheelAccumulator(pixelDeltaY)
+      && shouldArmUpwardWheelGesture({
+        accumulatedUpwardPx: upwardWheelPx,
+        threshold: scrollEdgeThreshold(),
+      })
+    ) {
+      markUserWheelScrollIntent()
+    }
   }
 
   function clearUserWheelScrollIntent() {
@@ -1412,6 +1515,7 @@ function createEngine(props: MessageScrollerProviderProps) {
       autoscrollingTimeout = null
     }
     clearUserScrollSettleTimeout()
+    cancelResizePendingClear()
     if (pendingScrollFrame !== null) {
       window.cancelAnimationFrame(pendingScrollFrame)
       pendingScrollFrame = null
@@ -1444,6 +1548,8 @@ function createEngine(props: MessageScrollerProviderProps) {
     clearUserTouchScrollIntent,
     markUserWheelScrollIntent,
     clearUserWheelScrollIntent,
+    noteFollowWheel,
+    markResizePending,
     markUserScrollbarScrollIntent,
     releaseUserScrollbarScrollIntent,
     clearUserScrollbarScrollIntent,

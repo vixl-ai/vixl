@@ -28,6 +28,17 @@ import {
   shouldTreatUpwardScrollAsLayoutClamp,
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
+  isNestedOverflowY,
+  nextUpwardWheelAccumulator,
+  normalizeWheelDeltaY,
+  shouldAddToUpwardWheelAccumulator,
+  shouldArmUpwardWheelGesture,
+  shouldPromoteNestedWheelToGesture,
+  wheelPathHasNestedOverflowScroller,
+  WHEEL_DELTA_LINE,
+  WHEEL_DELTA_PAGE,
+  WHEEL_DELTA_PIXEL,
+  WHEEL_LINE_HEIGHT_PX,
 } from '@/components/shadcn/ui/message-scroller/compute-windowed-ids'
 
 const ids = (...values: string[]): string[] => values
@@ -904,7 +915,9 @@ describe('shouldRecoverFollowAfterLayoutScroll', () => {
     distanceFromEnd: 24,
     followingBottom: true,
     layoutClamp: true,
+    resizePending: false,
     scrolledUp: true,
+    scrollHeightChanged: false,
     threshold: 8,
     userGesture: false,
   }
@@ -960,7 +973,9 @@ describe('shouldExitFollowBottomOnUnarmedScroll', () => {
   const exiting = {
     distanceFromEnd: 24,
     layoutClamp: false,
+    resizePending: false,
     scrolledUp: true,
+    scrollHeightChanged: false,
     threshold: 8,
     userGesture: false,
   }
@@ -1001,6 +1016,85 @@ describe('shouldExitFollowBottomOnUnarmedScroll', () => {
     expect(shouldExitFollowBottomOnUnarmedScroll({
       ...exiting,
       distanceFromEnd: 8,
+    })).toBe(false)
+  })
+})
+
+describe('follow exit during height change', () => {
+  const offEnd = {
+    distanceFromEnd: 24,
+    followingBottom: true,
+    layoutClamp: false,
+    programmatic: false,
+    scrolledUp: true,
+    threshold: 8,
+  } as const
+
+  it('stays in follow and recovers when unarmed scrollTop drops while scrollHeight grew', () => {
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...offEnd,
+      resizePending: false,
+      scrollHeightChanged: true,
+      userGesture: false,
+    })).toBe(false)
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...offEnd,
+      resizePending: false,
+      scrollHeightChanged: true,
+      userGesture: false,
+    })).toBe(true)
+  })
+
+  it('stays in follow and recovers when unarmed scrollTop drops while a resize is in flight', () => {
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...offEnd,
+      resizePending: true,
+      scrollHeightChanged: false,
+      userGesture: false,
+    })).toBe(false)
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...offEnd,
+      resizePending: true,
+      scrollHeightChanged: false,
+      userGesture: false,
+    })).toBe(true)
+  })
+
+  it('exits follow and does not recover for an upward reader gesture while height is changing', () => {
+    expect(shouldExitFollowBottom({
+      autoscrolling: false,
+      distanceFromEnd: offEnd.distanceFromEnd,
+      programmatic: false,
+      scrolledUp: true,
+      threshold: offEnd.threshold,
+      userGesture: true,
+    })).toBe(true)
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...offEnd,
+      resizePending: false,
+      scrollHeightChanged: true,
+      userGesture: true,
+    })).toBe(false)
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...offEnd,
+      resizePending: false,
+      scrollHeightChanged: true,
+      userGesture: true,
+    })).toBe(false)
+  })
+
+  it('exits follow and does not recover for an unarmed upward scroll with stable height', () => {
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...offEnd,
+      resizePending: false,
+      scrollHeightChanged: false,
+      userGesture: false,
+    })).toBe(true)
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...offEnd,
+      resizePending: false,
+      scrollHeightChanged: false,
+      userGesture: false,
     })).toBe(false)
   })
 })
@@ -1124,5 +1218,136 @@ describe('estimateItemsHeight', () => {
     })
 
     expect(height).toBe(80)
+  })
+})
+
+describe('normalizeWheelDeltaY', () => {
+  it('keeps pixel deltas in pixels', () => {
+    expect(normalizeWheelDeltaY({
+      deltaMode: WHEEL_DELTA_PIXEL,
+      deltaY: -12,
+      viewportClientHeight: 400,
+    })).toBe(-12)
+  })
+
+  it('treats one line as 16px', () => {
+    expect(normalizeWheelDeltaY({
+      deltaMode: WHEEL_DELTA_LINE,
+      deltaY: -1,
+      viewportClientHeight: 400,
+    })).toBe(-WHEEL_LINE_HEIGHT_PX)
+  })
+
+  it('treats one page as the viewport clientHeight', () => {
+    expect(normalizeWheelDeltaY({
+      deltaMode: WHEEL_DELTA_PAGE,
+      deltaY: -1,
+      viewportClientHeight: 480,
+    })).toBe(-480)
+  })
+})
+
+describe('upward wheel accumulation', () => {
+  const threshold = 8
+
+  it('adds the magnitude of negative deltaY toward older messages', () => {
+    expect(shouldAddToUpwardWheelAccumulator(-5)).toBe(true)
+    expect(nextUpwardWheelAccumulator(0, -5)).toBe(5)
+  })
+
+  it('does not add positive or horizontal deltas to the upward accumulator', () => {
+    expect(shouldAddToUpwardWheelAccumulator(6)).toBe(false)
+    expect(shouldAddToUpwardWheelAccumulator(0)).toBe(false)
+    expect(nextUpwardWheelAccumulator(0, 6)).toBe(0)
+    expect(nextUpwardWheelAccumulator(4, 0)).toBe(4)
+  })
+
+  it('subtracts downward deltaY so jitter cancels and never goes below zero', () => {
+    expect(nextUpwardWheelAccumulator(5, 3)).toBe(2)
+    expect(nextUpwardWheelAccumulator(2, 10)).toBe(0)
+  })
+
+  it('arms only after accumulated upward distance passes the edge threshold', () => {
+    const afterNoise = nextUpwardWheelAccumulator(0, -8)
+    expect(shouldArmUpwardWheelGesture({
+      accumulatedUpwardPx: afterNoise,
+      threshold,
+    })).toBe(false)
+    const afterUp = nextUpwardWheelAccumulator(afterNoise, -1)
+    expect(shouldArmUpwardWheelGesture({
+      accumulatedUpwardPx: afterUp,
+      threshold,
+    })).toBe(true)
+  })
+
+  it('does not arm from downward wheels even when they follow a partial upward move', () => {
+    const afterUp = nextUpwardWheelAccumulator(0, -6)
+    const afterDown = nextUpwardWheelAccumulator(afterUp, 2)
+    expect(shouldArmUpwardWheelGesture({
+      accumulatedUpwardPx: afterDown,
+      threshold,
+    })).toBe(false)
+  })
+})
+
+describe('nested overflow wheel targeting', () => {
+  it('treats auto, scroll, and overlay as nested overflow scrollers', () => {
+    expect(isNestedOverflowY('auto')).toBe(true)
+    expect(isNestedOverflowY('scroll')).toBe(true)
+    expect(isNestedOverflowY('overlay')).toBe(true)
+  })
+
+  it('does not treat visible, hidden, or clip as nested overflow scrollers', () => {
+    expect(isNestedOverflowY('visible')).toBe(false)
+    expect(isNestedOverflowY('hidden')).toBe(false)
+    expect(isNestedOverflowY('clip')).toBe(false)
+  })
+
+  it('detects a nested scroller between the target and the viewport', () => {
+    expect(wheelPathHasNestedOverflowScroller(['visible', 'auto', 'visible'])).toBe(true)
+    expect(wheelPathHasNestedOverflowScroller(['visible', 'hidden'])).toBe(false)
+    expect(wheelPathHasNestedOverflowScroller([])).toBe(false)
+  })
+})
+
+describe('shouldPromoteNestedWheelToGesture', () => {
+  const promoting = {
+    accumulatedUpwardPx: 12,
+    nestedWheelPending: true,
+    programmatic: false,
+    scrolledUp: true,
+    threshold: 8,
+  }
+
+  it('promotes when nested upward accumulation passed the threshold and scrollTop moved up', () => {
+    expect(shouldPromoteNestedWheelToGesture(promoting)).toBe(true)
+  })
+
+  it('does not promote from the nested wheel event itself without an upward viewport move', () => {
+    expect(shouldPromoteNestedWheelToGesture({
+      ...promoting,
+      scrolledUp: false,
+    })).toBe(false)
+  })
+
+  it('does not promote when nested accumulation has not passed the threshold', () => {
+    expect(shouldPromoteNestedWheelToGesture({
+      ...promoting,
+      accumulatedUpwardPx: 8,
+    })).toBe(false)
+  })
+
+  it('does not promote when no nested wheel is pending', () => {
+    expect(shouldPromoteNestedWheelToGesture({
+      ...promoting,
+      nestedWheelPending: false,
+    })).toBe(false)
+  })
+
+  it('does not promote a programmatic scrollTop drop', () => {
+    expect(shouldPromoteNestedWheelToGesture({
+      ...promoting,
+      programmatic: true,
+    })).toBe(false)
   })
 })

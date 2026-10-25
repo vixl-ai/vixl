@@ -625,7 +625,7 @@ watch(
 
 <template>
   <MessageScroller class="h-full min-h-0 min-w-0 overflow-hidden">
-    <MessageScrollerViewport class="scroll-fade-b overflow-x-hidden">
+    <MessageScrollerViewport class="overflow-x-hidden">
       <MessageScrollerContent
         class="mx-auto w-full min-w-0 max-w-3xl gap-6 overflow-x-hidden p-4 pb-2"
       >

@@ -12,6 +12,7 @@ const props = defineProps<{
 const {
   handleContentChange,
   handleContentResize,
+  markResizePending,
   setContentElement,
   setSpacerElement,
 } = useMessageScrollerContext()
@@ -39,6 +40,7 @@ onMounted(() => {
 
   if (typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(() => {
+      markResizePending()
       window.cancelAnimationFrame(resizeFrame)
       resizeFrame = window.requestAnimationFrame(handleContentResize)
     })

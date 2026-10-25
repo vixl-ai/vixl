@@ -1,6 +1,10 @@
 export const DEFAULT_ITEM_HEIGHT = 160
 export const DEFAULT_OVERSCAN_PX = 800
 export const FALLBACK_VIEWPORT_HEIGHT = 800
+export const WHEEL_LINE_HEIGHT_PX = 16
+export const WHEEL_DELTA_PIXEL = 0
+export const WHEEL_DELTA_LINE = 1
+export const WHEEL_DELTA_PAGE = 2
 
 export function resolveViewportHeight({
   clientHeight,
@@ -298,7 +302,9 @@ export function shouldRecoverFollowAfterLayoutScroll({
   followingBottom,
   layoutClamp,
   programmatic,
+  resizePending = false,
   scrolledUp,
+  scrollHeightChanged = false,
   threshold,
   userGesture,
 }: {
@@ -306,14 +312,17 @@ export function shouldRecoverFollowAfterLayoutScroll({
   followingBottom: boolean
   layoutClamp: boolean
   programmatic?: boolean
+  resizePending?: boolean
   scrolledUp: boolean
+  scrollHeightChanged?: boolean
   threshold: number
   userGesture: boolean
 }): boolean {
-  // Recovery is only for a layout clamp: scrollHeight shrank and that
-  // shrink explains the scrollTop drop. An unarmed reader scroll is not
-  // a clamp and must not chase.
-  if (!layoutClamp || !followingBottom || userGesture || programmatic || !scrolledUp)
+  // Recovery is for layout: a matching shrink clamp, a height change in
+  // either direction, or a resize already in flight. An unarmed reader
+  // scroll with a stable height is not layout and must not chase.
+  const layoutMoved = layoutClamp || scrollHeightChanged || resizePending
+  if (!layoutMoved || !followingBottom || userGesture || programmatic || !scrolledUp)
     return false
   return distanceFromEnd > threshold
 }
@@ -322,18 +331,24 @@ export function shouldExitFollowBottomOnUnarmedScroll({
   distanceFromEnd,
   layoutClamp,
   programmatic,
+  resizePending = false,
   scrolledUp,
+  scrollHeightChanged = false,
   threshold,
   userGesture,
 }: {
   distanceFromEnd: number
   layoutClamp: boolean
   programmatic?: boolean
+  resizePending?: boolean
   scrolledUp: boolean
+  scrollHeightChanged?: boolean
   threshold: number
   userGesture: boolean
 }): boolean {
   if (layoutClamp || userGesture || programmatic || !scrolledUp)
+    return false
+  if (scrollHeightChanged || resizePending)
     return false
   return distanceFromEnd > threshold
 }
@@ -368,6 +383,75 @@ export function shouldExitFollowBottomOnUserTouch({
   threshold: number
 }): boolean {
   return pendingUserTouchScroll && scrolledUp && distanceFromEnd > threshold
+}
+
+export function normalizeWheelDeltaY({
+  deltaMode,
+  deltaY,
+  viewportClientHeight,
+}: {
+  deltaMode: number
+  deltaY: number
+  viewportClientHeight: number
+}): number {
+  if (deltaMode === WHEEL_DELTA_LINE)
+    return deltaY * WHEEL_LINE_HEIGHT_PX
+  if (deltaMode === WHEEL_DELTA_PAGE)
+    return deltaY * viewportClientHeight
+  return deltaY
+}
+
+export function shouldAddToUpwardWheelAccumulator(pixelDeltaY: number): boolean {
+  return pixelDeltaY < 0
+}
+
+export function nextUpwardWheelAccumulator(
+  accumulatedUpwardPx: number,
+  pixelDeltaY: number,
+): number {
+  if (pixelDeltaY === 0)
+    return accumulatedUpwardPx
+  return Math.max(0, accumulatedUpwardPx - pixelDeltaY)
+}
+
+export function shouldArmUpwardWheelGesture({
+  accumulatedUpwardPx,
+  threshold,
+}: {
+  accumulatedUpwardPx: number
+  threshold: number
+}): boolean {
+  return accumulatedUpwardPx > threshold
+}
+
+export function isNestedOverflowY(overflowY: string): boolean {
+  return overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay"
+}
+
+export function wheelPathHasNestedOverflowScroller(
+  overflowYBetweenTargetAndViewport: readonly string[],
+): boolean {
+  return overflowYBetweenTargetAndViewport.some(isNestedOverflowY)
+}
+
+export function shouldPromoteNestedWheelToGesture({
+  accumulatedUpwardPx,
+  nestedWheelPending,
+  programmatic = false,
+  scrolledUp,
+  threshold,
+}: {
+  accumulatedUpwardPx: number
+  nestedWheelPending: boolean
+  programmatic?: boolean
+  scrolledUp: boolean
+  threshold: number
+}): boolean {
+  if (programmatic)
+    return false
+  return nestedWheelPending
+    && scrolledUp
+    && shouldArmUpwardWheelGesture({ accumulatedUpwardPx, threshold })
 }
 
 export function itemIdsEqual(a: readonly string[], b: readonly string[]): boolean {
