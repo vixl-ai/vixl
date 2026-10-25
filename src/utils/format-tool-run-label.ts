@@ -196,7 +196,7 @@ const formatTerminalRunLabel = (run: ToolRun, isRunning: boolean): string => {
   const prefix = mapped ?? (isRunning ? 'Running command' : 'Ran command')
   const target = desc.length > 0 ? ` ${desc}` : ''
   if (isRunning) {
-    return `${prefix}${target}`
+    return desc.length > 0 ? desc : prefix
   }
   if (run.status === 'rejected') {
     return `${prefix}${target} (rejected)`

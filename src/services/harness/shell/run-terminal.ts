@@ -62,13 +62,13 @@ const runTerminal = (ctx: HarnessToolContext) => {
         ? `Run a shell command in the project cwd. ${CWD_TOOL_HINT} A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell_id for terminal_output. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`
         : 'Run a shell command in the project cwd. A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell_id for terminal_output. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.',
     inputSchema: z.object({
-      command: z.string().describe('Shell command'),
-      is_background: z.boolean().optional().describe('Return shell_id without waiting'),
-      timeout_ms: z.number().optional().describe('Optional max wait for blocking runs'),
       description: z
         .string()
         .min(1)
         .describe('2-6 word UI title'),
+      command: z.string().describe('Shell command'),
+      is_background: z.boolean().optional().describe('Return shell_id without waiting'),
+      timeout_ms: z.number().optional().describe('Optional max wait for blocking runs'),
       ...cwdSlugFields(ctx),
     }),
     execute: async (input, { toolCallId }) => {

@@ -61,6 +61,7 @@ export const runTerminalCommand = async (
       ...(args.projectWritable === false ? { projectWritable: false } : {}),
       ...(projectRoots ? { projectRoots } : {}),
       ...(ctx.subagentId ? { subagentId: ctx.subagentId } : {}),
+      ...(args.description ? { description: args.description } : {}),
     })
 
     if (args.is_background) {
@@ -162,5 +163,6 @@ export const readTerminalOutput = async (
     stdout: clipTerminalOutput(output.stdout),
     stderr: clipTerminalOutput(output.stderr),
     exitCode: current.exitCode,
+    ...(current.description ? { description: current.description } : {}),
   }
 }

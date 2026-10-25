@@ -135,8 +135,13 @@ export const createAgentShell = async (args: {
   projectWritable?: boolean
   projectRoots?: IpcProjectRoot[]
   subagentId?: string
+  description?: string
 }): Promise<AgentShellRecord> => {
   const shellId = crypto.randomUUID()
+  const description =
+    typeof args.description === 'string' && args.description.length > 0
+      ? args.description
+      : undefined
   const record: AgentShellRecord = {
     shellId,
     chatId: args.chatId,
@@ -149,6 +154,7 @@ export const createAgentShell = async (args: {
     exitSignal: null,
     startedAt: new Date().toISOString(),
     subagentId: args.subagentId,
+    ...(description ? { description } : {}),
   }
 
   shells.set(shellId, record)

@@ -236,6 +236,67 @@ describe('formatToolRunLabel steer_subagent', () => {
   })
 })
 
+describe('formatToolRunLabel terminal', () => {
+  it('labels a running run_terminal with the description alone', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'run_terminal',
+          status: 'running',
+          args: { command: 'gh run watch', description: 'Polling CI status on remote' },
+        }),
+      ),
+    ).toBe('Polling CI status on remote')
+  })
+
+  it('labels a running terminal_output with the description alone', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'terminal_output',
+          status: 'running',
+          args: { shell_id: 'shell-1', description: 'Polling CI status on remote' },
+        }),
+      ),
+    ).toBe('Polling CI status on remote')
+  })
+
+  it('keeps the generic running run_terminal label without a description', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'run_terminal',
+          status: 'running',
+          args: { command: 'gh run watch' },
+        }),
+      ),
+    ).toBe('Running command')
+  })
+
+  it('keeps the generic running terminal_output label without a description', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'terminal_output',
+          status: 'running',
+          args: { shell_id: 'shell-1' },
+        }),
+      ),
+    ).toBe('Reading shell output')
+  })
+
+  it('keeps past-tense run_terminal copy with the description when done', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'run_terminal',
+          args: { command: 'gh run watch', description: 'Polling CI status on remote' },
+        }),
+      ),
+    ).toBe('Ran command Polling CI status on remote')
+  })
+})
+
 describe('formatToolRunLabel fallback', () => {
   it('title-cases unmapped tool names in the fallback', () => {
     expect(

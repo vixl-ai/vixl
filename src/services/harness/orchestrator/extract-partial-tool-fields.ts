@@ -4,6 +4,7 @@ const isWhitespace = (ch: string): boolean =>
 type PartialToolFields = {
   path?: string
   tool?: string
+  description?: string
 }
 
 const unescapeJsonString = (raw: string): string | null => {
@@ -93,6 +94,10 @@ const assignField = (
   }
   if (keyName === 'tool') {
     fields.tool = value
+    return
+  }
+  if (keyName === 'description') {
+    fields.description = value
   }
 }
 
@@ -117,7 +122,7 @@ const extractCompleteFields = (partialJson: string): PartialToolFields | null =>
         while (j < partialJson.length && isWhitespace(partialJson[j]!)) {
           j += 1
         }
-        if (keyName === 'path' || keyName === 'tool') {
+        if (keyName === 'path' || keyName === 'tool' || keyName === 'description') {
           if (partialJson[j] !== '"') {
             i = j
             continue
@@ -146,7 +151,11 @@ const extractCompleteFields = (partialJson: string): PartialToolFields | null =>
     }
     i += 1
   }
-  if (fields.path === undefined && fields.tool === undefined) {
+  if (
+    fields.path === undefined &&
+    fields.tool === undefined &&
+    fields.description === undefined
+  ) {
     return null
   }
   return fields

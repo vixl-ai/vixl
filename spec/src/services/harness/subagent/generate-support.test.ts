@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelMessage } from 'ai'
 import {
   createSubagentToolExecutionHooks,
@@ -10,6 +10,12 @@ import {
   setMessages,
 } from '@/services/harness/subagent/registry'
 import type { HarnessEvent } from '@/types/harness/harness-event'
+
+const getAgentShell = vi.fn<(shellId: string) => { description?: string } | null>()
+
+vi.mock('@/services/harness/shell/registry', () => ({
+  getAgentShell: (shellId: string) => getAgentShell(shellId),
+}))
 
 const user: ModelMessage = { role: 'user', content: 'task' }
 const step1: ModelMessage[] = [
@@ -98,6 +104,105 @@ describe('historyAfterGenerate', () => {
 })
 
 describe('createSubagentToolExecutionHooks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    getAgentShell.mockReturnValue(null)
+  })
+
+  it('includes the shell description on terminal_output tool-start args', () => {
+    getAgentShell.mockReturnValue({ description: 'Start the server' })
+    const events: HarnessEvent[] = []
+    const { onToolExecutionStart } = createSubagentToolExecutionHooks({
+      emitNestedEvent: (event) => {
+        events.push(event)
+      },
+    })
+
+    onToolExecutionStart({
+      toolCall: {
+        toolCallId: 't-wait',
+        toolName: 'terminal_output',
+        input: { shell_id: 'shell-1', block: true },
+      },
+    })
+
+    expect(events).toEqual([
+      {
+        type: 'tool-start',
+        toolCallId: 't-wait',
+        name: 'terminal_output',
+        args: {
+          shell_id: 'shell-1',
+          block: true,
+          description: 'Start the server',
+        },
+      },
+    ])
+  })
+
+  it('leaves terminal_output tool-start args unchanged when the shell has no description', () => {
+    getAgentShell.mockReturnValue({})
+    const events: HarnessEvent[] = []
+    const { onToolExecutionStart } = createSubagentToolExecutionHooks({
+      emitNestedEvent: (event) => {
+        events.push(event)
+      },
+    })
+    const input = { shell_id: 'shell-1', block: true }
+
+    onToolExecutionStart({
+      toolCall: {
+        toolCallId: 't-wait',
+        toolName: 'terminal_output',
+        input,
+      },
+    })
+
+    expect(events).toEqual([
+      {
+        type: 'tool-start',
+        toolCallId: 't-wait',
+        name: 'terminal_output',
+        args: input,
+      },
+    ])
+    expect(events[0] && events[0].type === 'tool-start' ? events[0].args : undefined).toBe(
+      input,
+    )
+  })
+
+  it('does not rewrite run_terminal tool-start args', () => {
+    getAgentShell.mockReturnValue({ description: 'Start the server' })
+    const events: HarnessEvent[] = []
+    const { onToolExecutionStart } = createSubagentToolExecutionHooks({
+      emitNestedEvent: (event) => {
+        events.push(event)
+      },
+    })
+    const input = { command: 'npm run dev', description: 'Start the server' }
+
+    onToolExecutionStart({
+      toolCall: {
+        toolCallId: 't-run',
+        toolName: 'run_terminal',
+        input,
+      },
+    })
+
+    expect(events).toEqual([
+      {
+        type: 'tool-start',
+        toolCallId: 't-run',
+        name: 'run_terminal',
+        args: input,
+      },
+    ])
+    expect(events[0] && events[0].type === 'tool-start' ? events[0].args : undefined).toBe(
+      input,
+    )
+    expect(getAgentShell).not.toHaveBeenCalled()
+  })
+
   it('emits a non-empty string error when a tool throws an Error', () => {
     const events: HarnessEvent[] = []
     const { onToolExecutionEnd } = createSubagentToolExecutionHooks({

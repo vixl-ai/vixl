@@ -6,6 +6,7 @@ import {
   deriveToolDiffs,
   resolveToolErrorMessage,
 } from '@/services/harness/orchestrator/helpers'
+import { withTerminalOutputDescription } from '@/services/harness/shell/with-terminal-output-description'
 import { getSubagent, setMessages } from '@/services/harness/subagent/registry'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
@@ -32,7 +33,10 @@ export const createSubagentToolExecutionHooks = (args: {
       type: 'tool-start',
       toolCallId: event.toolCall.toolCallId,
       name: event.toolCall.toolName,
-      args: event.toolCall.input,
+      args: withTerminalOutputDescription(
+        event.toolCall.toolName,
+        event.toolCall.input,
+      ),
     })
   },
   onToolExecutionEnd: (event) => {

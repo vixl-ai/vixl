@@ -222,6 +222,29 @@ describe('build-tools terminal io', () => {
       shellId: 'shell-1',
       status: 'running',
     })
+    expect(result).not.toHaveProperty('description')
+  })
+
+  it('returns the shell description on terminal_output', async () => {
+    getAgentShell.mockReturnValue({
+      shellId: 'shell-1',
+      status: 'running',
+      stdout: 'log line\n',
+      stderr: '',
+      exitCode: null,
+      exitSignal: null,
+      description: 'Start the server',
+    })
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(tools.terminal_output.execute, { shell_id: 'shell-1' })
+
+    expect(result).toMatchObject({
+      shellId: 'shell-1',
+      status: 'running',
+      description: 'Start the server',
+    })
   })
 
   it('rejects terminal_output when shell_id is a subagent id', async () => {

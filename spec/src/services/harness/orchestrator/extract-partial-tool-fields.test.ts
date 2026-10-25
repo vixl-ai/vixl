@@ -4,6 +4,7 @@ import extractPartialToolFields from '@/services/harness/orchestrator/extract-pa
 type Fields = {
   path?: string
   tool?: string
+  description?: string
 }
 
 const parse = (json: string, toolCallId = 'call-1'): Fields | null =>
@@ -201,6 +202,47 @@ describe('extractPartialToolFields', () => {
         expect(
           parse('{"serverId":"brave","tool":"brave_web_search","args":{"query":"hi"}}'),
         ).toEqual({ tool: 'brave_web_search' })
+      })
+    })
+  })
+
+  describe('description', () => {
+    it('returns a complete description from partial JSON while a later command string is still open', () => {
+      expect(
+        parse('{"description":"Polling CI status on remote","command":"gh pr checks'),
+      ).toEqual({ description: 'Polling CI status on remote' })
+    })
+
+    it('stays null until the description string is fully closed, then returns description', () => {
+      const payload = '{"description":"Polling CI status on remote","command":"gh pr checks"}'
+      const buffers = new Map<string, string>()
+      const results = feedChars(payload, 'call-1', buffers)
+      const closerIndex = '{"description":"Polling CI status on remote'.length
+      expect(results[closerIndex - 1]).toBeNull()
+      expect(results[closerIndex]).toEqual({
+        description: 'Polling CI status on remote',
+      })
+      expect(results.at(-1)).toEqual({
+        description: 'Polling CI status on remote',
+      })
+      expect(buffers.get('call-1')).toBe(payload)
+    })
+
+    it('returns null for an empty description string', () => {
+      expect(parse('{"description":""}')).toBeNull()
+    })
+
+    it('does not treat a nested description as a top-level description', () => {
+      expect(parse('{"args":{"description":"nope"}}')).toBeNull()
+      expect(parse('{"command":"x","args":{"description":"nope"}}')).toBeNull()
+    })
+
+    it('returns description and path when both top-level strings are complete', () => {
+      expect(
+        parse('{"description":"Write helper","path":"src/a.ts","content":"'),
+      ).toEqual({
+        description: 'Write helper',
+        path: 'src/a.ts',
       })
     })
   })

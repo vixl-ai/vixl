@@ -20,6 +20,7 @@ import {
   killAgentShell,
 } from '@/services/harness/shell/registry'
 import { clipTerminalOutput } from '@/utils/clip-terminal-output'
+import { shellDisplayTitle } from '@/utils/shell-display-title'
 import type { AgentShellPayload, WorkbenchTab } from '@/types/workbench/workbench-tab'
 
 const props = defineProps<{
@@ -43,11 +44,15 @@ const output = computed(() => {
 const isStreaming = computed(() => shell.value?.status === 'running')
 
 const title = computed(() => {
-  const command = shell.value?.command
-  if (!command) {
+  const record = shell.value
+  if (!record) {
     return props.tab.label
   }
-  return command.length > 60 ? `${command.slice(0, 60)}...` : command
+  const display = shellDisplayTitle(record)
+  if (!display) {
+    return props.tab.label
+  }
+  return display.length > 60 ? `${display.slice(0, 60)}...` : display
 })
 
 const handleStop = async (): Promise<void> => {

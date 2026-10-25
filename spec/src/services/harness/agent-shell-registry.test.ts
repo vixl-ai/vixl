@@ -45,12 +45,46 @@ describe('agent-shell-registry', () => {
     })
 
     expect(shell.status).toBe('running')
+    expect(shell).not.toHaveProperty('description')
     expect(shellSpawnTracked).toHaveBeenCalledWith({
       shellId: shell.shellId,
       projectRoot: '/project',
       command: 'npm run dev',
     })
     expect(getAgentShell(shell.shellId)?.chatId).toBe('chat-1')
+    expect(getAgentShell(shell.shellId)?.description).toBeUndefined()
+  })
+
+  it('stores a non-empty description on the shell record', async () => {
+    const { createAgentShell, getAgentShell } = await import(
+      '@/services/harness/shell/registry'
+    )
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run dev',
+      description: 'Start the server',
+    })
+
+    expect(shell.description).toBe('Start the server')
+    expect(getAgentShell(shell.shellId)?.description).toBe('Start the server')
+  })
+
+  it('omits an empty description from the shell record', async () => {
+    const { createAgentShell, getAgentShell } = await import(
+      '@/services/harness/shell/registry'
+    )
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run dev',
+      description: '',
+    })
+
+    expect(shell).not.toHaveProperty('description')
+    expect(getAgentShell(shell.shellId)?.description).toBeUndefined()
   })
 
   it('tails shell output to the last N lines', async () => {

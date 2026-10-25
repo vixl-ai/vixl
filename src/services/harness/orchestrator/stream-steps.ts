@@ -2,6 +2,7 @@ import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { HarnessWorkspace } from '@/types/harness/harness-workspace'
 import deriveToolArtifact from '@/services/harness/derive-tool-artifact'
 import parseTodoUpdate from '@/services/harness/parse-todo-update'
+import { withTerminalOutputDescription } from '@/services/harness/shell/with-terminal-output-description'
 import truncateToolResult from '@/utils/truncate-tool-result'
 import { deriveToolDiffs } from './helpers'
 import {
@@ -105,7 +106,8 @@ export default (options: StepControllerOptions) => {
     }
     startedToolIds.add(toolCallId)
     sealReasoningDuration()
-    onEvent({ type: 'tool-start', toolCallId, name, args })
+    const nextArgs = withTerminalOutputDescription(name, args)
+    onEvent({ type: 'tool-start', toolCallId, name, args: nextArgs })
     await persistToolRun(
       persistSlug(),
       chatId,
@@ -113,7 +115,7 @@ export default (options: StepControllerOptions) => {
       name,
       'running',
       currentStepId,
-      args,
+      nextArgs,
     )
   }
 

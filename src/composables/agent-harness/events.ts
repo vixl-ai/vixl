@@ -2,6 +2,7 @@ import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import { mapMetaStatusToChatStatus } from '@/services/harness/orchestrator'
+import { withTerminalOutputDescription } from '@/services/harness/shell/with-terminal-output-description'
 import mapSubagentResultStatus from '@/utils/map-subagent-result-status'
 import mergeToolRunArgs from '@/utils/merge-tool-run-args'
 import toolArgsPath from '@/utils/tool-args-path'
@@ -75,7 +76,10 @@ export default (
         (item) => item.toolCallId === event.toolCallId,
       )
       const name = event.name || existing?.name || 'tool'
-      const args = mergeToolRunArgs(existing?.args, event.args)
+      const args = withTerminalOutputDescription(
+        name,
+        mergeToolRunArgs(existing?.args, event.args),
+      )
       if (HOLD_PATH_TOOLS.has(name) && !toolArgsPath(args)) {
         status.value = 'streaming'
       } else if (!existing || existing.status === 'running') {
@@ -102,7 +106,10 @@ export default (
         toolCallId: event.toolCallId,
         name: event.name,
         status: 'running',
-        args: mergeToolRunArgs(existing?.args, event.args),
+        args: withTerminalOutputDescription(
+          event.name,
+          mergeToolRunArgs(existing?.args, event.args),
+        ),
         started: true,
       }
       toolRuns.value = [

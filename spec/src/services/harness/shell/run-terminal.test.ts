@@ -1068,6 +1068,12 @@ describe('build-tools run_terminal', () => {
     expect(result).toMatchObject({
       description: expected,
     })
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'echo hello',
+        description: expected,
+      }),
+    )
     expect(gateToolPermission).toHaveBeenCalledWith(
       expect.objectContaining({
         title: expected,
