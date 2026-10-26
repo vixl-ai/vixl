@@ -121,6 +121,9 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
   }
 
   const alreadyDeliveredShell = new Set(loadResumeOverlay(chatId).deliveredResultKeys)
+  const alreadyPersistedShellResults = shellResults.filter((result) =>
+    alreadyDeliveredShell.has(shellResultKey(result)),
+  )
   const shellWakeResults = shellResults.filter(
     (result) => !alreadyDeliveredShell.has(shellResultKey(result)),
   )
@@ -143,6 +146,10 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
       shellWakeResults.map((result) => result.toolCallId),
     )
   }
+  markShellResultsDelivered(
+    chatId,
+    alreadyPersistedShellResults.map((result) => result.toolCallId),
+  )
 
   const activeContextMeta = await readChatMeta(workspace.projectSlug, chatId).catch(() => null)
   const activeContext = activeContextMeta?.activeContext
