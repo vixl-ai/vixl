@@ -8,6 +8,7 @@ import {
 import flushPendingBackgroundResume from '@/services/harness/subagent/flush-pending-resume'
 import {
   clearPendingBackgroundResume,
+  clearTurnResponseMessages,
   getSubagent,
   hasPendingBackgroundResume,
   hasRunningSubagentsForChat,
@@ -99,6 +100,9 @@ export const commitPrefinishedShellResults = (
     return [item.toolCallId]
   })
   markShellResultsDelivered(chatId, deliveredToolCallIds)
+  if (deliveredToolCallIds.length > 0) {
+    clearTurnResponseMessages(chatId)
+  }
   if (
     !hasRunningParentBackgroundShells(chatId) &&
     listDeliverableShellResults(chatId).length === 0

@@ -22,12 +22,14 @@ import collectPrefinishedBackgroundResults, {
 } from '@/composables/agent-harness/collect-prefinished-background-results'
 import {
   fail,
+  getTurnResponseMessages,
   hasPendingBackgroundResume,
   listDeliverableBackgroundResults,
   register,
   reopen,
   resetSubagentRegistryForTests,
   resolve,
+  setTurnResponseMessages,
 } from '@/services/harness/subagent/registry'
 
 describe('collectPrefinishedBackgroundResults', () => {
@@ -197,6 +199,21 @@ describe('collectPrefinishedShellResults', () => {
       payload: { shellId: shell.shellId, exitCode: 0 },
     })
 
+    const spawnSnapshot = [
+      {
+        role: 'tool' as const,
+        content: [
+          {
+            type: 'tool-result' as const,
+            toolCallId: 'tc-shell',
+            toolName: 'run_terminal',
+            output: { type: 'json' as const, value: { pending: true } },
+          },
+        ],
+      },
+    ]
+    setTurnResponseMessages('chat-1', spawnSnapshot)
+
     const snapshot = collectPrefinishedShellResults('chat-1', false, false)
     expect(snapshot).toEqual([
       expect.objectContaining({
@@ -208,10 +225,12 @@ describe('collectPrefinishedShellResults', () => {
     ])
     expect(listDeliverableShellResults('chat-1')).toEqual(snapshot)
     expect(hasPendingShellResume('chat-1')).toBe(true)
+    expect(getTurnResponseMessages('chat-1')).toEqual(spawnSnapshot)
 
     commitPrefinishedShellResults('chat-1', snapshot)
 
     expect(listDeliverableShellResults('chat-1')).toEqual([])
     expect(hasPendingShellResume('chat-1')).toBe(false)
+    expect(getTurnResponseMessages('chat-1')).toBeNull()
   })
 })
