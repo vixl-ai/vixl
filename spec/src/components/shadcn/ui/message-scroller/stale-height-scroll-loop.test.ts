@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   computeWindowedIds,
   DEFAULT_ITEM_HEIGHT,
@@ -18,7 +18,11 @@ import {
   shouldRecoverFollowAfterLayoutScroll,
   shouldTreatUpwardScrollAsLayoutClamp,
   shouldSettleScrollToEnd,
+  createResizePendingState,
+  nextResizePendingOnFrame,
+  nextResizePendingOnMark,
 } from '@/components/shadcn/ui/message-scroller/compute-windowed-ids'
+import { observeContentBoxResize } from '@/components/shadcn/ui/message-scroller/observe-content-box-resize'
 
 /**
  * Regression for the at-rest follow-bottom 2-cycle:
@@ -105,6 +109,40 @@ function measuredItemCount(itemIds: readonly string[], heights: ReadonlyMap<stri
 
 function reportedHeight(height: number, roundReportedHeights: boolean): number {
   return roundReportedHeights ? Math.round(height) : height
+}
+
+function chaseObservedHeight({
+  observedHeight,
+  scrollTop,
+  viewportHeight,
+}: {
+  observedHeight: number
+  scrollTop: number
+  viewportHeight: number
+}) {
+  const maxScrollTop = Math.max(0, observedHeight - viewportHeight)
+  const offEnd = shouldChaseFollowBottomOnResize({
+    clientHeight: viewportHeight,
+    maxScrollTop,
+    scrollEpsilon: SCROLL_EPSILON,
+    scrollTop,
+  })
+  const chase = shouldChaseFollowBottom({ offEnd })
+  const nextScrollTop = chase ? maxScrollTop : Math.min(scrollTop, maxScrollTop)
+  return {
+    chase,
+    distanceFromEnd: maxScrollTop - nextScrollTop,
+    scrollTop: nextScrollTop,
+    settle: shouldSettleScrollToEnd({
+      hasStreamingTurn: false,
+      maxScrollTop,
+      mode: 'following-bottom',
+      nextMode: 'following-bottom',
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollTop: nextScrollTop,
+      spacerHeight: 0,
+    }),
+  }
 }
 
 function applyFixedGuards(): Pick<SimulatorOptions, 'chasePolicy' | 'followWindow'> {
@@ -1363,6 +1401,235 @@ describe('follow-bottom chase recheck after stale row heights', () => {
       grew: true,
       trust: false,
     })
+  })
+})
+
+describe('follow-bottom chase after layout, before paint', () => {
+  const viewportHeight = 400
+  const lineHeight = 20
+  const startHeight = 1000
+  const frames = 6
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function stubResizeObserver() {
+    let delivered: ResizeObserverCallback | undefined
+    class StubResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        delivered = callback
+      }
+
+      disconnect(): void {}
+      observe(): void {}
+      unobserve(): void {}
+    }
+    vi.stubGlobal('ResizeObserver', StubResizeObserver)
+    return {
+      deliver() {
+        delivered?.([], {} as ResizeObserver)
+      },
+    }
+  }
+
+  it('runs the resize handler inside the observer callback without requestAnimationFrame', () => {
+    const raf = vi.fn<(callback: FrameRequestCallback) => number>()
+    vi.stubGlobal('requestAnimationFrame', raf)
+    const observer = stubResizeObserver()
+    let handlerCalls = 0
+    observeContentBoxResize(document.createElement('div'), () => {
+      handlerCalls += 1
+    })
+
+    expect(handlerCalls).toBe(0)
+    observer.deliver()
+    expect(handlerCalls).toBe(1)
+    expect(raf).not.toHaveBeenCalled()
+  })
+
+  it('lands on each newly laid-out line before the next line is appended', () => {
+    const observer = stubResizeObserver()
+    let Hdom = startHeight
+    let scrollTop = Math.max(0, Hdom - viewportHeight)
+    const captured: Array<ReturnType<typeof chaseObservedHeight>> = []
+    observeContentBoxResize(document.createElement('div'), () => {
+      const chased = chaseObservedHeight({
+        observedHeight: Hdom,
+        scrollTop,
+        viewportHeight,
+      })
+      scrollTop = chased.scrollTop
+      captured.push(chased)
+    })
+
+    const framesOut: Array<{
+      chase: boolean
+      distanceFromEnd: number
+      Hdom: number
+      settle: boolean
+    }> = []
+    for (let frame = 0; frame < frames; frame += 1) {
+      Hdom += lineHeight
+      const previousCount = captured.length
+      observer.deliver()
+      const chased = captured[previousCount]
+      if (!chased)
+        throw new Error('resize handler did not run inside the observer callback')
+      framesOut.push({
+        chase: chased.chase,
+        distanceFromEnd: chased.distanceFromEnd,
+        Hdom,
+        settle: chased.settle,
+      })
+    }
+
+    expect(framesOut.map((frame) => frame.Hdom)).toEqual([
+      1020,
+      1040,
+      1060,
+      1080,
+      1100,
+      1120,
+    ])
+    expect(framesOut.every((frame) => frame.chase)).toBe(true)
+    expect(framesOut.every((frame) => frame.distanceFromEnd === 0)).toBe(true)
+    expect(framesOut.every((frame) => frame.settle)).toBe(true)
+
+    const idle = chaseObservedHeight({
+      observedHeight: 1120,
+      scrollTop: 720,
+      viewportHeight,
+    })
+    expect(idle).toMatchObject({
+      chase: false,
+      distanceFromEnd: 0,
+      settle: true,
+    })
+  })
+
+  it('deferred rAF chase stays one line short of the live edge', () => {
+    let Hdom = startHeight
+    let scrollTop = Math.max(0, Hdom - viewportHeight)
+    let pendingObservedHeight: number | null = null
+    const distances: number[] = []
+    const chases: boolean[] = []
+
+    for (let frame = 0; frame < frames; frame += 1) {
+      let chase = false
+      if (pendingObservedHeight !== null) {
+        const chased = chaseObservedHeight({
+          observedHeight: pendingObservedHeight,
+          scrollTop,
+          viewportHeight,
+        })
+        chase = chased.chase
+        scrollTop = chased.scrollTop
+      }
+      Hdom += lineHeight
+      pendingObservedHeight = Hdom
+      chases.push(chase)
+      distances.push(Math.max(0, Hdom - viewportHeight) - scrollTop)
+    }
+
+    expect(distances.every((distance) => distance === lineHeight)).toBe(true)
+    expect(chases[0]).toBe(false)
+    expect(chases.slice(1).every((chase) => chase)).toBe(true)
+  })
+})
+
+describe('follow-bottom across a multi-frame shrink', () => {
+  const viewportHeight = 400
+  const threshold = SCROLL_EDGE_THRESHOLD
+
+  it('keeps follow through a multi-frame collapse and chases the next growth to the live edge', () => {
+    const shrinks = [40, 40, 40, 40]
+    const growth = 80
+    let Hdom = 1400
+    let scrollTop = Math.max(0, Hdom - viewportHeight) - 24
+    let state = createResizePendingState()
+    const userGesture = false
+
+    expect(Math.max(0, Hdom - viewportHeight) - scrollTop).toBeGreaterThan(threshold)
+
+    for (const drop of shrinks) {
+      state = nextResizePendingOnMark(state)
+      const previousHeight = Hdom
+      const beforeScrollTop = scrollTop
+      Hdom -= drop
+      const maxScrollTop = Math.max(0, Hdom - viewportHeight)
+      if (scrollTop > maxScrollTop)
+        scrollTop = maxScrollTop
+      const layoutClamp = shouldTreatUpwardScrollAsLayoutClamp({
+        scrollHeightDelta: previousHeight - Hdom,
+        scrollTopDelta: beforeScrollTop - scrollTop,
+        threshold,
+      })
+      const scrolledUp = scrollTop < beforeScrollTop - SCROLL_EPSILON
+      const scrollHeightChanged = Math.abs(previousHeight - Hdom) > SCROLL_EPSILON
+      const distanceFromEnd = maxScrollTop - scrollTop
+      expect(state.pending).toBe(true)
+      expect(shouldExitFollowBottomOnUnarmedScroll({
+        distanceFromEnd,
+        layoutClamp,
+        programmatic: false,
+        resizePending: state.pending,
+        scrolledUp,
+        scrollHeightChanged,
+        threshold,
+        userGesture,
+      })).toBe(false)
+      expect(shouldExitFollowBottom({
+        autoscrolling: false,
+        distanceFromEnd,
+        programmatic: false,
+        scrolledUp,
+        threshold,
+        userGesture,
+      })).toBe(false)
+      const chased = chaseObservedHeight({
+        observedHeight: Hdom,
+        scrollTop,
+        viewportHeight,
+      })
+      scrollTop = chased.scrollTop
+      expect(chased.distanceFromEnd).toBe(0)
+      state = nextResizePendingOnFrame(state)
+      expect(state.pending).toBe(true)
+    }
+
+    state = nextResizePendingOnFrame(state)
+    expect(state.pending).toBe(false)
+
+    const previousHeight = Hdom
+    Hdom += growth
+    state = nextResizePendingOnMark(state)
+    const maxScrollTop = Math.max(0, Hdom - viewportHeight)
+    const offEnd = shouldChaseFollowBottomOnResize({
+      clientHeight: viewportHeight,
+      maxScrollTop,
+      scrollEpsilon: SCROLL_EPSILON,
+      scrollTop,
+    })
+    expect(state.pending).toBe(true)
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      distanceFromEnd: maxScrollTop - scrollTop,
+      layoutClamp: false,
+      programmatic: false,
+      resizePending: state.pending,
+      scrolledUp: false,
+      scrollHeightChanged: Math.abs(previousHeight - Hdom) > SCROLL_EPSILON,
+      threshold,
+      userGesture,
+    })).toBe(false)
+    expect(shouldChaseFollowBottom({ offEnd })).toBe(true)
+    const chased = chaseObservedHeight({
+      observedHeight: Hdom,
+      scrollTop,
+      viewportHeight,
+    })
+    expect(chased.distanceFromEnd).toBe(0)
+    expect(chased.settle).toBe(true)
   })
 })
 

@@ -2,6 +2,7 @@
 import type { HTMLAttributes } from "vue"
 import { onBeforeUnmount, onMounted, useTemplateRef } from "vue"
 import { cn } from "@/lib/utils"
+import { observeContentBoxResize } from "./observe-content-box-resize"
 import { useMessageScrollerContext } from "./useMessageScroller"
 
 const props = defineProps<{
@@ -12,7 +13,6 @@ const props = defineProps<{
 const {
   handleContentChange,
   handleContentResize,
-  markResizePending,
   setContentElement,
   setSpacerElement,
 } = useMessageScrollerContext()
@@ -22,7 +22,6 @@ const spacerRef = useTemplateRef<HTMLElement>("spacer")
 
 let mutationObserver: MutationObserver | null = null
 let resizeObserver: ResizeObserver | null = null
-let resizeFrame = 0
 
 onMounted(() => {
   const content = contentRef.value
@@ -38,18 +37,10 @@ onMounted(() => {
     mutationObserver.observe(content, { childList: true })
   }
 
-  if (typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(() => {
-      markResizePending()
-      window.cancelAnimationFrame(resizeFrame)
-      resizeFrame = window.requestAnimationFrame(handleContentResize)
-    })
-    resizeObserver.observe(content)
-  }
+  resizeObserver = observeContentBoxResize(content, handleContentResize)
 })
 
 onBeforeUnmount(() => {
-  window.cancelAnimationFrame(resizeFrame)
   mutationObserver?.disconnect()
   resizeObserver?.disconnect()
   mutationObserver = null

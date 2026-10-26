@@ -3,11 +3,14 @@ import { computed, getCurrentScope, inject, onMounted, onScopeDispose, provide, 
 import {
   clampReadingWindowScrollTop,
   computeWindowedIds,
+  createResizePendingState,
   DEFAULT_ITEM_HEIGHT,
   DEFAULT_OVERSCAN_PX,
   estimateItemsHeight,
   FALLBACK_VIEWPORT_HEIGHT,
   itemIdsEqual,
+  nextResizePendingOnFrame,
+  nextResizePendingOnMark,
   nextUpwardWheelAccumulator,
   normalizeWheelDeltaY,
   resolveFollowWindowScrollTop,
@@ -451,7 +454,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   let userScrollbarPointerHeld = false
   let upwardWheelPx = 0
   let nestedWheelPending = false
-  let resizePending = false
+  let resizePendingState = createResizePendingState()
   let programmaticScrollDepth = 0
   let defaultScrollPositionApplied = false
   let preserveScrollOnPrepend = true
@@ -503,9 +506,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     const scrolledUp = scrollTop < lastScrollTop - SCROLL_EPSILON
     const layoutClamp = isLayoutClampScroll()
     const scrollHeightChanged = Math.abs(lastScrollHeight - scrollHeight) > SCROLL_EPSILON
-    const pendingResize = resizePending
-    if (programmaticScrollDepth === 0)
-      consumeResizePending()
+    const pendingResize = resizePendingState.pending
     lastScrollTop = scrollTop
     lastScrollHeight = scrollHeight
     if (
@@ -1159,8 +1160,7 @@ function createEngine(props: MessageScrollerProviderProps) {
     // Already at the bottom must not call scrollToEnd: that retriggers
     // ResizeObserver. The window is chosen from the cached end, so scrolling
     // the viewport to the real DOM end does not collapse rows into
-    // placeholders. One follow-up frame catches a line that lands after
-    // this measurement. The follow-up does not schedule another frame.
+    // placeholders. A recheck does not schedule another frame.
     const offEnd = Boolean(
       viewport
       && shouldChaseFollowBottomOnResize({
@@ -1323,20 +1323,20 @@ function createEngine(props: MessageScrollerProviderProps) {
     }
   }
 
-  function consumeResizePending() {
-    if (!resizePending)
+  function scheduleResizePendingFrame() {
+    if (resizePendingClearFrame !== null)
       return
-    resizePending = false
-    cancelResizePendingClear()
+    resizePendingClearFrame = window.requestAnimationFrame(() => {
+      resizePendingClearFrame = null
+      resizePendingState = nextResizePendingOnFrame(resizePendingState)
+      if (resizePendingState.pending)
+        scheduleResizePendingFrame()
+    })
   }
 
   function markResizePending() {
-    resizePending = true
-    cancelResizePendingClear()
-    resizePendingClearFrame = window.requestAnimationFrame(() => {
-      resizePendingClearFrame = null
-      resizePending = false
-    })
+    resizePendingState = nextResizePendingOnMark(resizePendingState)
+    scheduleResizePendingFrame()
   }
 
   function armUserScrollSettleTimeout() {

@@ -29,6 +29,9 @@ import {
   shouldSettleScrollToEnd,
   shouldTreatAnchorAsUnhandled,
   isNestedOverflowY,
+  createResizePendingState,
+  nextResizePendingOnFrame,
+  nextResizePendingOnMark,
   nextUpwardWheelAccumulator,
   normalizeWheelDeltaY,
   shouldAddToUpwardWheelAccumulator,
@@ -1096,6 +1099,69 @@ describe('follow exit during height change', () => {
       scrollHeightChanged: false,
       userGesture: false,
     })).toBe(false)
+  })
+})
+
+describe('resizePending lifetime', () => {
+  const offEnd = {
+    distanceFromEnd: 24,
+    followingBottom: true,
+    layoutClamp: false,
+    programmatic: false,
+    scrolledUp: true,
+    threshold: 8,
+    userGesture: false,
+  } as const
+
+  it('stays pending on the frame after a resize', () => {
+    let state = createResizePendingState()
+    state = nextResizePendingOnMark(state)
+    state = nextResizePendingOnFrame(state)
+    expect(state.pending).toBe(true)
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...offEnd,
+      resizePending: state.pending,
+      scrollHeightChanged: false,
+    })).toBe(false)
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...offEnd,
+      resizePending: state.pending,
+      scrollHeightChanged: false,
+    })).toBe(true)
+  })
+
+  it('clears only after a frame with no resize', () => {
+    let state = createResizePendingState()
+    state = nextResizePendingOnMark(state)
+    state = nextResizePendingOnFrame(state)
+    expect(state.pending).toBe(true)
+    state = nextResizePendingOnFrame(state)
+    expect(state.pending).toBe(false)
+    expect(shouldExitFollowBottomOnUnarmedScroll({
+      ...offEnd,
+      resizePending: state.pending,
+      scrollHeightChanged: false,
+    })).toBe(true)
+    expect(shouldRecoverFollowAfterLayoutScroll({
+      ...offEnd,
+      resizePending: state.pending,
+      scrollHeightChanged: false,
+    })).toBe(false)
+  })
+
+  it('stays pending across consecutive resize frames', () => {
+    let state = createResizePendingState()
+    for (let frame = 0; frame < 6; frame += 1) {
+      state = nextResizePendingOnMark(state)
+      expect(state.pending).toBe(true)
+      state = nextResizePendingOnFrame(state)
+      expect(state.pending).toBe(true)
+      expect(shouldExitFollowBottomOnUnarmedScroll({
+        ...offEnd,
+        resizePending: state.pending,
+        scrollHeightChanged: false,
+      })).toBe(false)
+    }
   })
 })
 

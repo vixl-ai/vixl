@@ -353,6 +353,43 @@ export function shouldExitFollowBottomOnUnarmedScroll({
   return distanceFromEnd > threshold
 }
 
+export interface ResizePendingState {
+  pending: boolean
+  seenSinceTick: boolean
+}
+
+export function createResizePendingState(): ResizePendingState {
+  return {
+    pending: false,
+    seenSinceTick: false,
+  }
+}
+
+export function nextResizePendingOnMark(
+  state: ResizePendingState,
+): ResizePendingState {
+  void state
+  return {
+    pending: true,
+    seenSinceTick: true,
+  }
+}
+
+export function nextResizePendingOnFrame(
+  state: ResizePendingState,
+): ResizePendingState {
+  if (state.seenSinceTick) {
+    return {
+      pending: true,
+      seenSinceTick: false,
+    }
+  }
+  return {
+    pending: false,
+    seenSinceTick: false,
+  }
+}
+
 export function shouldTreatUpwardScrollAsLayoutClamp({
   scrollHeightDelta,
   scrollTopDelta,
