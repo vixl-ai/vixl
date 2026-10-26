@@ -4,6 +4,12 @@ import createModel from '@/services/providers/create-model'
 import { readChatMeta } from '@/services/vixl/vixl-tauri'
 import filterMessagesForActiveContext from '@/services/context/filter-messages-for-active-context'
 import {
+  clearPendingShellResume,
+  hasRunningParentBackgroundShells,
+  listDeliverableShellResults,
+  markShellResultsDelivered,
+} from '@/services/harness/shell/registry'
+import {
   clearPendingBackgroundResume,
   clearTurnResponseMessages,
   getTurnResponseMessages,
@@ -15,7 +21,9 @@ import {
 import resolveModelVision from '@/services/harness/resolve-model-vision'
 import dropTrailingAssistantMessages from '@/utils/drop-trailing-assistant-messages'
 import prepareMessagesForModelVision from '@/utils/prepare-messages-for-model-vision'
+import buildShellWakeNudge from './build-shell-wake-nudge'
 import buildWakeNudge from './build-wake-nudge'
+import { runningParentBackgroundShells, shellResultKey } from './shell-wake'
 import { finalizeBackgroundSpawnResults } from './finalize-background-spawns'
 import { patchSubagentToolResults } from './helpers'
 import loadResumeOverlay from './load-resume-overlay'
@@ -29,24 +37,28 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
     chatId,
     messages,
     completedResults,
+    shellResults = [],
     assistantId: inputAssistantId,
     onEvent,
     ...streamInput
   } = input
 
-  if (completedResults.length === 0) {
+  if (completedResults.length === 0 && shellResults.length === 0) {
     throw new Error('No completed subagent results to resume')
   }
 
   const turnMessages = getTurnResponseMessages(chatId)
 
-  const finalizedResults = await finalizeBackgroundSpawnResults(
-    workspace.projectSlug,
-    chatId,
-    completedResults,
-    onEvent,
-    turnMessages,
-  )
+  const finalizedResults =
+    completedResults.length === 0
+      ? []
+      : await finalizeBackgroundSpawnResults(
+          workspace.projectSlug,
+          chatId,
+          completedResults,
+          onEvent,
+          turnMessages,
+        )
 
   const overlay = loadResumeOverlay(chatId)
   const patchedTurnMessages = turnMessages
@@ -107,13 +119,50 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
       },
     })
   }
+
+  const alreadyDeliveredShell = new Set(loadResumeOverlay(chatId).deliveredResultKeys)
+  const alreadyPersistedShellResults = shellResults.filter((result) =>
+    alreadyDeliveredShell.has(shellResultKey(result)),
+  )
+  const shellWakeResults = shellResults.filter(
+    (result) => !alreadyDeliveredShell.has(shellResultKey(result)),
+  )
+  const shellWakeContent =
+    shellWakeResults.length > 0
+      ? buildShellWakeNudge(shellWakeResults, runningParentBackgroundShells(chatId))
+      : null
+  if (shellWakeContent) {
+    await persistResumeOverlay({
+      projectSlug: workspace.projectSlug,
+      chatId,
+      wake: {
+        content: shellWakeContent,
+        toolCallIds: shellWakeResults.map((result) => result.toolCallId),
+        resultKeys: shellWakeResults.map(shellResultKey),
+      },
+    })
+    markShellResultsDelivered(
+      chatId,
+      shellWakeResults.map((result) => result.toolCallId),
+    )
+  }
+  markShellResultsDelivered(
+    chatId,
+    alreadyPersistedShellResults.map((result) => result.toolCallId),
+  )
+
   const activeContextMeta = await readChatMeta(workspace.projectSlug, chatId).catch(() => null)
   const activeContext = activeContextMeta?.activeContext
   const { messages: contextMessages, checkpointText } = filterMessagesForActiveContext(
     messages,
     activeContext,
   )
-  const priorMessages = dropTrailingAssistantMessages(contextMessages)
+  const hasSpawnSnapshot =
+    Boolean(turnMessages && turnMessages.length > 0) ||
+    overlay.spawnMessages.length > 0
+  const priorMessages = hasSpawnSnapshot
+    ? dropTrailingAssistantMessages(contextMessages)
+    : contextMessages
   const visionModel = await createModel({
     providerId: input.providerId,
     modelId: input.modelId,
@@ -137,6 +186,18 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
     if (wakeContent) {
       modelMessages.push({ role: 'user', content: wakeContent })
     }
+    if (shellWakeContent) {
+      modelMessages.push({ role: 'user', content: shellWakeContent })
+    }
+    if (alreadyPersistedShellResults.length > 0) {
+      modelMessages.push({
+        role: 'user',
+        content: buildShellWakeNudge(
+          alreadyPersistedShellResults,
+          runningParentBackgroundShells(chatId),
+        ),
+      })
+    }
   } else {
     const persisted = loadResumeOverlay(chatId)
     modelMessages.push(
@@ -154,6 +215,12 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
     listDeliverableBackgroundResults(chatId).length === 0
   ) {
     clearPendingBackgroundResume(chatId)
+  }
+  if (
+    !hasRunningParentBackgroundShells(chatId) &&
+    listDeliverableShellResults(chatId).length === 0
+  ) {
+    clearPendingShellResume(chatId)
   }
 
   const lastUser = [...messages].reverse().find((message) => message.role === 'user')

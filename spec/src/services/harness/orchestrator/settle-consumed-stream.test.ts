@@ -1,6 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LanguageModelUsage, ModelMessage } from 'ai'
+import { mockTauriEvent } from '../../../test-utils/mocks/tauri-event'
+import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
+
+vi.mock('vue-sonner', () => ({
+  toast: { error: vi.fn<() => void>(), success: vi.fn<() => void>() },
+}))
+
+vi.mock('@tauri-apps/api/event', () => mockTauriEvent())
+vi.mock('@/services/vixl/vixl-tauri', () => mockVixlTauri())
+
 import { settleConsumedStream } from '@/services/harness/orchestrator/settle-consumed-stream'
+import {
+  createAgentShell,
+  resetAgentShellRegistryForTests,
+} from '@/services/harness/shell/registry'
 import {
   getTurnResponseMessages,
   register,
@@ -9,10 +23,6 @@ import {
   setTurnResponseMessages,
 } from '@/services/harness/subagent/registry'
 
-vi.mock('vue-sonner', () => ({
-  toast: { error: vi.fn<() => void>(), success: vi.fn<() => void>() },
-}))
-
 const spawnResultMessage = (toolCallId: string): ModelMessage => ({
   role: 'tool',
   content: [
@@ -20,6 +30,18 @@ const spawnResultMessage = (toolCallId: string): ModelMessage => ({
       type: 'tool-result',
       toolCallId,
       toolName: 'spawn_subagent',
+      output: { type: 'json', value: { pending: true } },
+    },
+  ],
+})
+
+const shellResultMessage = (toolCallId: string): ModelMessage => ({
+  role: 'tool',
+  content: [
+    {
+      type: 'tool-result',
+      toolCallId,
+      toolName: 'run_terminal',
       output: { type: 'json', value: { pending: true } },
     },
   ],
@@ -75,6 +97,7 @@ const settle = async (args: {
 describe('settleConsumedStream turn snapshot capture', () => {
   beforeEach(() => {
     resetSubagentRegistryForTests()
+    resetAgentShellRegistryForTests()
   })
 
   it('does not capture a non-spawn user turn while a pending wake is still set', async () => {
@@ -149,6 +172,58 @@ describe('settleConsumedStream turn snapshot capture', () => {
 
     await settle({
       responseMessages: [{ role: 'assistant', content: 'later user reply' }],
+    })
+
+    expect(getTurnResponseMessages('chat-1')).toEqual(wave1)
+  })
+
+  it('captures the snapshot when this turn started a parent background shell', async () => {
+    await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm test',
+      toolCallId: 'tc-shell',
+      background: true,
+      wakeParent: true,
+    })
+    const responseMessages = [shellResultMessage('tc-shell')]
+
+    await settle({ responseMessages })
+
+    expect(getTurnResponseMessages('chat-1')).toEqual(responseMessages)
+  })
+
+  it('does not capture a later turn that omits the parent background shell tool call', async () => {
+    await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm test',
+      toolCallId: 'tc-shell',
+      background: true,
+      wakeParent: true,
+    })
+
+    await settle({
+      responseMessages: [{ role: 'assistant', content: 'later user reply' }],
+    })
+
+    expect(getTurnResponseMessages('chat-1')).toBeNull()
+  })
+
+  it('does not overwrite a snapshot already captured for a parent background shell', async () => {
+    await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm test',
+      toolCallId: 'tc-shell',
+      background: true,
+      wakeParent: true,
+    })
+    const wave1 = [{ role: 'assistant' as const, content: 'spawn-wave' }]
+    setTurnResponseMessages('chat-1', wave1)
+
+    await settle({
+      responseMessages: [shellResultMessage('tc-shell')],
     })
 
     expect(getTurnResponseMessages('chat-1')).toEqual(wave1)

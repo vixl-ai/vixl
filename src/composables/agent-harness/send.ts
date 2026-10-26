@@ -14,13 +14,10 @@ import { loadEffectiveSettings } from '@/services/config/vixl-config'
 import normalizeAttachmentFiles from '@/utils/normalize-attachment-files'
 import appendSendUserMessage from './append-send-user-message'
 import applyParentTurnStart from './apply-parent-turn-start'
-import collectPrefinishedBackgroundResults, {
-  commitPrefinishedBackgroundResults,
-} from './collect-prefinished-background-results'
 import deferOverlappingParentTurn from './defer-overlapping-parent-turn'
 import enqueueComposerSend from './enqueue-composer-send'
 import handleSendCatch from './handle-send-catch'
-import runParentOrchestrator from './run-parent-orchestrator'
+import runParentWithPrefinished from './run-parent-with-prefinished'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
 export type SendArgs = {
@@ -242,13 +239,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
       }
       turnStarted = true
       suppressQueueDrainAfterStop.value = false
-      const prefinishedBackgroundResults = collectPrefinishedBackgroundResults(
-        options.chatId,
-        args.internal,
-        resumingBackgroundBatch.value,
-      )
-
-      await runParentOrchestrator({
+      await runParentWithPrefinished({
         workspace: options,
         projectSlug: options.projectSlug,
         chatId: options.chatId,
@@ -274,14 +265,9 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         sessionAllows: state.sessionAllows,
         sessionDenies: state.sessionDenies,
         continueTurnId: args.continueTurnId,
-        ...(prefinishedBackgroundResults
-          ? { prefinishedBackgroundResults }
-          : {}),
+        internal: args.internal,
+        resumingBackgroundBatch: resumingBackgroundBatch.value,
       })
-      commitPrefinishedBackgroundResults(
-        options.chatId,
-        prefinishedBackgroundResults,
-      )
       status.value = 'ready'
       session.finishAgentTurn()
       attention.applyTurnEndAttention('success')

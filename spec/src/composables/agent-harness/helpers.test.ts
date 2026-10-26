@@ -1,10 +1,28 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import type { AgentHarnessState } from '@/composables/agent-harness/types'
+
+const hasPendingShellResume = vi.hoisted(() =>
+  vi.fn<(chatId: string) => boolean>(() => false),
+)
+const hasRunningParentBackgroundShells = vi.hoisted(() =>
+  vi.fn<(chatId: string) => boolean>(() => false),
+)
+const listDeliverableShellResults = vi.hoisted(() =>
+  vi.fn<(chatId: string) => unknown[]>(() => []),
+)
 
 vi.mock('@/services/harness/subagent/registry', () => ({
   hasPendingBackgroundResume: () => false,
   hasRunningSubagentsForChat: () => false,
+}))
+
+vi.mock('@/services/harness/shell/registry', () => ({
+  hasPendingShellResume: (chatId: string) => hasPendingShellResume(chatId),
+  hasRunningParentBackgroundShells: (chatId: string) =>
+    hasRunningParentBackgroundShells(chatId),
+  listDeliverableShellResults: (chatId: string) =>
+    listDeliverableShellResults(chatId),
 }))
 
 vi.mock('@/services/vixl/vixl-tauri', () => ({
@@ -60,5 +78,34 @@ describe('agent-harness helpers isParentBusy', () => {
   it('is true while streaming even if not compacting', () => {
     const attention = createHelpers(buildState({ status: 'streaming' }))
     expect(attention.isParentBusy()).toBe(true)
+  })
+})
+
+describe('agent-harness helpers isWaitingOnBackground', () => {
+  beforeEach(() => {
+    hasPendingShellResume.mockReturnValue(false)
+    hasRunningParentBackgroundShells.mockReturnValue(false)
+    listDeliverableShellResults.mockReturnValue([])
+  })
+
+  it('is waiting when a parent background shell resume is pending', () => {
+    hasPendingShellResume.mockReturnValue(true)
+    const attention = createHelpers(buildState({ status: 'ready' }))
+    expect(attention.isParentBusy()).toBe(false)
+    expect(attention.isFullyIdle()).toBe(false)
+  })
+
+  it('is waiting when a parent background shell is still running', () => {
+    hasRunningParentBackgroundShells.mockReturnValue(true)
+    const attention = createHelpers(buildState({ status: 'ready' }))
+    expect(attention.isParentBusy()).toBe(false)
+    expect(attention.isFullyIdle()).toBe(false)
+  })
+
+  it('is waiting when a shell result is undelivered', () => {
+    listDeliverableShellResults.mockReturnValue([{ toolCallId: 'tc-1' }])
+    const attention = createHelpers(buildState({ status: 'ready' }))
+    expect(attention.isParentBusy()).toBe(false)
+    expect(attention.isFullyIdle()).toBe(false)
   })
 })

@@ -3,7 +3,10 @@ import { computed, ref, shallowRef, type Ref } from 'vue'
 import type { AgentHarnessState, AttentionHelpers } from '@/composables/agent-harness/types'
 import type { PendingQuestionState } from '@/types/chat/pending-question'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import { mockTauriEvent } from '../../test-utils/mocks/tauri-event'
 import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
+
+vi.mock('@tauri-apps/api/event', () => mockTauriEvent())
 
 const updateChatMeta = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>(),

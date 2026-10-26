@@ -87,6 +87,57 @@ describe('agent-shell-registry', () => {
     expect(getAgentShell(shell.shellId)?.description).toBeUndefined()
   })
 
+  it('rolls back a wakeParent create when spawn fails', async () => {
+    shellSpawnTracked.mockRejectedValueOnce(new Error('spawn failed'))
+    const { createAgentShell, listShellsForChat, hasPendingShellResume } =
+      await import('@/services/harness/shell/registry')
+
+    await expect(
+      createAgentShell({
+        chatId: 'chat-1',
+        projectRoot: '/project',
+        command: 'npm test',
+        background: true,
+        wakeParent: true,
+      }),
+    ).rejects.toThrow('spawn failed')
+
+    expect(listShellsForChat('chat-1')).toEqual([])
+    expect(hasPendingShellResume('chat-1')).toBe(false)
+  })
+
+  it('keeps pending resume when a later wakeParent create fails', async () => {
+    const {
+      createAgentShell,
+      listShellsForChat,
+      hasPendingShellResume,
+    } = await import('@/services/harness/shell/registry')
+
+    const first = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run dev',
+      background: true,
+      wakeParent: true,
+    })
+    shellSpawnTracked.mockRejectedValueOnce(new Error('spawn failed'))
+
+    await expect(
+      createAgentShell({
+        chatId: 'chat-1',
+        projectRoot: '/project',
+        command: 'npm test',
+        background: true,
+        wakeParent: true,
+      }),
+    ).rejects.toThrow('spawn failed')
+
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+    expect(listShellsForChat('chat-1').map((shell) => shell.shellId)).toEqual([
+      first.shellId,
+    ])
+  })
+
   it('tails shell output to the last N lines', async () => {
     const { tailShellOutput } = await import('@/services/harness/shell/registry')
 
@@ -101,6 +152,8 @@ describe('agent-shell-registry', () => {
       exitCode: null,
       exitSignal: null,
       startedAt: new Date().toISOString(),
+      background: false,
+      wakeParent: false,
     }
 
     const output = tailShellOutput(shell, 2)
@@ -293,5 +346,331 @@ describe('agent-shell-registry', () => {
     await killAgentShell(shell.shellId)
 
     expect(runningShells.value).toEqual([])
+  })
+
+  it('queues a clipped deliverable once when a parent background shell exits', async () => {
+    const { clipTerminalOutput } = await import('@/utils/clip-terminal-output')
+    type OutputListener = (event: {
+      payload: { shellId: string; stream: 'stdout' | 'stderr'; data: string }
+    }) => void
+    let exitHandler: ExitListener | undefined
+    let outputHandler: OutputListener | undefined
+    listen.mockImplementation(async (event, handler: ExitListener | OutputListener) => {
+      if (event.startsWith('shell-exit-')) {
+        exitHandler = handler as ExitListener
+      }
+      if (event.startsWith('shell-output-')) {
+        outputHandler = handler as OutputListener
+      }
+      return () => {}
+    })
+
+    const {
+      createAgentShell,
+      listDeliverableShellResults,
+      markShellResultsDelivered,
+      hasPendingShellResume,
+      clearPendingShellResume,
+      hasRunningParentBackgroundShells,
+    } = await import('@/services/harness/shell/registry')
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run build',
+      description: 'Build the app',
+      toolCallId: 'tc-bg',
+      background: true,
+      wakeParent: true,
+    })
+
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+    expect(hasRunningParentBackgroundShells('chat-1')).toBe(true)
+
+    const hugeStdout = `out-${'x'.repeat(40_000)}`
+    const hugeStderr = `err-${'y'.repeat(40_000)}`
+    outputHandler?.({
+      payload: { shellId: shell.shellId, stream: 'stdout', data: hugeStdout },
+    })
+    outputHandler?.({
+      payload: { shellId: shell.shellId, stream: 'stderr', data: hugeStderr },
+    })
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    const queued = listDeliverableShellResults('chat-1')
+    expect(queued).toEqual([
+      {
+        toolCallId: 'tc-bg',
+        shellId: shell.shellId,
+        command: 'npm run build',
+        description: 'Build the app',
+        exitCode: 0,
+        stdout: clipTerminalOutput(hugeStdout),
+        stderr: clipTerminalOutput(hugeStderr),
+      },
+    ])
+    expect(queued[0]?.stdout).not.toBe(hugeStdout)
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+    expect(hasRunningParentBackgroundShells('chat-1')).toBe(false)
+
+    clearPendingShellResume('chat-1')
+    expect(hasPendingShellResume('chat-1')).toBe(false)
+    expect(listDeliverableShellResults('chat-1')).toHaveLength(1)
+
+    markShellResultsDelivered('chat-1', ['tc-bg'])
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+  })
+
+  it('discards a queued parent background result when killing shells for a chat', async () => {
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (event.startsWith('shell-exit-')) {
+        exitHandler = handler
+      }
+      return () => {}
+    })
+
+    const {
+      createAgentShell,
+      killShellsForChat,
+      listDeliverableShellResults,
+      hasPendingShellResume,
+    } = await import('@/services/harness/shell/registry')
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm test',
+      toolCallId: 'tc-stop',
+      background: true,
+      wakeParent: true,
+    })
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    expect(listDeliverableShellResults('chat-1')).toHaveLength(1)
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+
+    await killShellsForChat('chat-1')
+
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+    expect(hasPendingShellResume('chat-1')).toBe(false)
+  })
+
+  it('keeps a queued parent background result when keepBackground is set', async () => {
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (event.startsWith('shell-exit-')) {
+        exitHandler = handler
+      }
+      return () => {}
+    })
+
+    const {
+      createAgentShell,
+      killShellsForChat,
+      listDeliverableShellResults,
+      hasPendingShellResume,
+    } = await import('@/services/harness/shell/registry')
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm test',
+      toolCallId: 'tc-keep',
+      background: true,
+      wakeParent: true,
+    })
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    expect(listDeliverableShellResults('chat-1')).toHaveLength(1)
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+
+    await killShellsForChat('chat-1', { keepBackground: true })
+
+    expect(listDeliverableShellResults('chat-1')).toHaveLength(1)
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+  })
+
+  it('does not queue a result when a foreground shell exits', async () => {
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (event.startsWith('shell-exit-')) {
+        exitHandler = handler
+      }
+      return () => {}
+    })
+
+    const {
+      createAgentShell,
+      listDeliverableShellResults,
+      hasPendingShellResume,
+      hasRunningParentBackgroundShells,
+    } = await import('@/services/harness/shell/registry')
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'echo hello',
+      toolCallId: 'tc-fg',
+      background: false,
+      wakeParent: false,
+    })
+
+    expect(hasPendingShellResume('chat-1')).toBe(false)
+    expect(hasRunningParentBackgroundShells('chat-1')).toBe(false)
+
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+  })
+
+  it('does not queue when waitForShellExit already has a waiter', async () => {
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (event.startsWith('shell-exit-')) {
+        exitHandler = handler
+      }
+      return () => {}
+    })
+
+    const {
+      createAgentShell,
+      waitForShellExit,
+      listDeliverableShellResults,
+    } = await import('@/services/harness/shell/registry')
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'sleep 1',
+      toolCallId: 'tc-wait',
+      background: true,
+      wakeParent: true,
+    })
+
+    const waitPromise = waitForShellExit(shell.shellId)
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0, signal: 15 },
+    })
+
+    await expect(waitPromise).resolves.toEqual({
+      exitCode: 0,
+      signal: 15,
+      timedOut: false,
+    })
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+  })
+
+  it('does not queue when killAgentShell stops a parent background shell', async () => {
+    const {
+      createAgentShell,
+      killAgentShell,
+      listDeliverableShellResults,
+      hasPendingShellResume,
+    } = await import('@/services/harness/shell/registry')
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'sleep 10',
+      toolCallId: 'tc-kill',
+      background: true,
+      wakeParent: true,
+    })
+
+    await killAgentShell(shell.shellId)
+
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+  })
+
+  it('does not queue when the exit listener wins the kill race', async () => {
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (event.startsWith('shell-exit-')) {
+        exitHandler = handler
+      }
+      return () => {}
+    })
+    shellKillTracked.mockRejectedValueOnce(new Error('Shell not found'))
+
+    const {
+      createAgentShell,
+      killAgentShell,
+      listDeliverableShellResults,
+    } = await import('@/services/harness/shell/registry')
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'sleep 10',
+      toolCallId: 'tc-race',
+      background: true,
+      wakeParent: true,
+    })
+
+    const killPromise = killAgentShell(shell.shellId)
+    await Promise.resolve()
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    await killPromise
+
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+  })
+
+  it('does not queue when a still-running subagent owns the shell', async () => {
+    const { register, resetSubagentRegistryForTests } = await import(
+      '@/services/harness/subagent/registry'
+    )
+    resetSubagentRegistryForTests()
+    register('chat-1', 'bg-1', new AbortController(), {
+      toolCallId: 'tc-sub',
+      agentName: 'background',
+    })
+
+    try {
+      let exitHandler: ExitListener | undefined
+      listen.mockImplementation(async (event, handler) => {
+        if (event.startsWith('shell-exit-')) {
+          exitHandler = handler
+        }
+        return () => {}
+      })
+
+      const { createAgentShell, listDeliverableShellResults } = await import(
+        '@/services/harness/shell/registry'
+      )
+
+      const shell = await createAgentShell({
+        chatId: 'chat-1',
+        projectRoot: '/project',
+        command: 'sleep 2',
+        toolCallId: 'tc-owned',
+        background: true,
+        wakeParent: true,
+        subagentId: 'bg-1',
+      })
+
+      exitHandler?.({
+        payload: { shellId: shell.shellId, exitCode: 0 },
+      })
+
+      expect(listDeliverableShellResults('chat-1')).toEqual([])
+    } finally {
+      resetSubagentRegistryForTests()
+    }
   })
 })

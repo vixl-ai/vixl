@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { noPoll, visibleStatus } from '@/services/harness/guidance'
 
 describe('harness guidance clauses', () => {
-  it('ends the turn instead of polling and says the harness resumes as each background subagent finishes', () => {
+  it('ends the turn instead of polling and says the harness resumes for subagents and terminals', () => {
     expect(noPoll).toContain('End the turn and wait')
-    expect(noPoll).toContain('as each background subagent finishes')
+    expect(noPoll).toContain('when a background subagent finishes')
+    expect(noPoll).toContain('when a background terminal exits')
     expect(noPoll).toContain('progress checks through tools')
-    expect(noPoll).toContain('terminal_output reads only run_terminal shell_id values')
+    expect(noPoll).toContain(
+      'terminal_output reads output for a run_terminal shell id before that shell exits',
+    )
+    expect(noPoll).toContain('it is not how you wait for completion')
   })
 
   it('requires a one-line visible status for spawned, steered, and finished work', () => {

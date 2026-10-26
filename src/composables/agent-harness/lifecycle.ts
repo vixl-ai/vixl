@@ -10,7 +10,10 @@ import {
   rejectPendingForChat,
   rejectPendingForSubagent,
 } from '@/services/harness/permission/approval-gate'
-import { killShellsForChat } from '@/services/harness/shell/registry'
+import {
+  discardShellWakeForChat,
+  killShellsForChat,
+} from '@/services/harness/shell/registry'
 import {
   rejectPendingMcpAuthForChat,
   rejectPendingMcpAuthForSubagent,
@@ -95,6 +98,7 @@ export default (
       : runningIds
     if (!keepBackground) {
       abortSubagentsForChat(options.chatId)
+      discardShellWakeForChat(options.chatId)
     }
     for (const subagentId of stoppedIds) {
       session.clearLocalQueuedSubagentSteers(subagentId)

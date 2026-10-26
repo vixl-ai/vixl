@@ -2,6 +2,11 @@ import { toast } from 'vue-sonner'
 import type { ChatAttention } from '@/types/chat/chat-attention'
 import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import {
+  hasPendingShellResume,
+  hasRunningParentBackgroundShells,
+  listDeliverableShellResults,
+} from '@/services/harness/shell/registry'
+import {
   hasPendingBackgroundResume,
   hasRunningSubagentsForChat,
 } from '@/services/harness/subagent/registry'
@@ -22,7 +27,10 @@ export default (state: AgentHarnessState): AttentionHelpers => {
 
   const isWaitingOnBackground = (): boolean =>
     hasPendingBackgroundResume(options.chatId) ||
-    hasRunningSubagentsForChat(options.chatId)
+    hasRunningSubagentsForChat(options.chatId) ||
+    hasPendingShellResume(options.chatId) ||
+    hasRunningParentBackgroundShells(options.chatId) ||
+    listDeliverableShellResults(options.chatId).length > 0
 
   const isFullyIdle = (): boolean => !isParentBusy() && !isWaitingOnBackground()
 

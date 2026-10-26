@@ -121,6 +121,7 @@ export default () => {
   const isWaitingOnBackground = computed(
     () =>
       subagentRegistryRevision.value >= 0 &&
+      agentShellRevision.value >= 0 &&
       (harness.value?.isWaitingOnBackground() ?? false),
   )
   const runningSubagents = computed(() => {

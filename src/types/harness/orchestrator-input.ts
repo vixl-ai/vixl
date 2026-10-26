@@ -5,6 +5,7 @@ import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { HarnessWorkspace } from '@/types/harness/harness-workspace'
 import type { PermissionCapabilityKey, PermissionLevel } from '@/types/harness/permission'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
+import type { ShellWakeResult } from '@/types/harness/agent-shell'
 import type { SubagentResult } from '@/types/harness/subagent-record'
 import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
 
@@ -40,6 +41,7 @@ export type OrchestratorInput = {
   // Finished, undelivered background results snapped before a user-turn flush.
   // The user turn includes them via the same wake nudge as resumeOrchestrator.
   prefinishedBackgroundResults?: Array<{ toolCallId: string; result: SubagentResult }>
+  prefinishedShellResults?: ShellWakeResult[]
 }
 
 export type ResumeOrchestratorInput = Omit<
@@ -47,6 +49,7 @@ export type ResumeOrchestratorInput = Omit<
   'userText' | 'skipUserPersist'
 > & {
   completedResults: Array<{ toolCallId: string; result: SubagentResult }>
+  shellResults?: ShellWakeResult[]
   skipUserPersist: true
 }
 

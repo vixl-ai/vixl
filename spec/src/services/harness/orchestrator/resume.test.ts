@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ResumeOrchestratorInput } from '@/types/harness/orchestrator-input'
+import { mockTauriEvent } from '../../../test-utils/mocks/tauri-event'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
+
+const listen = vi.hoisted(() =>
+  vi.fn<(event: string, handler: unknown) => Promise<() => void>>(
+    async () => () => {},
+  ),
+)
+
+vi.mock('@tauri-apps/api/event', () => mockTauriEvent({ listen }))
 
 const runHarnessStream = vi.hoisted(() =>
   vi.fn<(input: { captureTurnMessages: boolean; chatId: string; modelMessages: unknown[] }) => Promise<void>>(),
@@ -55,8 +64,17 @@ vi.mock('@/services/harness/orchestrator/stream', () => ({
 
 import { persistLine, persistToolRun } from '@/services/harness/orchestrator/persistence'
 import { finalizeBackgroundSpawnResults } from '@/services/harness/orchestrator/finalize-background-spawns'
+import persistResumeOverlay from '@/services/harness/orchestrator/persist-resume-overlay'
 import resumeOrchestrator from '@/services/harness/orchestrator/resume'
 import resetResumeOverlay from '@/services/harness/orchestrator/reset-resume-overlay'
+import buildShellWakeNudge from '@/services/harness/orchestrator/build-shell-wake-nudge'
+import { shellResultKey } from '@/services/harness/orchestrator/shell-wake'
+import {
+  createAgentShell,
+  hasPendingShellResume,
+  listDeliverableShellResults,
+  resetAgentShellRegistryForTests,
+} from '@/services/harness/shell/registry'
 import { isBackgroundResultDelivered } from '@/services/harness/subagent/background-result-sets'
 import {
   abortOne,
@@ -77,6 +95,7 @@ const wave2Messages = [{ role: 'assistant' as const, content: 'wave-2' }]
 
 const buildInput = (
   completedResults: ResumeOrchestratorInput['completedResults'],
+  extras: Partial<ResumeOrchestratorInput> = {},
 ): ResumeOrchestratorInput =>
   ({
     workspace: {
@@ -106,12 +125,14 @@ const buildInput = (
     skipUserPersist: true,
     sessionAllows: new Set<string>(),
     sessionDenies: new Set<string>(),
+    ...extras,
   }) as ResumeOrchestratorInput
 
 describe('resumeOrchestrator background waves', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     resetSubagentRegistryForTests()
+    resetAgentShellRegistryForTests()
     resetResumeOverlay()
     runHarnessStream.mockResolvedValue(undefined)
   })
@@ -1168,6 +1189,245 @@ describe('resumeOrchestrator background waves', () => {
     expect(wakeNudge?.content).toContain('[harness: background subagent results]')
     expect(wakeNudge?.content).toContain(
       '- explorer (sub-1, completed): mapped the repo',
+    )
+  })
+
+  it('keeps a captured parent shell tool result and appends one shell nudge', async () => {
+    const shellResult = {
+      toolCallId: 'tc-shell',
+      shellId: 'sh-finished',
+      command: 'npm test',
+      description: 'Run tests',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    }
+    setTurnResponseMessages('chat-1', [
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'tc-shell',
+            toolName: 'run_terminal',
+            output: { type: 'json', value: { pending: true } },
+          },
+        ],
+      },
+    ])
+
+    await resumeOrchestrator(buildInput([], { shellResults: [shellResult] }))
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content:
+        | string
+        | Array<{
+            type: string
+            toolCallId?: string
+          }>
+    }>
+    expect(JSON.stringify(modelMessages)).toContain('tc-shell')
+    const shellNudges = modelMessages.filter(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.includes('[harness: background terminal results]'),
+    )
+    expect(shellNudges).toHaveLength(1)
+  })
+
+  it('resumes with only a shell result and includes the shell nudge', async () => {
+    const shellResult = {
+      toolCallId: 'tc-shell',
+      shellId: 'sh-finished',
+      command: 'npm test',
+      description: 'Run tests',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    }
+
+    await resumeOrchestrator(
+      buildInput([], { shellResults: [shellResult] }),
+    )
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: string
+    }>
+    const wakeNudge = modelMessages[modelMessages.length - 1]
+    expect(wakeNudge?.role).toBe('user')
+    expect(wakeNudge?.content).toContain('[harness: background terminal results]')
+    expect(wakeNudge?.content).toContain('sh-finished')
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+  })
+
+  it('delivers an overlay-persisted shell result once after a failed user turn', async () => {
+    type ExitListener = (event: {
+      payload: { shellId: string; exitCode: number; signal?: number }
+    }) => void
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (typeof event === 'string' && event.startsWith('shell-exit-')) {
+        exitHandler = handler as ExitListener
+      }
+      return () => {}
+    })
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/tmp/proj',
+      command: 'npm test',
+      description: 'Run tests',
+      toolCallId: 'tc-shell',
+      background: true,
+      wakeParent: true,
+    })
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    const queued = listDeliverableShellResults('chat-1')
+    const result = queued[0]
+    if (!result) {
+      throw new Error('expected a deliverable shell result')
+    }
+    const wakeContent = buildShellWakeNudge([result], [])
+    await persistResumeOverlay({
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      wake: {
+        content: wakeContent,
+        toolCallIds: [result.toolCallId],
+        resultKeys: [shellResultKey(result)],
+      },
+    })
+    expect(listDeliverableShellResults('chat-1')).toEqual([result])
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+
+    await resumeOrchestrator(buildInput([], { shellResults: queued }))
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: string
+    }>
+    const shellNudges = modelMessages.filter(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.includes('[harness: background terminal results]'),
+    )
+    expect(shellNudges).toHaveLength(1)
+    expect(shellNudges[0]?.content).toContain(shell.shellId)
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+    expect(hasPendingShellResume('chat-1')).toBe(false)
+
+    await expect(
+      resumeOrchestrator(
+        buildInput([], {
+          shellResults: listDeliverableShellResults('chat-1'),
+        }),
+      ),
+    ).rejects.toThrow('No completed subagent results to resume')
+  })
+
+  it('appends an overlay-persisted shell nudge when captured turn messages skip overlay replay', async () => {
+    type ExitListener = (event: {
+      payload: { shellId: string; exitCode: number; signal?: number }
+    }) => void
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (typeof event === 'string' && event.startsWith('shell-exit-')) {
+        exitHandler = handler as ExitListener
+      }
+      return () => {}
+    })
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/tmp/proj',
+      command: 'npm test',
+      description: 'Run tests',
+      toolCallId: 'tc-shell',
+      background: true,
+      wakeParent: true,
+    })
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    const queued = listDeliverableShellResults('chat-1')
+    const result = queued[0]
+    if (!result) {
+      throw new Error('expected a deliverable shell result')
+    }
+    await persistResumeOverlay({
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      wake: {
+        content: buildShellWakeNudge([result], []),
+        toolCallIds: [result.toolCallId],
+        resultKeys: [shellResultKey(result)],
+      },
+    })
+    setTurnResponseMessages('chat-1', wave1Messages)
+
+    await resumeOrchestrator(buildInput([], { shellResults: queued }))
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: string
+    }>
+    const shellNudges = modelMessages.filter(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.includes('[harness: background terminal results]'),
+    )
+    expect(shellNudges).toHaveLength(1)
+    expect(shellNudges[0]?.content).toContain(shell.shellId)
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+  })
+
+  it('names a still-running parent background shell in the resume nudge', async () => {
+    const running = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/tmp/proj',
+      command: 'npm run dev',
+      background: true,
+      wakeParent: true,
+    })
+    const shellResult = {
+      toolCallId: 'tc-shell',
+      shellId: 'sh-finished',
+      command: 'npm test',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    }
+
+    await resumeOrchestrator(
+      buildInput([], { shellResults: [shellResult] }),
+    )
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: string
+    }>
+    const wakeNudge = modelMessages[modelMessages.length - 1]
+    expect(wakeNudge?.content).toContain('Still running:')
+    expect(wakeNudge?.content).toContain(running.shellId)
+  })
+
+  it('throws when resume has neither subagent nor shell results', async () => {
+    await expect(resumeOrchestrator(buildInput([]))).rejects.toThrow(
+      'No completed subagent results to resume',
     )
   })
 })

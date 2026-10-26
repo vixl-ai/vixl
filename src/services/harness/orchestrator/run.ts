@@ -13,11 +13,15 @@ import {
 import { isDefaultChatTitle } from '@/utils/derive-chat-title'
 import resolveModelVision from '@/services/harness/resolve-model-vision'
 import prepareMessagesForModelVision from '@/utils/prepare-messages-for-model-vision'
+import buildShellWakeNudge from './build-shell-wake-nudge'
 import buildWakeNudge from './build-wake-nudge'
 import { finalizeBackgroundSpawnResults } from './finalize-background-spawns'
 import { nowIso } from './helpers'
+import loadResumeOverlay from './load-resume-overlay'
+import persistResumeOverlay from './persist-resume-overlay'
 import { persistLine } from './persistence'
 import resolveLiveWorkspace from './resolve-workspace'
+import { runningParentBackgroundShells, shellResultKey } from './shell-wake'
 import runHarnessStream from './stream'
 
 export default async (input: OrchestratorInput): Promise<void> => {
@@ -30,6 +34,7 @@ export default async (input: OrchestratorInput): Promise<void> => {
     skipUserPersist = false,
     assistantId: inputAssistantId,
     prefinishedBackgroundResults,
+    prefinishedShellResults,
     ...streamInput
   } = input
 
@@ -145,6 +150,7 @@ export default async (input: OrchestratorInput): Promise<void> => {
     : recentModelMessages
 
   let modelMessages = effectiveModelMessages
+  const extraWakes: ModelMessage[] = []
   if (prefinishedBackgroundResults && prefinishedBackgroundResults.length > 0) {
     const finalizedResults = await finalizeBackgroundSpawnResults(
       workspace.projectSlug,
@@ -161,7 +167,7 @@ export default async (input: OrchestratorInput): Promise<void> => {
           name: record.agentName.trim() || record.subagentId,
           subagentId: record.subagentId,
         }))
-      const wakeNudge: ModelMessage = {
+      extraWakes.push({
         role: 'user',
         content: buildWakeNudge(
           finalizedResults.map((item) => ({
@@ -177,9 +183,33 @@ export default async (input: OrchestratorInput): Promise<void> => {
             summariesInline: true,
           },
         ),
-      }
-      modelMessages = [...effectiveModelMessages, wakeNudge]
+      })
     }
+  }
+  if (prefinishedShellResults && prefinishedShellResults.length > 0) {
+    const alreadyDelivered = new Set(loadResumeOverlay(chatId).deliveredResultKeys)
+    const unseenShellResults = prefinishedShellResults.filter(
+      (result) => !alreadyDelivered.has(shellResultKey(result)),
+    )
+    const running = runningParentBackgroundShells(chatId)
+    if (unseenShellResults.length > 0) {
+      await persistResumeOverlay({
+        projectSlug: workspace.projectSlug,
+        chatId,
+        wake: {
+          content: buildShellWakeNudge(unseenShellResults, running),
+          toolCallIds: unseenShellResults.map((result) => result.toolCallId),
+          resultKeys: unseenShellResults.map(shellResultKey),
+        },
+      })
+    }
+    extraWakes.push({
+      role: 'user',
+      content: buildShellWakeNudge(prefinishedShellResults, running),
+    })
+  }
+  if (extraWakes.length > 0) {
+    modelMessages = [...effectiveModelMessages, ...extraWakes]
   }
 
   await runHarnessStream({

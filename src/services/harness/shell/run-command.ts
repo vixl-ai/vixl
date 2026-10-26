@@ -36,6 +36,7 @@ export const runTerminalCommand = async (
     projectWritable?: boolean
     projectRoot?: string
     cwdSlug?: string
+    toolCallId: string
   },
 ): Promise<Record<string, unknown>> => {
   if (ctx.signal?.aborted) {
@@ -62,6 +63,9 @@ export const runTerminalCommand = async (
       ...(projectRoots ? { projectRoots } : {}),
       ...(ctx.subagentId ? { subagentId: ctx.subagentId } : {}),
       ...(args.description ? { description: args.description } : {}),
+      toolCallId: args.toolCallId,
+      background: args.is_background === true,
+      wakeParent: args.is_background === true && !ctx.subagentId,
     })
 
     if (args.is_background) {
