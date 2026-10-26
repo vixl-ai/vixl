@@ -60,8 +60,11 @@ vi.mock('@/services/harness/resolve-model-vision', () => ({
 }))
 
 import { visibleStatus } from '@/services/harness/guidance'
+import buildShellWakeNudge from '@/services/harness/orchestrator/build-shell-wake-nudge'
+import persistResumeOverlay from '@/services/harness/orchestrator/persist-resume-overlay'
 import runOrchestrator from '@/services/harness/orchestrator/run'
 import resetResumeOverlay from '@/services/harness/orchestrator/reset-resume-overlay'
+import { shellResultKey } from '@/services/harness/orchestrator/shell-wake'
 import { resetAgentShellRegistryForTests } from '@/services/harness/shell/registry'
 import {
   fail,
@@ -539,5 +542,54 @@ describe('orchestrator run user persist', () => {
     expect(wakeNudge?.role).toBe('user')
     expect(wakeNudge?.content).toContain('[harness: background terminal results]')
     expect(wakeNudge?.content).toContain('sh-finished')
+  })
+
+  it('still appends a prefinished shell nudge when the overlay already has that result', async () => {
+    const shellResult = {
+      toolCallId: 'tc-shell',
+      shellId: 'sh-finished',
+      command: 'npm test',
+      description: 'Run tests',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    }
+    const wakeContent = buildShellWakeNudge([shellResult], [])
+    await persistResumeOverlay({
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      wake: {
+        content: wakeContent,
+        toolCallIds: [shellResult.toolCallId],
+        resultKeys: [shellResultKey(shellResult)],
+      },
+    })
+    persistLine.mockClear()
+
+    await runOrchestrator(
+      buildInput({
+        appendedUserMessageId: 'user-1',
+        userText: '',
+        prefinishedShellResults: [shellResult],
+      }),
+    )
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0] as {
+      modelMessages: Array<{ role: string; content: string }>
+    }
+    const shellNudges = streamInput.modelMessages.filter(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.includes('[harness: background terminal results]'),
+    )
+    expect(shellNudges).toHaveLength(1)
+    expect(shellNudges[0]?.content).toContain('sh-finished')
+    expect(
+      persistLine.mock.calls.some((call) => {
+        const line = call[2] as { parts?: Array<{ text?: string }> }
+        return line?.parts?.some((part) => part.text === wakeContent) === true
+      }),
+    ).toBe(false)
   })
 })

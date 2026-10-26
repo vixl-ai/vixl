@@ -188,25 +188,25 @@ export default async (input: OrchestratorInput): Promise<void> => {
   }
   if (prefinishedShellResults && prefinishedShellResults.length > 0) {
     const alreadyDelivered = new Set(loadResumeOverlay(chatId).deliveredResultKeys)
-    const shellWakeResults = prefinishedShellResults.filter(
+    const unseenShellResults = prefinishedShellResults.filter(
       (result) => !alreadyDelivered.has(shellResultKey(result)),
     )
-    if (shellWakeResults.length > 0) {
-      const content = buildShellWakeNudge(
-        shellWakeResults,
-        runningParentBackgroundShells(chatId),
-      )
+    const running = runningParentBackgroundShells(chatId)
+    if (unseenShellResults.length > 0) {
       await persistResumeOverlay({
         projectSlug: workspace.projectSlug,
         chatId,
         wake: {
-          content,
-          toolCallIds: shellWakeResults.map((result) => result.toolCallId),
-          resultKeys: shellWakeResults.map(shellResultKey),
+          content: buildShellWakeNudge(unseenShellResults, running),
+          toolCallIds: unseenShellResults.map((result) => result.toolCallId),
+          resultKeys: unseenShellResults.map(shellResultKey),
         },
       })
-      extraWakes.push({ role: 'user', content })
     }
+    extraWakes.push({
+      role: 'user',
+      content: buildShellWakeNudge(prefinishedShellResults, running),
+    })
   }
   if (extraWakes.length > 0) {
     modelMessages = [...effectiveModelMessages, ...extraWakes]
