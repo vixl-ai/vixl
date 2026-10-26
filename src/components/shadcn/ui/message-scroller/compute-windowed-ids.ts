@@ -318,11 +318,12 @@ export function shouldRecoverFollowAfterLayoutScroll({
   threshold: number
   userGesture: boolean
 }): boolean {
-  // Recovery is for layout: a matching shrink clamp, a height change in
-  // either direction, or a resize already in flight. An unarmed reader
-  // scroll with a stable height is not layout and must not chase.
-  const layoutMoved = layoutClamp || scrollHeightChanged || resizePending
-  if (!layoutMoved || !followingBottom || userGesture || programmatic || !scrolledUp)
+  void layoutClamp
+  void resizePending
+  void scrollHeightChanged
+  // Recovery is an unarmed upward move off the live edge while following.
+  // Height may be stable. An armed gesture must not chase.
+  if (!followingBottom || userGesture || programmatic || !scrolledUp)
     return false
   return distanceFromEnd > threshold
 }
@@ -346,11 +347,17 @@ export function shouldExitFollowBottomOnUnarmedScroll({
   threshold: number
   userGesture: boolean
 }): boolean {
-  if (layoutClamp || userGesture || programmatic || !scrolledUp)
-    return false
-  if (scrollHeightChanged || resizePending)
-    return false
-  return distanceFromEnd > threshold
+  void distanceFromEnd
+  void layoutClamp
+  void programmatic
+  void resizePending
+  void scrolledUp
+  void scrollHeightChanged
+  void threshold
+  void userGesture
+  // Unarmed upward movement recovers through shouldRecoverFollowAfterLayoutScroll.
+  // An armed gesture exits through shouldExitFollowBottom.
+  return false
 }
 
 export interface ResizePendingState {
