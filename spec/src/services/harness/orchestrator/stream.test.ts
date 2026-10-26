@@ -5,6 +5,12 @@ import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
 const hasRunningSubagentsForChat = vi.hoisted(() =>
   vi.fn<(chatId: string) => boolean>(),
 )
+const hasRunningParentBackgroundShells = vi.hoisted(() =>
+  vi.fn<(chatId: string) => boolean>(),
+)
+const listDeliverableShellResults = vi.hoisted(() =>
+  vi.fn<(chatId: string) => unknown[]>(),
+)
 const consumeStream = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
 )
@@ -37,6 +43,10 @@ vi.mock('@/services/mcp/mcp-auth-gate', () => ({
 
 vi.mock('@/services/harness/shell/registry', () => ({
   setAgentShellEventEmitter: vi.fn<() => void>(),
+  hasRunningParentBackgroundShells: (chatId: string) =>
+    hasRunningParentBackgroundShells(chatId),
+  listDeliverableShellResults: (chatId: string) =>
+    listDeliverableShellResults(chatId),
 }))
 
 vi.mock('@/services/harness/subagent/registry', () => ({
@@ -74,6 +84,8 @@ describe('harness stream status', () => {
     prepareStream.mockResolvedValue({ steps: { stepCount: 0 } })
     updateChatMeta.mockResolvedValue(undefined)
     hasRunningSubagentsForChat.mockReturnValue(false)
+    hasRunningParentBackgroundShells.mockReturnValue(false)
+    listDeliverableShellResults.mockReturnValue([])
   })
 
   it('marks the chat idle when no background subagents are running', async () => {
@@ -86,6 +98,26 @@ describe('harness stream status', () => {
 
   it('keeps sidebar running while background subagents are still working', async () => {
     hasRunningSubagentsForChat.mockReturnValue(true)
+
+    await runStream(buildInput(new AbortController().signal))
+
+    expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', {
+      status: 'running',
+    })
+  })
+
+  it('keeps sidebar running while a parent background shell is still live', async () => {
+    hasRunningParentBackgroundShells.mockReturnValue(true)
+
+    await runStream(buildInput(new AbortController().signal))
+
+    expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', {
+      status: 'running',
+    })
+  })
+
+  it('keeps sidebar running while a shell result is undelivered', async () => {
+    listDeliverableShellResults.mockReturnValue([{ toolCallId: 'tc-1' }])
 
     await runStream(buildInput(new AbortController().signal))
 

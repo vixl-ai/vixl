@@ -17,7 +17,7 @@ const ERROR_HINTS: Array<{ pattern: RegExp; hint: string }> = [
   },
   {
     pattern: /command timed out/i,
-    hint: 'The shell command exceeded the timeout. For dev servers and watchers, use is_background: true on run_terminal and poll with terminal_output.',
+    hint: 'The shell command exceeded the timeout. For dev servers and watchers, use is_background: true on run_terminal and end the turn. The harness wakes the parent when that terminal exits. terminal_output reads output before exit.',
   },
   {
     pattern: /command failed/i,

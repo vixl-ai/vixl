@@ -1,11 +1,36 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, effectScope, nextTick, ref, shallowRef } from 'vue'
 import type { AgentHarnessState, AttentionHelpers } from '@/composables/agent-harness/types'
+import { mockTauriEvent } from '../../test-utils/mocks/tauri-event'
 import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
+
+vi.mock('@tauri-apps/api/event', () => mockTauriEvent())
 
 const useRealRegistryQueries = vi.hoisted(() => ({ current: false }))
 const clearPendingBackgroundResume = vi.hoisted(() =>
   vi.fn<(chatId: string) => void>(),
+)
+const clearPendingShellResume = vi.hoisted(() =>
+  vi.fn<(chatId: string) => void>(),
+)
+const markShellResultsDelivered = vi.hoisted(() =>
+  vi.fn<(chatId: string, toolCallIds: string[]) => void>(),
+)
+const listDeliverableShellResults = vi.hoisted(() =>
+  vi.fn<(chatId: string) => Array<{
+    toolCallId: string
+    shellId: string
+    command: string
+    exitCode: number
+    stdout: string
+    stderr: string
+  }>>(() => []),
+)
+const hasPendingShellResume = vi.hoisted(() =>
+  vi.fn<(chatId: string) => boolean>(() => false),
+)
+const hasRunningParentBackgroundShells = vi.hoisted(() =>
+  vi.fn<(chatId: string) => boolean>(() => false),
 )
 const clearTurnResponseMessages = vi.hoisted(() =>
   vi.fn<(chatId: string) => void>(),
@@ -62,6 +87,27 @@ vi.mock('@/services/harness/subagent/registry', async (importOriginal) => {
       useRealRegistryQueries.current
         ? actual.listDeliverableBackgroundResults(chatId)
         : listDeliverableBackgroundResults(),
+  }
+})
+
+vi.mock('@/services/harness/shell/registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/harness/shell/registry')>()
+  return {
+    ...actual,
+    listDeliverableShellResults: (chatId: string) =>
+      listDeliverableShellResults(chatId),
+    hasPendingShellResume: (chatId: string) => hasPendingShellResume(chatId),
+    hasRunningParentBackgroundShells: (chatId: string) =>
+      hasRunningParentBackgroundShells(chatId),
+    clearPendingShellResume: (chatId: string) => {
+      clearPendingShellResume(chatId)
+      actual.clearPendingShellResume(chatId)
+    },
+    markShellResultsDelivered: (chatId: string, toolCallIds: string[]) => {
+      markShellResultsDelivered(chatId, toolCallIds)
+      actual.markShellResultsDelivered(chatId, toolCallIds)
+    },
+    agentShellRevision: actual.agentShellRevision,
   }
 })
 
@@ -200,6 +246,9 @@ const buildAttention = (
 beforeEach(() => {
   useRealRegistryQueries.current = false
   resetSubagentRegistryForTests()
+  listDeliverableShellResults.mockReturnValue([])
+  hasPendingShellResume.mockReturnValue(false)
+  hasRunningParentBackgroundShells.mockReturnValue(false)
 })
 
 describe('maybeFlushBackgroundSubagentResume', () => {
@@ -226,6 +275,7 @@ describe('maybeFlushBackgroundSubagentResume', () => {
     maybeFlushBackgroundSubagentResume()
 
     expect(clearPendingBackgroundResume).toHaveBeenCalledWith('chat-1')
+    expect(clearPendingShellResume).toHaveBeenCalledWith('chat-1')
     expect(clearTurnResponseMessages).toHaveBeenCalledWith('chat-1')
     expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', { status: 'idle' })
   })
@@ -315,6 +365,79 @@ describe('maybeFlushBackgroundSubagentResume', () => {
     expect(resumeOrchestrator).toHaveBeenCalled()
   })
 
+  it('resumes with shell results when the parent is idle and a shell is deliverable', async () => {
+    useRealRegistryQueries.current = true
+    shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
+    hasPendingShellResume.mockReturnValue(true)
+    const shellResult = {
+      toolCallId: 'tc-shell',
+      shellId: 'sh-1',
+      command: 'npm test',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    }
+    listDeliverableShellResults.mockReturnValue([shellResult])
+    const state = buildState()
+    state.lastRunConfig.value = lastRunConfig
+    const { maybeFlushBackgroundSubagentResume } = createTurnLoop(
+      state,
+      buildAttention(state),
+      loopDeps(),
+    )
+
+    maybeFlushBackgroundSubagentResume()
+    await Promise.resolve()
+
+    expect(resumeOrchestrator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        completedResults: [],
+        shellResults: [shellResult],
+      }),
+    )
+  })
+
+  it('does not resume when a parent background shell is still running and nothing is deliverable', async () => {
+    useRealRegistryQueries.current = true
+    shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
+    hasPendingShellResume.mockReturnValue(true)
+    hasRunningParentBackgroundShells.mockReturnValue(true)
+    listDeliverableShellResults.mockReturnValue([])
+    const state = buildState()
+    state.lastRunConfig.value = lastRunConfig
+    const { maybeFlushBackgroundSubagentResume } = createTurnLoop(
+      state,
+      buildAttention(state),
+      loopDeps(),
+    )
+
+    maybeFlushBackgroundSubagentResume()
+    await Promise.resolve()
+
+    expect(resumeOrchestrator).not.toHaveBeenCalled()
+  })
+
+  it('clears a killed parent background shell with nothing deliverable', async () => {
+    useRealRegistryQueries.current = true
+    shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
+    hasPendingShellResume.mockReturnValue(true)
+    hasRunningParentBackgroundShells.mockReturnValue(false)
+    listDeliverableShellResults.mockReturnValue([])
+    const state = buildState()
+    state.lastRunConfig.value = lastRunConfig
+    const { maybeFlushBackgroundSubagentResume } = createTurnLoop(
+      state,
+      buildAttention(state),
+      loopDeps(),
+    )
+
+    maybeFlushBackgroundSubagentResume()
+    await Promise.resolve()
+
+    expect(resumeOrchestrator).not.toHaveBeenCalled()
+    expect(clearPendingShellResume).toHaveBeenCalledWith('chat-1')
+  })
+
   it('resumes on each idle flush when a background result is deliverable', async () => {
     shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
     listDeliverableBackgroundResults.mockReturnValue([deliverableResult])
@@ -391,6 +514,44 @@ describe('resumeAfterBackgroundSubagents', () => {
     }
     expect(state.session.setAgentTurnStop).toHaveBeenCalledWith(turnId, stop)
     expect(persistTurnEnded).toHaveBeenCalledWith('proj', 'chat-1', turnId, stop)
+  })
+
+  it('marks snapshotted shell results delivered when resume throws', async () => {
+    const shellResult = {
+      toolCallId: 'tc-shell',
+      shellId: 'sh-1',
+      command: 'npm test',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    }
+    listDeliverableShellResults.mockReturnValue([shellResult])
+    resumeOrchestrator.mockRejectedValue(
+      new Error('No pending subagent turn to resume'),
+    )
+    const state = buildState()
+    state.lastRunConfig.value = {
+      mode: 'agent',
+      model: 'openai::gpt-4o',
+      mentions: [],
+      effectiveSettings: { version: 1 },
+    }
+    const { resumeAfterBackgroundSubagents } = createTurnLoop(
+      state,
+      buildAttention(state),
+      {
+        handleEvent: vi.fn<() => void>(),
+        persistPermission: vi
+          .fn<() => Promise<void>>()
+          .mockResolvedValue(undefined),
+      },
+    )
+
+    await resumeAfterBackgroundSubagents()
+
+    expect(markShellResultsDelivered).toHaveBeenCalledWith('chat-1', ['tc-shell'])
+    expect(state.status.value).toBe('error')
+    expect(state.resumingBackgroundBatch.value).toBe(false)
   })
 
   it('writes a timeout stop when resume fails with a timeout', async () => {

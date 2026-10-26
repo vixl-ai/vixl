@@ -232,6 +232,9 @@ describe('build-tools run_terminal', () => {
       command: 'echo hello',
       sandboxed: true,
       allowNetwork: true,
+      toolCallId: 'tc-shell',
+      background: false,
+      wakeParent: false,
     })
     expect(waitForShellExit).toHaveBeenCalledWith('shell-1', undefined)
     expect(result).toMatchObject({
@@ -321,6 +324,16 @@ describe('build-tools run_terminal', () => {
     })
 
     expect(waitForShellExit).not.toHaveBeenCalled()
+    expect(createAgentShell).toHaveBeenCalledWith({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run dev',
+      sandboxed: true,
+      allowNetwork: true,
+      toolCallId: 'tc-shell',
+      background: true,
+      wakeParent: true,
+    })
     expect(result).toMatchObject({
       shellId: 'shell-1',
       status: 'running',
@@ -1095,8 +1108,35 @@ describe('build-tools run_terminal', () => {
         chatId: 'chat-1',
         command: 'echo hello',
         subagentId: 'bg-1',
+        toolCallId: 'tc-shell',
+        background: false,
+        wakeParent: false,
       }),
     )
+  })
+
+  it('does not wake the parent for a nested background shell', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools({
+      ...ctx,
+      subagentId: 'bg-1',
+    })
+    await runTool(tools.run_terminal.execute, {
+      command: 'npm run dev',
+      is_background: true,
+    })
+
+    expect(createAgentShell).toHaveBeenCalledWith({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run dev',
+      sandboxed: true,
+      allowNetwork: true,
+      subagentId: 'bg-1',
+      toolCallId: 'tc-shell',
+      background: true,
+      wakeParent: false,
+    })
   })
 
   it('never retries unsandboxed for a read-only nested ctx', async () => {
@@ -1237,6 +1277,9 @@ describe('build-tools run_terminal', () => {
         { slug: 'api', path: '/tmp/api' },
         { slug: 'web', path: '/tmp/web' },
       ],
+      toolCallId: 'tc-shell',
+      background: false,
+      wakeParent: false,
     })
     expect(result).toMatchObject({
       cwd: '/tmp/web',

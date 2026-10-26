@@ -14,6 +14,7 @@ export default async (input: ParentOrchestratorInput): Promise<void> => {
     appendedUserMessageId,
     assistantId,
     prefinishedBackgroundResults,
+    prefinishedShellResults,
     ...shared
   } = input
 
@@ -39,5 +40,6 @@ export default async (input: ParentOrchestratorInput): Promise<void> => {
     ...(prefinishedBackgroundResults
       ? { prefinishedBackgroundResults }
       : {}),
+    ...(prefinishedShellResults ? { prefinishedShellResults } : {}),
   })
 }

@@ -1,6 +1,24 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mockTauriEvent } from '../../test-utils/mocks/tauri-event'
+import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
+
+type ExitListener = (event: {
+  payload: { shellId: string; exitCode: number; signal?: number }
+}) => void
+
+const listen = vi.hoisted(() =>
+  vi.fn<(event: string, handler: ExitListener) => Promise<() => void>>(
+    async () => () => {},
+  ),
+)
+
+vi.mock('@tauri-apps/api/event', () => mockTauriEvent({ listen }))
+vi.mock('@/services/vixl/vixl-tauri', () => mockVixlTauri())
+
 import collectPrefinishedBackgroundResults, {
+  collectPrefinishedShellResults,
   commitPrefinishedBackgroundResults,
+  commitPrefinishedShellResults,
 } from '@/composables/agent-harness/collect-prefinished-background-results'
 import {
   fail,
@@ -13,8 +31,13 @@ import {
 } from '@/services/harness/subagent/registry'
 
 describe('collectPrefinishedBackgroundResults', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
     resetSubagentRegistryForTests()
+    const { resetAgentShellRegistryForTests } = await import(
+      '@/services/harness/shell/registry'
+    )
+    resetAgentShellRegistryForTests()
   })
 
   it('snapshots background results without marking blocking inline results delivered', () => {
@@ -135,5 +158,60 @@ describe('collectPrefinishedBackgroundResults', () => {
       },
     ])
     expect(hasPendingBackgroundResume('chat-1')).toBe(true)
+  })
+})
+
+describe('collectPrefinishedShellResults', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    const { resetAgentShellRegistryForTests } = await import(
+      '@/services/harness/shell/registry'
+    )
+    resetAgentShellRegistryForTests()
+  })
+
+  it('snapshots a queued parent background result and commits it after success', async () => {
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (event.startsWith('shell-exit-')) {
+        exitHandler = handler
+      }
+      return () => {}
+    })
+
+    const {
+      createAgentShell,
+      hasPendingShellResume,
+      listDeliverableShellResults,
+    } = await import('@/services/harness/shell/registry')
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm test',
+      toolCallId: 'tc-shell',
+      background: true,
+      wakeParent: true,
+    })
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    const snapshot = collectPrefinishedShellResults('chat-1', false, false)
+    expect(snapshot).toEqual([
+      expect.objectContaining({
+        toolCallId: 'tc-shell',
+        shellId: shell.shellId,
+        command: 'npm test',
+        exitCode: 0,
+      }),
+    ])
+    expect(listDeliverableShellResults('chat-1')).toEqual(snapshot)
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+
+    commitPrefinishedShellResults('chat-1', snapshot)
+
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+    expect(hasPendingShellResume('chat-1')).toBe(false)
   })
 })

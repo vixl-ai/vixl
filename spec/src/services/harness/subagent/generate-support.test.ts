@@ -262,7 +262,7 @@ describe('createSubagentToolExecutionHooks', () => {
       : undefined
     expect(result).toEqual({
       error:
-        'command timed out after 30s\n\nHint: The shell command exceeded the timeout. For dev servers and watchers, use is_background: true on run_terminal and poll with terminal_output.',
+        'command timed out after 30s\n\nHint: The shell command exceeded the timeout. For dev servers and watchers, use is_background: true on run_terminal and end the turn. The harness wakes the parent when that terminal exits. terminal_output reads output before exit.',
     })
   })
 

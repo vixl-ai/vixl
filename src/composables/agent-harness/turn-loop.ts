@@ -4,18 +4,23 @@ import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { PermissionCapabilityKey } from '@/types/harness/permission'
 import { resumeOrchestrator } from '@/services/harness/orchestrator'
 import {
+  agentShellRevision,
+  clearPendingShellResume,
+  hasRunningParentBackgroundShells,
+  listDeliverableShellResults,
+  markShellResultsDelivered,
+} from '@/services/harness/shell/registry'
+import {
   clearPendingBackgroundResume,
   clearTurnResponseMessages,
-  hasPendingBackgroundResume,
   hasRunningSubagentsForChat,
   listDeliverableBackgroundResults,
   markBackgroundResultsDelivered,
   subagentRegistryRevision,
 } from '@/services/harness/subagent/registry'
-import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import parseModelRef from '@/utils/parse-model-ref'
-import shouldFlushBackgroundSubagentResume from '@/utils/should-flush-background-subagent-resume'
 import createSend, { type SendArgs } from './send'
+import flushBackgroundResume from './flush-background-resume'
 import { parentFailureStop, writeGuardedTurnStop } from './turn-stop'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
@@ -118,8 +123,9 @@ export default (
     }
 
     const completedResults = listDeliverableBackgroundResults(options.chatId)
+    const shellResults = listDeliverableShellResults(options.chatId)
     const cfg = lastRunConfig.value
-    if (completedResults.length === 0 || !cfg) {
+    if ((completedResults.length === 0 && shellResults.length === 0) || !cfg) {
       return
     }
 
@@ -162,6 +168,7 @@ export default (
         onEvent: deps.handleEvent,
         assistantId: turnId,
         completedResults,
+        shellResults,
         skipUserPersist: true,
         permissionLevel: sessionPermissionLevel.value ?? undefined,
         persistPermission: deps.persistPermission,
@@ -188,6 +195,16 @@ export default (
       )
       if (!hasRunningSubagentsForChat(options.chatId)) {
         clearPendingBackgroundResume(options.chatId)
+      }
+      markShellResultsDelivered(
+        options.chatId,
+        shellResults.map((item) => item.toolCallId),
+      )
+      if (
+        !hasRunningParentBackgroundShells(options.chatId) &&
+        listDeliverableShellResults(options.chatId).length === 0
+      ) {
+        clearPendingShellResume(options.chatId)
       }
       clearTurnResponseMessages(options.chatId)
       error.value = err instanceof Error ? err.message : 'Unknown error'
@@ -217,37 +234,17 @@ export default (
   }
 
   const maybeFlushBackgroundSubagentResume = (): void => {
-    const action = shouldFlushBackgroundSubagentResume({
+    flushBackgroundResume({
+      chatId: options.chatId,
+      projectSlug: options.projectSlug,
       parentBusy: attention.isParentBusy(),
-      hasPending: hasPendingBackgroundResume(options.chatId),
-      hasRunning: hasRunningSubagentsForChat(options.chatId),
-      deliverableCount: listDeliverableBackgroundResults(options.chatId).length,
-    })
-
-    if (action === 'clear') {
-      clearPendingBackgroundResume(options.chatId)
-      clearTurnResponseMessages(options.chatId)
-      updateChatMeta(options.projectSlug, options.chatId, { status: 'idle' })
-        .then(() => {
-          session.patchMeta({ status: 'idle' })
-          attention.refreshSidebar()
-        })
-        .catch((err) => {
-          toast.error('Failed to update chat status', {
-            description: err instanceof Error ? err.message : 'Unknown error',
-          })
-        })
-      return
-    }
-
-    if (action !== 'resume') {
-      return
-    }
-
-    resumeAfterBackgroundSubagents().catch((err) => {
-      toast.error('Agent resume failed', {
-        description: err instanceof Error ? err.message : 'Unknown error',
-      })
+      patchMeta: (patch) => {
+        session.patchMeta(patch)
+      },
+      refreshSidebar: () => {
+        attention.refreshSidebar()
+      },
+      resume: resumeAfterBackgroundSubagents,
     })
   }
 
@@ -289,6 +286,7 @@ export default (
         abortController.value,
         suppressQueueDrainAfterStop.value,
         subagentRegistryRevision.value,
+        agentShellRevision.value,
       ].join(':')
     },
     () => {

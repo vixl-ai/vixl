@@ -3,7 +3,11 @@ import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import { rejectPendingForChat } from '@/services/harness/permission/approval-gate'
 import { rejectPendingQuestionsForChat } from '@/services/harness/permission/question-gate'
 import { rejectPendingMcpAuthForChat } from '@/services/mcp/mcp-auth-gate'
-import { setAgentShellEventEmitter } from '@/services/harness/shell/registry'
+import {
+  hasRunningParentBackgroundShells,
+  listDeliverableShellResults,
+  setAgentShellEventEmitter,
+} from '@/services/harness/shell/registry'
 import { hasRunningSubagentsForChat } from '@/services/harness/subagent/registry'
 import consumeStream from './consume-stream'
 import prepareStream, { type PreparedHarnessStream } from './prepare-stream'
@@ -43,8 +47,11 @@ export default async (input: HarnessStreamInput): Promise<void> => {
     rejectPendingMcpAuthForChat(chatId)
     setAgentShellEventEmitter(chatId, null)
     // Parent turn is done locally (idle) so resume can flush, but keep the
-    // sidebar "running" while background subagents are still working.
-    const waitingOnBackground = hasRunningSubagentsForChat(chatId)
+    // sidebar running while background subagents or parent terminals still need it.
+    const waitingOnBackground =
+      hasRunningSubagentsForChat(chatId) ||
+      hasRunningParentBackgroundShells(chatId) ||
+      listDeliverableShellResults(chatId).length > 0
     onEvent({
       type: 'chat-status-changed',
       projectSlug: workspace.projectSlug,

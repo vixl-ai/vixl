@@ -59,8 +59,8 @@ const runTerminal = (ctx: HarnessToolContext) => {
         ? 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. Optional cwd is a project slug; defaults to the primary project and is not kept between calls. When the sandbox blocks a command, report the denial as the result.'
         : 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. When the sandbox blocks a command, report the denial as the result.'
       : multiRoot
-        ? `Run a shell command in the project cwd. ${CWD_TOOL_HINT} A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell_id for terminal_output. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`
-        : 'Run a shell command in the project cwd. A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell_id for terminal_output. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.',
+        ? `Run a shell command in the project cwd. ${CWD_TOOL_HINT} A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell id and the harness wakes the parent when that terminal exits, so end the turn instead of polling. terminal_output reads output before exit. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`
+        : 'Run a shell command in the project cwd. A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell id and the harness wakes the parent when that terminal exits, so end the turn instead of polling. terminal_output reads output before exit. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.',
     inputSchema: z.object({
       description: z
         .string()
@@ -144,6 +144,7 @@ const runTerminal = (ctx: HarnessToolContext) => {
         projectWritable: !readOnlyProject,
         projectRoot: resolvedCwd.projectRoot,
         cwdSlug: resolvedCwd.slug,
+        toolCallId,
       }
 
       const retryUnsandboxed = async (

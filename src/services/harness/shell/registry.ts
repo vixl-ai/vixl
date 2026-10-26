@@ -3,9 +3,28 @@ import { ref } from 'vue'
 import appendStreamText from '@/services/harness/shell/append-stream-text'
 import { isRunningBackgroundSubagent } from '@/services/harness/subagent/registry'
 import { shellKillTracked, shellSpawnTracked, type IpcProjectRoot } from '@/services/vixl/vixl-tauri'
-import type { AgentShellRecord, AgentShellStatus } from '@/types/harness/agent-shell'
+import type {
+  AgentShellRecord,
+  AgentShellStatus,
+  ShellWakeResult,
+} from '@/types/harness/agent-shell'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { ShellExitResult } from '@/types/harness/shell-exit'
+import {
+  clearPendingShellResumeState,
+  enqueueDeliverableShellResult,
+  markPendingShellResume,
+  parentBackgroundShellsAreRunning,
+  resetShellWakeQueueForTests,
+} from './shell-wake-queue'
+import waitForTrackedShellExit from './wait-for-shell-exit'
+
+export type { ShellWakeResult }
+export {
+  hasPendingShellResume,
+  listDeliverableShellResults,
+  markShellResultsDelivered,
+} from './shell-wake-queue'
 
 type ShellOutputPayload = {
   shellId: string
@@ -98,7 +117,9 @@ const markShellComplete = (shellId: string, exit: ShellExitResult): void => {
     return
   }
 
+  const hasExitWaiters = (exitWaiters.get(shellId) ?? []).length > 0
   setShellStatus(shell, exit.exitCode === 0 ? 'completed' : 'failed', exit)
+  enqueueDeliverableShellResult(shell, exit, hasExitWaiters)
   emitHarnessEvent(shell.chatId, { type: 'shell-complete', shellId, exitCode: exit.exitCode })
   bumpRevision()
   resolveExitWaiters(shellId, exit)
@@ -136,12 +157,17 @@ export const createAgentShell = async (args: {
   projectRoots?: IpcProjectRoot[]
   subagentId?: string
   description?: string
+  toolCallId?: string
+  background?: boolean
+  wakeParent?: boolean
 }): Promise<AgentShellRecord> => {
   const shellId = crypto.randomUUID()
   const description =
     typeof args.description === 'string' && args.description.length > 0
       ? args.description
       : undefined
+  const background = args.background === true
+  const wakeParent = args.wakeParent === true
   const record: AgentShellRecord = {
     shellId,
     chatId: args.chatId,
@@ -153,12 +179,18 @@ export const createAgentShell = async (args: {
     exitCode: null,
     exitSignal: null,
     startedAt: new Date().toISOString(),
+    background,
+    wakeParent,
+    ...(args.toolCallId ? { toolCallId: args.toolCallId } : {}),
     subagentId: args.subagentId,
     ...(description ? { description } : {}),
   }
 
   shells.set(shellId, record)
   trackShellForChat(args.chatId, shellId)
+  if (wakeParent) {
+    markPendingShellResume(args.chatId)
+  }
   await registerShellListeners(shellId)
   await shellSpawnTracked({
     shellId,
@@ -177,47 +209,8 @@ export const createAgentShell = async (args: {
 export const waitForShellExit = (
   shellId: string,
   timeoutMs?: number,
-): Promise<ShellExitResult & { timedOut: boolean }> => {
-  const shell = shells.get(shellId)
-  if (!shell) {
-    return Promise.reject(new Error(`Shell not found: ${shellId}`))
-  }
-
-  const toExitResult = (): ShellExitResult => ({
-    exitCode: shell.exitCode ?? -1,
-    signal: shell.exitSignal ?? undefined,
-  })
-
-  if (shell.status !== 'running') {
-    return Promise.resolve({
-      ...toExitResult(),
-      timedOut: false,
-    })
-  }
-
-  return new Promise((resolve) => {
-    const hasTimeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
-    const timer = hasTimeout
-      ? setTimeout(() => {
-          resolve({
-            ...toExitResult(),
-            timedOut: true,
-          })
-        }, timeoutMs)
-      : null
-
-    const onExit = (exit: ShellExitResult): void => {
-      if (timer) {
-        clearTimeout(timer)
-      }
-      resolve({ ...exit, timedOut: false })
-    }
-
-    const waiters = exitWaiters.get(shellId) ?? []
-    waiters.push(onExit)
-    exitWaiters.set(shellId, waiters)
-  })
-}
+): Promise<ShellExitResult & { timedOut: boolean }> =>
+  waitForTrackedShellExit(shells.get(shellId), shellId, timeoutMs, exitWaiters)
 
 export const getAgentShell = (shellId: string): AgentShellRecord | null =>
   shells.get(shellId) ?? null
@@ -255,6 +248,7 @@ export const killAgentShell = async (shellId: string): Promise<AgentShellRecord>
   }
 
   if (shell.status === 'running') {
+    shell.wakeParent = false
     try {
       const exit = await shellKillTracked(shellId)
       markShellComplete(shellId, exit)
@@ -310,6 +304,16 @@ export const killShellsForChat = async (
   }
 }
 
+export const clearPendingShellResume = (chatId: string): void => {
+  if (!clearPendingShellResumeState(chatId)) {
+    return
+  }
+  bumpRevision()
+}
+
+export const hasRunningParentBackgroundShells = (chatId: string): boolean =>
+  parentBackgroundShellsAreRunning(listShellsForChat(chatId))
+
 export const resetAgentShellRegistryForTests = (): void => {
   for (const shellId of shellUnlisteners.keys()) {
     cleanupShellListeners(shellId)
@@ -318,4 +322,5 @@ export const resetAgentShellRegistryForTests = (): void => {
   chatShells.clear()
   exitWaiters.clear()
   eventEmitters.clear()
+  resetShellWakeQueueForTests()
 }

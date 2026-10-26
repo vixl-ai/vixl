@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UIMessage } from 'ai'
 import type { OrchestratorInput } from '@/types/harness/orchestrator-input'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
+import { mockTauriEvent } from '../../../test-utils/mocks/tauri-event'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
+
+vi.mock('@tauri-apps/api/event', () => mockTauriEvent())
 
 const persistLine = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
@@ -58,6 +61,8 @@ vi.mock('@/services/harness/resolve-model-vision', () => ({
 
 import { visibleStatus } from '@/services/harness/guidance'
 import runOrchestrator from '@/services/harness/orchestrator/run'
+import resetResumeOverlay from '@/services/harness/orchestrator/reset-resume-overlay'
+import { resetAgentShellRegistryForTests } from '@/services/harness/shell/registry'
 import {
   fail,
   isBackgroundResultFinalized,
@@ -117,6 +122,8 @@ describe('orchestrator run user persist', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetSubagentRegistryForTests()
+    resetAgentShellRegistryForTests()
+    resetResumeOverlay()
     persistLine.mockResolvedValue(undefined)
     persistToolRun.mockResolvedValue(undefined)
     runHarnessStream.mockResolvedValue(undefined)
@@ -504,5 +511,33 @@ describe('orchestrator run user persist', () => {
       ),
     ).toBe(false)
     expect(persistToolRun).not.toHaveBeenCalled()
+  })
+
+  it('appends a shell wake nudge for prefinished background terminal results on a user turn', async () => {
+    const shellResult = {
+      toolCallId: 'tc-shell',
+      shellId: 'sh-finished',
+      command: 'npm test',
+      description: 'Run tests',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    }
+
+    await runOrchestrator(
+      buildInput({
+        appendedUserMessageId: 'user-1',
+        userText: '',
+        prefinishedShellResults: [shellResult],
+      }),
+    )
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0] as {
+      modelMessages: Array<{ role: string; content: string }>
+    }
+    const wakeNudge = streamInput.modelMessages[streamInput.modelMessages.length - 1]
+    expect(wakeNudge?.role).toBe('user')
+    expect(wakeNudge?.content).toContain('[harness: background terminal results]')
+    expect(wakeNudge?.content).toContain('sh-finished')
   })
 })
