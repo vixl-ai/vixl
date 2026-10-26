@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import { toast } from 'vue-sonner'
 import { nanoid } from 'nanoid'
@@ -22,6 +21,7 @@ import {
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
 import VixlFileCreateSheet from '@/components/settings/vixl-files/VixlFileCreateSheet.vue'
+import { toTypedSchema } from '@/components/settings/vixl-files/to-typed-schema'
 import writePlanFile from '@/services/plans/write-plan-file'
 import type { PlanTodoItem } from '@/types/plans/plan-document'
 
