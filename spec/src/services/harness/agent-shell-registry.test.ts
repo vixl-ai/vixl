@@ -87,6 +87,57 @@ describe('agent-shell-registry', () => {
     expect(getAgentShell(shell.shellId)?.description).toBeUndefined()
   })
 
+  it('rolls back a wakeParent create when spawn fails', async () => {
+    shellSpawnTracked.mockRejectedValueOnce(new Error('spawn failed'))
+    const { createAgentShell, listShellsForChat, hasPendingShellResume } =
+      await import('@/services/harness/shell/registry')
+
+    await expect(
+      createAgentShell({
+        chatId: 'chat-1',
+        projectRoot: '/project',
+        command: 'npm test',
+        background: true,
+        wakeParent: true,
+      }),
+    ).rejects.toThrow('spawn failed')
+
+    expect(listShellsForChat('chat-1')).toEqual([])
+    expect(hasPendingShellResume('chat-1')).toBe(false)
+  })
+
+  it('keeps pending resume when a later wakeParent create fails', async () => {
+    const {
+      createAgentShell,
+      listShellsForChat,
+      hasPendingShellResume,
+    } = await import('@/services/harness/shell/registry')
+
+    const first = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run dev',
+      background: true,
+      wakeParent: true,
+    })
+    shellSpawnTracked.mockRejectedValueOnce(new Error('spawn failed'))
+
+    await expect(
+      createAgentShell({
+        chatId: 'chat-1',
+        projectRoot: '/project',
+        command: 'npm test',
+        background: true,
+        wakeParent: true,
+      }),
+    ).rejects.toThrow('spawn failed')
+
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+    expect(listShellsForChat('chat-1').map((shell) => shell.shellId)).toEqual([
+      first.shellId,
+    ])
+  })
+
   it('tails shell output to the last N lines', async () => {
     const { tailShellOutput } = await import('@/services/harness/shell/registry')
 

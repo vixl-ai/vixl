@@ -18,6 +18,7 @@ import {
   parentBackgroundShellsAreRunning,
   resetShellWakeQueueForTests,
 } from './shell-wake-queue'
+import rollbackFailedAgentShellCreate, { trackShellForChat } from './rollback-failed-agent-shell'
 import waitForTrackedShellExit from './wait-for-shell-exit'
 
 export type { ShellWakeResult }
@@ -142,12 +143,6 @@ const registerShellListeners = async (shellId: string): Promise<void> => {
   shellUnlisteners.set(shellId, [unlistenOutput, unlistenExit])
 }
 
-const trackShellForChat = (chatId: string, shellId: string): void => {
-  const existing = chatShells.get(chatId) ?? new Set<string>()
-  existing.add(shellId)
-  chatShells.set(chatId, existing)
-}
-
 export const createAgentShell = async (args: {
   chatId: string
   projectRoot: string
@@ -188,20 +183,27 @@ export const createAgentShell = async (args: {
   }
 
   shells.set(shellId, record)
-  trackShellForChat(args.chatId, shellId)
+  trackShellForChat(chatShells, args.chatId, shellId)
   if (wakeParent) {
     markPendingShellResume(args.chatId)
   }
-  await registerShellListeners(shellId)
-  await shellSpawnTracked({
-    shellId,
-    projectRoot: args.projectRoot,
-    command: args.command,
-    sandboxed: args.sandboxed,
-    allowNetwork: args.allowNetwork,
-    ...(args.projectWritable === false ? { projectWritable: false } : {}),
-    ...(args.projectRoots ? { projectRoots: args.projectRoots } : {}),
-  })
+  try {
+    await registerShellListeners(shellId)
+    await shellSpawnTracked({
+      shellId,
+      projectRoot: args.projectRoot,
+      command: args.command,
+      sandboxed: args.sandboxed,
+      allowNetwork: args.allowNetwork,
+      ...(args.projectWritable === false ? { projectWritable: false } : {}),
+      ...(args.projectRoots ? { projectRoots: args.projectRoots } : {}),
+    })
+  } catch (error) {
+    rollbackFailedAgentShellCreate(
+      shellId, args.chatId, shells, chatShells, cleanupShellListeners, bumpRevision,
+    )
+    throw error
+  }
   bumpRevision()
 
   return record
