@@ -32,4 +32,23 @@ describe('toTypedSchema', () => {
     })
     expect(result.errors[0]?.errors[0]).toBeTruthy()
   })
+
+  it('uses bracket notation for an invalid array element', async () => {
+    const result = await toTypedSchema(
+      z.object({
+        tools: z.array(z.string().min(1)),
+      }),
+    ).parse({
+      tools: [''],
+    })
+
+    expect(result.value).toBeUndefined()
+    expect(result.errors).toEqual([
+      {
+        path: 'tools[0]',
+        errors: [expect.any(String)],
+      },
+    ])
+    expect(result.errors[0]?.errors[0]).toBeTruthy()
+  })
 })
