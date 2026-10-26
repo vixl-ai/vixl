@@ -1,4 +1,4 @@
-import { convertToModelMessages, type ModelMessage } from 'ai'
+import { convertToModelMessages, type ModelMessage, type UIMessage } from 'ai'
 import type { ResumeOrchestratorInput } from '@/types/harness/orchestrator-input'
 import createModel from '@/services/providers/create-model'
 import { readChatMeta } from '@/services/vixl/vixl-tauri'
@@ -30,6 +30,23 @@ import loadResumeOverlay from './load-resume-overlay'
 import persistResumeOverlay from './persist-resume-overlay'
 import resolveLiveWorkspace from './resolve-workspace'
 import runHarnessStream from './stream'
+
+const isHarnessWakeMessage = (message: UIMessage): boolean => {
+  if (message.role !== 'user') {
+    return false
+  }
+  const metadata = message.metadata
+  if (!metadata || typeof metadata !== 'object') {
+    return false
+  }
+  return (metadata as Record<string, unknown>).harnessWake === true
+}
+
+const joinedTextParts = (message: UIMessage): string =>
+  message.parts
+    .filter((part) => part.type === 'text')
+    .map((part) => (part.type === 'text' ? part.text : ''))
+    .join('')
 
 export default async (input: ResumeOrchestratorInput): Promise<void> => {
   const workspace = await resolveLiveWorkspace(input)
@@ -181,32 +198,42 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
     ? [{ role: 'user', content: checkpointText }, ...recentModelMessages]
     : recentModelMessages
   const modelMessages: ModelMessage[] = [...baseMessages]
+  const existingHarnessWakeTexts = new Set(
+    priorMessages
+      .filter(isHarnessWakeMessage)
+      .map(joinedTextParts)
+      .filter((text) => text.length > 0),
+  )
+  const pushWakeIfNew = (content: string): void => {
+    if (existingHarnessWakeTexts.has(content)) {
+      return
+    }
+    modelMessages.push({ role: 'user', content })
+  }
   if (turnMessages) {
     modelMessages.push(...patchedTurnMessages)
     if (wakeContent) {
-      modelMessages.push({ role: 'user', content: wakeContent })
+      pushWakeIfNew(wakeContent)
     }
     if (shellWakeContent) {
-      modelMessages.push({ role: 'user', content: shellWakeContent })
+      pushWakeIfNew(shellWakeContent)
     }
     if (alreadyPersistedShellResults.length > 0) {
-      modelMessages.push({
-        role: 'user',
-        content: buildShellWakeNudge(
+      pushWakeIfNew(
+        buildShellWakeNudge(
           alreadyPersistedShellResults,
           runningParentBackgroundShells(chatId),
         ),
-      })
+      )
     }
   } else {
     const persisted = loadResumeOverlay(chatId)
     modelMessages.push(
       ...patchSubagentToolResults(persisted.spawnMessages, finalizedResults),
-      ...persisted.wakes.map((wake) => ({
-        role: 'user' as const,
-        content: wake.content,
-      })),
     )
+    for (const wake of persisted.wakes) {
+      pushWakeIfNew(wake.content)
+    }
   }
 
   clearTurnResponseMessages(chatId)
@@ -223,7 +250,16 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
     clearPendingShellResume(chatId)
   }
 
-  const lastUser = [...messages].reverse().find((message) => message.role === 'user')
+  const lastUser = [...messages].reverse().find((message) => {
+    if (message.role !== 'user') {
+      return false
+    }
+    const metadata = message.metadata
+    if (!metadata || typeof metadata !== 'object') {
+      return true
+    }
+    return (metadata as Record<string, unknown>).harnessWake !== true
+  })
   const userMessageId = lastUser?.id
   if (!userMessageId) {
     throw new Error('Cannot resume harness without a user message id for file checkpoints')

@@ -62,12 +62,14 @@ vi.mock('@/services/harness/orchestrator/stream', () => ({
   ) => runHarnessStream(input),
 }))
 
+import { convertToModelMessages } from 'ai'
 import { persistLine, persistToolRun } from '@/services/harness/orchestrator/persistence'
 import { finalizeBackgroundSpawnResults } from '@/services/harness/orchestrator/finalize-background-spawns'
 import persistResumeOverlay from '@/services/harness/orchestrator/persist-resume-overlay'
 import resumeOrchestrator from '@/services/harness/orchestrator/resume'
 import resetResumeOverlay from '@/services/harness/orchestrator/reset-resume-overlay'
 import buildShellWakeNudge from '@/services/harness/orchestrator/build-shell-wake-nudge'
+import buildWakeNudge from '@/services/harness/orchestrator/build-wake-nudge'
 import { shellResultKey } from '@/services/harness/orchestrator/shell-wake'
 import {
   createAgentShell,
@@ -83,6 +85,7 @@ import {
   hasPendingBackgroundResume,
   isBackgroundResultFinalized,
   listDeliverableBackgroundResults,
+  listSubagentsForChat,
   register,
   reopen,
   resetSubagentRegistryForTests,
@@ -225,6 +228,108 @@ describe('resumeOrchestrator background waves', () => {
     expect(wakeNudge.content).toContain(
       'Subagent ledger:\n- explorer (sub-1): completed: mapped the repo',
     )
+  })
+
+  it('does not use a trailing harnessWake user message as the stream userMessageId', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    setTurnResponseMessages('chat-1', wave1Messages)
+
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1'), {
+        messages: [
+          {
+            id: 'user-1',
+            role: 'user',
+            parts: [{ type: 'text', text: 'orchestrate this' }],
+          },
+          {
+            id: 'background-wake:chat-1:tc-1',
+            role: 'user',
+            parts: [{ type: 'text', text: 'wake body' }],
+            metadata: { harnessWake: true },
+          },
+        ],
+      }),
+    )
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0] as {
+      userMessageId?: string
+      modelMessages: Array<{ role: string; content: string }>
+    }
+    expect(streamInput.userMessageId).toBe('user-1')
+    const wakeNudge = streamInput.modelMessages.at(-1)
+    expect(wakeNudge?.role).toBe('user')
+    expect(wakeNudge?.content).toContain('[harness: background subagent results]')
+  })
+
+  it('does not append a wake nudge already present as a harnessWake message', async () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+    })
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'explorer',
+      summary: 'mapped the repo',
+    })
+    setTurnResponseMessages('chat-1', wave1Messages)
+    const completedResults = listDeliverableBackgroundResults('chat-1')
+    const nudge = buildWakeNudge(
+      completedResults.map((item) => ({ ...item, status: 'completed' as const })),
+      [],
+      listSubagentsForChat('chat-1'),
+      { summariesInline: false },
+    )
+    vi.mocked(convertToModelMessages).mockImplementationOnce(
+      async (messages: unknown) => {
+        const list = Array.isArray(messages) ? messages : []
+        return list.map((entry) => {
+          const message = entry as {
+            role: string
+            parts?: Array<{ type: string; text?: string }>
+          }
+          const content = (message.parts ?? [])
+            .filter((part) => part.type === 'text')
+            .map((part) => part.text ?? '')
+            .join('')
+          return { role: 'user' as const, content }
+        })
+      },
+    )
+
+    await resumeOrchestrator(
+      buildInput(completedResults, {
+        messages: [
+          {
+            id: 'user-1',
+            role: 'user',
+            parts: [{ type: 'text', text: 'orchestrate this' }],
+          },
+          {
+            id: 'background-wake:chat-1:tc-1',
+            role: 'user',
+            parts: [{ type: 'text', text: nudge }],
+            metadata: { harnessWake: true },
+          },
+        ],
+      }),
+    )
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0] as {
+      modelMessages: Array<{ role: string; content: string }>
+    }
+    const matches = streamInput.modelMessages.filter(
+      (message) => message.role === 'user' && message.content === nudge,
+    )
+    expect(matches).toHaveLength(1)
   })
 
   it('keeps pending resume when a sibling finishes during resume awaits', async () => {

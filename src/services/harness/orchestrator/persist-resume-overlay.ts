@@ -90,9 +90,15 @@ export default async (input: {
       })
       await persistLine(input.projectSlug, input.chatId, {
         id,
-        role: 'user',
-        parts: [{ type: 'text', text: input.wake.content }],
+        role: 'assistant',
+        parts: [],
         createdAt: nowIso(),
+        harnessEvent: {
+          type: 'background-wake',
+          content: input.wake.content,
+          toolCallIds: input.wake.toolCallIds,
+          resultKeys: input.wake.resultKeys,
+        },
       })
     }
   }

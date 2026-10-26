@@ -66,7 +66,13 @@ export const applyHydrateLine = (
 
   if (
     harnessEvent &&
-    applyHydrateHarnessEvent(acc, harnessEvent, flushTurn, parsed.createdAt)
+    applyHydrateHarnessEvent(
+      acc,
+      harnessEvent,
+      flushTurn,
+      parsed.createdAt,
+      parsed.id,
+    )
   ) {
     return
   }

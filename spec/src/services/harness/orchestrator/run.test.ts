@@ -564,6 +564,20 @@ describe('orchestrator run user persist', () => {
         resultKeys: [shellResultKey(shellResult)],
       },
     })
+    expect(persistLine).toHaveBeenCalledWith(
+      'proj',
+      'chat-1',
+      expect.objectContaining({
+        role: 'assistant',
+        parts: [],
+        harnessEvent: {
+          type: 'background-wake',
+          content: wakeContent,
+          toolCallIds: [shellResult.toolCallId],
+          resultKeys: [shellResultKey(shellResult)],
+        },
+      }),
+    )
     persistLine.mockClear()
 
     await runOrchestrator(
@@ -587,8 +601,13 @@ describe('orchestrator run user persist', () => {
     expect(shellNudges[0]?.content).toContain('sh-finished')
     expect(
       persistLine.mock.calls.some((call) => {
-        const line = call[2] as { parts?: Array<{ text?: string }> }
-        return line?.parts?.some((part) => part.text === wakeContent) === true
+        const line = call[2] as {
+          harnessEvent?: { type?: string; content?: string }
+        }
+        return (
+          line?.harnessEvent?.type === 'background-wake' &&
+          line?.harnessEvent?.content === wakeContent
+        )
       }),
     ).toBe(false)
   })

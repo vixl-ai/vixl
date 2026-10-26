@@ -39,6 +39,7 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
       ...metaFor(chatId),
       ...patch,
     })),
+    truncateChatLog: vi.fn<() => Promise<void>>(async () => {}),
   }),
 )
 
@@ -349,5 +350,225 @@ describe('chat session registry isolation', () => {
     expect(store.loading.value).toBe(false)
     expect(contextUsage.lastStepUsage.value?.inputTokens).toBe(51_000)
     expect(contextUsage.promptUsed.value).toBe(51_000)
+  })
+})
+
+describe('truncate merges harnessWake messages', () => {
+  const userMessage = (
+    id: string,
+    text: string,
+    createdAt?: string,
+    harnessWake?: boolean,
+  ) => ({
+    id,
+    role: 'user' as const,
+    parts: [{ type: 'text' as const, text }],
+    metadata: {
+      ...(createdAt ? { createdAt } : {}),
+      ...(harnessWake ? { harnessWake: true } : {}),
+    },
+  })
+
+  const assistantTurn = (id: string, createdAt: string) => ({
+    id,
+    steps: [],
+    text: 'ok',
+    createdAt,
+  })
+
+  it('keeps a wake strictly before a truncated user message', async () => {
+    const { createSession } = await import('@/composables/chat-store/helpers')
+    const { createSessionMutations } = await import(
+      '@/composables/chat-store/session-mutations'
+    )
+    const session = createSession('proj', 'chat-trunc-before')
+    const first = userMessage('u1', 'first', '2026-01-01T00:00:00.000Z')
+    const wake = userMessage(
+      'wake-1',
+      'wake body',
+      '2026-01-01T00:00:02.000Z',
+      true,
+    )
+    const second = userMessage('u2', 'second', '2026-01-01T00:00:03.000Z')
+    const turn = assistantTurn('a1', '2026-01-01T00:00:01.000Z')
+    session.timeline.value = [
+      { type: 'user', message: first },
+      { type: 'agent-turn', turn },
+      { type: 'user', message: second },
+    ]
+    session.messages.value = [
+      first,
+      { id: 'a1', role: 'assistant', parts: [{ type: 'text', text: 'ok' }], metadata: { createdAt: turn.createdAt } },
+      wake,
+      second,
+    ]
+    const api = createSessionMutations(session)
+    await api.truncateBeforeMessage('proj', 'chat-trunc-before', 'u2')
+
+    expect(session.timeline.value.map((item) => item.type)).toEqual([
+      'user',
+      'agent-turn',
+    ])
+    expect(session.messages.value.map((message) => message.id)).toEqual([
+      'u1',
+      'a1',
+      'wake-1',
+    ])
+    expect(session.messages.value[2]?.metadata).toMatchObject({ harnessWake: true })
+  })
+
+  it('keeps a wake through the last user and drops a later wake', async () => {
+    const { createSession } = await import('@/composables/chat-store/helpers')
+    const { createSessionMutations } = await import(
+      '@/composables/chat-store/session-mutations'
+    )
+    const session = createSession('proj', 'chat-trunc-after')
+    const first = userMessage('u1', 'first', '2026-01-01T00:00:01.000Z')
+    const keptWake = userMessage(
+      'wake-keep',
+      'kept wake',
+      '2026-01-01T00:00:00.000Z',
+      true,
+    )
+    const laterWake = userMessage(
+      'wake-drop',
+      'later wake',
+      '2026-01-01T00:00:02.000Z',
+      true,
+    )
+    session.timeline.value = [{ type: 'user', message: first }]
+    session.messages.value = [first, keptWake, laterWake]
+    const api = createSessionMutations(session)
+    await api.truncateAfterLastUserMessage('proj', 'chat-trunc-after')
+
+    expect(session.timeline.value).toEqual([{ type: 'user', message: first }])
+    expect(session.messages.value.map((message) => message.id)).toEqual([
+      'wake-keep',
+      'u1',
+    ])
+  })
+
+  it('drops a wake after the kept user when truncating after that user', async () => {
+    const { createSession } = await import('@/composables/chat-store/helpers')
+    const { createSessionMutations } = await import(
+      '@/composables/chat-store/session-mutations'
+    )
+    const session = createSession('proj', 'chat-trunc-after-user')
+    const first = userMessage('u1', 'first', '2026-01-01T00:00:00.000Z')
+    const second = userMessage('u2', 'second', '2026-01-01T00:00:03.000Z')
+    const wake = userMessage(
+      'wake-1',
+      'wake after first',
+      '2026-01-01T00:00:01.000Z',
+      true,
+    )
+    session.timeline.value = [
+      { type: 'user', message: first },
+      { type: 'user', message: second },
+    ]
+    session.messages.value = [first, wake, second]
+    const api = createSessionMutations(session)
+    await api.truncateAfterUserMessage('proj', 'chat-trunc-after-user', 'u1')
+
+    expect(session.messages.value.map((message) => message.id)).toEqual(['u1'])
+  })
+
+  it('leaves rebuilt messages when the boundary user has no createdAt', async () => {
+    const { mergeHarnessWakeMessages } = await import(
+      '@/composables/chat-store/merge-harness-wake-messages'
+    )
+    const first = userMessage('u1', 'first')
+    const wake = userMessage(
+      'wake-1',
+      'wake body',
+      '2026-01-01T00:00:01.000Z',
+      true,
+    )
+    expect(
+      mergeHarnessWakeMessages(
+        [first],
+        [first, wake],
+        undefined,
+        'through',
+        first.id,
+      ).map((message) => message.id),
+    ).toEqual(['u1'])
+  })
+
+  it('drops a wake that has no createdAt', async () => {
+    const { mergeHarnessWakeMessages } = await import(
+      '@/composables/chat-store/merge-harness-wake-messages'
+    )
+    const first = userMessage('u1', 'first', '2026-01-01T00:00:00.000Z')
+    const wake = userMessage(
+      'wake-1',
+      'wake body',
+      undefined,
+      true,
+    )
+    expect(
+      mergeHarnessWakeMessages(
+        [first],
+        [first, wake],
+        '2026-01-01T00:00:00.000Z',
+        'through',
+        first.id,
+      ).map((message) => message.id),
+    ).toEqual(['u1'])
+  })
+
+  it('keeps a same-timestamp wake that appears before the boundary', async () => {
+    const { mergeHarnessWakeMessages } = await import(
+      '@/composables/chat-store/merge-harness-wake-messages'
+    )
+    const stamp = '2026-01-01T00:00:03.000Z'
+    const first = userMessage('u1', 'first', '2026-01-01T00:00:00.000Z')
+    const wake = userMessage('wake-1', 'wake body', stamp, true)
+    const second = userMessage('u2', 'second', stamp)
+    expect(
+      mergeHarnessWakeMessages(
+        [first],
+        [first, wake, second],
+        stamp,
+        'before',
+        second.id,
+      ).map((message) => message.id),
+    ).toEqual(['u1', 'wake-1'])
+    expect(
+      mergeHarnessWakeMessages(
+        [second],
+        [wake, second],
+        stamp,
+        'through',
+        second.id,
+      ).map((message) => message.id),
+    ).toEqual(['wake-1', 'u2'])
+  })
+
+  it('drops a same-timestamp wake that appears after the boundary', async () => {
+    const { mergeHarnessWakeMessages } = await import(
+      '@/composables/chat-store/merge-harness-wake-messages'
+    )
+    const stamp = '2026-01-01T00:00:00.000Z'
+    const first = userMessage('u1', 'first', stamp)
+    const wake = userMessage('wake-1', 'wake body', stamp, true)
+    expect(
+      mergeHarnessWakeMessages(
+        [first],
+        [first, wake],
+        stamp,
+        'through',
+        first.id,
+      ).map((message) => message.id),
+    ).toEqual(['u1'])
+    expect(
+      mergeHarnessWakeMessages(
+        [],
+        [first, wake],
+        stamp,
+        'before',
+        first.id,
+      ).map((message) => message.id),
+    ).toEqual([])
   })
 })

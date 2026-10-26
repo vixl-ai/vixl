@@ -56,11 +56,7 @@ fn keep_count(
     } else if keep_through_last_user.unwrap_or(false) {
         messages
             .iter()
-            .rposition(|line| {
-                line.get("role")
-                    .and_then(|value| value.as_str())
-                    .is_some_and(|role| role == "user")
-            })
+            .rposition(is_keep_through_user_line)
             .map(|index| index + 1)
             .unwrap_or(0)
     } else {
@@ -70,4 +66,55 @@ fn keep_count(
         );
     };
     Ok(count as i64)
+}
+
+fn is_keep_through_user_line(line: &serde_json::Value) -> bool {
+    let harness_type = line
+        .get("harnessEvent")
+        .and_then(|value| value.get("type"))
+        .and_then(|value| value.as_str());
+    if harness_type == Some("background-wake") {
+        return false;
+    }
+    line.get("role")
+        .and_then(|value| value.as_str())
+        .is_some_and(|role| role == "user")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::keep_count;
+
+    #[test]
+    fn keep_through_last_user_skips_trailing_background_wake_even_if_role_is_user() {
+        let lines = vec![
+            serde_json::json!({
+                "id": "u1",
+                "role": "user",
+                "parts": [{ "type": "text", "text": "real prompt" }]
+            }),
+            serde_json::json!({
+                "id": "a1",
+                "role": "assistant",
+                "parts": [{ "type": "text", "text": "ok" }]
+            }),
+            serde_json::json!({
+                "id": "wake",
+                "role": "user",
+                "parts": [],
+                "harnessEvent": {
+                    "type": "background-wake",
+                    "content": "wake body"
+                }
+            }),
+        ];
+        let count = keep_count(&lines, None, Some(true), None).expect("keep count");
+        assert_eq!(count, 1);
+        let kept: Vec<&str> = lines
+            .iter()
+            .take(count as usize)
+            .filter_map(|line| line.get("id").and_then(|value| value.as_str()))
+            .collect();
+        assert_eq!(kept, ["u1"]);
+    }
 }
