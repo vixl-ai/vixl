@@ -12,6 +12,7 @@ import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { ShellExitResult } from '@/types/harness/shell-exit'
 import {
   clearPendingShellResumeState,
+  discardShellWakeQueueForChat,
   enqueueDeliverableShellResult,
   markPendingShellResume,
   parentBackgroundShellsAreRunning,
@@ -272,10 +273,20 @@ export const killAgentShell = async (shellId: string): Promise<AgentShellRecord>
   return shell
 }
 
+export const discardShellWakeForChat = (chatId: string): void => {
+  if (!discardShellWakeQueueForChat(chatId)) {
+    return
+  }
+  bumpRevision()
+}
+
 export const killShellsForChat = async (
   chatId: string,
   options?: { keepBackground?: boolean },
 ): Promise<void> => {
+  if (options?.keepBackground !== true) {
+    discardShellWakeForChat(chatId)
+  }
   const shellIds = chatShells.get(chatId)
   if (!shellIds) {
     return

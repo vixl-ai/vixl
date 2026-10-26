@@ -375,6 +375,80 @@ describe('agent-shell-registry', () => {
     expect(listDeliverableShellResults('chat-1')).toEqual([])
   })
 
+  it('discards a queued parent background result when killing shells for a chat', async () => {
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (event.startsWith('shell-exit-')) {
+        exitHandler = handler
+      }
+      return () => {}
+    })
+
+    const {
+      createAgentShell,
+      killShellsForChat,
+      listDeliverableShellResults,
+      hasPendingShellResume,
+    } = await import('@/services/harness/shell/registry')
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm test',
+      toolCallId: 'tc-stop',
+      background: true,
+      wakeParent: true,
+    })
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    expect(listDeliverableShellResults('chat-1')).toHaveLength(1)
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+
+    await killShellsForChat('chat-1')
+
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+    expect(hasPendingShellResume('chat-1')).toBe(false)
+  })
+
+  it('keeps a queued parent background result when keepBackground is set', async () => {
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (event.startsWith('shell-exit-')) {
+        exitHandler = handler
+      }
+      return () => {}
+    })
+
+    const {
+      createAgentShell,
+      killShellsForChat,
+      listDeliverableShellResults,
+      hasPendingShellResume,
+    } = await import('@/services/harness/shell/registry')
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm test',
+      toolCallId: 'tc-keep',
+      background: true,
+      wakeParent: true,
+    })
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    expect(listDeliverableShellResults('chat-1')).toHaveLength(1)
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+
+    await killShellsForChat('chat-1', { keepBackground: true })
+
+    expect(listDeliverableShellResults('chat-1')).toHaveLength(1)
+    expect(hasPendingShellResume('chat-1')).toBe(true)
+  })
+
   it('does not queue a result when a foreground shell exits', async () => {
     let exitHandler: ExitListener | undefined
     listen.mockImplementation(async (event, handler) => {

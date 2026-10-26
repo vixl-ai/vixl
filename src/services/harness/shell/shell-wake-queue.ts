@@ -89,6 +89,13 @@ export const parentBackgroundShellsAreRunning = (
       shell.status === 'running' && shell.background === true && !shell.subagentId,
   )
 
+export const discardShellWakeQueueForChat = (chatId: string): boolean => {
+  const hadPending = pendingShellResume.delete(chatId)
+  const hadQueued = queuedShellResults.delete(chatId)
+  deliveredShellResults.delete(chatId)
+  return hadPending || hadQueued
+}
+
 export const resetShellWakeQueueForTests = (): void => {
   pendingShellResume.clear()
   deliveredShellResults.clear()

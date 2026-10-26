@@ -26,6 +26,9 @@ const killShellsForChat = vi.hoisted(() =>
     .fn<(chatId: string, options?: { keepBackground?: boolean }) => Promise<void>>()
     .mockResolvedValue(undefined),
 )
+const discardShellWakeForChat = vi.hoisted(() =>
+  vi.fn<(chatId: string) => void>(),
+)
 const rejectPendingMcpAuthForChat = vi.hoisted(() =>
   vi.fn<(chatId: string, options?: { keepBackground?: boolean }) => void>(),
 )
@@ -52,6 +55,7 @@ vi.mock('@/services/harness/shell/registry', () => ({
     chatId: string,
     options?: { keepBackground?: boolean },
   ) => killShellsForChat(chatId, options),
+  discardShellWakeForChat: (chatId: string) => discardShellWakeForChat(chatId),
 }))
 
 vi.mock('@/services/mcp/mcp-auth-gate', () => ({
@@ -181,6 +185,7 @@ describe('agent-harness lifecycle stop', () => {
 
     expect(state.suppressQueueDrainAfterStop.value).toBe(true)
     expect(abortSubagentsForChat).toHaveBeenCalledWith('chat-1')
+    expect(discardShellWakeForChat).toHaveBeenCalledWith('chat-1')
     expect(killShellsForChat).toHaveBeenCalledWith('chat-1', undefined)
     expect(rejectPendingMcpAuthForChat).toHaveBeenCalledWith('chat-1', undefined)
     expect(state.session.clearLocalQueuedSubagentSteers).toHaveBeenCalledWith(
@@ -445,6 +450,7 @@ describe('agent-harness lifecycle stop', () => {
 
     expect(abortBlocking).toHaveBeenCalledWith('chat-1')
     expect(abortSubagentsForChat).not.toHaveBeenCalled()
+    expect(discardShellWakeForChat).not.toHaveBeenCalled()
     expect(clearPendingBackgroundResume).not.toHaveBeenCalled()
     expect(state.session.completeLocalSubagent).toHaveBeenCalledWith(
       'block-1',
