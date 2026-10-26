@@ -246,6 +246,7 @@ function simulateFollowBottomWidthChange({
   let liveTrueHeight = trueHeight
   let shouldClearHeightsOnWidth = invalidateOnWidthChange
   let previousScrollHeight = 0
+  let followingBottom = true
 
   const framesOut: FrameOut[] = []
 
@@ -345,13 +346,6 @@ function simulateFollowBottomWidthChange({
       scrollEpsilon: SCROLL_EPSILON,
       scrollTop,
     })
-    const chase = chaseFollowFrame({
-      grew,
-      offEnd,
-      policy,
-      source,
-      trusted,
-    })
     const settle = shouldSettleScrollToEnd({
       hasStreamingTurn: false,
       maxScrollTop,
@@ -382,7 +376,7 @@ function simulateFollowBottomWidthChange({
     })
     const recoverFollow = shouldRecoverFollowAfterLayoutScroll({
       distanceFromEnd,
-      followingBottom: true,
+      followingBottom,
       layoutClamp,
       programmatic: false,
       resizePending: false,
@@ -390,6 +384,15 @@ function simulateFollowBottomWidthChange({
       scrollHeightChanged,
       threshold: SCROLL_EDGE_THRESHOLD,
       userGesture,
+    })
+    if (exitFollowIfScrolledUp)
+      followingBottom = false
+    const chase = followingBottom && chaseFollowFrame({
+      grew,
+      offEnd,
+      policy,
+      source,
+      trusted,
     })
 
     previousScrollHeight = Hdom
@@ -1077,7 +1080,7 @@ describe('stale-height follow-bottom resize loop', () => {
       })).toBe(false)
     })
 
-    it('does not recover and exits follow for an unarmed upward scroll with stable height', () => {
+    it('recovers follow for an unarmed upward scroll with stable height', () => {
       const layoutClamp = shouldTreatUpwardScrollAsLayoutClamp({
         scrollHeightDelta: 0,
         scrollTopDelta: 24,
@@ -1102,7 +1105,7 @@ describe('stale-height follow-bottom resize loop', () => {
         scrollHeightChanged: false,
         threshold: SCROLL_EDGE_THRESHOLD,
         userGesture,
-      })).toBe(false)
+      })).toBe(true)
       expect(shouldExitFollowBottomOnUnarmedScroll({
         distanceFromEnd: 24,
         layoutClamp,
@@ -1112,10 +1115,10 @@ describe('stale-height follow-bottom resize loop', () => {
         scrollHeightChanged: false,
         threshold: SCROLL_EDGE_THRESHOLD,
         userGesture,
-      })).toBe(true)
+      })).toBe(false)
     })
 
-    it('does not recover and exits follow when an unarmed reader scroll leaves the viewport off the end', () => {
+    it('recovers follow when an unarmed scroll leaves the viewport off the end', () => {
       const framesOut = simulateFollowBottomWidthChange({
         frames: 1,
         readerJumpFrame: 0,
@@ -1128,8 +1131,109 @@ describe('stale-height follow-bottom resize loop', () => {
 
       expect(framesOut[0]?.clamped).toBe(true)
       expect(framesOut[0]?.distanceFromEnd).toBeGreaterThan(SCROLL_EDGE_THRESHOLD)
-      expect(framesOut[0]?.recoverFollow).toBe(false)
-      expect(framesOut[0]?.exitFollowIfScrolledUp).toBe(true)
+      expect(framesOut[0]?.recoverFollow).toBe(true)
+      expect(framesOut[0]?.exitFollowIfScrolledUp).toBe(false)
+    })
+
+    it('keeps follow and chases to the live edge after an unarmed viewport-filling jump with stable height', () => {
+      const viewportHeight = 400
+      const rowHeight = 400
+      const gap = 24
+      const jumpPx = rowHeight + gap
+      const framesOut = simulateFollowBottomWidthChange({
+        frames: 8,
+        lateTrueHeight: 480,
+        lateTrueHeightFromFrame: 2,
+        readerJumpFrame: 0,
+        readerJumpPx: jumpPx,
+        reportPolicy: 'allMounted',
+        userGesture: false,
+        ...applyFixedGuards(),
+        gap,
+        itemCount: 6,
+        oldHeight: rowHeight,
+        overscanPx: DEFAULT_OVERSCAN_PX,
+        trueHeight: rowHeight,
+        viewportHeight,
+      })
+
+      const jumped = framesOut[0]
+      expect(jumped?.clamped).toBe(true)
+      expect(jumped?.distanceFromEnd).toBeGreaterThanOrEqual(viewportHeight)
+      expect(jumped?.exitFollowIfScrolledUp).toBe(false)
+      expect(jumped?.recoverFollow).toBe(true)
+      expect(jumped?.chase).toBe(true)
+      expect(isTwoCycle(framesOut)).toBe(false)
+      expectConverged(framesOut)
+      expect(framesOut.at(-1)?.distanceFromEnd).toBe(0)
+    })
+
+    it('exits follow and does not chase for an armed scrollbar or wheel jump with stable height', () => {
+      const layoutClamp = shouldTreatUpwardScrollAsLayoutClamp({
+        scrollHeightDelta: 0,
+        scrollTopDelta: 424,
+        threshold: SCROLL_EDGE_THRESHOLD,
+      })
+      const pendingUserScrollbarScroll = true
+      const pendingUserWheelScroll = true
+      const wheelOrTouchGesture = !layoutClamp && pendingUserWheelScroll
+      const userGesture = wheelOrTouchGesture || (pendingUserScrollbarScroll && !layoutClamp)
+      expect(layoutClamp).toBe(false)
+      expect(userGesture).toBe(true)
+      expect(shouldExitFollowBottom({
+        autoscrolling: false,
+        distanceFromEnd: 424,
+        scrolledUp: true,
+        threshold: SCROLL_EDGE_THRESHOLD,
+        userGesture,
+      })).toBe(true)
+      expect(shouldRecoverFollowAfterLayoutScroll({
+        distanceFromEnd: 424,
+        followingBottom: true,
+        layoutClamp,
+        programmatic: false,
+        resizePending: false,
+        scrolledUp: true,
+        scrollHeightChanged: false,
+        threshold: SCROLL_EDGE_THRESHOLD,
+        userGesture,
+      })).toBe(false)
+      expect(shouldExitFollowBottomOnUnarmedScroll({
+        distanceFromEnd: 424,
+        layoutClamp,
+        programmatic: false,
+        resizePending: false,
+        scrolledUp: true,
+        scrollHeightChanged: false,
+        threshold: SCROLL_EDGE_THRESHOLD,
+        userGesture,
+      })).toBe(false)
+
+      const framesOut = simulateFollowBottomWidthChange({
+        frames: 8,
+        lateTrueHeight: 480,
+        lateTrueHeightFromFrame: 2,
+        readerJumpFrame: 0,
+        readerJumpPx: 424,
+        reportPolicy: 'allMounted',
+        userGesture: true,
+        ...applyFixedGuards(),
+        gap: 24,
+        itemCount: 6,
+        oldHeight: 400,
+        overscanPx: DEFAULT_OVERSCAN_PX,
+        trueHeight: 400,
+        viewportHeight: 400,
+      })
+
+      const jumped = framesOut[0]
+      expect(jumped?.clamped).toBe(true)
+      expect(jumped?.distanceFromEnd).toBeGreaterThan(SCROLL_EDGE_THRESHOLD)
+      expect(jumped?.exitFollowIfScrolledUp).toBe(true)
+      expect(jumped?.recoverFollow).toBe(false)
+      const last = framesOut.at(-1)
+      expect(last?.chase).toBe(false)
+      expect(last?.distanceFromEnd).toBeGreaterThan(SCROLL_EDGE_THRESHOLD)
     })
 
     it('keeps follow and chases to the live edge when content grows and scrollTop drops without a gesture', () => {

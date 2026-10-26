@@ -23,7 +23,6 @@ import {
   shouldChaseFollowBottom,
   shouldChaseFollowBottomOnResize,
   shouldExitFollowBottom,
-  shouldExitFollowBottomOnUnarmedScroll,
   shouldExitFollowBottomOnUserTouch,
   shouldPromoteNestedWheelToGesture,
   shouldRecoverFollowAfterLayoutScroll,
@@ -456,6 +455,7 @@ function createEngine(props: MessageScrollerProviderProps) {
   let nestedWheelPending = false
   let resizePendingState = createResizePendingState()
   let programmaticScrollDepth = 0
+  let pendingFollowRecoveryScroll = false
   let defaultScrollPositionApplied = false
   let preserveScrollOnPrepend = true
   let prependRestore: PrependRestore | null = null
@@ -556,6 +556,7 @@ function createEngine(props: MessageScrollerProviderProps) {
         })
       ) {
         mode = "free-scrolling"
+        pendingFollowRecoveryScroll = false
         clearUserInertiaScrollIntent()
       }
       else if (shouldRecoverFollowAfterLayoutScroll({
@@ -569,23 +570,8 @@ function createEngine(props: MessageScrollerProviderProps) {
         threshold,
         userGesture,
       })) {
+        pendingFollowRecoveryScroll = true
         scheduleFollowChaseRecheck()
-      }
-      else if (shouldExitFollowBottomOnUnarmedScroll({
-        distanceFromEnd,
-        layoutClamp,
-        programmatic,
-        resizePending: pendingResize,
-        scrolledUp,
-        scrollHeightChanged,
-        threshold,
-        userGesture,
-      })) {
-        // Scrollbar drag whose pointerdown missed the viewport, or any
-        // other unarmed reader scroll. Do not chase. Staying in
-        // following-bottom would let the next stream tick yank them down.
-        mode = "free-scrolling"
-        clearUserInertiaScrollIntent()
       }
     }
     // Do not clear wheel or touch here. Inertia after a trackpad or
@@ -1472,6 +1458,11 @@ function createEngine(props: MessageScrollerProviderProps) {
   function syncAfterScroll() {
     const layoutClamp = isLayoutClampScroll()
     commitScrollState()
+    if (pendingFollowRecoveryScroll) {
+      pendingFollowRecoveryScroll = false
+      if (mode === "following-bottom" && autoScroll())
+        scrollToEnd({ behavior: "auto" })
+    }
     // Do not drop wheel or touch after a scroll commit. Trackpad and
     // touch inertia keep emitting scroll after the originating gesture.
     // A programmatic write must not count as inertia. A content shrink

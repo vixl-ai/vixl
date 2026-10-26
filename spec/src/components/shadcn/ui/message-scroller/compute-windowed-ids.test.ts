@@ -929,11 +929,11 @@ describe('shouldRecoverFollowAfterLayoutScroll', () => {
     expect(shouldRecoverFollowAfterLayoutScroll(recovering)).toBe(true)
   })
 
-  it('does not recover when the upward scroll is not a layout clamp', () => {
+  it('recovers when the upward scroll is not a layout clamp', () => {
     expect(shouldRecoverFollowAfterLayoutScroll({
       ...recovering,
       layoutClamp: false,
-    })).toBe(false)
+    })).toBe(true)
   })
 
   it('does not recover when the reader is not following', () => {
@@ -983,8 +983,8 @@ describe('shouldExitFollowBottomOnUnarmedScroll', () => {
     userGesture: false,
   }
 
-  it('exits follow when an unarmed reader scroll moves off the live edge', () => {
-    expect(shouldExitFollowBottomOnUnarmedScroll(exiting)).toBe(true)
+  it('keeps follow when an unarmed reader scroll moves off the live edge', () => {
+    expect(shouldExitFollowBottomOnUnarmedScroll(exiting)).toBe(false)
   })
 
   it('keeps follow when the upward scroll is a layout clamp', () => {
@@ -1086,19 +1086,19 @@ describe('follow exit during height change', () => {
     })).toBe(false)
   })
 
-  it('exits follow and does not recover for an unarmed upward scroll with stable height', () => {
+  it('stays in follow and recovers for an unarmed upward scroll with stable height', () => {
     expect(shouldExitFollowBottomOnUnarmedScroll({
       ...offEnd,
       resizePending: false,
       scrollHeightChanged: false,
       userGesture: false,
-    })).toBe(true)
+    })).toBe(false)
     expect(shouldRecoverFollowAfterLayoutScroll({
       ...offEnd,
       resizePending: false,
       scrollHeightChanged: false,
       userGesture: false,
-    })).toBe(false)
+    })).toBe(true)
   })
 })
 
@@ -1141,12 +1141,12 @@ describe('resizePending lifetime', () => {
       ...offEnd,
       resizePending: state.pending,
       scrollHeightChanged: false,
-    })).toBe(true)
+    })).toBe(false)
     expect(shouldRecoverFollowAfterLayoutScroll({
       ...offEnd,
       resizePending: state.pending,
       scrollHeightChanged: false,
-    })).toBe(false)
+    })).toBe(true)
   })
 
   it('stays pending across consecutive resize frames', () => {
