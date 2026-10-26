@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import { toast } from 'vue-sonner'
 import { z } from 'zod'
@@ -17,6 +16,7 @@ import { Input } from '@/components/shadcn/ui/input'
 import { Textarea } from '@/components/shadcn/ui/textarea'
 import AgentToolsInput from '@/components/settings/vixl-files/AgentToolsInput.vue'
 import VixlFileCreateSheet from '@/components/settings/vixl-files/VixlFileCreateSheet.vue'
+import { toTypedSchema } from '@/components/settings/vixl-files/to-typed-schema'
 import useVixlConfig from '@/composables/use-vixl-config'
 import writeAgent from '@/services/agents/write-agent'
 

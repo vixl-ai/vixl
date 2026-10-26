@@ -13,7 +13,7 @@ const getMcpPrompt = (ctx: HarnessToolContext) =>
     inputSchema: z.object({
       serverId: z.string(),
       name: z.string().describe('Prompt name'),
-      args: z.record(z.unknown()).optional().describe('Prompt arguments'),
+      args: z.record(z.string(), z.unknown()).optional().describe('Prompt arguments'),
     }),
     execute: async ({ serverId, name, args }, { toolCallId }) => {
       const trust = await resolveTrustedMcpServer(ctx, serverId)

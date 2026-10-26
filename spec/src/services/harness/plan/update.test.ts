@@ -288,7 +288,7 @@ describe('update_plan', () => {
           message: 'Invalid',
         },
       ]),
-    })
+    } as ReturnType<typeof parsedPlanSchema.safeParse>)
     const updatePlan = (await import('@/services/harness/plan/update')).default
     const tool = updatePlan(planCtx())
 

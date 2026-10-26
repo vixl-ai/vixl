@@ -6,7 +6,7 @@ const stdioServerSchema = z.object({
   // migrateMcpConfig does not wipe existing server entries.
   command: z.string().min(1),
   args: z.array(z.string()).optional(),
-  env: z.record(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
   envFile: z.string().optional(),
   enabled: z.boolean().optional(),
 })
@@ -42,7 +42,7 @@ const httpServerSchema = z
     type: z.enum(['http', 'sse']),
     url: templatableUrl,
     auth: z.enum(['none', 'headers', 'oauth']).optional(),
-    headers: z.record(z.string()).optional(),
+    headers: z.record(z.string(), z.string()).optional(),
     oauth: oauthSchema.optional(),
     enabled: z.boolean().optional(),
   })
@@ -75,7 +75,7 @@ const inputSchema = z.object({
 })
 
 export const mcpConfigSchema = z.object({
-  servers: z.record(serverSchema),
+  servers: z.record(z.string(), serverSchema),
   inputs: z.array(inputSchema).optional(),
 })
 

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
@@ -14,6 +13,7 @@ import {
 import { Input } from '@/components/shadcn/ui/input'
 import { Textarea } from '@/components/shadcn/ui/textarea'
 import VixlFileCreateSheet from '@/components/settings/vixl-files/VixlFileCreateSheet.vue'
+import { toTypedSchema } from '@/components/settings/vixl-files/to-typed-schema'
 import { createSkillInputSchema } from '@/schemas/skills/skill-document'
 import writeSkill from '@/services/skills/write-skill'
 
