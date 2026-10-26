@@ -172,12 +172,6 @@
     "proxy-addr": "2.0.8",
     "postcss-selector-parser": "7.1.6",
     "tinypool": "2.1.2",
-    "hono": "4.13.13",
-    "shadcn": {
-      "zod": "$zod"
-    },
-    "shadcn-vue": {
-      "zod": "$zod"
-    }
+    "hono": "4.13.13"
   }
 }
