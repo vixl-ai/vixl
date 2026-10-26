@@ -184,6 +184,15 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
     if (shellWakeContent) {
       modelMessages.push({ role: 'user', content: shellWakeContent })
     }
+    if (alreadyPersistedShellResults.length > 0) {
+      modelMessages.push({
+        role: 'user',
+        content: buildShellWakeNudge(
+          alreadyPersistedShellResults,
+          runningParentBackgroundShells(chatId),
+        ),
+      })
+    }
   } else {
     const persisted = loadResumeOverlay(chatId)
     modelMessages.push(

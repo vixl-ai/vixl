@@ -1289,6 +1289,65 @@ describe('resumeOrchestrator background waves', () => {
     ).rejects.toThrow('No completed subagent results to resume')
   })
 
+  it('appends an overlay-persisted shell nudge when captured turn messages skip overlay replay', async () => {
+    type ExitListener = (event: {
+      payload: { shellId: string; exitCode: number; signal?: number }
+    }) => void
+    let exitHandler: ExitListener | undefined
+    listen.mockImplementation(async (event, handler) => {
+      if (typeof event === 'string' && event.startsWith('shell-exit-')) {
+        exitHandler = handler as ExitListener
+      }
+      return () => {}
+    })
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/tmp/proj',
+      command: 'npm test',
+      description: 'Run tests',
+      toolCallId: 'tc-shell',
+      background: true,
+      wakeParent: true,
+    })
+    exitHandler?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+
+    const queued = listDeliverableShellResults('chat-1')
+    const result = queued[0]
+    if (!result) {
+      throw new Error('expected a deliverable shell result')
+    }
+    await persistResumeOverlay({
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      wake: {
+        content: buildShellWakeNudge([result], []),
+        toolCallIds: [result.toolCallId],
+        resultKeys: [shellResultKey(result)],
+      },
+    })
+    setTurnResponseMessages('chat-1', wave1Messages)
+
+    await resumeOrchestrator(buildInput([], { shellResults: queued }))
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content: string
+    }>
+    const shellNudges = modelMessages.filter(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.includes('[harness: background terminal results]'),
+    )
+    expect(shellNudges).toHaveLength(1)
+    expect(shellNudges[0]?.content).toContain(shell.shellId)
+    expect(listDeliverableShellResults('chat-1')).toEqual([])
+  })
+
   it('names a still-running parent background shell in the resume nudge', async () => {
     const running = await createAgentShell({
       chatId: 'chat-1',
