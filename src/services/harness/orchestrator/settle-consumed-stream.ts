@@ -3,6 +3,8 @@ import { toast } from 'vue-sonner'
 import type { AgentStop } from '@/types/chat/agent-stop'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import { getPlanExecutionSession } from '@/services/harness/plan-execution-session'
+import { hasPendingShellResume } from '@/services/harness/shell/registry'
+import { turnSpawnedParentBackgroundShells } from '@/services/harness/shell/turn-spawned-parent-shell'
 import {
   getTurnResponseMessages,
   hasPendingBackgroundResume,
@@ -115,14 +117,19 @@ export const settleConsumedStream = async (input: {
     }
   }
 
-  if (
-    input.captureTurnMessages &&
-    hasPendingBackgroundResume(input.chatId) &&
-    !getTurnResponseMessages(input.chatId)
-  ) {
-    const responseMessages = await input.result.responseMessages
-    if (turnSpawnedBackgroundSubagents(input.chatId, responseMessages)) {
-      setTurnResponseMessages(input.chatId, responseMessages)
+  if (input.captureTurnMessages && !getTurnResponseMessages(input.chatId)) {
+    const pendingSubagent = hasPendingBackgroundResume(input.chatId)
+    const pendingShell = hasPendingShellResume(input.chatId)
+    if (pendingSubagent || pendingShell) {
+      const responseMessages = await input.result.responseMessages
+      if (
+        (pendingSubagent &&
+          turnSpawnedBackgroundSubagents(input.chatId, responseMessages)) ||
+        (pendingShell &&
+          turnSpawnedParentBackgroundShells(input.chatId, responseMessages))
+      ) {
+        setTurnResponseMessages(input.chatId, responseMessages)
+      }
     }
   }
 

@@ -1192,6 +1192,52 @@ describe('resumeOrchestrator background waves', () => {
     )
   })
 
+  it('keeps a captured parent shell tool result and appends one shell nudge', async () => {
+    const shellResult = {
+      toolCallId: 'tc-shell',
+      shellId: 'sh-finished',
+      command: 'npm test',
+      description: 'Run tests',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    }
+    setTurnResponseMessages('chat-1', [
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'tc-shell',
+            toolName: 'run_terminal',
+            output: { type: 'json', value: { pending: true } },
+          },
+        ],
+      },
+    ])
+
+    await resumeOrchestrator(buildInput([], { shellResults: [shellResult] }))
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content:
+        | string
+        | Array<{
+            type: string
+            toolCallId?: string
+          }>
+    }>
+    expect(JSON.stringify(modelMessages)).toContain('tc-shell')
+    const shellNudges = modelMessages.filter(
+      (message) =>
+        message.role === 'user' &&
+        typeof message.content === 'string' &&
+        message.content.includes('[harness: background terminal results]'),
+    )
+    expect(shellNudges).toHaveLength(1)
+  })
+
   it('resumes with only a shell result and includes the shell nudge', async () => {
     const shellResult = {
       toolCallId: 'tc-shell',

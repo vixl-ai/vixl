@@ -157,7 +157,12 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
     messages,
     activeContext,
   )
-  const priorMessages = dropTrailingAssistantMessages(contextMessages)
+  const hasSpawnSnapshot =
+    Boolean(turnMessages && turnMessages.length > 0) ||
+    overlay.spawnMessages.length > 0
+  const priorMessages = hasSpawnSnapshot
+    ? dropTrailingAssistantMessages(contextMessages)
+    : contextMessages
   const visionModel = await createModel({
     providerId: input.providerId,
     modelId: input.modelId,
