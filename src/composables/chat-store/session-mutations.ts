@@ -15,19 +15,16 @@ import {
   truncateChatLogBeforeMessage,
 } from '@/services/chat/truncate-chat-log'
 import {
-  clearActiveTurnState,
   extractUserMessageText,
   getActiveSession,
   mapMeta,
   todosFromTimeline,
 } from './helpers'
 import { upsertTodoTimelineItem } from './timeline'
-import {
-  rebuildMessagesFromTimeline,
-  updateTimelineTurn,
-} from './message-parsing'
+import { updateTimelineTurn } from './message-parsing'
 import applyAgentTurnStop from './apply-agent-turn-stop'
 import closeTurnForCompaction from './close-turn-for-compaction'
+import { applyHarnessWakeTimelineTruncate } from './merge-harness-wake-messages'
 import createSessionAgentOps from './session-agent-ops'
 import createSessionSubagentOps from './session-subagent-ops'
 import type { ChatSession, SessionMutations } from './types'
@@ -52,15 +49,21 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
     if (index < 0) {
       return
     }
-    const nextTimeline = session.timeline.value.slice(0, index)
-    session.timeline.value = nextTimeline
-    session.messages.value = rebuildMessagesFromTimeline(nextTimeline)
-    clearActiveTurnState(session)
+    applyHarnessWakeTimelineTruncate(
+      session,
+      session.timeline.value.slice(0, index),
+      index,
+      'before',
+    )
   }
 
   const truncateTimelineAfterLastUserMessage = (): void => {
     let lastUserIndex = -1
-    for (let index = session.timeline.value.length - 1; index >= 0; index -= 1) {
+    for (
+      let index: number = session.timeline.value.length - 1;
+      index >= 0;
+      index -= 1
+    ) {
       if (session.timeline.value[index]?.type === 'user') {
         lastUserIndex = index
         break
@@ -69,10 +72,12 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
     if (lastUserIndex < 0) {
       return
     }
-    const nextTimeline = session.timeline.value.slice(0, lastUserIndex + 1)
-    session.timeline.value = nextTimeline
-    session.messages.value = rebuildMessagesFromTimeline(nextTimeline)
-    clearActiveTurnState(session)
+    applyHarnessWakeTimelineTruncate(
+      session,
+      session.timeline.value.slice(0, lastUserIndex + 1),
+      lastUserIndex,
+      'through',
+    )
   }
 
   const truncateTimelineAfterUserMessage = (messageId: string): void => {
@@ -82,10 +87,12 @@ export const createSessionMutations = (session: ChatSession): SessionMutations =
     if (index < 0) {
       return
     }
-    const nextTimeline = session.timeline.value.slice(0, index + 1)
-    session.timeline.value = nextTimeline
-    session.messages.value = rebuildMessagesFromTimeline(nextTimeline)
-    clearActiveTurnState(session)
+    applyHarnessWakeTimelineTruncate(
+      session,
+      session.timeline.value.slice(0, index + 1),
+      index,
+      'through',
+    )
   }
 
   return {

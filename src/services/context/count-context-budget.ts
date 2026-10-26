@@ -91,6 +91,17 @@ const serializeMessages = (messages: UIMessage[], checkpointText: string): strin
   return `${checkpointText}\n\n${body}`
 }
 
+const isHarnessWakeMessage = (message: UIMessage): boolean => {
+  if (message.role !== 'user') {
+    return false
+  }
+  const metadata = message.metadata
+  if (!metadata || typeof metadata !== 'object') {
+    return false
+  }
+  return (metadata as Record<string, unknown>).harnessWake === true
+}
+
 const serializeConversation = (input: CountContextBudgetInput): string => {
   const { messages, checkpointText } = filterMessagesForActiveContext(
     input.messages,
@@ -98,11 +109,22 @@ const serializeConversation = (input: CountContextBudgetInput): string => {
   )
 
   if (input.timeline && input.timeline.length > 0) {
-    return serializeTimelineForBudget({
+    const timelineText = serializeTimelineForBudget({
       timeline: input.timeline,
       checkpointText,
       includeFromCreatedAt: input.activeContext?.includeFromCreatedAt,
     })
+    const wakeText = serializeMessages(
+      messages.filter(isHarnessWakeMessage),
+      '',
+    )
+    if (!wakeText) {
+      return timelineText
+    }
+    if (!timelineText) {
+      return wakeText
+    }
+    return `${timelineText}\n\n${wakeText}`
   }
 
   return serializeMessages(messages, checkpointText)

@@ -1663,3 +1663,137 @@ describe('hydrate-harness subagent-result stop', () => {
     expect(again.stop).toEqual({ reason: 'completed', finish: 'stop', detail: 'ok' })
   })
 })
+
+const harnessLine = (id: string, harnessEvent: Record<string, unknown>) => ({
+  id,
+  role: 'assistant' as const,
+  parts: [] as Array<Record<string, unknown>>,
+  createdAt: '2026-01-01T00:00:04.000Z',
+  harnessEvent,
+})
+
+describe('hydrate background-wake', () => {
+  it('puts a background-wake on messages as a hidden user wake', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      harnessLine('background-wake:chat:tool', {
+        type: 'background-wake',
+        content: 'wake body',
+        toolCallIds: ['tool'],
+        resultKeys: ['tool'],
+      }),
+      flushTurn,
+    )
+
+    expect(acc.nextTimeline.some((item) => item.type === 'user')).toBe(false)
+    expect(acc.nextMessages).toHaveLength(1)
+    expect(acc.nextMessages[0]).toEqual({
+      id: 'background-wake:chat:tool',
+      role: 'user',
+      parts: [{ type: 'text', text: 'wake body' }],
+      metadata: {
+        createdAt: '2026-01-01T00:00:04.000Z',
+        harnessWake: true,
+      },
+    })
+  })
+
+  it('still puts a normal user line on the timeline', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      {
+        id: 'user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'please continue' }],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      flushTurn,
+    )
+
+    expect(acc.nextTimeline).toEqual([
+      {
+        type: 'user',
+        message: {
+          id: 'user-1',
+          role: 'user',
+          parts: [{ type: 'text', text: 'please continue' }],
+          metadata: { createdAt: '2026-01-01T00:00:00.000Z' },
+        },
+      },
+    ])
+    expect(acc.nextMessages).toHaveLength(1)
+    expect(acc.nextMessages[0]?.id).toBe('user-1')
+    expect(acc.nextMessages[0]?.metadata).toEqual({
+      createdAt: '2026-01-01T00:00:00.000Z',
+    })
+  })
+
+  it('still puts a compaction harness line on the timeline', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      harnessLine('compact-1', {
+        type: 'compaction',
+        summary: 'Prior work',
+        focus: 'parent',
+      }),
+      flushTurn,
+    )
+
+    expect(acc.nextTimeline).toEqual([
+      { type: 'compaction', summary: 'Prior work', focus: 'parent' },
+    ])
+    expect(acc.nextMessages).toEqual([])
+  })
+
+  it('flushes a pending assistant turn before inserting the wake on messages', () => {
+    const acc = emptyAcc()
+    const flushTurn = createFlushTurn(acc)
+    applyHydrateLine(
+      acc,
+      {
+        id: 'tc-1',
+        role: 'assistant',
+        parts: [],
+        createdAt: '2026-01-01T00:00:01.000Z',
+        harnessEvent: {
+          type: 'tool-run',
+          toolCallId: 'tc-1',
+          name: 'read_file',
+          status: 'done',
+          args: { path: 'a.ts' },
+          result: { content: 'ok' },
+          stepId: 'step-1',
+        },
+      },
+      flushTurn,
+    )
+    expect(acc.pendingTurn).not.toBeNull()
+    applyHydrateLine(
+      acc,
+      harnessLine('background-wake:chat:tool', {
+        type: 'background-wake',
+        content: 'wake body',
+        toolCallIds: ['tool'],
+        resultKeys: ['tool'],
+      }),
+      flushTurn,
+    )
+
+    expect(acc.pendingTurn).toBeNull()
+    expect(acc.nextTimeline.map((item) => item.type)).toEqual(['agent-turn'])
+    expect(acc.nextMessages.map((message) => message.role)).toEqual([
+      'assistant',
+      'user',
+    ])
+    expect(acc.nextMessages[1]?.metadata).toEqual({
+      createdAt: '2026-01-01T00:00:04.000Z',
+      harnessWake: true,
+    })
+  })
+})

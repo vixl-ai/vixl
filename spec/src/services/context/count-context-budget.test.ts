@@ -363,4 +363,62 @@ describe('countContextBudget', () => {
     expect(token(grouped, 'mcp')).toBeGreaterThan(token(single, 'mcp'))
     expect(token(grouped, 'skills')).toBeGreaterThan(token(single, 'skills'))
   })
+
+  it('counts harnessWake message text that is missing from the timeline', async () => {
+    const user = message('1', '2026-01-01T00:00:00.000Z', 'hi')
+    const wakeText = 'w'.repeat(4000)
+    const wake: UIMessage = {
+      id: 'wake-1',
+      role: 'user',
+      parts: [{ type: 'text', text: wakeText }],
+      metadata: { createdAt: '2026-01-01T00:00:01.000Z', harnessWake: true },
+    }
+    const timeline: ChatTimelineItem[] = [{ type: 'user', message: user }]
+    const baseInput = {
+      modelId: 'gpt-4.1' as const,
+      mode: 'agent' as const,
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [] as [],
+      timeline,
+    }
+    const withoutWake = await countContextBudget({
+      ...baseInput,
+      messages: [user],
+    })
+    const withWake = await countContextBudget({
+      ...baseInput,
+      messages: [user, wake],
+    })
+    const messagesWithout =
+      withoutWake.buckets.find((bucket) => bucket.id === 'messages')?.tokens ?? 0
+    const messagesWith =
+      withWake.buckets.find((bucket) => bucket.id === 'messages')?.tokens ?? 0
+    expect(messagesWith).toBeGreaterThan(messagesWithout)
+
+    const longUser = message('1', '2026-01-01T00:00:00.000Z', 'q'.repeat(4000))
+    const longTimeline: ChatTimelineItem[] = [{ type: 'user', message: longUser }]
+    const messagesOnly = await countContextBudget({
+      modelId: 'gpt-4.1',
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [longUser],
+    })
+    const timelineAndMessages = await countContextBudget({
+      modelId: 'gpt-4.1',
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [longUser],
+      timeline: longTimeline,
+    })
+    const onlyTokens =
+      messagesOnly.buckets.find((bucket) => bucket.id === 'messages')?.tokens ?? 0
+    const bothTokens =
+      timelineAndMessages.buckets.find((bucket) => bucket.id === 'messages')?.tokens ?? 0
+    expect(bothTokens).toBe(onlyTokens)
+  })
 })

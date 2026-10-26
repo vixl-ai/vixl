@@ -7,6 +7,7 @@ import { parseChatArtifact, parseChatDiffs, parseTodoItems } from './helpers'
 import hydrateTimelineBuilder, {
   type HydrateAccumulator,
 } from './hydrate-timeline-builder'
+import { pushHarnessWakeUserMessage } from './hydrate-wake'
 import {
   closeRunningTools,
   createStep,
@@ -23,6 +24,7 @@ const applyHydrateHarnessEvent = (
   harnessEvent: Record<string, unknown>,
   flushTurn: () => void,
   createdAt?: string,
+  lineId?: string,
 ): boolean => {
   const type = harnessEvent.type
   const isParentTurnPrefixLine =
@@ -142,6 +144,20 @@ const applyHydrateHarnessEvent = (
     if (summary) {
       acc.nextTimeline.push({ type: 'compaction', summary, focus })
     }
+    return true
+  }
+
+  if (type === 'background-wake') {
+    const content = harnessEvent.content
+    if (typeof content === 'string' && content.length > 0 && lineId) {
+      pushHarnessWakeUserMessage(acc, flushTurn, {
+        id: lineId,
+        parts: [{ type: 'text', text: content }],
+        createdAt,
+      })
+      return true
+    }
+    flushTurn()
     return true
   }
 
