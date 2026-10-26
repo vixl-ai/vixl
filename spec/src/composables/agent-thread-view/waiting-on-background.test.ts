@@ -158,6 +158,7 @@ import createHelpers from '@/composables/agent-harness/helpers'
 import createLifecycle from '@/composables/agent-harness/lifecycle'
 import useAgentThreadView from '@/composables/agent-thread-view/use-agent-thread-view'
 import { resetApprovalGateForTests } from '@/services/harness/permission/approval-gate'
+import { agentShellRevision } from '@/services/harness/shell/registry'
 import {
   register,
   resetSubagentRegistryForTests,
@@ -271,5 +272,26 @@ describe('useAgentThreadView waiting on background', () => {
 
     expect(harnessState.subagents.value).toBe(subagentsBefore)
     expect(view.isWaitingOnBackground.value).toBe(false)
+  })
+
+  it('recomputes waiting when only the shell registry revision changes', async () => {
+    let waiting = false
+    const view = scope.run(() => useAgentThreadView())
+    if (!view || !capturedState) {
+      throw new Error('useAgentThreadView did not return')
+    }
+
+    capturedState.harness.value = {
+      isWaitingOnBackground: () => waiting,
+    } as never
+    await nextTick()
+
+    expect(view.isWaitingOnBackground.value).toBe(false)
+
+    waiting = true
+    agentShellRevision.value += 1
+    await nextTick()
+
+    expect(view.isWaitingOnBackground.value).toBe(true)
   })
 })
