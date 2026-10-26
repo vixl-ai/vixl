@@ -297,6 +297,28 @@ describe('formatToolRunLabel terminal', () => {
   })
 })
 
+describe('formatToolRunLabel worktree_create', () => {
+  it('uses past and present labels instead of the humanized tool name', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'worktree_create',
+          status: 'running',
+          args: { name: 'feature' },
+        }),
+      ),
+    ).toBe('Creating worktree')
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'worktree_create',
+          args: { name: 'feature' },
+        }),
+      ),
+    ).toBe('Created Worktree')
+  })
+})
+
 describe('formatToolRunLabel fallback', () => {
   it('title-cases unmapped tool names in the fallback', () => {
     expect(
