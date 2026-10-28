@@ -8,7 +8,9 @@ import { isReasoningLevel } from '@/types/models/reasoning-level'
 import {
   adoptLateMetaPermissionLevel,
   adoptViewPermissionLevel,
+  clearSettingsPermissionSeed,
   isPermissionLevel,
+  noteSettingsPermissionSeed,
 } from './permission-level'
 import type { AgentThreadViewState } from './types'
 
@@ -29,14 +31,24 @@ export const createSessionOps = (state: AgentThreadViewState) => {
     state.harness.value = nextHarness
     const cachedLevel = nextHarness.sessionPermissionLevel.value
     if (isPermissionLevel(cachedLevel)) {
+      clearSettingsPermissionSeed(state)
       state.sessionPermissionLevel.value = cachedLevel
       state.permissionLevelTouched.value = true
     } else if (state.permissionLevelTouched.value) {
+      clearSettingsPermissionSeed(state)
       nextHarness.setPermissionLevel(state.sessionPermissionLevel.value)
     } else {
       const resolution = adoptViewPermissionLevel(state)
       if (resolution.source !== 'cache') {
         nextHarness.setPermissionLevel(state.sessionPermissionLevel.value)
+      }
+      if (resolution.source === 'unset') {
+        noteSettingsPermissionSeed(
+          state,
+          state.projectSlug.value,
+          state.chatId.value,
+          state.sessionPermissionLevel.value,
+        )
       }
     }
     nextHarness.restorePendingApprovals()

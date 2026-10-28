@@ -9,7 +9,9 @@ import syncContextActions from './context-actions-sync'
 import {
   cachedHarnessPermissionLevel,
   metaPermissionLevelForChat,
+  noteSettingsPermissionSeed,
   settingsMayApplyPermissionLevel,
+  settingsPermissionSeedLevel,
   writeSettingsPermissionLevel,
 } from './permission-level'
 
@@ -33,12 +35,14 @@ export const bindAgentThreadLifecycle = (
 
   const thisChatPermissionSources = () => {
     const chatId = state.chatId.value
+    const slug = state.projectSlug.value
     return {
       touched: state.permissionLevelTouched.value,
-      cachedLevel: cachedHarnessPermissionLevel(state.projectSlug.value, chatId),
+      cachedLevel: cachedHarnessPermissionLevel(slug, chatId),
       metaLevel:
         metaPermissionLevelForChat(state.paintedSession.value?.meta.value, chatId) ??
         metaPermissionLevelForChat(state.chatStore.meta.value, chatId),
+      seededLevel: settingsPermissionSeedLevel(state, slug, chatId),
     }
   }
 
@@ -69,8 +73,10 @@ export const bindAgentThreadLifecycle = (
           return
         }
         const next = settings['agent.permissionLevel'] ?? 'allowlist'
+        const seededLevel = settingsPermissionSeedLevel(state, slug, chatId)
         state.sessionPermissionLevel.value = next
-        writeSettingsPermissionLevel(slug, chatId, next)
+        noteSettingsPermissionSeed(state, slug, chatId, next)
+        writeSettingsPermissionLevel(slug, chatId, next, seededLevel)
       } catch (error) {
         toast.error('Failed to load project settings', {
           description: error instanceof Error ? error.message : 'Unknown error',

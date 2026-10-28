@@ -96,6 +96,17 @@ describe('settingsMayApplyPermissionLevel', () => {
     ).toBe(false)
   })
 
+  it('allows settings to replace a provisional settings seed', () => {
+    expect(
+      settingsMayApplyPermissionLevel({
+        touched: false,
+        cachedLevel: 'allowlist',
+        metaLevel: null,
+        seededLevel: 'allowlist',
+      }),
+    ).toBe(true)
+  })
+
   it('blocks settings when this chat meta has a level', () => {
     expect(
       settingsMayApplyPermissionLevel({
@@ -304,6 +315,16 @@ describe('writeSettingsPermissionLevel', () => {
       setPermissionLevel,
     })
     writeSettingsPermissionLevel('proj', 'chat-1', 'bypass')
+    expect(setPermissionLevel).toHaveBeenCalledWith('bypass')
+  })
+
+  it('replaces a provisional settings seed with the loaded level', () => {
+    const setPermissionLevel = vi.fn<(level: string | null) => void>()
+    getCachedAgentHarness.mockReturnValue({
+      sessionPermissionLevel: { value: 'allowlist' },
+      setPermissionLevel,
+    })
+    writeSettingsPermissionLevel('proj', 'chat-1', 'bypass', 'allowlist')
     expect(setPermissionLevel).toHaveBeenCalledWith('bypass')
   })
 })

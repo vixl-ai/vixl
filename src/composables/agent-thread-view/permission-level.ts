@@ -54,17 +54,51 @@ export const settingsMayApplyPermissionLevel = (input: {
   touched: boolean
   cachedLevel: unknown
   metaLevel: unknown
+  seededLevel?: unknown
 }): boolean => {
   if (input.touched) {
-    return false
-  }
-  if (isPermissionLevel(input.cachedLevel)) {
     return false
   }
   if (isPermissionLevel(input.metaLevel)) {
     return false
   }
-  return true
+  if (!isPermissionLevel(input.cachedLevel)) {
+    return true
+  }
+  return isPermissionLevel(input.seededLevel) && input.cachedLevel === input.seededLevel
+}
+
+type SettingsPermissionSeed = {
+  projectSlug: string
+  chatId: string
+  level: PermissionLevel
+}
+
+const settingsPermissionSeeds = new WeakMap<AgentThreadViewState, SettingsPermissionSeed>()
+
+export const settingsPermissionSeedLevel = (
+  state: AgentThreadViewState,
+  projectSlug: string,
+  chatId: string,
+): PermissionLevel | null => {
+  const seed = settingsPermissionSeeds.get(state)
+  if (!seed || seed.projectSlug !== projectSlug || seed.chatId !== chatId) {
+    return null
+  }
+  return seed.level
+}
+
+export const noteSettingsPermissionSeed = (
+  state: AgentThreadViewState,
+  projectSlug: string,
+  chatId: string,
+  level: PermissionLevel,
+): void => {
+  settingsPermissionSeeds.set(state, { projectSlug, chatId, level })
+}
+
+export const clearSettingsPermissionSeed = (state: AgentThreadViewState): void => {
+  settingsPermissionSeeds.delete(state)
 }
 
 const readMetaLevel = (state: AgentThreadViewState): PermissionLevel | null => {
@@ -87,9 +121,15 @@ export const adoptViewPermissionLevel = (
   })
   if (resolution.source === 'unset') {
     state.permissionLevelTouched.value = false
-    state.sessionPermissionLevel.value = state.defaultPermissionLevel.value
+    const seeded = settingsPermissionSeedLevel(
+      state,
+      state.projectSlug.value,
+      state.chatId.value,
+    )
+    state.sessionPermissionLevel.value = seeded ?? state.defaultPermissionLevel.value
     return resolution
   }
+  clearSettingsPermissionSeed(state)
   state.sessionPermissionLevel.value = resolution.level
   state.permissionLevelTouched.value = true
   return resolution
@@ -103,6 +143,7 @@ export const adoptLateMetaPermissionLevel = (state: AgentThreadViewState): void 
   if (!metaLevel) {
     return
   }
+  clearSettingsPermissionSeed(state)
   state.sessionPermissionLevel.value = metaLevel
   state.permissionLevelTouched.value = true
   state.harness.value?.setPermissionLevel(metaLevel)
@@ -112,9 +153,11 @@ export const writeSettingsPermissionLevel = (
   projectSlug: string,
   chatId: string,
   level: PermissionLevel,
+  seededLevel?: PermissionLevel | null,
 ): void => {
   const cached = getCachedAgentHarness<CachedPermissionHarness>(projectSlug, chatId)
-  if (isPermissionLevel(cached?.sessionPermissionLevel?.value)) {
+  const current = cached?.sessionPermissionLevel?.value
+  if (isPermissionLevel(current) && current !== seededLevel) {
     return
   }
   cached?.setPermissionLevel?.(level)
