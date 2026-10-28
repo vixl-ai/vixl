@@ -193,12 +193,84 @@ describe('harness tools notify workspace fs mutations', () => {
         paths: ['src/added.ts', 'src/gone.ts', 'src/moved.ts', 'src/edited.ts'],
       }),
     )
+    expect(gateToolPermission).toHaveBeenCalledTimes(2)
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'fs.delete',
+        capability: 'fs.delete:src/gone.ts',
+        name: 'apply_patch',
+        kind: 'fs',
+        title: 'Delete src/gone.ts',
+        paths: ['src/gone.ts'],
+        diff: [emptyDiff('src/gone.ts', 'delete')],
+      }),
+    )
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'fs.write',
+        capability: 'fs.write:*',
+        name: 'apply_patch',
+        kind: 'fs',
+        paths: ['src/added.ts', 'src/moved.ts', 'src/edited.ts'],
+        diff: [
+          emptyDiff('src/added.ts', 'create'),
+          emptyDiff('src/moved.ts', 'rename'),
+          emptyDiff('src/edited.ts', 'update'),
+        ],
+      }),
+    )
     expect(notifyWorkspaceFsMutation).toHaveBeenCalledWith('/tmp/project', [
       'src/added.ts',
       'src/gone.ts',
       'src/moved.ts',
       'src/edited.ts',
     ])
+  })
+
+  it('apply_patch mixed preview skips apply when the delete gate rejects', async () => {
+    gateToolPermission.mockResolvedValueOnce(false)
+    const result = await execute(applyPatch(baseCtx()), {
+      patch: '*** Update File: src/edited.ts\n@@\n-old\n+new',
+    })
+
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'fs.delete',
+        capability: 'fs.delete:src/gone.ts',
+      }),
+    )
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'fs.write',
+      }),
+    )
+    expect(result).toEqual({ rejected: true, error: 'Patch not approved' })
+    expect(fsApplyPatch).not.toHaveBeenCalled()
+    expect(notifyWorkspaceFsMutation).not.toHaveBeenCalled()
+  })
+
+  it('apply_patch mixed preview skips apply when the write gate rejects', async () => {
+    gateToolPermission.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+    const result = await execute(applyPatch(baseCtx()), {
+      patch: '*** Update File: src/edited.ts\n@@\n-old\n+new',
+    })
+
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'fs.delete',
+        capability: 'fs.delete:src/gone.ts',
+      }),
+    )
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'fs.write',
+        capability: 'fs.write:*',
+        paths: ['src/added.ts', 'src/moved.ts', 'src/edited.ts'],
+      }),
+    )
+    expect(result).toEqual({ rejected: true, error: 'Patch not approved' })
+    expect(fsApplyPatch).not.toHaveBeenCalled()
+    expect(notifyWorkspaceFsMutation).not.toHaveBeenCalled()
   })
 
   it('apply_patch does not notify when the permission gate rejects', async () => {

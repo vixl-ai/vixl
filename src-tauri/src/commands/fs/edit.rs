@@ -89,6 +89,9 @@ fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, String> {
                 }
                 index += 1;
             }
+            if !content.is_empty() && !content.ends_with('\n') {
+                content.push('\n');
+            }
             operations.push(PatchOperation::Add { path, content });
             continue;
         }
@@ -130,21 +133,14 @@ fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, String> {
     Ok(operations)
 }
 
-fn append_line(result: &mut String, line: &str) {
-    if !result.is_empty() {
-        result.push('\n');
-    }
-    result.push_str(line);
-}
-
-fn seek_matching_line(
-    old_lines: &[&str],
+fn seek_matching_line<'a>(
+    old_lines: &[&'a str],
     old_index: &mut usize,
     target: &str,
-    result: &mut String,
+    result: &mut Vec<&'a str>,
 ) -> Result<(), String> {
     while *old_index < old_lines.len() && old_lines[*old_index] != target {
-        append_line(result, old_lines[*old_index]);
+        result.push(old_lines[*old_index]);
         *old_index += 1;
     }
     if *old_index >= old_lines.len() {
@@ -153,8 +149,8 @@ fn seek_matching_line(
     Ok(())
 }
 
-fn apply_update_patch(existing: &str, patched: &str) -> Result<String, String> {
-    let mut result = String::new();
+fn apply_update_patch<'a>(existing: &'a str, patched: &'a str) -> Result<String, String> {
+    let mut result: Vec<&'a str> = Vec::new();
     let mut old_index = 0usize;
     let old_lines: Vec<&str> = existing.lines().collect();
     let patch_lines: Vec<&str> = patched.lines().collect();
@@ -173,22 +169,30 @@ fn apply_update_patch(existing: &str, patched: &str) -> Result<String, String> {
             continue;
         }
         if let Some(added) = line.strip_prefix('+') {
-            append_line(&mut result, added);
+            result.push(added);
             patch_index += 1;
             continue;
         }
         seek_matching_line(&old_lines, &mut old_index, line, &mut result)?;
-        append_line(&mut result, line);
+        result.push(line);
         old_index += 1;
         patch_index += 1;
     }
 
     while old_index < old_lines.len() {
-        append_line(&mut result, old_lines[old_index]);
+        result.push(old_lines[old_index]);
         old_index += 1;
     }
 
-    Ok(result)
+    if result.is_empty() {
+        return Ok(String::new());
+    }
+
+    let mut output = result.join("\n");
+    if existing.ends_with('\n') {
+        output.push('\n');
+    }
+    Ok(output)
 }
 
 pub(crate) fn preview_patch(
@@ -392,7 +396,7 @@ pub fn fs_stage_preview(
 
 #[cfg(test)]
 mod tests {
-    use super::apply_update_patch;
+    use super::{apply_update_patch, build_file_diff, parse_patch, PatchOperation};
 
     #[test]
     fn mid_file_hunk_preserves_prefix_and_suffix() {
@@ -424,5 +428,69 @@ mod tests {
         let patched = "@@\n-missing\n+x";
         let error = apply_update_patch(existing, patched).expect_err("mismatch");
         assert_eq!(error, "Patch context does not match file contents");
+    }
+
+    #[test]
+    fn mid_file_hunk_keeps_trailing_newline() {
+        let existing = "alpha\nbeta\ngamma\n";
+        let patched = "@@\n-beta\n+changed";
+        let result = apply_update_patch(existing, patched).expect("mid-file hunk");
+        assert_eq!(result, "alpha\nchanged\ngamma\n");
+    }
+
+    #[test]
+    fn eof_append_keeps_trailing_newline() {
+        let existing = "alpha\nbeta\n";
+        let patched = "@@\nbeta\n+gamma";
+        let result = apply_update_patch(existing, patched).expect("eof append");
+        assert_eq!(result, "alpha\nbeta\ngamma\n");
+    }
+
+    #[test]
+    fn blank_line_terminator_survives_mid_file_hunk() {
+        let existing = "a\n\n";
+        let patched = "@@\n-a\n+b";
+        let result = apply_update_patch(existing, patched).expect("blank terminator");
+        assert_eq!(result, "b\n\n");
+    }
+
+    #[test]
+    fn add_file_body_gets_trailing_newline() {
+        let operations = parse_patch("*** Add File: foo.txt\n+hello").expect("add file");
+        match &operations[..] {
+            [PatchOperation::Add { content, .. }] => assert_eq!(content, "hello\n"),
+            _ => panic!("expected a single Add operation"),
+        }
+    }
+
+    #[test]
+    fn mid_file_edit_diff_has_no_phantom_last_line() {
+        let existing = "alpha\nbeta\ngamma\n";
+        let patched = "@@\n-beta\n+changed";
+        let new_content = apply_update_patch(existing, patched).expect("mid-file hunk");
+        let diff = build_file_diff(
+            "file.txt".to_string(),
+            "update",
+            Some(existing.to_string()),
+            Some(new_content),
+        );
+        for hunk in &diff.hunks {
+            let changes: Vec<_> = hunk
+                .lines
+                .iter()
+                .filter(|line| line.kind != "context")
+                .collect();
+            let phantom_last_line = changes.len() == 2
+                && changes[0].kind == "remove"
+                && changes[1].kind == "add"
+                && changes[0].content == changes[1].content;
+            assert!(
+                !phantom_last_line,
+                "hunk whose only change is an identical remove and add"
+            );
+            for line in &changes {
+                assert_ne!(line.content.as_str(), "gamma");
+            }
+        }
     }
 }

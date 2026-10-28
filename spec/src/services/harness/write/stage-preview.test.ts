@@ -266,5 +266,151 @@ describe('build-tools stage preview wiring', () => {
       patch,
     })
   })
+
+  it('apply_patch update-only patch gates once as fs.write', async () => {
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const patch = '*** Update File: src/main.ts\n@@\n-old\n+new'
+    await runTool(tools.apply_patch.execute, { patch }, 'tc-update')
+
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'apply_patch',
+        kind: 'fs',
+        action: 'fs.write',
+        capability: 'fs.write:*',
+        title: 'Apply patch (1 file)',
+        paths: ['src/main.ts'],
+        diff: [sampleDiff],
+      }),
+    )
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'fs.delete',
+      }),
+    )
+  })
+
+  it('apply_patch delete-only patch gates as fs.delete and never as fs.write', async () => {
+    const deleteDiff: FileDiff = {
+      path: 'src/gone.ts',
+      operation: 'delete',
+      hunks: [],
+    }
+    fsStagePreviewApplyPatch.mockResolvedValue([deleteDiff])
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.apply_patch.execute,
+      { patch: '*** Delete File: src/gone.ts' },
+      'tc-delete',
+    )
+
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'apply_patch',
+        kind: 'fs',
+        action: 'fs.delete',
+        capability: 'fs.delete:src/gone.ts',
+        title: 'Delete src/gone.ts',
+        paths: ['src/gone.ts'],
+        diff: [deleteDiff],
+      }),
+    )
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'fs.write',
+      }),
+    )
+    expect(fsApplyPatch).toHaveBeenCalled()
+    expect(result).toEqual({
+      ok: true,
+      paths: ['src/gone.ts'],
+      diffs: [deleteDiff],
+    })
+  })
+
+  it('apply_patch does not apply when a delete gate rejects', async () => {
+    const deleteDiff: FileDiff = {
+      path: 'src/gone.ts',
+      operation: 'delete',
+      hunks: [],
+    }
+    fsStagePreviewApplyPatch.mockResolvedValue([deleteDiff])
+    gateToolPermission.mockResolvedValue(false)
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.apply_patch.execute,
+      { patch: '*** Delete File: src/gone.ts' },
+      'tc-delete-deny',
+    )
+
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'fs.delete',
+        capability: 'fs.delete:src/gone.ts',
+      }),
+    )
+    expect(result).toEqual({ rejected: true, error: 'Patch not approved' })
+    expect(fsApplyPatch).not.toHaveBeenCalled()
+  })
+
+  it('apply_patch returns hunks without file bodies and still gates with bodies', async () => {
+    const hunks = [
+      {
+        oldStart: 1,
+        newStart: 1,
+        lines: [
+          { kind: 'remove' as const, content: 'old' },
+          { kind: 'add' as const, content: 'new' },
+        ],
+      },
+    ]
+    const previewDiff: FileDiff = {
+      path: 'src/main.ts',
+      operation: 'update',
+      oldContent: 'old',
+      newContent: 'new',
+      hunks,
+    }
+    fsStagePreviewApplyPatch.mockResolvedValue([previewDiff])
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(
+      tools.apply_patch.execute,
+      { patch: '*** Update File: src/main.ts\n@@\n-old\n+new' },
+      'tc-bodies',
+    )
+
+    expect(gateToolPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        diff: [
+          expect.objectContaining({
+            path: 'src/main.ts',
+            oldContent: 'old',
+            newContent: 'new',
+            hunks,
+          }),
+        ],
+      }),
+    )
+    expect(result).toEqual({
+      ok: true,
+      paths: ['src/main.ts'],
+      diffs: [
+        {
+          path: 'src/main.ts',
+          operation: 'update',
+          hunks,
+        },
+      ],
+    })
+    const returnedDiff = (result as { diffs: FileDiff[] }).diffs[0]
+    expect(returnedDiff).not.toHaveProperty('oldContent')
+    expect(returnedDiff).not.toHaveProperty('newContent')
+  })
 })
 
