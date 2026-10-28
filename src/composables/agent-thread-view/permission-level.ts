@@ -7,6 +7,7 @@ type CachedPermissionHarness = {
   markDisposed: () => void
   dispose: () => Promise<void>
   sessionPermissionLevel?: { value: PermissionLevel | null }
+  permissionLevelFromSettings?: { value: boolean }
   setPermissionLevel?: (level: PermissionLevel | null) => void
 }
 
@@ -21,12 +22,18 @@ export type ChatPermissionResolution =
 export const resolveChatPermissionLevel = (input: {
   cachedLevel: unknown
   metaLevel: unknown
+  cachedFromSettings?: boolean
 }): ChatPermissionResolution => {
-  if (isPermissionLevel(input.cachedLevel)) {
-    return { source: 'cache', level: input.cachedLevel }
+  const cached = isPermissionLevel(input.cachedLevel) ? input.cachedLevel : null
+  const meta = isPermissionLevel(input.metaLevel) ? input.metaLevel : null
+  if (cached && meta && cached !== meta && input.cachedFromSettings) {
+    return { source: 'meta', level: meta }
   }
-  if (isPermissionLevel(input.metaLevel)) {
-    return { source: 'meta', level: input.metaLevel }
+  if (cached) {
+    return { source: 'cache', level: cached }
+  }
+  if (meta) {
+    return { source: 'meta', level: meta }
   }
   return { source: 'unset' }
 }
@@ -35,9 +42,20 @@ export const cachedHarnessPermissionLevel = (
   projectSlug: string,
   chatId: string,
 ): PermissionLevel | null => {
+  const cached = readCachedPermissionHarness(projectSlug, chatId)
+  return cached.level
+}
+
+const readCachedPermissionHarness = (
+  projectSlug: string,
+  chatId: string,
+): { level: PermissionLevel | null; fromSettings: boolean } => {
   const cached = getCachedAgentHarness<CachedPermissionHarness>(projectSlug, chatId)
   const level = cached?.sessionPermissionLevel?.value
-  return isPermissionLevel(level) ? level : null
+  return {
+    level: isPermissionLevel(level) ? level : null,
+    fromSettings: cached?.permissionLevelFromSettings?.value === true,
+  }
 }
 
 export const metaPermissionLevelForChat = (
@@ -109,12 +127,11 @@ const readMetaLevel = (state: AgentThreadViewState): PermissionLevel | null => {
 export const adoptViewPermissionLevel = (
   state: AgentThreadViewState,
 ): ChatPermissionResolution => {
+  const cached = readCachedPermissionHarness(state.projectSlug.value, state.chatId.value)
   const resolution = resolveChatPermissionLevel({
-    cachedLevel: cachedHarnessPermissionLevel(
-      state.projectSlug.value,
-      state.chatId.value,
-    ),
+    cachedLevel: cached.level,
     metaLevel: readMetaLevel(state),
+    cachedFromSettings: cached.fromSettings,
   })
   if (resolution.source === 'unset') {
     state.permissionLevelTouched.value = false
@@ -159,4 +176,7 @@ export const writeSettingsPermissionLevel = (
 ): void => {
   const cached = getCachedAgentHarness<CachedPermissionHarness>(projectSlug, chatId)
   cached?.setPermissionLevel?.(level)
+  if (cached?.permissionLevelFromSettings) {
+    cached.permissionLevelFromSettings.value = true
+  }
 }

@@ -174,6 +174,7 @@ describe('createSessionOps flushPendingChatMessage', () => {
 describe('createSessionOps initHarness', () => {
   const harnessState = (overrides?: {
     cachedLevel?: 'ask' | 'allowlist' | 'bypass' | null
+    cachedFromSettings?: boolean
     metaLevel?: 'ask' | 'allowlist' | 'bypass'
     sessionLevel?: 'ask' | 'allowlist' | 'bypass'
     touched?: boolean
@@ -188,6 +189,7 @@ describe('createSessionOps initHarness', () => {
       restorePendingApprovals,
       setPermissionLevel,
       sessionPermissionLevel: ref(overrides?.cachedLevel ?? null),
+      permissionLevelFromSettings: ref(overrides?.cachedFromSettings === true),
     } as unknown as ReturnType<typeof useAgentHarness>)
 
     const chatId = 'chat-1'
@@ -241,6 +243,23 @@ describe('createSessionOps initHarness', () => {
     expect(setPermissionLevel).not.toHaveBeenCalled()
     expect(state.sessionPermissionLevel.value).toBe('allowlist')
     expect(state.permissionLevelTouched.value).toBe(false)
+  })
+
+  it('replaces a settings-seeded harness with stored meta', async () => {
+    const { createSessionOps } = await import('@/composables/agent-thread-view/session')
+    const { state, setPermissionLevel } = harnessState({
+      cachedLevel: 'bypass',
+      cachedFromSettings: true,
+      metaLevel: 'ask',
+      sessionLevel: 'bypass',
+    })
+
+    const session = createSessionOps(state)
+    await session.initHarness('/tmp/proj', 'Proj')
+
+    expect(setPermissionLevel).toHaveBeenCalledWith('ask')
+    expect(state.sessionPermissionLevel.value).toBe('ask')
+    expect(state.permissionLevelTouched.value).toBe(true)
   })
 
   it('writes this chat meta onto a new harness', async () => {

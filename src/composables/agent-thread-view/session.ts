@@ -12,6 +12,7 @@ import {
   isPermissionLevel,
   metaPermissionLevelForChat,
   noteSettingsPermissionSeed,
+  resolveChatPermissionLevel,
 } from './permission-level'
 import type { AgentThreadViewState } from './types'
 
@@ -32,11 +33,21 @@ export const createSessionOps = (state: AgentThreadViewState) => {
     state.harness.value = nextHarness
     const cachedLevel = nextHarness.sessionPermissionLevel.value
     if (isPermissionLevel(cachedLevel)) {
-      state.sessionPermissionLevel.value = cachedLevel
       const persisted =
         metaPermissionLevelForChat(state.paintedSession.value?.meta.value, state.chatId.value)
         ?? metaPermissionLevelForChat(state.chatStore?.meta?.value, state.chatId.value)
-      if (persisted) {
+      const resolution = resolveChatPermissionLevel({
+        cachedLevel,
+        metaLevel: persisted,
+        cachedFromSettings: nextHarness.permissionLevelFromSettings?.value === true,
+      })
+      state.sessionPermissionLevel.value =
+        resolution.source === 'unset' ? cachedLevel : resolution.level
+      if (resolution.source === 'meta') {
+        clearSettingsPermissionSeed(state)
+        state.permissionLevelTouched.value = true
+        nextHarness.setPermissionLevel(resolution.level)
+      } else if (persisted) {
         clearSettingsPermissionSeed(state)
         state.permissionLevelTouched.value = true
       } else {
@@ -51,6 +62,9 @@ export const createSessionOps = (state: AgentThreadViewState) => {
         nextHarness.setPermissionLevel(state.sessionPermissionLevel.value)
       }
       if (resolution.source === 'unset') {
+        if (nextHarness.permissionLevelFromSettings) {
+          nextHarness.permissionLevelFromSettings.value = true
+        }
         noteSettingsPermissionSeed(
           state,
           state.projectSlug.value,

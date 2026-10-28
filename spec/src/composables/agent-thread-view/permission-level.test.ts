@@ -47,6 +47,16 @@ describe('resolveChatPermissionLevel', () => {
     ).toEqual({ source: 'cache', level: 'allowlist' })
   })
 
+  it('prefers stored meta over a settings seed that disagrees', () => {
+    expect(
+      resolveChatPermissionLevel({
+        cachedLevel: 'bypass',
+        metaLevel: 'ask',
+        cachedFromSettings: true,
+      }),
+    ).toEqual({ source: 'meta', level: 'ask' })
+  })
+
   it('uses meta when the cache has no level', () => {
     expect(
       resolveChatPermissionLevel({
@@ -126,6 +136,7 @@ describe('adoptViewPermissionLevel', () => {
   const buildState = (overrides?: {
     chatId?: string
     cachedLevel?: 'ask' | 'allowlist' | 'bypass' | null
+    cachedFromSettings?: boolean
     meta?: ChatMeta | null
     defaultLevel?: 'ask' | 'allowlist' | 'bypass'
     sessionLevel?: 'ask' | 'allowlist' | 'bypass'
@@ -134,6 +145,7 @@ describe('adoptViewPermissionLevel', () => {
     if (overrides?.cachedLevel) {
       getCachedAgentHarness.mockReturnValue({
         sessionPermissionLevel: { value: overrides.cachedLevel },
+        permissionLevelFromSettings: { value: overrides.cachedFromSettings === true },
       })
     }
     const chatId = overrides?.chatId ?? 'chat-1'
@@ -159,6 +171,18 @@ describe('adoptViewPermissionLevel', () => {
     expect(resolution).toEqual({ source: 'cache', level: 'allowlist' })
     expect(state.sessionPermissionLevel.value).toBe('allowlist')
     expect(state.permissionLevelTouched.value).toBe(false)
+  })
+
+  it('replaces a settings seed when stored meta disagrees', () => {
+    const state = buildState({
+      cachedLevel: 'bypass',
+      cachedFromSettings: true,
+      meta: metaFor('chat-1', 'ask'),
+    })
+    const resolution = adoptViewPermissionLevel(state)
+    expect(resolution).toEqual({ source: 'meta', level: 'ask' })
+    expect(state.sessionPermissionLevel.value).toBe('ask')
+    expect(state.permissionLevelTouched.value).toBe(true)
   })
 
   it('locks settings when the cached chat also has a stored level', () => {

@@ -35,6 +35,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
     pendingApprovals,
     pendingMcpAuth,
     sessionPermissionLevel,
+    permissionLevelFromSettings,
     mcpAuthPollTimer,
     status,
   } = state
@@ -259,6 +260,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
 
   const setPermissionLevel = (level: typeof sessionPermissionLevel.value): void => {
     sessionPermissionLevel.value = level
+    permissionLevelFromSettings.value = false
   }
 
   const restorePendingApprovals = (): void => {
