@@ -237,7 +237,7 @@ describe('createSessionOps initHarness', () => {
 
     expect(setPermissionLevel).not.toHaveBeenCalled()
     expect(state.sessionPermissionLevel.value).toBe('allowlist')
-    expect(state.permissionLevelTouched.value).toBe(true)
+    expect(state.permissionLevelTouched.value).toBe(false)
   })
 
   it('writes this chat meta onto a new harness', async () => {

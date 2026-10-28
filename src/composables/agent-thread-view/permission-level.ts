@@ -62,10 +62,7 @@ export const settingsMayApplyPermissionLevel = (input: {
   if (isPermissionLevel(input.metaLevel)) {
     return false
   }
-  if (!isPermissionLevel(input.cachedLevel)) {
-    return true
-  }
-  return isPermissionLevel(input.seededLevel) && input.cachedLevel === input.seededLevel
+  return true
 }
 
 type SettingsPermissionSeed = {
@@ -129,6 +126,12 @@ export const adoptViewPermissionLevel = (
     state.sessionPermissionLevel.value = seeded ?? state.defaultPermissionLevel.value
     return resolution
   }
+  const persisted = readMetaLevel(state)
+  if (resolution.source === 'cache' && !persisted) {
+    state.sessionPermissionLevel.value = resolution.level
+    state.permissionLevelTouched.value = false
+    return resolution
+  }
   clearSettingsPermissionSeed(state)
   state.sessionPermissionLevel.value = resolution.level
   state.permissionLevelTouched.value = true
@@ -153,12 +156,7 @@ export const writeSettingsPermissionLevel = (
   projectSlug: string,
   chatId: string,
   level: PermissionLevel,
-  seededLevel?: PermissionLevel | null,
 ): void => {
   const cached = getCachedAgentHarness<CachedPermissionHarness>(projectSlug, chatId)
-  const current = cached?.sessionPermissionLevel?.value
-  if (isPermissionLevel(current) && current !== seededLevel) {
-    return
-  }
   cached?.setPermissionLevel?.(level)
 }

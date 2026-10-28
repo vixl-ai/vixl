@@ -86,23 +86,12 @@ describe('settingsMayApplyPermissionLevel', () => {
     ).toBe(false)
   })
 
-  it('blocks settings when the cached harness already has a level', () => {
+  it('does not treat an unpersisted harness level as a saved choice', () => {
     expect(
       settingsMayApplyPermissionLevel({
         touched: false,
         cachedLevel: 'allowlist',
         metaLevel: null,
-      }),
-    ).toBe(false)
-  })
-
-  it('allows settings to replace a provisional settings seed', () => {
-    expect(
-      settingsMayApplyPermissionLevel({
-        touched: false,
-        cachedLevel: 'allowlist',
-        metaLevel: null,
-        seededLevel: 'allowlist',
       }),
     ).toBe(true)
   })
@@ -164,11 +153,21 @@ describe('adoptViewPermissionLevel', () => {
     } as unknown as AgentThreadViewState
   }
 
-  it('copies a cached harness level onto the dial and sets touched', () => {
+  it('copies a cached harness level onto the dial without locking settings', () => {
     const state = buildState({ cachedLevel: 'allowlist' })
     const resolution = adoptViewPermissionLevel(state)
     expect(resolution).toEqual({ source: 'cache', level: 'allowlist' })
     expect(state.sessionPermissionLevel.value).toBe('allowlist')
+    expect(state.permissionLevelTouched.value).toBe(false)
+  })
+
+  it('locks settings when the cached chat also has a stored level', () => {
+    const state = buildState({
+      cachedLevel: 'allowlist',
+      meta: metaFor('chat-1', 'allowlist'),
+    })
+    const resolution = adoptViewPermissionLevel(state)
+    expect(resolution).toEqual({ source: 'cache', level: 'allowlist' })
     expect(state.permissionLevelTouched.value).toBe(true)
   })
 
@@ -298,14 +297,14 @@ describe('writeSettingsPermissionLevel', () => {
     getCachedAgentHarness.mockReset()
   })
 
-  it('does not overwrite a harness that already has a session level', () => {
+  it('replaces an unpersisted harness level with the loaded settings level', () => {
     const setPermissionLevel = vi.fn<(level: string | null) => void>()
     getCachedAgentHarness.mockReturnValue({
       sessionPermissionLevel: { value: 'allowlist' },
       setPermissionLevel,
     })
     writeSettingsPermissionLevel('proj', 'chat-1', 'bypass')
-    expect(setPermissionLevel).not.toHaveBeenCalled()
+    expect(setPermissionLevel).toHaveBeenCalledWith('bypass')
   })
 
   it('writes settings onto a harness with no session level', () => {
@@ -318,13 +317,4 @@ describe('writeSettingsPermissionLevel', () => {
     expect(setPermissionLevel).toHaveBeenCalledWith('bypass')
   })
 
-  it('replaces a provisional settings seed with the loaded level', () => {
-    const setPermissionLevel = vi.fn<(level: string | null) => void>()
-    getCachedAgentHarness.mockReturnValue({
-      sessionPermissionLevel: { value: 'allowlist' },
-      setPermissionLevel,
-    })
-    writeSettingsPermissionLevel('proj', 'chat-1', 'bypass', 'allowlist')
-    expect(setPermissionLevel).toHaveBeenCalledWith('bypass')
-  })
 })

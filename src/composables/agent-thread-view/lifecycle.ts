@@ -73,10 +73,9 @@ export const bindAgentThreadLifecycle = (
           return
         }
         const next = settings['agent.permissionLevel'] ?? 'allowlist'
-        const seededLevel = settingsPermissionSeedLevel(state, slug, chatId)
         state.sessionPermissionLevel.value = next
         noteSettingsPermissionSeed(state, slug, chatId, next)
-        writeSettingsPermissionLevel(slug, chatId, next, seededLevel)
+        writeSettingsPermissionLevel(slug, chatId, next)
       } catch (error) {
         toast.error('Failed to load project settings', {
           description: error instanceof Error ? error.message : 'Unknown error',
