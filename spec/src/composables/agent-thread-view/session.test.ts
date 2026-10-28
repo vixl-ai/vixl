@@ -474,6 +474,51 @@ describe('createSessionOps loadThread permission restore', () => {
     expect(setPermissionLevel).not.toHaveBeenCalledWith('allowlist')
   })
 
+  it('applies refreshed permission before a warm pending send', async () => {
+    const { createSessionOps } = await import('@/composables/agent-thread-view/session')
+    const { state, setPermissionLevel } = loadThreadState()
+    const stored = ref<'ask' | undefined>(undefined)
+    const meta = computed(() => ({
+      id: 'chat-b',
+      ...(stored.value ? { permissionLevel: stored.value } : {}),
+    }))
+    const send = vi.fn<(args: unknown) => Promise<void>>().mockResolvedValue(undefined)
+    vi.mocked(useAgentHarness).mockReturnValue({
+      restoreUsageLedger: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      restorePendingApprovals: vi.fn<() => void>(),
+      setPermissionLevel,
+      sessionPermissionLevel: ref(null),
+      permissionLevelFromSettings: ref(true),
+      send,
+    } as unknown as ReturnType<typeof useAgentHarness>)
+    state.chatStore.selectChat = vi.fn<(slug: string, id: string) => unknown>().mockReturnValue({
+      meta,
+    })
+    state.chatStore.ensureChatHydrated = vi
+      .fn<(slug: string, id: string) => Promise<string>>()
+      .mockResolvedValue('warmIdle')
+    state.chatStore.refreshChatMeta = vi
+      .fn<(slug: string, id: string) => Promise<void>>()
+      .mockImplementation(async () => {
+        stored.value = 'ask'
+      })
+    setPendingChatMessage({
+      text: 'continue',
+      mode: 'agent',
+      model: 'test',
+    })
+
+    const session = createSessionOps(state)
+    await session.loadThread()
+
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(setPermissionLevel).toHaveBeenCalledWith('ask')
+    const askCall = setPermissionLevel.mock.invocationCallOrder.find((_, index) =>
+      setPermissionLevel.mock.calls[index]?.[0] === 'ask',
+    )
+    expect(askCall).toBeLessThan(send.mock.invocationCallOrder[0] ?? 0)
+  })
+
   it('applies the settings default when the next chat has no stored level', async () => {
     const { createSessionOps } = await import('@/composables/agent-thread-view/session')
     const { state, setPermissionLevel } = loadThreadState()

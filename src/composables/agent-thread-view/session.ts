@@ -228,19 +228,19 @@ export const createSessionOps = (state: AgentThreadViewState) => {
     }
     adoptLateMetaPermissionLevel(state)
 
-    // Idle warm: soft meta refresh in the background, never blocks paint.
-    if (hydratePath === 'warmIdle') {
-      state.chatStore.refreshChatMeta(slug, state.chatId.value).then(() => {
-        if (isStale()) {
-          return
-        }
-        adoptLateMetaPermissionLevel(state)
-      }).catch((error) => {
-        toast.error('Failed to refresh chat', {
-          description: error instanceof Error ? error.message : 'Unknown error',
+    // Idle warm: refresh meta without blocking paint. A pending send waits for it.
+    const refreshedMeta = hydratePath === 'warmIdle'
+      ? state.chatStore.refreshChatMeta(slug, state.chatId.value).then(() => {
+          if (isStale()) {
+            return
+          }
+          adoptLateMetaPermissionLevel(state)
+        }).catch((error) => {
+          toast.error('Failed to refresh chat', {
+            description: error instanceof Error ? error.message : 'Unknown error',
+          })
         })
-      })
-    }
+      : null
 
     state.loadedThreadKey.value = nextThreadKey
     state.threadReady.value = true
@@ -267,6 +267,13 @@ export const createSessionOps = (state: AgentThreadViewState) => {
         description: error instanceof Error ? error.message : 'Unknown error',
       })
     })
+
+    if (refreshedMeta && !state.permissionLevelChosen.value) {
+      await refreshedMeta
+      if (isStale()) {
+        return
+      }
+    }
 
     await flushPendingChatMessage()
   }

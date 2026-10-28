@@ -142,6 +142,21 @@ fn duplicate_message_ids_are_allowed() {
 }
 
 #[test]
+fn fork_keeps_source_permission_level() {
+    let mut source = sample_meta("src", "slug", "Chat", "2026-01-01T00:00:00Z");
+    source.permission_level = Some("ask".to_string());
+    let forked = super::fork::forked_chat_meta(
+        &source,
+        "dst".to_string(),
+        "slug".to_string(),
+        "2026-01-02T00:00:00Z".to_string(),
+        "src".to_string(),
+    );
+    assert_eq!(forked.permission_level.as_deref(), Some("ask"));
+    assert_eq!(forked.forked_from.as_deref(), Some("src"));
+}
+
+#[test]
 fn fork_copies_message_rows() {
     let (_dir, conn) = open_migrated();
     let source = sample_meta("src", "slug", "Chat", "2026-01-01T00:00:00Z");
