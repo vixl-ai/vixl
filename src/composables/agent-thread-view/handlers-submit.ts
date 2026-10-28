@@ -250,10 +250,9 @@ export const createSubmitHandlers = (state: AgentThreadViewState) => {
 
   const handleContinue = createContinueHandler(state)
 
-  const handlePermissionLevelChange = async (
-    level: PermissionLevel,
-  ): Promise<void> => {
+  const handlePermissionLevelChange = async (level: PermissionLevel): Promise<void> => {
     state.permissionLevelTouched.value = true
+    state.permissionLevelChosen.value = true
     state.sessionPermissionLevel.value = level
     state.harness.value?.setPermissionLevel(level)
     try {

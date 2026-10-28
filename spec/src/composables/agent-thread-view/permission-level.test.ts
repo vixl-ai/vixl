@@ -279,7 +279,7 @@ describe('adoptLateMetaPermissionLevel', () => {
     expect(setPermissionLevel).toHaveBeenCalledWith('allowlist')
   })
 
-  it('does not apply late meta after this chat already adopted a level', () => {
+  it('replaces an early adopt when hydrated meta arrives later', () => {
     const setPermissionLevel = vi.fn<(level: string) => void>()
     const state = {
       projectSlug: computed(() => 'proj'),
@@ -289,6 +289,29 @@ describe('adoptLateMetaPermissionLevel', () => {
       }),
       chatStore: { meta: computed(() => null) },
       permissionLevelTouched: ref(true),
+      permissionLevelChosen: ref(false),
+      sessionPermissionLevel: ref('allowlist'),
+      harness: shallowRef({ setPermissionLevel }),
+    } as unknown as AgentThreadViewState
+
+    adoptLateMetaPermissionLevel(state)
+
+    expect(state.sessionPermissionLevel.value).toBe('ask')
+    expect(state.permissionLevelTouched.value).toBe(true)
+    expect(setPermissionLevel).toHaveBeenCalledWith('ask')
+  })
+
+  it('does not apply late meta after the user chose a level', () => {
+    const setPermissionLevel = vi.fn<(level: string) => void>()
+    const state = {
+      projectSlug: computed(() => 'proj'),
+      chatId: computed(() => 'chat-1'),
+      paintedSession: shallowRef({
+        meta: computed(() => metaFor('chat-1', 'ask')),
+      }),
+      chatStore: { meta: computed(() => null) },
+      permissionLevelTouched: ref(true),
+      permissionLevelChosen: ref(true),
       sessionPermissionLevel: ref('allowlist'),
       harness: shallowRef({ setPermissionLevel }),
     } as unknown as AgentThreadViewState

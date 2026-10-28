@@ -96,6 +96,7 @@ export const createSessionOps = (state: AgentThreadViewState) => {
 
     if (pending.permissionLevel) {
       state.permissionLevelTouched.value = true
+      state.permissionLevelChosen.value = true
       state.sessionPermissionLevel.value = pending.permissionLevel
       state.harness.value.setPermissionLevel(pending.permissionLevel)
       try {
@@ -190,6 +191,7 @@ export const createSessionOps = (state: AgentThreadViewState) => {
     state.paintedSession.value = session
     const alreadyWarm = state.chatStore.isSessionWarm(slug, state.chatId.value)
     state.threadReady.value = alreadyWarm
+    state.permissionLevelChosen.value = false
     adoptViewPermissionLevel(state)
 
     if (state.isStandalone.value) {

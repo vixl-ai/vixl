@@ -89,6 +89,7 @@ export default () => {
   )
   const sessionPermissionLevel = ref<PermissionLevel>(defaultPermissionLevel.value)
   const permissionLevelTouched = ref(false)
+  const permissionLevelChosen = ref(false)
 
   const filePolicyOpen = ref(false)
   const filePolicyChanges = ref<AgentThreadViewState['filePolicyChanges']['value']>([])
@@ -193,6 +194,7 @@ export default () => {
     sessionPermissionLevel,
     defaultPermissionLevel,
     permissionLevelTouched,
+    permissionLevelChosen,
     filePolicyOpen,
     filePolicyChanges,
     filePolicyTitle,

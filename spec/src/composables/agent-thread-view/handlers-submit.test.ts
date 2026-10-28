@@ -219,6 +219,7 @@ describe('createSubmitHandlers handlePermissionLevelChange', () => {
     const patchMeta = vi.fn<(patch: { permissionLevel: string }) => void>()
     const state = {
       permissionLevelTouched: ref(false),
+      permissionLevelChosen: ref(false),
       sessionPermissionLevel: ref('allowlist'),
       projectSlug: computed(() => 'proj'),
       chatId: computed(() => 'chat-1'),
@@ -250,6 +251,7 @@ describe('createSubmitHandlers handlePermissionLevelChange', () => {
     const setPermissionLevel = vi.fn<(level: string) => void>()
     const state = {
       permissionLevelTouched: ref(false),
+      permissionLevelChosen: ref(false),
       sessionPermissionLevel: ref('allowlist'),
       projectSlug: computed(() => 'proj'),
       chatId: computed(() => 'chat-1'),

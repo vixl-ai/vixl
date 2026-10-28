@@ -142,6 +142,7 @@ describe('createSessionOps flushPendingChatMessage', () => {
         setPermissionLevel,
       }),
       permissionLevelTouched: ref(false),
+      permissionLevelChosen: ref(false),
       sessionPermissionLevel: ref('ask'),
       projectSlug: computed(() => 'home'),
       chatId: computed(() => 'chat-1'),
@@ -397,6 +398,7 @@ describe('createSessionOps loadThread permission restore', () => {
       sessionPermissionLevel: ref('allowlist' as const),
       defaultPermissionLevel: computed(() => 'bypass' as const),
       permissionLevelTouched: ref(true),
+      permissionLevelChosen: ref(false),
       paintedSession: shallowRef({
         meta: computed(() => ({
           id: 'chat-a',

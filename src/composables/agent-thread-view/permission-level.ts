@@ -156,7 +156,7 @@ export const adoptViewPermissionLevel = (
 }
 
 export const adoptLateMetaPermissionLevel = (state: AgentThreadViewState): void => {
-  if (state.permissionLevelTouched.value) {
+  if (state.permissionLevelChosen?.value) {
     return
   }
   const metaLevel = readMetaLevel(state)

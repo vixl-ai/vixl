@@ -55,6 +55,7 @@ export type AgentThreadViewState = {
   sessionPermissionLevel: Ref<PermissionLevel>
   defaultPermissionLevel: ComputedRef<PermissionLevel>
   permissionLevelTouched: Ref<boolean>
+  permissionLevelChosen: Ref<boolean>
   filePolicyOpen: Ref<boolean>
   filePolicyChanges: Ref<AggregatedTurnFileChange[]>
   filePolicyTitle: Ref<string>
