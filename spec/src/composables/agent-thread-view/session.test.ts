@@ -491,11 +491,12 @@ describe('createSessionOps loadThread permission restore', () => {
       permissionLevelFromSettings: ref(true),
       send,
     } as unknown as ReturnType<typeof useAgentHarness>)
-    state.chatStore.selectChat = vi.fn<(slug: string, id: string) => unknown>().mockReturnValue({
-      meta,
-    })
+    const chatStore = state.chatStore
+    state.chatStore.selectChat = vi
+      .fn<typeof chatStore.selectChat>()
+      .mockReturnValue({ meta } as ReturnType<typeof chatStore.selectChat>)
     state.chatStore.ensureChatHydrated = vi
-      .fn<(slug: string, id: string) => Promise<string>>()
+      .fn<typeof chatStore.ensureChatHydrated>()
       .mockResolvedValue('warmIdle')
     state.chatStore.refreshChatMeta = vi
       .fn<(slug: string, id: string) => Promise<void>>()
