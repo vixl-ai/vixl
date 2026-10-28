@@ -63,6 +63,7 @@ export const chatMetaSchema = z.object({
   subagentModel: z.string().nullable().optional(),
   reasoning: z.string().nullable().optional(),
   subagentReasoning: z.string().nullable().optional(),
+  permissionLevel: z.enum(['ask', 'allowlist', 'bypass']).nullable().optional(),
   usageTotals: z
     .object({
       inputTokens: z.number(),

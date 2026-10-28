@@ -6,6 +6,12 @@ import type { AgentThreadHandlers } from './handlers'
 import type { AgentThreadSessionOps } from './session'
 import type { AgentThreadViewState } from './types'
 import syncContextActions from './context-actions-sync'
+import {
+  cachedHarnessPermissionLevel,
+  metaPermissionLevelForChat,
+  settingsMayApplyPermissionLevel,
+  writeSettingsPermissionLevel,
+} from './permission-level'
 
 export const bindAgentThreadLifecycle = (
   state: AgentThreadViewState,
@@ -25,6 +31,17 @@ export const bindAgentThreadLifecycle = (
     { immediate: true },
   )
 
+  const thisChatPermissionSources = () => {
+    const chatId = state.chatId.value
+    return {
+      touched: state.permissionLevelTouched.value,
+      cachedLevel: cachedHarnessPermissionLevel(state.projectSlug.value, chatId),
+      metaLevel:
+        metaPermissionLevelForChat(state.paintedSession.value?.meta.value, chatId) ??
+        metaPermissionLevelForChat(state.chatStore.meta.value, chatId),
+    }
+  }
+
   watch(
     [
       () => state.config.hydrated.value,
@@ -33,9 +50,11 @@ export const bindAgentThreadLifecycle = (
       () => state.project.value?.rootPath ?? null,
     ],
     async ([hydrated]) => {
-      if (!hydrated || state.permissionLevelTouched.value) {
+      if (!hydrated || !settingsMayApplyPermissionLevel(thisChatPermissionSources())) {
         return
       }
+      const chatId = state.chatId.value
+      const slug = state.projectSlug.value
       const root = state.isStandalone.value
         ? null
         : (state.chatStore.meta.value?.projectRoot?.trim()
@@ -43,12 +62,15 @@ export const bindAgentThreadLifecycle = (
           || null)
       try {
         const settings = await loadEffectiveSettings(root)
-        if (state.permissionLevelTouched.value) {
+        if (state.chatId.value !== chatId || state.projectSlug.value !== slug) {
           return
         }
-        state.sessionPermissionLevel.value =
-          settings['agent.permissionLevel'] ?? 'allowlist'
-        state.harness.value?.setPermissionLevel(state.sessionPermissionLevel.value)
+        if (!settingsMayApplyPermissionLevel(thisChatPermissionSources())) {
+          return
+        }
+        const next = settings['agent.permissionLevel'] ?? 'allowlist'
+        state.sessionPermissionLevel.value = next
+        writeSettingsPermissionLevel(slug, chatId, next)
       } catch (error) {
         toast.error('Failed to load project settings', {
           description: error instanceof Error ? error.message : 'Unknown error',

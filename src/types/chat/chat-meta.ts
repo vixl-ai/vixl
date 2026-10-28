@@ -2,6 +2,7 @@ import type { ChatAttention } from '@/types/chat/chat-attention'
 import type { AwaitingPlanGo } from '@/types/plans/awaiting-plan-go'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { PrefixSnapshot } from '@/types/harness/prefix-snapshot'
+import type { PermissionLevel } from '@/types/harness/permission'
 
 export type ChatStatus = 'idle' | 'running'
 
@@ -41,5 +42,6 @@ export type ChatMeta = {
   subagentModel?: string | null
   reasoning?: string | null
   subagentReasoning?: string | null
+  permissionLevel?: PermissionLevel | null
   usageTotals?: ChatUsageTotals
 }

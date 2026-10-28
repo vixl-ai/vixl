@@ -34,6 +34,8 @@ pub struct ChatMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subagent_reasoning: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_level: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage_totals: Option<serde_json::Value>,
 }
 

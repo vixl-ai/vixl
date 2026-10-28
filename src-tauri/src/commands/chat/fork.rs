@@ -41,6 +41,7 @@ pub fn fork_chat(
         subagent_model: None,
         reasoning: None,
         subagent_reasoning: None,
+        permission_level: None,
         usage_totals: None,
     };
 

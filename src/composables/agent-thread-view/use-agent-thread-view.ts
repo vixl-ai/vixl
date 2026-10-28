@@ -83,9 +83,11 @@ export default () => {
   const { settings: chatEffectiveSettings } = useRootEffectiveSettings(
     () => chatSettingsRoot.value,
   )
-  const sessionPermissionLevel = ref<PermissionLevel>(
-    chatEffectiveSettings.value['agent.permissionLevel'] ?? 'allowlist',
+  const defaultPermissionLevel = computed(
+    (): PermissionLevel =>
+      chatEffectiveSettings.value['agent.permissionLevel'] ?? 'allowlist',
   )
+  const sessionPermissionLevel = ref<PermissionLevel>(defaultPermissionLevel.value)
   const permissionLevelTouched = ref(false)
 
   const filePolicyOpen = ref(false)
@@ -189,6 +191,7 @@ export default () => {
     homeRoot,
     paintedSession,
     sessionPermissionLevel,
+    defaultPermissionLevel,
     permissionLevelTouched,
     filePolicyOpen,
     filePolicyChanges,

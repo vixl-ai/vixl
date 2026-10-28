@@ -38,7 +38,12 @@ import type { AgentHarnessState, LastRunConfig } from './types'
 
 type AgentHarness = ReturnType<typeof createAgentHarness>
 
-export { dropAgentHarness, rekeyAgentHarness, resetAgentHarnessCacheForTests }
+export {
+  dropAgentHarness,
+  getCachedAgentHarness,
+  rekeyAgentHarness,
+  resetAgentHarnessCacheForTests,
+}
 
 const createAgentHarness = (options: AgentHarnessOptions) => {
   const chatStore = useChatStore()

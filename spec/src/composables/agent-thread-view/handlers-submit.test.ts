@@ -1,15 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import type { AgentThreadViewState } from '@/composables/agent-thread-view/types'
 import { createSubmitHandlers } from '@/composables/agent-thread-view/handlers-submit'
 import type { ReasoningLevel } from '@/types/models/reasoning-level'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
+import { updateChatMeta } from '@/services/vixl/vixl-tauri'
+import type { ChatMetaRecord } from '@/services/vixl/vixl-tauri/types'
+import { toast } from 'vue-sonner'
 
 vi.mock('vue-sonner', () => ({
   toast: {
     error: vi.fn<(...args: unknown[]) => void>(),
   },
 }))
+
+vi.mock('@/services/vixl/vixl-tauri', () => ({
+  updateChatMeta: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+}))
+
+const savedChatMeta = (): ChatMetaRecord => ({
+  id: 'chat-1',
+  title: 'Chat',
+  projectSlug: 'proj',
+  projectRoot: '/tmp/proj',
+  mode: 'agent',
+  model: 'test',
+  status: 'idle',
+  createdAt: '2020-01-01T00:00:00.000Z',
+  updatedAt: '2020-01-01T00:00:00.000Z',
+  forkedFrom: null,
+  pinned: false,
+  pinnedAt: null,
+})
 
 const payload = {
   text: 'look at auth next',
@@ -180,5 +202,68 @@ describe('createSubmitHandlers handleContinue', () => {
     const handlers = createSubmitHandlers(state)
     await handlers.handleContinue()
     expect(continueLastTurn).not.toHaveBeenCalled()
+  })
+})
+
+describe('createSubmitHandlers handlePermissionLevelChange', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(updateChatMeta).mockResolvedValue(savedChatMeta())
+  })
+
+  it('writes the chat meta and keeps the personal default for new composers', async () => {
+    const updateSetting = vi
+      .fn<(scope: string, key: string, value: unknown) => Promise<void>>()
+      .mockResolvedValue(undefined)
+    const setPermissionLevel = vi.fn<(level: string) => void>()
+    const state = {
+      permissionLevelTouched: ref(false),
+      sessionPermissionLevel: ref('allowlist'),
+      projectSlug: computed(() => 'proj'),
+      chatId: computed(() => 'chat-1'),
+      harness: shallowRef({
+        setPermissionLevel,
+      }),
+      config: { updateSetting },
+    } as unknown as AgentThreadViewState
+
+    const handlers = createSubmitHandlers(state)
+    await handlers.handlePermissionLevelChange('ask')
+
+    expect(state.permissionLevelTouched.value).toBe(true)
+    expect(state.sessionPermissionLevel.value).toBe('ask')
+    expect(setPermissionLevel).toHaveBeenCalledWith('ask')
+    expect(updateSetting).toHaveBeenCalledWith('personal', 'agent.permissionLevel', 'ask')
+    expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', {
+      permissionLevel: 'ask',
+    })
+  })
+
+  it('keeps the in-memory level when the chat meta write fails', async () => {
+    vi.mocked(updateChatMeta).mockRejectedValueOnce(new Error('disk full'))
+    const updateSetting = vi
+      .fn<(scope: string, key: string, value: unknown) => Promise<void>>()
+      .mockResolvedValue(undefined)
+    const setPermissionLevel = vi.fn<(level: string) => void>()
+    const state = {
+      permissionLevelTouched: ref(false),
+      sessionPermissionLevel: ref('allowlist'),
+      projectSlug: computed(() => 'proj'),
+      chatId: computed(() => 'chat-1'),
+      harness: shallowRef({
+        setPermissionLevel,
+      }),
+      config: { updateSetting },
+    } as unknown as AgentThreadViewState
+
+    const handlers = createSubmitHandlers(state)
+    await handlers.handlePermissionLevelChange('bypass')
+
+    expect(state.sessionPermissionLevel.value).toBe('bypass')
+    expect(setPermissionLevel).toHaveBeenCalledWith('bypass')
+    expect(updateSetting).toHaveBeenCalledWith('personal', 'agent.permissionLevel', 'bypass')
+    expect(toast.error).toHaveBeenCalledWith('Failed to save permission level', {
+      description: 'disk full',
+    })
   })
 })
