@@ -126,6 +126,7 @@ describe('createSessionOps flushPendingChatMessage', () => {
 
     const send = vi.fn<(args: unknown) => Promise<void>>().mockResolvedValue(undefined)
     const setPermissionLevel = vi.fn<(level: string) => void>()
+    const patchMeta = vi.fn<(patch: { permissionLevel: string }) => void>()
 
     setPendingChatMessage({
       text: 'Inspect this',
@@ -150,6 +151,7 @@ describe('createSessionOps flushPendingChatMessage', () => {
       fleetSidebar: {
         refreshSlug: vi.fn<(slug: string) => Promise<void>>().mockResolvedValue(undefined),
       },
+      paintedSession: shallowRef({ patchMeta }),
     } as unknown as AgentThreadViewState
 
     const session = createSessionOps(state)
@@ -164,6 +166,7 @@ describe('createSessionOps flushPendingChatMessage', () => {
     expect(toastError).toHaveBeenCalledWith('Failed to save permission level', {
       description: 'disk full',
     })
+    expect(patchMeta).not.toHaveBeenCalled()
     expect(send).toHaveBeenCalledTimes(1)
   })
 })

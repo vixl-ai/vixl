@@ -216,6 +216,7 @@ describe('createSubmitHandlers handlePermissionLevelChange', () => {
       .fn<(scope: string, key: string, value: unknown) => Promise<void>>()
       .mockResolvedValue(undefined)
     const setPermissionLevel = vi.fn<(level: string) => void>()
+    const patchMeta = vi.fn<(patch: { permissionLevel: string }) => void>()
     const state = {
       permissionLevelTouched: ref(false),
       sessionPermissionLevel: ref('allowlist'),
@@ -224,6 +225,7 @@ describe('createSubmitHandlers handlePermissionLevelChange', () => {
       harness: shallowRef({
         setPermissionLevel,
       }),
+      paintedSession: shallowRef({ patchMeta }),
       config: { updateSetting },
     } as unknown as AgentThreadViewState
 
@@ -237,6 +239,7 @@ describe('createSubmitHandlers handlePermissionLevelChange', () => {
     expect(updateChatMeta).toHaveBeenCalledWith('proj', 'chat-1', {
       permissionLevel: 'ask',
     })
+    expect(patchMeta).toHaveBeenCalledWith({ permissionLevel: 'ask' })
   })
 
   it('keeps the in-memory level when the chat meta write fails', async () => {

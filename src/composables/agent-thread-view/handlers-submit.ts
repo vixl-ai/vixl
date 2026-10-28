@@ -267,6 +267,7 @@ export const createSubmitHandlers = (state: AgentThreadViewState) => {
       await updateChatMeta(state.projectSlug.value, state.chatId.value, {
         permissionLevel: level,
       })
+      state.paintedSession.value?.patchMeta({ permissionLevel: level })
     } catch (error) {
       toast.error('Failed to save permission level', {
         description: error instanceof Error ? error.message : 'Unknown error',
