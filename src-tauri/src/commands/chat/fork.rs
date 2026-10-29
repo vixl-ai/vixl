@@ -6,6 +6,40 @@ use super::paths::chat_dir_for;
 use super::store;
 use crate::db::AppDb;
 
+pub(super) fn forked_chat_meta(
+    source: &ChatMeta,
+    new_id: String,
+    project_slug: String,
+    now: String,
+    source_id: String,
+) -> ChatMeta {
+    ChatMeta {
+        id: new_id,
+        title: format!("{} (fork)", source.title),
+        project_slug,
+        project_root: source.project_root.clone(),
+        mode: source.mode.clone(),
+        model: source.model.clone(),
+        status: "idle".to_string(),
+        attention: None,
+        created_at: now.clone(),
+        updated_at: now,
+        last_user_message_at: None,
+        forked_from: Some(source_id),
+        pinned: false,
+        pinned_at: None,
+        prefix_snapshot: None,
+        active_context: None,
+        awaiting_plan_go: None,
+        active_plan_path: None,
+        subagent_model: None,
+        reasoning: None,
+        subagent_reasoning: None,
+        permission_level: source.permission_level.clone(),
+        usage_totals: None,
+    }
+}
+
 #[tauri::command]
 pub fn fork_chat(
     app: AppHandle,
@@ -19,30 +53,13 @@ pub fn fork_chat(
 
     let conn = db.lock()?;
     let source = store::get_chat(&conn, &project_slug, &source_id)?;
-    let new_meta = ChatMeta {
-        id: new_id.clone(),
-        title: format!("{} (fork)", source.meta.title),
-        project_slug: project_slug.clone(),
-        project_root: source.meta.project_root.clone(),
-        mode: source.meta.mode.clone(),
-        model: source.meta.model.clone(),
-        status: "idle".to_string(),
-        attention: None,
-        created_at: now.clone(),
-        updated_at: now,
-        last_user_message_at: None,
-        forked_from: Some(source_id.clone()),
-        pinned: false,
-        pinned_at: None,
-        prefix_snapshot: None,
-        active_context: None,
-        awaiting_plan_go: None,
-        active_plan_path: None,
-        subagent_model: None,
-        reasoning: None,
-        subagent_reasoning: None,
-        usage_totals: None,
-    };
+    let new_meta = forked_chat_meta(
+        &source.meta,
+        new_id.clone(),
+        project_slug.clone(),
+        now,
+        source_id.clone(),
+    );
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     store::insert_chat(&tx, &new_meta, &source.project_id)?;

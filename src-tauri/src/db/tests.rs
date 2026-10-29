@@ -91,7 +91,7 @@ fn migrate_creates_chat_schema() {
     assert!(table_exists(&conn, "workbench_tabs"));
     assert!(table_exists(&conn, "editor_view_state"));
     assert!(table_exists(&conn, "workbench_prefs"));
-    assert_eq!(migration_versions(&conn), vec![1, 2, 3, 4]);
+    assert_eq!(migration_versions(&conn), vec![1, 2, 3, 4, 5]);
 }
 
 #[test]

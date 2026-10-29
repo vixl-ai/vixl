@@ -1,6 +1,7 @@
 import { toast } from 'vue-sonner'
 import type { FileUIPart } from 'ai'
 import { HOME_CHAT_SLUG, isHomeChatSlug } from '@/constants/home-chat'
+import { updateChatMeta } from '@/services/vixl/vixl-tauri'
 import type { ContextMention } from '@/types/harness/context-mention'
 import type { FileCheckpointFilePolicy } from '@/types/harness/file-checkpoint'
 import type { PermissionLevel } from '@/types/harness/permission'
@@ -249,14 +250,23 @@ export const createSubmitHandlers = (state: AgentThreadViewState) => {
 
   const handleContinue = createContinueHandler(state)
 
-  const handlePermissionLevelChange = async (
-    level: PermissionLevel,
-  ): Promise<void> => {
+  const handlePermissionLevelChange = async (level: PermissionLevel): Promise<void> => {
     state.permissionLevelTouched.value = true
+    state.permissionLevelChosen.value = true
     state.sessionPermissionLevel.value = level
     state.harness.value?.setPermissionLevel(level)
     try {
       await state.config.updateSetting('personal', 'agent.permissionLevel', level)
+    } catch (error) {
+      toast.error('Failed to save permission level', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
+    try {
+      await updateChatMeta(state.projectSlug.value, state.chatId.value, {
+        permissionLevel: level,
+      })
+      state.paintedSession.value?.patchMeta({ permissionLevel: level })
     } catch (error) {
       toast.error('Failed to save permission level', {
         description: error instanceof Error ? error.message : 'Unknown error',

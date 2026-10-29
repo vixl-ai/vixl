@@ -108,6 +108,7 @@ export type ChatMetaRecord = {
   subagentModel?: string | null
   reasoning?: string | null
   subagentReasoning?: string | null
+  permissionLevel?: 'ask' | 'allowlist' | 'bypass' | null
   usageTotals?: {
     inputTokens: number
     outputTokens: number

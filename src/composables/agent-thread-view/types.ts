@@ -53,7 +53,9 @@ export type AgentThreadViewState = {
   homeRoot: Ref<string | null>
   paintedSession: ShallowRef<ReturnType<ReturnType<typeof useChatStore>['forChat']> | null>
   sessionPermissionLevel: Ref<PermissionLevel>
+  defaultPermissionLevel: ComputedRef<PermissionLevel>
   permissionLevelTouched: Ref<boolean>
+  permissionLevelChosen: Ref<boolean>
   filePolicyOpen: Ref<boolean>
   filePolicyChanges: Ref<AggregatedTurnFileChange[]>
   filePolicyTitle: Ref<string>

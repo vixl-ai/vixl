@@ -134,4 +134,9 @@ pub const MIGRATIONS: &[SqlMigration] = &[
         name: "chats_active_plan_path",
         sql: "ALTER TABLE chats ADD COLUMN active_plan_path TEXT;",
     },
+    SqlMigration {
+        version: 5,
+        name: "chats_permission_level",
+        sql: "ALTER TABLE chats ADD COLUMN permission_level TEXT;",
+    },
 ];

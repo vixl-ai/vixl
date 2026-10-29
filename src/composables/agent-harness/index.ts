@@ -38,7 +38,12 @@ import type { AgentHarnessState, LastRunConfig } from './types'
 
 type AgentHarness = ReturnType<typeof createAgentHarness>
 
-export { dropAgentHarness, rekeyAgentHarness, resetAgentHarnessCacheForTests }
+export {
+  dropAgentHarness,
+  getCachedAgentHarness,
+  rekeyAgentHarness,
+  resetAgentHarnessCacheForTests,
+}
 
 const createAgentHarness = (options: AgentHarnessOptions) => {
   const chatStore = useChatStore()
@@ -72,6 +77,7 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     subagents: shallowRef<SubagentEntry[]>([]),
     abortController: ref<AbortController | null>(null),
     sessionPermissionLevel: ref<PermissionLevel | null>(null),
+    permissionLevelFromSettings: ref(false),
     lastRunConfig: ref<LastRunConfig | null>(null),
     resumingBackgroundBatch: ref(false),
     compacting: ref(false),
@@ -131,6 +137,7 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     pendingApprovals: state.pendingApprovals,
     pendingMcpAuth: state.pendingMcpAuth,
     sessionPermissionLevel: state.sessionPermissionLevel,
+    permissionLevelFromSettings: state.permissionLevelFromSettings,
     lastRunConfig: state.lastRunConfig,
     toolRuns: state.toolRuns,
     subagents: state.subagents,

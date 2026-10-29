@@ -54,6 +54,7 @@ export type AgentHarnessState = {
   subagents: ShallowRef<SubagentEntry[]>
   abortController: Ref<AbortController | null>
   sessionPermissionLevel: Ref<PermissionLevel | null>
+  permissionLevelFromSettings: Ref<boolean>
   lastRunConfig: Ref<LastRunConfig | null>
   resumingBackgroundBatch: Ref<boolean>
   compacting: Ref<boolean>

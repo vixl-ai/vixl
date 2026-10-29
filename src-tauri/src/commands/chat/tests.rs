@@ -58,6 +58,7 @@ fn sample_meta(id: &str, slug: &str, title: &str, updated_at: &str) -> ChatMeta 
         subagent_model: None,
         reasoning: None,
         subagent_reasoning: None,
+        permission_level: None,
         usage_totals: None,
     }
 }
@@ -138,6 +139,21 @@ fn duplicate_message_ids_are_allowed() {
     assert_eq!(messages[0]["id"], "same");
     assert_eq!(messages[1]["id"], "same");
     assert_eq!(messages[0]["createdAt"], "2026-01-01T00:00:00Z");
+}
+
+#[test]
+fn fork_keeps_source_permission_level() {
+    let mut source = sample_meta("src", "slug", "Chat", "2026-01-01T00:00:00Z");
+    source.permission_level = Some("ask".to_string());
+    let forked = super::fork::forked_chat_meta(
+        &source,
+        "dst".to_string(),
+        "slug".to_string(),
+        "2026-01-02T00:00:00Z".to_string(),
+        "src".to_string(),
+    );
+    assert_eq!(forked.permission_level.as_deref(), Some("ask"));
+    assert_eq!(forked.forked_from.as_deref(), Some("src"));
 }
 
 #[test]
@@ -430,4 +446,24 @@ fn active_plan_path_survives_insert_update_and_read() {
     store::update_chat(&conn, &meta, "pid").expect("clear");
     let cleared = store::get_chat(&conn, "slug", "c1").expect("get after clear");
     assert_eq!(cleared.meta.active_plan_path, None);
+}
+
+#[test]
+fn permission_level_survives_insert_update_and_read() {
+    let (_dir, conn) = open_migrated();
+    let mut meta = sample_meta("c1", "slug", "Chat", "2026-01-01T00:00:00Z");
+    meta.permission_level = Some("ask".to_string());
+    store::insert_chat(&conn, &meta, "pid").expect("insert");
+    let inserted = store::get_chat(&conn, "slug", "c1").expect("get after insert");
+    assert_eq!(inserted.meta.permission_level.as_deref(), Some("ask"));
+
+    meta.permission_level = Some("bypass".to_string());
+    store::update_chat(&conn, &meta, "pid").expect("update");
+    let updated = store::get_chat(&conn, "slug", "c1").expect("get after update");
+    assert_eq!(updated.meta.permission_level.as_deref(), Some("bypass"));
+
+    meta.permission_level = None;
+    store::update_chat(&conn, &meta, "pid").expect("clear");
+    let cleared = store::get_chat(&conn, "slug", "c1").expect("get after clear");
+    assert_eq!(cleared.meta.permission_level, None);
 }

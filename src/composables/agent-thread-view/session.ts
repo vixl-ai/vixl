@@ -5,6 +5,15 @@ import { setSubagentModelLock } from '@/services/harness/plan-execution-session'
 import { getUserHomeDir, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import { isReasoningLevel } from '@/types/models/reasoning-level'
+import {
+  adoptLateMetaPermissionLevel,
+  adoptViewPermissionLevel,
+  clearSettingsPermissionSeed,
+  isPermissionLevel,
+  metaPermissionLevelForChat,
+  noteSettingsPermissionSeed,
+  resolveChatPermissionLevel,
+} from './permission-level'
 import type { AgentThreadViewState } from './types'
 
 export const createSessionOps = (state: AgentThreadViewState) => {
@@ -22,7 +31,48 @@ export const createSessionOps = (state: AgentThreadViewState) => {
       loadedThreadKey: state.loadedThreadKey,
     })
     state.harness.value = nextHarness
-    nextHarness.setPermissionLevel(state.sessionPermissionLevel.value)
+    const cachedLevel = nextHarness.sessionPermissionLevel.value
+    if (isPermissionLevel(cachedLevel)) {
+      const persisted =
+        metaPermissionLevelForChat(state.paintedSession.value?.meta.value, state.chatId.value)
+        ?? metaPermissionLevelForChat(state.chatStore?.meta?.value, state.chatId.value)
+      const resolution = resolveChatPermissionLevel({
+        cachedLevel,
+        metaLevel: persisted,
+        cachedFromSettings: nextHarness.permissionLevelFromSettings?.value === true,
+      })
+      state.sessionPermissionLevel.value =
+        resolution.source === 'unset' ? cachedLevel : resolution.level
+      if (resolution.source === 'meta') {
+        clearSettingsPermissionSeed(state)
+        state.permissionLevelTouched.value = true
+        nextHarness.setPermissionLevel(resolution.level)
+      } else if (persisted) {
+        clearSettingsPermissionSeed(state)
+        state.permissionLevelTouched.value = true
+      } else {
+        state.permissionLevelTouched.value = false
+      }
+    } else if (state.permissionLevelTouched.value) {
+      clearSettingsPermissionSeed(state)
+      nextHarness.setPermissionLevel(state.sessionPermissionLevel.value)
+    } else {
+      const resolution = adoptViewPermissionLevel(state)
+      if (resolution.source !== 'cache') {
+        nextHarness.setPermissionLevel(state.sessionPermissionLevel.value)
+      }
+      if (resolution.source === 'unset') {
+        if (nextHarness.permissionLevelFromSettings) {
+          nextHarness.permissionLevelFromSettings.value = true
+        }
+        noteSettingsPermissionSeed(
+          state,
+          state.projectSlug.value,
+          state.chatId.value,
+          state.sessionPermissionLevel.value,
+        )
+      }
+    }
     nextHarness.restorePendingApprovals()
     nextHarness.restoreUsageLedger().catch((error) => {
       toast.error('Failed to restore usage', {
@@ -46,8 +96,21 @@ export const createSessionOps = (state: AgentThreadViewState) => {
 
     if (pending.permissionLevel) {
       state.permissionLevelTouched.value = true
+      state.permissionLevelChosen.value = true
       state.sessionPermissionLevel.value = pending.permissionLevel
       state.harness.value.setPermissionLevel(pending.permissionLevel)
+      try {
+        await updateChatMeta(state.projectSlug.value, state.chatId.value, {
+          permissionLevel: pending.permissionLevel,
+        })
+        state.paintedSession.value?.patchMeta({
+          permissionLevel: pending.permissionLevel,
+        })
+      } catch (error) {
+        toast.error('Failed to save permission level', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        })
+      }
     }
 
     if (pending.subagentModel) {
@@ -128,6 +191,8 @@ export const createSessionOps = (state: AgentThreadViewState) => {
     state.paintedSession.value = session
     const alreadyWarm = state.chatStore.isSessionWarm(slug, state.chatId.value)
     state.threadReady.value = alreadyWarm
+    state.permissionLevelChosen.value = false
+    adoptViewPermissionLevel(state)
 
     if (state.isStandalone.value) {
       if (state.homeRoot.value) {
@@ -161,15 +226,21 @@ export const createSessionOps = (state: AgentThreadViewState) => {
     if (isStale()) {
       return
     }
+    adoptLateMetaPermissionLevel(state)
 
-    // Idle warm: soft meta refresh in the background, never blocks paint.
-    if (hydratePath === 'warmIdle') {
-      state.chatStore.refreshChatMeta(slug, state.chatId.value).catch((error) => {
-        toast.error('Failed to refresh chat', {
-          description: error instanceof Error ? error.message : 'Unknown error',
+    // Idle warm: refresh meta without blocking paint. A pending send waits for it.
+    const refreshedMeta = hydratePath === 'warmIdle'
+      ? state.chatStore.refreshChatMeta(slug, state.chatId.value).then(() => {
+          if (isStale()) {
+            return
+          }
+          adoptLateMetaPermissionLevel(state)
+        }).catch((error) => {
+          toast.error('Failed to refresh chat', {
+            description: error instanceof Error ? error.message : 'Unknown error',
+          })
         })
-      })
-    }
+      : null
 
     state.loadedThreadKey.value = nextThreadKey
     state.threadReady.value = true
@@ -196,6 +267,13 @@ export const createSessionOps = (state: AgentThreadViewState) => {
         description: error instanceof Error ? error.message : 'Unknown error',
       })
     })
+
+    if (refreshedMeta && !state.permissionLevelChosen.value) {
+      await refreshedMeta
+      if (isStale()) {
+        return
+      }
+    }
 
     await flushPendingChatMessage()
   }

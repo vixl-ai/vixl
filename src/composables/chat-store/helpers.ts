@@ -135,6 +135,7 @@ export const mapMeta = (record: {
   subagentModel?: ChatMeta['subagentModel']
   reasoning?: ChatMeta['reasoning']
   subagentReasoning?: ChatMeta['subagentReasoning']
+  permissionLevel?: ChatMeta['permissionLevel']
   usageTotals?: ChatMeta['usageTotals']
 }): ChatMeta =>
   chatMetaSchema.parse({
@@ -159,6 +160,7 @@ export const mapMeta = (record: {
     subagentModel: record.subagentModel,
     reasoning: record.reasoning,
     subagentReasoning: record.subagentReasoning,
+    permissionLevel: record.permissionLevel,
     usageTotals: record.usageTotals,
   })
 
