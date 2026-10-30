@@ -105,7 +105,12 @@ export type HarnessEvent =
   | { type: 'terminal-output'; shellId: string; stream: 'stdout' | 'stderr'; data: string }
   | { type: 'shell-complete'; shellId: string; exitCode: number }
   | { type: 'chat-status-changed'; projectSlug: string; chatId: string; status: 'idle' | 'running' }
-  | { type: 'turn-aborted'; reason: 'user-stop' | 'error'; partialSteps: number }
+  | {
+      type: 'turn-aborted'
+      reason: 'user-stop' | 'error'
+      partialSteps: number
+      assistantId: string
+    }
   | {
       type: 'turn-ended'
       turnId: string

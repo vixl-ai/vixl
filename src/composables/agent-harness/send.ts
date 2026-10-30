@@ -1,10 +1,6 @@
 import { toast } from 'vue-sonner'
 import type { FileUIPart } from 'ai'
-import type { ContextMention } from '@/types/harness/context-mention'
-import type { HarnessEvent } from '@/types/harness/harness-event'
-import type { PermissionCapabilityKey } from '@/types/harness/permission'
-import type { ReasoningLevel } from '@/types/models/reasoning-level'
-import type { VixlChatMode, VixlSettings } from '@/types/vixl/vixl-settings'
+import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
 import parseModelRef from '@/utils/parse-model-ref'
 import { listAgentIndex } from '@/services/agents/registry'
@@ -18,38 +14,20 @@ import deferOverlappingParentTurn from './defer-overlapping-parent-turn'
 import enqueueComposerSend from './enqueue-composer-send'
 import handleSendCatch from './handle-send-catch'
 import runParentWithPrefinished from './run-parent-with-prefinished'
+import type { SendArgs, SendDeps, SendResult } from './send-types'
+import {
+  forceSendSkippedAfterAppend,
+  forceSendSkippedAtStart,
+  forceSendSkippedBeforeAppend,
+  withParentSendInFlight,
+} from './wait-for-force-send'
+import {
+  backgroundResumeHoldEpoch,
+  clearBackgroundResumeHold,
+} from './hold-background-resume'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
-export type SendArgs = {
-  text: string
-  mode: VixlChatMode
-  model: string
-  reasoning?: ReasoningLevel
-  mentions?: ContextMention[]
-  files?: FileUIPart[]
-  skipUserMessage?: boolean
-  skipUserPersist?: boolean
-  appendedUserMessageId?: string
-  continueTurnId?: string
-  // Internal sends (drain, retry, edit, forceSendQueued) bypass the outbound
-  // composer busy enqueue. They still defer when compaction or a background
-  // resume is in flight: drain/retry/edit re-enqueue, force-send waits first.
-  // Continue toasts instead of enqueueing.
-  internal?: boolean
-  autoRetryAttempt?: number
-}
-
-export type SendResult = 'completed' | 'failed' | 'skipped'
-
-type SendDeps = {
-  handleEvent: (event: HarnessEvent) => void | Promise<void>
-  persistPermission: (
-    capability: PermissionCapabilityKey,
-    verdict: 'allow' | 'deny',
-    scope: 'workspace' | 'always',
-  ) => Promise<void>
-  maybeDrainQueue: () => Promise<void>
-}
+export type { SendArgs, SendResult } from './send-types'
 
 export default (state: AgentHarnessState, attention: AttentionHelpers, deps: SendDeps) => {
   const {
@@ -69,7 +47,11 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
     suppressQueueDrainAfterStop,
   } = state
 
-  const send = async (args: SendArgs): Promise<SendResult> => {
+  const sendTracked = async (args: SendArgs): Promise<SendResult> => {
+    const resumeHoldEpoch =
+      typeof args.resumeHoldEpoch === 'number'
+        ? args.resumeHoldEpoch
+        : backgroundResumeHoldEpoch(state)
     const pending = session.pendingQuestion.value
     if (!args.internal && pending && args.text.trim().length > 0) {
       session.submitAnswer(pending.toolCallId, args.text)
@@ -82,7 +64,11 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
       return 'skipped'
     }
 
+    if (await forceSendSkippedAtStart(state, args.queuedItemId)) {
+      return 'skipped'
+    }
     if (
+      args.queuedItemId == null &&
       (status.value === 'streaming' || status.value === 'submitted') &&
       args.autoRetryAttempt == null
     ) {
@@ -172,6 +158,18 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         return 'skipped'
       }
 
+      if (
+        await forceSendSkippedBeforeAppend({
+          queuedItemId: args.queuedItemId,
+          state,
+          controller,
+          previousAbort,
+        })
+      ) {
+        await fleetSidebar.refreshSlug(options.projectSlug)
+        return 'skipped'
+      }
+
       let userMessageAppended = false
       if (!args.skipUserMessage) {
         const appended = await appendSendUserMessage({
@@ -193,13 +191,21 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         userMessageAppended = true
       }
 
-      if (controller.signal.aborted) {
-        status.value = 'ready'
+      if (
+        await forceSendSkippedAfterAppend({
+          queuedItemId: args.queuedItemId,
+          userMessageAppended,
+          state,
+          controller,
+          previousAbort,
+        })
+      ) {
         await fleetSidebar.refreshSlug(options.projectSlug)
         return 'skipped'
       }
 
       if (
+        args.queuedItemId == null &&
         deferOverlappingParentTurn({
           resumeInFlight: resumingBackgroundBatch.value,
           compacting: compacting.value,
@@ -238,7 +244,11 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         session.startAgentTurn(turnId)
       }
       turnStarted = true
+      if (args.queuedItemId) {
+        messageQueue.remove(args.queuedItemId)
+      }
       suppressQueueDrainAfterStop.value = false
+      clearBackgroundResumeHold(state, resumeHoldEpoch)
       await runParentWithPrefinished({
         workspace: options,
         projectSlug: options.projectSlug,
@@ -306,6 +316,9 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
       }
     }
   }
+
+  const send = (args: SendArgs): Promise<SendResult> =>
+    withParentSendInFlight(state, () => sendTracked(args))
 
   return { send }
 }

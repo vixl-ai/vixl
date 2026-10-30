@@ -1157,6 +1157,7 @@ describe('consumeStream terminal stop', () => {
       type: 'turn-aborted',
       reason: 'user-stop',
       partialSteps: 2,
+      assistantId: 'turn-1',
     })
   })
 

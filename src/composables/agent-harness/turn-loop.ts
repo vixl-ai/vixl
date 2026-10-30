@@ -50,6 +50,7 @@ export default (
     fleetSidebar,
     messageQueue,
     suppressQueueDrainAfterStop,
+    holdBackgroundResume,
     disposed,
   } = state
 
@@ -238,6 +239,7 @@ export default (
       chatId: options.chatId,
       projectSlug: options.projectSlug,
       parentBusy: attention.isParentBusy(),
+      holdBackgroundResume: holdBackgroundResume.value,
       patchMeta: (patch) => {
         session.patchMeta(patch)
       },

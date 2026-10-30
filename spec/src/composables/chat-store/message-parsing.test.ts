@@ -457,4 +457,37 @@ describe('finishAgentTurn truncated tool close', () => {
       started: true,
     })
   })
+
+  it('closes running tools on another turn without clearing activeTurnId', () => {
+    const session = createSession('proj', 'chat-late-abort')
+    const ops = createSessionAgentOps(session)
+    session.activeTurnId.value = 'turn-old'
+    ops.startAgentStep('step-old')
+    ops.upsertLocalToolRun({
+      toolCallId: 'tc-old',
+      name: 'read_file',
+      status: 'running',
+      args: { path: 'a.ts' },
+      started: true,
+    })
+    session.activeTurnId.value = 'turn-new'
+    session.activeStepId.value = 'step-new'
+    ops.closeRunningToolsOnTurn('turn-old')
+
+    expect(session.activeTurnId.value).toBe('turn-new')
+    expect(session.activeStepId.value).toBe('step-new')
+    const oldItem = session.timeline.value.find(
+      (item) => item.type === 'agent-turn' && item.turn.id === 'turn-old',
+    )
+    expect(oldItem?.type).toBe('agent-turn')
+    if (oldItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(oldItem.turn.steps[0]?.tools[0]).toMatchObject({
+      toolCallId: 'tc-old',
+      status: 'done',
+      result: { stopped: true },
+      started: true,
+    })
+  })
 })

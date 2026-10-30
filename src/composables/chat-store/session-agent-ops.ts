@@ -25,22 +25,25 @@ type TurnOps = {
   appendLocalReasoningDelta: (delta: string, messageId?: string, stepId?: string) => void
   setLocalReasoningSeconds: (stepId: string, seconds: number) => void
   upsertLocalToolRun: (run: ToolRun) => void
+  closeRunningToolsOnTurn: (turnId: string) => void
   finishAgentTurn: () => void
   flushPendingStreamDeltas: () => void
   disposePendingStreamDeltas: () => void
 }
 
 const createSessionAgentOps = (session: ChatSession): TurnOps => {
-  const getActiveTurn = (): AgentTurn | null => {
-    if (!session.activeTurnId.value) {
+  const findTurnById = (turnId: string | null): AgentTurn | null => {
+    if (!turnId) {
       return null
     }
     const item = session.timeline.value.find(
-      (entry) =>
-        entry.type === 'agent-turn' && entry.turn.id === session.activeTurnId.value,
+      (entry) => entry.type === 'agent-turn' && entry.turn.id === turnId,
     )
     return item?.type === 'agent-turn' ? item.turn : null
   }
+
+  const getActiveTurn = (): AgentTurn | null =>
+    findTurnById(session.activeTurnId.value)
 
   const ensureActiveTurn = (): AgentTurn | null => {
     const existing = getActiveTurn()
@@ -66,29 +69,44 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     updateAssistantMessage(session, turn)
   }
 
+  const resolveDeltaTurn = (
+    messageId?: string,
+  ): { turn: AgentTurn; isActive: boolean } | null => {
+    const unresolvedId = messageId ?? session.activeTurnId.value
+    if (!unresolvedId) {
+      return null
+    }
+    const turnId = resolveTurnId(unresolvedId, session.turnIdRemap)
+    const isActive = turnId === session.activeTurnId.value
+    const existing = isActive ? getActiveTurn() : findTurnById(turnId)
+    if (existing) {
+      return { turn: existing, isActive }
+    }
+    if (!isActive) {
+      return null
+    }
+    return {
+      turn: {
+        id: turnId,
+        steps: [],
+        text: '',
+        createdAt: new Date().toISOString(),
+      },
+      isActive: true,
+    }
+  }
+
   const applyLocalTextDelta = (
     delta: string,
     messageId?: string,
     stepId?: string,
   ): void => {
-    const unresolvedId = messageId ?? session.activeTurnId.value
-    if (!unresolvedId) {
+    const resolved = resolveDeltaTurn(messageId)
+    if (!resolved) {
       return
     }
-    const turnId = resolveTurnId(unresolvedId, session.turnIdRemap)
-    if (turnId !== session.activeTurnId.value) {
-      session.activeTurnId.value = turnId
-    }
-    const current =
-      getActiveTurn() ??
-      ({
-        id: turnId,
-        steps: [],
-        text: '',
-        createdAt: new Date().toISOString(),
-      } satisfies AgentTurn)
-
-    const targetStepId = stepId ?? session.activeStepId.value
+    const { turn: current, isActive } = resolved
+    const targetStepId = stepId ?? (isActive ? session.activeStepId.value : null)
     if (targetStepId) {
       const step =
         current.steps.find((item) => item.id === targetStepId) ??
@@ -100,8 +118,11 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
       )
       return
     }
-
-    session.pendingStepText.value += delta
+    if (isActive) {
+      session.pendingStepText.value += delta
+      return
+    }
+    patchActiveTurn({ ...current, text: current.text + delta })
   }
 
   const applyLocalReasoningDelta = (
@@ -109,26 +130,21 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     messageId?: string,
     stepId?: string,
   ): void => {
-    const unresolvedId = messageId ?? session.activeTurnId.value
-    if (!unresolvedId) {
+    const resolved = resolveDeltaTurn(messageId)
+    if (!resolved) {
       return
     }
-    const turnId = resolveTurnId(unresolvedId, session.turnIdRemap)
-    if (turnId !== session.activeTurnId.value) {
-      session.activeTurnId.value = turnId
+    const { turn: current, isActive } = resolved
+    let targetStepId = stepId
+    if (!targetStepId) {
+      if (isActive) {
+        targetStepId = ensureActiveStep()
+      } else {
+        targetStepId = current.steps.at(-1)?.id ?? crypto.randomUUID()
+      }
+    } else if (isActive && session.activeStepId.value !== targetStepId) {
+      session.activeStepId.value = targetStepId
     }
-    const targetStepId = stepId ?? ensureActiveStep()
-    if (stepId && session.activeStepId.value !== stepId) {
-      session.activeStepId.value = stepId
-    }
-    const current =
-      getActiveTurn() ??
-      ({
-        id: turnId,
-        steps: [],
-        text: '',
-        createdAt: new Date().toISOString(),
-      } satisfies AgentTurn)
     const withStep = ensureStep(current, targetStepId)
     const step =
       withStep.steps.find((item) => item.id === targetStepId) ??
@@ -248,6 +264,17 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     patchActiveTurn(patchStep(current, stepId, upsertToolInStep(step, run)))
   }
 
+  const closeRunningToolsOnTurn = (turnId: string): void => {
+    const current = findTurnById(turnId)
+    if (!current) {
+      return
+    }
+    patchActiveTurn({
+      ...current,
+      steps: current.steps.map((step) => closeRunningTools(step)),
+    })
+  }
+
   const finishAgentTurn = (): void => {
     pending.flush()
     finishAgentStep()
@@ -283,6 +310,7 @@ const createSessionAgentOps = (session: ChatSession): TurnOps => {
     },
     setLocalReasoningSeconds,
     upsertLocalToolRun,
+    closeRunningToolsOnTurn,
     finishAgentTurn,
     flushPendingStreamDeltas: pending.flush,
     disposePendingStreamDeltas: pending.dispose,

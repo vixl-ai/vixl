@@ -19,12 +19,17 @@ type FlushBackgroundResumeArgs = {
   chatId: string
   projectSlug: string
   parentBusy: boolean
+  holdBackgroundResume: boolean
   patchMeta: (patch: { status: 'idle' }) => void
   refreshSidebar: () => void
   resume: () => Promise<void>
 }
 
 export default (args: FlushBackgroundResumeArgs): void => {
+  if (args.holdBackgroundResume) {
+    return
+  }
+
   const action = shouldFlushBackgroundSubagentResume({
     parentBusy: args.parentBusy,
     hasPending:

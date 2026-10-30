@@ -218,6 +218,57 @@ describe('stream delta batching', () => {
     expect(revived.timeline.value).toEqual([])
   })
 
+  it('does not move activeTurnId when a stale text delta arrives', async () => {
+    const { default: useChatStore, resetChatSessionsForTests } = await import(
+      '@/composables/use-chat-store'
+    )
+    const { STREAM_DELTA_FLUSH_MS } = await import(
+      '@/composables/chat-store/stream-delta-buffer'
+    )
+    resetChatSessionsForTests()
+    const store = useChatStore()
+    const session = store.forChat('proj', 'chat-stale-delta')
+
+    session.startAgentTurn('turn-old')
+    session.startAgentStep('step-old')
+    session.appendLocalTextDelta('old text', 'turn-old', 'step-old')
+    await vi.advanceTimersByTimeAsync(STREAM_DELTA_FLUSH_MS)
+
+    session.startAgentTurn('turn-new')
+    session.startAgentStep('step-new')
+    session.appendLocalTextDelta('new text', 'turn-new', 'step-new')
+    await vi.advanceTimersByTimeAsync(STREAM_DELTA_FLUSH_MS)
+
+    session.appendLocalTextDelta(' late', 'turn-old', 'step-old')
+    await vi.advanceTimersByTimeAsync(STREAM_DELTA_FLUSH_MS)
+
+    expect(session.activeTurnId.value).toBe('turn-new')
+    expect(stepTextOf(turnOf(session.timeline, 'turn-old'))).toBe('old text late')
+    expect(stepTextOf(turnOf(session.timeline, 'turn-new'))).toBe('new text')
+  })
+
+  it('appends a remapped text delta onto the active turn', async () => {
+    const { default: useChatStore, resetChatSessionsForTests } = await import(
+      '@/composables/use-chat-store'
+    )
+    const { STREAM_DELTA_FLUSH_MS } = await import(
+      '@/composables/chat-store/stream-delta-buffer'
+    )
+    resetChatSessionsForTests()
+    const store = useChatStore()
+    const session = store.forChat('proj', 'chat-remap-delta')
+
+    session.startAgentTurn('turn-new')
+    session.startAgentStep('step-new')
+    session.turnIdRemap.set('turn-old', 'turn-new')
+    session.appendLocalTextDelta('hello', 'turn-old', 'step-new')
+    await vi.advanceTimersByTimeAsync(STREAM_DELTA_FLUSH_MS)
+
+    expect(session.activeTurnId.value).toBe('turn-new')
+    expect(stepTextOf(turnOf(session.timeline, 'turn-new'))).toBe('hello')
+    expect(turnOf(session.timeline, 'turn-old')).toBeNull()
+  })
+
   it('stores reasoningSeconds on the active step', async () => {
     const { default: useChatStore, resetChatSessionsForTests } = await import(
       '@/composables/use-chat-store'

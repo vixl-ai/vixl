@@ -59,6 +59,9 @@ const buildState = (): AgentHarnessState =>
       appendLocalCompaction: vi.fn<(...args: unknown[]) => void>(),
       clearPendingQuestion: vi.fn<(...args: unknown[]) => void>(),
       finishAgentTurn: vi.fn<(...args: unknown[]) => void>(),
+      closeRunningToolsOnTurn: vi.fn<(...args: unknown[]) => void>(),
+      activeTurnId: ref<string | null>(null),
+      turnIdRemap: new Map<string, string>(),
     },
     status: ref('ready'),
     toolRuns: shallowRef([]),
@@ -76,6 +79,8 @@ const buildState = (): AgentHarnessState =>
     },
     compacting: ref(false),
     disposed: ref(false),
+    suppressQueueDrainAfterStop: ref(false),
+    holdBackgroundResume: ref(false),
     chatStore: {
       isSessionActive: vi.fn<() => boolean>().mockReturnValue(true),
     },
@@ -798,6 +803,212 @@ describe('agent-harness events subagent result flush', () => {
       'done',
       { reason: 'completed', finish: 'stop' },
     )
+  })
+})
+
+describe('agent-harness events idle resume flush', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('asks to flush background resume when chat becomes idle', () => {
+    const state = buildState()
+    const attention = buildAttention()
+    const { handleEvent } = createEvents(state, attention, deps)
+
+    handleEvent({
+      type: 'chat-status-changed',
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      status: 'idle',
+    })
+
+    expect(deps.maybeFlushBackgroundSubagentResume).toHaveBeenCalledTimes(1)
+    expect(state.status.value).toBe('idle')
+    expect(state.session.patchMeta).toHaveBeenCalledWith({ status: 'idle' })
+    expect(attention.refreshSidebar).toHaveBeenCalled()
+  })
+
+  it('does not flush background resume on idle while the force-send hold is set', () => {
+    const state = buildState()
+    state.holdBackgroundResume.value = true
+    const attention = buildAttention()
+    const { handleEvent } = createEvents(state, attention, deps)
+
+    handleEvent({
+      type: 'chat-status-changed',
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      status: 'idle',
+    })
+
+    expect(deps.maybeFlushBackgroundSubagentResume).not.toHaveBeenCalled()
+    expect(state.status.value).toBe('idle')
+    expect(state.session.patchMeta).toHaveBeenCalledWith({ status: 'idle' })
+    expect(attention.refreshSidebar).toHaveBeenCalled()
+  })
+
+  it('flushes on idle when the hold is clear even if queue drain is suppressed', () => {
+    const state = buildState()
+    state.suppressQueueDrainAfterStop.value = true
+    const attention = buildAttention()
+    const { handleEvent } = createEvents(state, attention, deps)
+
+    handleEvent({
+      type: 'chat-status-changed',
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      status: 'idle',
+    })
+
+    expect(deps.maybeFlushBackgroundSubagentResume).toHaveBeenCalledTimes(1)
+    expect(state.status.value).toBe('idle')
+    expect(state.session.patchMeta).toHaveBeenCalledWith({ status: 'idle' })
+    expect(attention.refreshSidebar).toHaveBeenCalled()
+  })
+
+  it('does not flush background resume on a non-idle chat status', () => {
+    const state = buildState()
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'chat-status-changed',
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      status: 'running',
+    })
+
+    expect(deps.maybeFlushBackgroundSubagentResume).not.toHaveBeenCalled()
+  })
+})
+
+describe('agent-harness events turn-aborted', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('does not finish a newer turn when a late abort arrives for the old id', () => {
+    const state = buildState()
+    state.session.activeTurnId.value = 'turn-new'
+    state.status.value = 'streaming'
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'turn-aborted',
+      reason: 'user-stop',
+      partialSteps: 1,
+      assistantId: 'turn-old',
+    })
+
+    expect(state.session.finishAgentTurn).not.toHaveBeenCalled()
+    expect(state.session.activeTurnId.value).toBe('turn-new')
+    expect(state.status.value).toBe('streaming')
+    expect(state.session.clearPendingQuestion).not.toHaveBeenCalled()
+    expect(state.session.closeRunningToolsOnTurn).toHaveBeenCalledWith('turn-old')
+  })
+
+  it('sets ready when a late abort arrives and no turn is active', () => {
+    const state = buildState()
+    state.status.value = 'streaming'
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'turn-aborted',
+      reason: 'user-stop',
+      partialSteps: 1,
+      assistantId: 'turn-old',
+    })
+
+    expect(state.session.finishAgentTurn).not.toHaveBeenCalled()
+    expect(state.session.activeTurnId.value).toBeNull()
+    expect(state.status.value).toBe('ready')
+    expect(state.session.clearPendingQuestion).toHaveBeenCalledTimes(1)
+    expect(state.session.closeRunningToolsOnTurn).toHaveBeenCalledWith('turn-old')
+  })
+
+  it('does not clobber submitted status when a late abort arrives with no active turn', () => {
+    const state = buildState()
+    state.status.value = 'submitted'
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'turn-aborted',
+      reason: 'user-stop',
+      partialSteps: 1,
+      assistantId: 'turn-old',
+    })
+
+    expect(state.status.value).toBe('submitted')
+    expect(state.session.clearPendingQuestion).not.toHaveBeenCalled()
+    expect(state.session.finishAgentTurn).not.toHaveBeenCalled()
+    expect(state.session.closeRunningToolsOnTurn).toHaveBeenCalledWith('turn-old')
+  })
+
+  it('finishes the turn when the aborted id is still active', () => {
+    const state = buildState()
+    state.session.activeTurnId.value = 'turn-1'
+    state.status.value = 'streaming'
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'turn-aborted',
+      reason: 'error',
+      partialSteps: 2,
+      assistantId: 'turn-1',
+    })
+
+    expect(state.session.finishAgentTurn).toHaveBeenCalledTimes(1)
+    expect(state.status.value).toBe('ready')
+    expect(state.session.clearPendingQuestion).toHaveBeenCalledTimes(1)
+    expect(state.session.closeRunningToolsOnTurn).not.toHaveBeenCalled()
+  })
+})
+
+describe('agent-harness events stale delta status', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('does not set streaming for a text delta on an older turn', () => {
+    const state = buildState()
+    state.session.activeTurnId.value = 'turn-new'
+    state.status.value = 'ready'
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'text-delta',
+      delta: 'late',
+      messageId: 'turn-old',
+      stepId: 'step-old',
+    })
+
+    expect(state.session.appendLocalTextDelta).toHaveBeenCalledWith(
+      'late',
+      'turn-old',
+      'step-old',
+    )
+    expect(state.status.value).toBe('ready')
+  })
+
+  it('sets streaming for a text delta on the active turn', () => {
+    const state = buildState()
+    state.session.activeTurnId.value = 'turn-new'
+    state.status.value = 'ready'
+    const { handleEvent } = createEvents(state, buildAttention(), deps)
+
+    handleEvent({
+      type: 'text-delta',
+      delta: 'hello',
+      messageId: 'turn-new',
+      stepId: 'step-new',
+    })
+
+    expect(state.session.appendLocalTextDelta).toHaveBeenCalledWith(
+      'hello',
+      'turn-new',
+      'step-new',
+    )
+    expect(state.status.value).toBe('streaming')
   })
 })
 

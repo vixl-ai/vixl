@@ -182,6 +182,7 @@ const buildState = (): AgentHarnessState =>
     compacting: ref(false),
     disposed: ref(false),
     suppressQueueDrainAfterStop: ref(false),
+    holdBackgroundResume: ref(false),
     config: {
       hydrated: computed(() => true),
     },
@@ -460,6 +461,57 @@ describe('maybeFlushBackgroundSubagentResume', () => {
     )
     expect(resumeOrchestrator).toHaveBeenCalledTimes(1)
     expect(state.resumingBackgroundBatch.value).toBe(true)
+  })
+
+  it('does not resume while the force-send hold is set even when a background result is deliverable', async () => {
+    shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
+    listDeliverableBackgroundResults.mockReturnValue([deliverableResult])
+    const state = buildState()
+    state.holdBackgroundResume.value = true
+    state.lastRunConfig.value = lastRunConfig
+    const { maybeFlushBackgroundSubagentResume } = createTurnLoop(
+      state,
+      buildAttention(state),
+      loopDeps(),
+    )
+
+    maybeFlushBackgroundSubagentResume()
+    await Promise.resolve()
+
+    expect(shouldFlushBackgroundSubagentResume).not.toHaveBeenCalled()
+    expect(resumeOrchestrator).not.toHaveBeenCalled()
+    expect(state.status.value).toBe('ready')
+    expect(state.resumingBackgroundBatch.value).toBe(false)
+    expect(state.session.startAgentTurn).not.toHaveBeenCalled()
+  })
+
+  it('resumes after the force-send hold clears when a background result is deliverable', async () => {
+    shouldFlushBackgroundSubagentResume.mockImplementation(flushPolicyFromArgs)
+    listDeliverableBackgroundResults.mockReturnValue([deliverableResult])
+    resumeOrchestrator.mockImplementation(async () => {
+      listDeliverableBackgroundResults.mockReturnValue([])
+    })
+    const state = buildState()
+    state.holdBackgroundResume.value = true
+    state.lastRunConfig.value = lastRunConfig
+    const { maybeFlushBackgroundSubagentResume } = createTurnLoop(
+      state,
+      buildAttention(state),
+      loopDeps(),
+    )
+
+    maybeFlushBackgroundSubagentResume()
+    await Promise.resolve()
+    expect(resumeOrchestrator).not.toHaveBeenCalled()
+
+    state.holdBackgroundResume.value = false
+    maybeFlushBackgroundSubagentResume()
+    await Promise.resolve()
+
+    expect(shouldFlushBackgroundSubagentResume).toHaveBeenCalledWith(
+      expect.objectContaining({ parentBusy: false }),
+    )
+    expect(resumeOrchestrator).toHaveBeenCalled()
   })
 })
 

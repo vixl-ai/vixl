@@ -1,6 +1,7 @@
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
+import resolveTurnId from '@/composables/chat-store/resolve-turn-id'
 import { mapMetaStatusToChatStatus } from '@/services/harness/orchestrator'
 import { withTerminalOutputDescription } from '@/services/harness/shell/with-terminal-output-description'
 import mapSubagentResultStatus from '@/utils/map-subagent-result-status'
@@ -33,16 +34,24 @@ export default (
     billableUsageRecords,
     turnUsageByTurnId,
     compacting,
+    holdBackgroundResume,
   } = state
+
+  const deltaBelongsToActiveTurn = (messageId?: string): boolean =>
+    !messageId || resolveTurnId(messageId, session.turnIdRemap) === session.activeTurnId.value
 
   const handleEvent = (event: HarnessEvent): void | Promise<void> => {
     if (event.type === 'text-delta') {
       session.appendLocalTextDelta(event.delta, event.messageId, event.stepId)
-      status.value = 'streaming'
+      if (deltaBelongsToActiveTurn(event.messageId)) {
+        status.value = 'streaming'
+      }
     }
     if (event.type === 'reasoning-delta') {
       session.appendLocalReasoningDelta(event.delta, event.messageId, event.stepId)
-      status.value = 'streaming'
+      if (deltaBelongsToActiveTurn(event.messageId)) {
+        status.value = 'streaming'
+      }
     }
     if (event.type === 'reasoning-duration') {
       session.setLocalReasoningSeconds(event.stepId, event.seconds)
@@ -247,7 +256,7 @@ export default (
       status.value = mapMetaStatusToChatStatus(event.status, false)
       session.patchMeta({ status: event.status })
       attention.refreshSidebar()
-      if (event.status === 'idle') {
+      if (event.status === 'idle' && !holdBackgroundResume.value) {
         deps.maybeFlushBackgroundSubagentResume()
       }
     }
@@ -275,9 +284,17 @@ export default (
       session.setAgentTurnStop(event.turnId, event.stop)
     }
     if (event.type === 'turn-aborted') {
-      status.value = 'ready'
-      session.clearPendingQuestion()
-      session.finishAgentTurn()
+      const abortedId = resolveTurnId(event.assistantId, session.turnIdRemap)
+      const activeId = session.activeTurnId.value
+      if (abortedId === activeId) {
+        session.finishAgentTurn()
+      } else {
+        session.closeRunningToolsOnTurn(abortedId)
+      }
+      if (abortedId === activeId || (activeId == null && status.value !== 'submitted')) {
+        status.value = 'ready'
+        session.clearPendingQuestion()
+      }
     }
     if (event.type === 'workspace-moved') {
       return rebindWorkspace(state, event)

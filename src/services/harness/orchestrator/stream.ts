@@ -38,6 +38,7 @@ export default async (input: HarnessStreamInput): Promise<void> => {
         type: 'turn-aborted',
         reason: 'error',
         partialSteps: prepared?.steps.stepCount ?? 0,
+        assistantId: input.assistantId,
       })
       throw error
     }

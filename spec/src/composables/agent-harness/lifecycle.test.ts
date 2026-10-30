@@ -148,6 +148,8 @@ const buildState = (): AgentHarnessState =>
       clear: vi.fn<() => void>(),
     },
     suppressQueueDrainAfterStop: ref(false),
+    holdBackgroundResume: ref(false),
+    parentSendInFlight: { current: null },
     compacting: ref(false),
     resumingBackgroundBatch: ref(false),
     disposed: ref(false),
@@ -341,14 +343,23 @@ describe('agent-harness lifecycle stop', () => {
     ]
     const deps = buildDeps()
     const { forceSendQueued } = createLifecycle(state, buildAttention(), deps)
+    vi.spyOn(state.abortController.value!, 'abort').mockImplementation(() => {
+      expect(state.holdBackgroundResume.value).toBe(true)
+    })
 
     await forceSendQueued('q-1')
 
     expect(state.suppressQueueDrainAfterStop.value).toBe(true)
+    expect(state.holdBackgroundResume.value).toBe(false)
+    expect(state.messageQueue.remove).not.toHaveBeenCalled()
+    expect(state.messageQueue.items.value).toEqual([
+      expect.objectContaining({ id: 'q-1', text: 'queued' }),
+    ])
     expect(deps.send).toHaveBeenCalledWith(
       expect.objectContaining({
         text: 'queued',
         internal: true,
+        queuedItemId: 'q-1',
         skipUserMessage: undefined,
         skipUserPersist: undefined,
       }),
@@ -377,6 +388,7 @@ describe('agent-harness lifecycle stop', () => {
       expect.objectContaining({
         text: 'queued',
         internal: true,
+        queuedItemId: 'q-1',
         skipUserMessage: true,
         skipUserPersist: true,
       }),
@@ -411,8 +423,138 @@ describe('agent-harness lifecycle stop', () => {
       expect.objectContaining({
         text: 'queued',
         internal: true,
+        queuedItemId: 'q-1',
       }),
     )
+  })
+
+  it('waits for the in-flight parent send to finish before force-sending', async () => {
+    const state = buildState()
+    let resolveParent: () => void = () => undefined
+    state.parentSendInFlight.current = new Promise<void>((resolve) => {
+      resolveParent = resolve
+    })
+    state.messageQueue.items.value = [
+      {
+        id: 'q-1',
+        text: 'queued',
+        files: [],
+        mode: 'agent',
+        model: 'openai::gpt-4o',
+      },
+    ]
+    const deps = buildDeps()
+    const { forceSendQueued } = createLifecycle(state, buildAttention(), deps)
+
+    const pending = forceSendQueued('q-1')
+    await nextTick()
+
+    expect(deps.send).not.toHaveBeenCalled()
+    expect(state.messageQueue.remove).not.toHaveBeenCalled()
+    expect(state.holdBackgroundResume.value).toBe(true)
+
+    resolveParent()
+    await pending
+
+    expect(deps.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'queued',
+        internal: true,
+        queuedItemId: 'q-1',
+      }),
+    )
+    expect(state.messageQueue.remove).not.toHaveBeenCalled()
+    expect(state.messageQueue.items.value).toEqual([
+      expect.objectContaining({ id: 'q-1', text: 'queued' }),
+    ])
+  })
+
+  it('keeps the resume hold while a later force-send still owns it', async () => {
+    const state = buildState()
+    state.messageQueue.items.value = [
+      {
+        id: 'q-1',
+        text: 'first',
+        files: [],
+        mode: 'agent',
+        model: 'openai::gpt-4o',
+      },
+      {
+        id: 'q-2',
+        text: 'second',
+        files: [],
+        mode: 'agent',
+        model: 'openai::gpt-4o',
+      },
+    ]
+    const deps = buildDeps()
+    let resolveFirstSend = (): void => undefined
+    let resolveSecondSend = (): void => undefined
+    const firstSend = new Promise<void>((resolve) => {
+      resolveFirstSend = resolve
+    })
+    const secondSend = new Promise<void>((resolve) => {
+      resolveSecondSend = resolve
+    })
+    let firstSendStarted = (): void => undefined
+    const firstSendSeen = new Promise<void>((resolve) => {
+      firstSendStarted = resolve
+    })
+    deps.send.mockImplementation(async () => {
+      if (deps.send.mock.calls.length === 1) {
+        const tracked = firstSend
+        state.parentSendInFlight.current = tracked
+        firstSendStarted()
+        try {
+          await tracked
+        } finally {
+          if (state.parentSendInFlight.current === tracked) {
+            state.parentSendInFlight.current = null
+          }
+        }
+        return
+      }
+      await secondSend
+    })
+    const { forceSendQueued } = createLifecycle(state, buildAttention(), deps)
+
+    const first = forceSendQueued('q-1')
+    await firstSendSeen
+    expect(state.holdBackgroundResume.value).toBe(true)
+
+    const second = forceSendQueued('q-2')
+    resolveFirstSend()
+    await first
+    expect(state.holdBackgroundResume.value).toBe(true)
+    expect(deps.maybeFlushBackgroundSubagentResume).not.toHaveBeenCalled()
+
+    resolveSecondSend()
+    await second
+    expect(state.holdBackgroundResume.value).toBe(false)
+    expect(deps.maybeFlushBackgroundSubagentResume).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not flush background resume when force-send starts a turn', async () => {
+    const state = buildState()
+    state.messageQueue.items.value = [
+      {
+        id: 'q-1',
+        text: 'queued',
+        files: [],
+        mode: 'agent',
+        model: 'openai::gpt-4o',
+      },
+    ]
+    const deps = buildDeps()
+    deps.send.mockImplementation(async () => {
+      state.holdBackgroundResume.value = false
+    })
+    const { forceSendQueued } = createLifecycle(state, buildAttention(), deps)
+
+    await forceSendQueued('q-1')
+
+    expect(state.holdBackgroundResume.value).toBe(false)
+    expect(deps.maybeFlushBackgroundSubagentResume).not.toHaveBeenCalled()
   })
 
   it('force-sends without aborting background subagents or clearing resume', async () => {

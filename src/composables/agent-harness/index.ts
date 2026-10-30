@@ -88,6 +88,8 @@ const createAgentHarness = (options: AgentHarnessOptions) => {
     sessionDenies: new Set<string>(),
     disposed: ref(false),
     suppressQueueDrainAfterStop: ref(false),
+    holdBackgroundResume: ref(false),
+    parentSendInFlight: { current: null },
   }
 
   const attention = createHelpers(state)

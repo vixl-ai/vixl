@@ -116,6 +116,7 @@ export default async (
         type: 'turn-aborted',
         reason: 'user-stop',
         partialSteps: steps.stepCount,
+        assistantId,
       })
     },
   })

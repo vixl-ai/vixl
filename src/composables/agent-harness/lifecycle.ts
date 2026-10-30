@@ -19,6 +19,10 @@ import {
   rejectPendingMcpAuthForSubagent,
 } from '@/services/mcp/mcp-auth-gate'
 import { updateChatMeta } from '@/services/vixl/vixl-tauri'
+import {
+  claimBackgroundResumeHold,
+  clearBackgroundResumeHold,
+} from './hold-background-resume'
 import waitUntilParentUnblocked from './wait-until-parent-unblocked'
 import type { QueuedChatMessage } from '@/types/chat/queued-chat-message'
 import type { SendArgs } from './send'
@@ -139,29 +143,44 @@ export default (
     if (!item) {
       return
     }
-    messageQueue.remove(id)
-    await stop({ keepBackground: true })
-    await waitUntilParentUnblocked(state)
-    if (state.disposed.value) {
-      return
-    }
+    const epoch = claimBackgroundResumeHold(state)
+    const previousSend = state.parentSendInFlight?.current ?? null
     try {
-      await deps.send({
-        text: item.text,
-        files: item.files,
-        mode: item.mode,
-        model: item.model,
-        reasoning: item.reasoning,
-        mentions: item.mentions,
-        skipUserMessage: item.skipUserMessage,
-        skipUserPersist: item.skipUserPersist,
-        appendedUserMessageId: item.appendedUserMessageId,
-        internal: true,
-      })
-    } catch (err) {
-      toast.error('Failed to send queued message', {
-        description: err instanceof Error ? err.message : 'Unknown error',
-      })
+      await stop({ keepBackground: true })
+      if (previousSend) {
+        await Promise.resolve(previousSend).catch(() => null)
+      }
+      await waitUntilParentUnblocked(state)
+      if (state.disposed.value) {
+        return
+      }
+      try {
+        await deps.send({
+          text: item.text,
+          files: item.files,
+          mode: item.mode,
+          model: item.model,
+          reasoning: item.reasoning,
+          mentions: item.mentions,
+          skipUserMessage: item.skipUserMessage,
+          skipUserPersist: item.skipUserPersist,
+          appendedUserMessageId: item.appendedUserMessageId,
+          internal: true,
+          queuedItemId: id,
+          resumeHoldEpoch: epoch,
+        })
+      } catch (err) {
+        toast.error('Failed to send queued message', {
+          description: err instanceof Error ? err.message : 'Unknown error',
+        })
+      }
+    } finally {
+      if (
+        clearBackgroundResumeHold(state, epoch) &&
+        !state.disposed.value
+      ) {
+        deps.maybeFlushBackgroundSubagentResume()
+      }
     }
   }
 
