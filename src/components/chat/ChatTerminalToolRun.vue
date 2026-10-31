@@ -13,6 +13,7 @@ import {
   terminalPhaseStatusKind,
   terminalPhaseStatusTooltip,
 } from '@/components/chat/chat-terminal-status'
+import { overlayLiveShellExit } from '@/components/chat/overlay-live-shell-exit'
 import {
   Terminal,
   TerminalContent,
@@ -33,6 +34,10 @@ import {
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { HOME_WORKSPACE_ID, isHomeChatSlug } from '@/constants/home-chat'
+import {
+  agentShellRevision,
+  getAgentShell,
+} from '@/services/harness/shell/registry'
 
 const props = defineProps<{
   run: ToolRun
@@ -48,12 +53,20 @@ const view = computed(() => parseTerminalToolView(props.run))
 const label = computed(() => formatToolRunLabel(props.run))
 const headline = computed(() => view.value?.label || label.value)
 const lastPhaseIndex = computed(() => (view.value?.phases.length ?? 0) - 1)
+const liveShell = computed(() => {
+  const shellId = view.value?.shellId
+  if (!shellId || agentShellRevision.value < 0) {
+    return null
+  }
+  return getAgentShell(shellId)
+})
 const lastPhase = computed(() => {
   const phases = view.value?.phases
-  if (!phases || phases.length === 0) {
+  const phase = phases?.[phases.length - 1]
+  if (!phase) {
     return undefined
   }
-  return phases[phases.length - 1]
+  return overlayLiveShellExit(phase, liveShell.value)
 })
 const phaseOutput = (output: string): string => {
   const command = view.value?.command

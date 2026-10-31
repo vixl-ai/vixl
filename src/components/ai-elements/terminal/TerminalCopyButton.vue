@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { CheckIcon, CopyIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { computed, ref } from 'vue'
 import { useTerminalContext } from './context'
+
+defineOptions({ inheritAttrs: false })
 
 type ButtonProps = InstanceType<typeof Button>['$props']
 
@@ -24,6 +27,7 @@ const { output } = useTerminalContext('TerminalCopyButton')
 const isCopied = ref(false)
 
 const Icon = computed(() => (isCopied.value ? CheckIcon : CopyIcon))
+const copyLabel = computed(() => (isCopied.value ? 'Copied' : 'Copy'))
 
 async function copyToClipboard() {
   if (typeof window === 'undefined' || !navigator?.clipboard?.writeText) {
@@ -46,18 +50,24 @@ async function copyToClipboard() {
 </script>
 
 <template>
-  <Button
-    :class="cn(
-      'size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
-      props.class,
-    )"
-    size="icon"
-    variant="ghost"
-    v-bind="$attrs"
-    @click="copyToClipboard"
-  >
-    <slot>
-      <component :is="Icon" :size="14" />
-    </slot>
-  </Button>
+  <Tooltip>
+    <TooltipTrigger as-child>
+      <Button
+        v-bind="$attrs"
+        :aria-label="copyLabel"
+        :class="cn(
+          'size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
+          props.class,
+        )"
+        size="icon"
+        variant="ghost"
+        @click="copyToClipboard"
+      >
+        <slot>
+          <component :is="Icon" :size="14" />
+        </slot>
+      </Button>
+    </TooltipTrigger>
+    <TooltipContent>{{ copyLabel }}</TooltipContent>
+  </Tooltip>
 </template>

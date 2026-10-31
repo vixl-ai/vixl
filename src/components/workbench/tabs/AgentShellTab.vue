@@ -8,7 +8,6 @@ import {
   TerminalContent,
   TerminalCopyButton,
   TerminalHeader,
-  TerminalStatus,
   TerminalTitle,
 } from '@/components/ai-elements/terminal'
 import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
@@ -20,7 +19,6 @@ import {
   killAgentShell,
 } from '@/services/harness/shell/registry'
 import { clipTerminalOutput } from '@/utils/clip-terminal-output'
-import { shellDisplayTitle } from '@/utils/shell-display-title'
 import type { AgentShellPayload, WorkbenchTab } from '@/types/workbench/workbench-tab'
 
 const props = defineProps<{
@@ -31,7 +29,23 @@ const { transparencyEnabled } = useTransparency()
 
 const shellId = computed(() => (props.tab.payload as AgentShellPayload).shellId)
 
-const shell = computed(() => (agentShellRevision.value >= 0 ? getAgentShell(shellId.value) : null))
+const shell = computed(() => {
+  if (agentShellRevision.value < 0) {
+    return null
+  }
+  const record = getAgentShell(shellId.value)
+  if (!record) {
+    return null
+  }
+  return {
+    status: record.status,
+    command: record.command,
+    stdout: record.stdout,
+    stderr: record.stderr,
+  }
+})
+
+const running = computed(() => shell.value?.status === 'running')
 
 const output = computed(() => {
   const record = shell.value
@@ -41,18 +55,10 @@ const output = computed(() => {
   return clipTerminalOutput(record.stdout + (record.stderr ? `\n${record.stderr}` : ''))
 })
 
-const isStreaming = computed(() => shell.value?.status === 'running')
-
 const title = computed(() => {
-  const record = shell.value
-  if (!record) {
-    return props.tab.label
-  }
-  const display = shellDisplayTitle(record)
-  if (!display) {
-    return props.tab.label
-  }
-  return display.length > 60 ? `${display.slice(0, 60)}...` : display
+  const command = shell.value?.command.trim() ?? ''
+  const text = command || props.tab.label
+  return text.length > 60 ? `${text.slice(0, 60)}...` : text
 })
 
 const handleStop = async (): Promise<void> => {
@@ -80,21 +86,20 @@ const handleStop = async (): Promise<void> => {
     <Terminal
       v-else
       :output="output"
-      :is-streaming="isStreaming"
+      :is-streaming="running"
       :class="['h-full min-h-0 flex-1 rounded-none border-0', transparencyEnabled ? 'bg-transparent' : '']"
     >
       <TerminalHeader>
         <TerminalTitle class="min-w-0 truncate">
-          <AiElementsShimmerShimmer v-if="isStreaming" :duration="1" as="span">
+          <AiElementsShimmerShimmer v-if="running" :duration="1" as="span">
             {{ title }}
           </AiElementsShimmerShimmer>
           <template v-else>{{ title }}</template>
         </TerminalTitle>
         <div class="flex shrink-0 items-center gap-1">
-          <TerminalStatus />
           <TerminalActions>
             <TerminalCopyButton />
-            <Tooltip v-if="isStreaming">
+            <Tooltip v-if="running">
               <TooltipTrigger as-child>
                 <Button
                   variant="ghost"
