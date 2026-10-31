@@ -68,7 +68,7 @@ const handleStop = async (): Promise<void> => {
 
 <template>
   <div
-    class="flex h-full min-h-0 flex-col overflow-hidden p-2"
+    class="flex h-full min-h-0 flex-col overflow-hidden"
     :class="transparencyEnabled ? 'bg-transparent' : 'bg-background'"
   >
     <div
@@ -81,7 +81,7 @@ const handleStop = async (): Promise<void> => {
       v-else
       :output="output"
       :is-streaming="isStreaming"
-      :class="['h-full min-h-0 flex-1 rounded-md', transparencyEnabled ? 'bg-transparent' : '']"
+      :class="['h-full min-h-0 flex-1 rounded-none border-0', transparencyEnabled ? 'bg-transparent' : '']"
     >
       <TerminalHeader>
         <TerminalTitle class="min-w-0 truncate">
