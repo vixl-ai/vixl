@@ -19,22 +19,22 @@ const MODES: VixlChatMode[] = ['ask', 'plan', 'agent', 'orchestrator']
  * Empty-project (standalone, no rules, no MCP) ceilings after slim prompts
  * and builtin tool descriptions.
  * Measured totals (system join + builtin tool defs, chars/4):
- * ask 3319, plan 3888, agent 4969, orchestrator 4343.
+ * ask 3351, plan 3920, agent 5000, orchestrator 4374.
  * Headroom is about 3 percent so waste cannot return unnoticed.
  */
 const TOTAL_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 3419,
-  plan: 4005,
-  agent: 5119,
-  orchestrator: 4474,
+  ask: 3452,
+  plan: 4038,
+  agent: 5150,
+  orchestrator: 4506,
 }
 
-/** Measured base tokens: ask 229, plan 289, agent 247, orchestrator 387. */
+/** Measured base tokens: ask 260, plan 320, agent 279, orchestrator 419. */
 const BASE_CEILINGS: Record<VixlChatMode, number> = {
-  ask: 236,
-  plan: 298,
-  agent: 255,
-  orchestrator: 403,
+  ask: 268,
+  plan: 330,
+  agent: 288,
+  orchestrator: 432,
 }
 
 /** Available skills catalog with ungated command skills; measured 59. */
@@ -125,6 +125,8 @@ describe('system prompt token snapshot (empty project)', () => {
   it('includes shared tool guidance and omits patch and embedded browser from ask', async () => {
     const snapshot = await measureMode('ask')
     expect(snapshot.systemString).toContain('codebase_explore')
+    expect(snapshot.systemString).toContain('progressive discovery')
+    expect(snapshot.systemString).toContain('get_mcp_tools')
     expect(snapshot.systemString).not.toContain('browser_cdp')
     expect(snapshot.systemString).not.toContain('browser_lock')
     expect(snapshot.systemString).not.toContain('apply_patch')
