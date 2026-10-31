@@ -64,12 +64,7 @@ const {
 
     <div class="space-y-6">
       <div class="flex items-center justify-between gap-4">
-        <div class="space-y-1">
-          <Label>Auto-download language servers</Label>
-          <p class="text-sm text-muted-foreground">
-            Download default language support on project open. Disable for airgapped machines.
-          </p>
-        </div>
+        <Label>Auto-download language servers</Label>
         <Switch :model-value="autoDownload" @update:model-value="updateAutoDownload" />
       </div>
 
