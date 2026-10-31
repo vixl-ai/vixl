@@ -37,6 +37,7 @@ import ChatPromptEditSync from '@/components/chat/ChatPromptEditSync.vue'
 import ChatPromptMentionSync from '@/components/chat/ChatPromptMentionSync.vue'
 import ChatQueueHandlers from '@/components/chat/ChatQueueHandlers.vue'
 import ChatPromptEditor from '@/components/chat/prompt-editor/ChatPromptEditor.vue'
+import { composerExpandedLabelClass } from '@/constants/composer-expanded-label'
 import type { QueuedChatMessage } from '@/types/chat/queued-chat-message'
 import ModelsOptionsModelOptionsRow from '@/components/models/options/ModelOptionsRow.vue'
 import { CHAT_MODES, getChatModeMeta } from '@/constants/chat-modes'
@@ -744,8 +745,8 @@ watch(
             :members="promptWorkspaceMembers"
           />
         </PromptInputBody>
-        <PromptInputFooter class="w-full min-w-0 flex-nowrap px-1 pb-1">
-          <PromptInputTools class="shrink-0 gap-1">
+        <PromptInputFooter class="w-full min-w-0 flex-nowrap justify-start gap-2 px-1 pb-1">
+          <PromptInputTools class="min-w-0 overflow-hidden gap-1">
             <PromptInputActionMenu>
               <PromptInputActionMenuTrigger />
               <PromptInputActionMenuContent>
@@ -759,7 +760,7 @@ watch(
                 :title="`${selectedModeMeta.label} mode`"
               >
                 <component :is="selectedModeMeta.icon" class="size-4 shrink-0" />
-                <span class="text-sm @max-[22rem]/composer:hidden">{{ selectedModeMeta.label }}</span>
+                <span class="text-sm" :class="composerExpandedLabelClass">{{ selectedModeMeta.label }}</span>
               </PromptInputActionMenuTrigger>
               <PromptInputActionMenuContent>
                 <PromptInputActionMenuItem
@@ -774,9 +775,11 @@ watch(
               </PromptInputActionMenuContent>
             </PromptInputActionMenu>
           </PromptInputTools>
-          <PromptInputTools class="ml-auto min-w-0 items-center gap-2">
+          <div
+            v-if="!hideModel"
+            class="ml-auto flex min-w-0 max-w-56 overflow-hidden"
+          >
             <ModelsOptionsModelOptionsRow
-              v-if="!hideModel"
               :model-value="session.selectedModelRef"
               compact
               hide-disallowed
@@ -784,6 +787,11 @@ watch(
               placeholder="Select model"
               @update:model-value="handleModelChange"
             />
+          </div>
+          <div
+            class="relative z-10 flex shrink-0 items-center gap-1"
+            :class="{ 'ml-auto': hideModel }"
+          >
             <PromptInputSubmit
               v-if="showSubmit"
               class="shrink-0"
@@ -804,7 +812,7 @@ watch(
               </TooltipTrigger>
               <TooltipContent>Stop generating</TooltipContent>
             </Tooltip>
-          </PromptInputTools>
+          </div>
         </PromptInputFooter>
         </PromptInput>
       </ChatPromptInputContextMenu>

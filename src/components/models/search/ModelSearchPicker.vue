@@ -35,6 +35,7 @@ import {
   regroupScoredVendorModels,
   toScoredVendorModelEntries,
 } from '@/services/models/search'
+import { composerExpandedLabelClass } from '@/constants/composer-expanded-label'
 
 const props = withDefaults(
   defineProps<{
@@ -269,12 +270,12 @@ watch(
         :disabled="disabled || catalog.loading.value"
         :class="
           compact
-            ? 'h-8 min-w-0 max-w-56 border-0 bg-transparent px-2 shadow-none hover:bg-transparent'
+            ? 'h-8 min-w-0 max-w-56 shrink overflow-hidden border-0 bg-transparent px-2 shadow-none hover:bg-transparent'
             : 'w-full max-w-md justify-between font-normal'
         "
         :title="displayLabel"
       >
-        <span class="min-w-0 truncate text-sm @max-[22rem]/composer:hidden">
+        <span class="min-w-0 truncate text-sm" :class="composerExpandedLabelClass">
           {{ compact ? compactLabel : displayLabel }}
           <span
             v-if="selectedSuffix"

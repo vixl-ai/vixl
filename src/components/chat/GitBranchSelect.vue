@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
 import useGitBranches from '@/composables/use-git-branches'
+import { composerExpandedLabelClass } from '@/constants/composer-expanded-label'
 
 const git = useGitBranches()
 const branchSearch = ref('')
@@ -49,7 +50,7 @@ const handleBranchSelect = async (branch: string): Promise<void> => {
         aria-label="Git branch"
       >
         <GitBranchIcon class="size-3.5 shrink-0" />
-        <span class="max-w-24 min-w-0 truncate @max-[22rem]/composer:hidden">
+        <span class="max-w-24 min-w-0 truncate" :class="composerExpandedLabelClass">
           {{ git.currentBranch.value ?? 'Branch' }}
         </span>
         <ChevronDownIcon class="size-3 shrink-0 opacity-60" />

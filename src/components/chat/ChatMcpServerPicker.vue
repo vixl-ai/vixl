@@ -13,6 +13,7 @@ import {
 import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import connectionKey from '@/services/mcp/connection-key'
 import useChatMcpServerPicker from '@/composables/mcp-servers/use-chat-mcp-server-picker'
+import { composerExpandedLabelClass } from '@/constants/composer-expanded-label'
 
 const props = defineProps<{
   projectRoot: string | null
@@ -58,7 +59,7 @@ const {
         aria-label="MCP servers"
       >
         <ServerIcon class="size-3.5 shrink-0" />
-        <span class="max-w-32 min-w-0 truncate @max-[22rem]/composer:hidden">
+        <span class="max-w-32 min-w-0 truncate" :class="composerExpandedLabelClass">
           MCP
           <template v-if="pickerServers.length > 0">
             ({{ connectedCount }}/{{ pickerServers.length }})

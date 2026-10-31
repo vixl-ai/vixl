@@ -8,11 +8,13 @@ import {
   PromptInputSubmit,
 } from '@/components/ai-elements/prompt-input'
 import ChatPromptInput from '@/components/chat/ChatPromptInput.vue'
+import { composerExpandedLabelClass } from '@/constants/composer-expanded-label'
 import ChatGitBranchSelect from '@/components/chat/GitBranchSelect.vue'
 import ChatPromptEditor from '@/components/chat/prompt-editor/ChatPromptEditor.vue'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import ModelOptionsRow from '@/components/models/options/ModelOptionsRow.vue'
 import { Button } from '@/components/shadcn/ui/button'
+import { Tooltip } from '@/components/shadcn/ui/tooltip'
 import { DropdownMenuCheckboxItem, DropdownMenuItem } from '@/components/shadcn/ui/dropdown-menu'
 
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
@@ -415,6 +417,53 @@ describe('ChatPromptInput subagent composer props', () => {
       .findAllComponents(PromptInputActionMenuTrigger)
       .find((trigger) => trigger.attributes('title') === 'Agent mode')
     expect(modeTrigger).toBeDefined()
+
+    wrapper.unmount()
+  })
+})
+
+describe('ChatPromptInput composer toolbar overflow', () => {
+  it('collapses the mode label with composerExpandedLabelClass', async () => {
+    const wrapper = mountPromptInput()
+    await flushPromises()
+
+    const modeTrigger = wrapper
+      .findAllComponents(PromptInputActionMenuTrigger)
+      .find((trigger) => trigger.attributes('title') === 'Agent mode')
+    expect(modeTrigger).toBeDefined()
+    expect(modeTrigger!.html()).toContain(composerExpandedLabelClass)
+
+    wrapper.unmount()
+  })
+
+  it('keeps the submit slot as a sibling of the model wrapper', async () => {
+    const wrapper = mountPromptInput()
+    await flushPromises()
+
+    const submitSlot = wrapper.findComponent(PromptInputSubmit).element.parentElement
+    const modelWrapper = wrapper.findComponent(ModelOptionsRow).element.parentElement
+    expect(submitSlot).not.toBeNull()
+    expect(modelWrapper).not.toBeNull()
+    expect(submitSlot).not.toBe(modelWrapper)
+    expect(submitSlot!.parentElement).toBe(modelWrapper!.parentElement)
+    expect(modelWrapper!.classList.contains('ml-auto')).toBe(true)
+    expect(submitSlot!.classList.contains('ml-auto')).toBe(false)
+    expect(submitSlot!.parentElement?.classList.contains('ml-auto')).toBe(false)
+    expect(submitSlot!.classList.contains('shrink-0')).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('keeps the stop button in the same shrink-0 slot while streaming', async () => {
+    const wrapper = mountPromptInput({ status: 'streaming' })
+    await flushPromises()
+
+    const stop = wrapper.find('[aria-label="Stop generating"]')
+    const stopSlot = wrapper.findComponent(Tooltip).element.parentElement
+    expect(stop.exists()).toBe(true)
+    expect(wrapper.findComponent(PromptInputSubmit).exists()).toBe(false)
+    expect(stopSlot?.classList.contains('shrink-0')).toBe(true)
+    expect(stopSlot?.contains(stop.element)).toBe(true)
 
     wrapper.unmount()
   })
