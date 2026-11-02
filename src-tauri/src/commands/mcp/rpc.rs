@@ -3,7 +3,9 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::{oneshot, Mutex};
 
-use super::types::{set_state, McpProcess, McpToolInfo, MCP_PROCESSES};
+use crate::commands::ssh::close_channel;
+
+use super::types::{set_state, McpChild, McpProcess, McpToolInfo, MCP_PROCESSES};
 
 const MCP_REQUEST_TIMEOUT: Duration = Duration::from_secs(45);
 
@@ -105,6 +107,7 @@ pub(crate) fn spawn_reader(
         };
 
         let Some(stdout) = stdout else {
+            release_remote_mcp(&process).await;
             return;
         };
 
@@ -125,10 +128,24 @@ pub(crate) fn spawn_reader(
                 }
             }
         }
+        release_remote_mcp(&process).await;
         set_state(Some(&scope_key), &server_id, "stopped", None, vec![], None).await;
         let mut processes = MCP_PROCESSES.lock().await;
         processes.remove(&connection_key);
     });
+}
+
+async fn release_remote_mcp(process: &Mutex<McpProcess>) {
+    let channel_id = {
+        let guard = process.lock().await;
+        match &guard.child {
+            McpChild::Remote { channel_id, .. } => Some(channel_id.clone()),
+            McpChild::Local(_) => None,
+        }
+    };
+    if let Some(channel_id) = channel_id {
+        let _ = close_channel(channel_id).await;
+    }
 }
 
 pub(crate) async fn list_tools_internal(
@@ -156,4 +173,43 @@ pub(crate) async fn list_tools_internal(
             })
         })
         .collect())
+}
+
+#[cfg(test)]
+pub(crate) fn watch_remote_mcp_exit(
+    channel_id: String,
+    stdin: tokio::process::ChildStdin,
+    stdout: tokio::process::ChildStdout,
+) -> String {
+    use std::collections::HashMap;
+
+    use super::types::mcp_connection_key;
+
+    let scope = "reap-scope";
+    let server = "reap";
+    let connection_key = mcp_connection_key(Some(scope), server);
+    let process = std::sync::Arc::new(Mutex::new(McpProcess {
+        child: McpChild::Remote {
+            channel_id,
+            stdout: Some(stdout),
+        },
+        stdin,
+        pending: Mutex::new(HashMap::new()),
+        next_id: Mutex::new(0),
+    }));
+    spawn_reader(
+        process,
+        connection_key.clone(),
+        scope.to_string(),
+        server.to_string(),
+    );
+    connection_key
+}
+
+#[cfg(test)]
+pub(crate) async fn clear_mcp_connection(connection_key: &str) {
+    use super::types::MCP_STATES;
+
+    MCP_PROCESSES.lock().await.remove(connection_key);
+    MCP_STATES.lock().await.remove(connection_key);
 }

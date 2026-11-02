@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use super::channels::{open_exec, wait_channel_exit};
+use super::channels::{channel_exit_rx, channel_is_tracked, open_exec, take_channel_stdio};
 use super::remote_cmd::{
     git_hooks_refused, indexer_cannot_run, login_command, missing_program, probe_remote_program,
 };
@@ -346,7 +346,16 @@ async fn run_live_exec_cases(user: &str, port: u16, short_root: &Path) {
     )
     .await
     .expect("agent exec");
-    let _ = wait_channel_exit(&info.channel_id).await;
+    let exit_watch = channel_exit_rx(&info.channel_id).await.expect("exit watch");
+    let (_kill_tx, kill_rx) = tokio::sync::mpsc::channel(1);
+    let code =
+        crate::commands::shell::reap_remote_shell(info.channel_id.clone(), exit_watch, kill_rx)
+            .await;
+    assert_eq!(code, 0);
+    assert!(
+        !channel_is_tracked(&info.channel_id).await,
+        "finished remote shell left its ssh channel open"
+    );
     assert!(
         remote.join("agent-exec-marker").is_file(),
         "agent exec should write on the host cwd"
@@ -359,6 +368,29 @@ async fn run_live_exec_cases(user: &str, port: u16, short_root: &Path) {
         !local_cwd_marker.is_file(),
         "agent exec must not create a file in the local cwd"
     );
+
+    let mcp_info = open_exec(
+        session_key(user, "127.0.0.1", port),
+        "printf '\\n'".to_string(),
+    )
+    .await
+    .expect("mcp exec");
+    let stdio = take_channel_stdio(&mcp_info.channel_id)
+        .await
+        .expect("mcp stdio");
+    let mcp_key = crate::commands::mcp::watch_remote_mcp_exit(
+        mcp_info.channel_id.clone(),
+        stdio.stdin,
+        stdio.stdout,
+    );
+    let mcp_deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while channel_is_tracked(&mcp_info.channel_id).await {
+        if std::time::Instant::now() > mcp_deadline {
+            panic!("finished remote mcp left its ssh channel open");
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    crate::commands::mcp::clear_mcp_connection(&mcp_key).await;
 
     let ssh = crate::commands::fs::parse_ssh_project_root(&root).expect("uri");
     match probe_remote_program(&ssh, "rg").await {

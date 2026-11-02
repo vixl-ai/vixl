@@ -301,6 +301,10 @@ async fn collect_stdio(
     tokio::join!(stdout_task, stderr_task)
 }
 
+fn exec_output_stands(command_ok: bool, master_alive: bool) -> bool {
+    command_ok || master_alive
+}
+
 pub async fn exec_wait(key: SessionKey, command: String) -> Result<SshExecResult, String> {
     let snapshot = fail_if_dead(&key).await?;
     let argv = build_ssh_argv(ArgvRequest {
@@ -328,8 +332,11 @@ pub async fn exec_wait(key: SessionKey, command: String) -> Result<SshExecResult
     let stderr = child.stderr.take();
     let (stdout, stderr) = collect_stdio(stdout, stderr).await;
     let status = child.wait().await.map_err(|err| err.to_string())?;
-    if !control_check(&snapshot) {
+    let master_alive = control_check(&snapshot);
+    if !master_alive {
         mark_master_dead(&key).await;
+    }
+    if !exec_output_stands(status.success(), master_alive) {
         return Err(errors::dead_master_channel(&key.hostname));
     }
     Ok(SshExecResult {
@@ -411,8 +418,9 @@ pub async fn channel_exit_rx(
         .ok_or_else(|| "SSH channel not found".to_string())
 }
 
-pub async fn wait_channel_exit(channel_id: &str) -> Result<i32, String> {
-    recv_channel_exit(channel_exit_rx(channel_id).await?).await
+#[cfg(test)]
+pub(crate) async fn channel_is_tracked(channel_id: &str) -> bool {
+    CHANNELS.lock().await.contains_key(channel_id)
 }
 
 pub async fn recv_channel_exit(
@@ -501,6 +509,14 @@ mod tests {
         assert!(status.success());
         assert!(stdout.contains("stdout-marker"), "stdout was {stdout:?}");
         assert!(stderr.contains("stderr-marker"), "stderr was {stderr:?}");
+    }
+
+    #[test]
+    fn exec_output_stands_when_the_command_finished() {
+        assert!(exec_output_stands(true, false));
+        assert!(exec_output_stands(true, true));
+        assert!(exec_output_stands(false, true));
+        assert!(!exec_output_stands(false, false));
     }
 
     #[tokio::test]

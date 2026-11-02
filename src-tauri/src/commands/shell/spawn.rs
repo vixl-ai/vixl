@@ -14,7 +14,7 @@ use super::builders::spawn_child;
 use crate::commands::fs::parse_ssh_project_root;
 use crate::commands::ssh::{
     channel_exit_rx, close_channel, is_ssh_root, key_for, login_command, map_unreachable,
-    open_exec, recv_channel_exit, take_channel_stdio, wait_channel_exit,
+    open_exec, recv_channel_exit, take_channel_stdio,
 };
 
 /// Live tracked shell: wait task owns the Child and listens on `kill_rx`.
@@ -243,6 +243,26 @@ pub async fn shell_spawn_tracked(
     Ok(())
 }
 
+pub(crate) async fn reap_remote_shell(
+    channel_id: String,
+    exit_watch: tokio::sync::watch::Receiver<Option<i32>>,
+    mut kill_rx: tokio::sync::mpsc::Receiver<()>,
+) -> i32 {
+    tokio::select! {
+        code = recv_channel_exit(exit_watch.clone()) => {
+            let code = code.unwrap_or(-1);
+            let _ = close_channel(channel_id).await;
+            code
+        }
+        kill = kill_rx.recv() => {
+            if kill.is_some() {
+                let _ = close_channel(channel_id).await;
+            }
+            recv_channel_exit(exit_watch).await.unwrap_or(-1)
+        }
+    }
+}
+
 async fn spawn_tracked_remote(
     app: AppHandle,
     shell_id: String,
@@ -262,7 +282,7 @@ async fn spawn_tracked_remote(
         .ok_or_else(|| "stderr unavailable".to_string())?;
     drop(stdio.stdin);
 
-    let (kill_tx, mut kill_rx) = tokio::sync::mpsc::channel::<()>(1);
+    let (kill_tx, kill_rx) = tokio::sync::mpsc::channel::<()>(1);
     let (exit_tx, exit_rx) = tokio::sync::watch::channel::<Option<ShellExitResult>>(None);
 
     TRACKED_SHELLS.lock().unwrap().insert(
@@ -290,15 +310,7 @@ async fn spawn_tracked_remote(
     let channel_id = info.channel_id.clone();
     let exit_watch = channel_exit_rx(&channel_id).await?;
     tokio::spawn(async move {
-        let exit_code = tokio::select! {
-            code = wait_channel_exit(&channel_id) => code.unwrap_or(-1),
-            kill = kill_rx.recv() => {
-                if kill.is_some() {
-                    let _ = close_channel(channel_id.clone()).await;
-                }
-                recv_channel_exit(exit_watch).await.unwrap_or(-1)
-            }
-        };
+        let exit_code = reap_remote_shell(channel_id, exit_watch, kill_rx).await;
         join_output_pumps(stdout_task, stderr_task).await;
         let exit = ShellExitResult {
             exit_code,

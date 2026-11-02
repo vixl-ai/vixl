@@ -25,7 +25,7 @@ pub use askpass::{
 pub use auth::{AuthAttempt, SecretDisposition, FIXTURE_SSH_PASSWORD};
 pub(crate) use channels::{
     channel_exit_rx, close_channel, open_exec, open_sftp, recv_channel_exit, take_channel_stdio,
-    tty_argv_on_master, wait_channel_exit, ChannelStdio, SshExecResult,
+    tty_argv_on_master, ChannelStdio, SshExecResult,
 };
 pub use channels::{read_channel_stderr, read_channel_stdout, write_channel_stdin};
 pub use errors::looks_like_host_key_changed;
