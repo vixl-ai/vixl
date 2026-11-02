@@ -640,16 +640,28 @@ pub async fn connect(
         &stderr_text,
         user_cancelled.load(Ordering::SeqCst),
     );
-    emit_error(app.as_ref(), &user, &preview.hostname, preview.port, &copy);
     let _ = kill_tx.send(()).await;
-    let mut sessions = SESSIONS.lock().await;
-    if let Some(record) = sessions.get_mut(&key) {
-        record.state = "error".to_string();
-        record.line = copy.title.clone();
-        record.last_error = Some(copy.clone());
-        record.master_alive = false;
+    let owned = {
+        let mut sessions = SESSIONS.lock().await;
+        sessions
+            .get_mut(&key)
+            .is_some_and(|record| record_connect_failure(record, master_generation, copy.clone()))
+    };
+    if owned {
+        emit_error(app.as_ref(), &user, &preview.hostname, preview.port, &copy);
     }
     Err(copy.into_message())
+}
+
+fn record_connect_failure(record: &mut SessionRecord, generation: u64, copy: SshErrorCopy) -> bool {
+    if record.master_generation != generation {
+        return false;
+    }
+    record.state = "error".to_string();
+    record.line = copy.title.clone();
+    record.last_error = Some(copy);
+    record.master_alive = false;
+    true
 }
 
 async fn disconnect_still_owns(key: &SessionKey, generation: u64) -> bool {
@@ -700,6 +712,9 @@ pub async fn disconnect(user: &str, hostname: &str, port: u16) -> Result<SshSess
     crate::commands::fs::close_pooled_sftp(&key).await;
     let _gate = CONTROL_SOCKET_GATE.lock().await;
     if !disconnect_still_owns(&key, generation).await {
+        if let Some(kill_tx) = kill_tx {
+            let _ = kill_tx.send(()).await;
+        }
         return Ok(session_status(user, hostname, port).await);
     }
     let snapshot = SessionSnapshot {
@@ -999,6 +1014,63 @@ mod tests {
             .master_generation;
         remove_control_socket_if_owned(&key, current, &socket).await;
         assert!(!socket.exists());
+        clear_sessions_for_tests().await;
+    }
+
+    #[tokio::test]
+    async fn stale_connect_failure_does_not_clobber_a_newer_session() {
+        let _lock = SESSION_TEST_LOCK.lock().await;
+        clear_sessions_for_tests().await;
+        let hostname = "appleseed.example";
+        let dir = tempdir().expect("tempdir");
+        let paths = SshPaths::from_roots(dir.path().join("vixl"), dir.path().join("user"));
+        insert_test_session(
+            SshSessionStatus {
+                user: "johnny".to_string(),
+                hostname: hostname.to_string(),
+                port: 2222,
+                destination: hostname.to_string(),
+                state: "connecting".to_string(),
+                line: format!("Connecting to {hostname} port 2222."),
+                last_error: None,
+                master_alive: false,
+            },
+            paths,
+            dir.path().join("cm-stale-fail"),
+        )
+        .await;
+        let key = session_key("johnny", hostname, 2222);
+        let stale = {
+            let mut sessions = SESSIONS.lock().await;
+            let record = sessions.get_mut(&key).expect("session");
+            let stale = record.master_generation;
+            record.master_generation = next_master_generation();
+            record.state = "connected".to_string();
+            record.master_alive = true;
+            stale
+        };
+        let wrote = {
+            let mut sessions = SESSIONS.lock().await;
+            let record = sessions.get_mut(&key).expect("session");
+            record_connect_failure(
+                record,
+                stale,
+                SshErrorCopy::new("Could not connect to appleseed.example.", "old"),
+            )
+        };
+        assert!(!wrote);
+        let (state, alive, last_error) = {
+            let sessions = SESSIONS.lock().await;
+            let record = sessions.get(&key).expect("session");
+            (
+                record.state.clone(),
+                record.master_alive,
+                record.last_error.clone(),
+            )
+        };
+        assert_eq!(state, "connected");
+        assert!(alive);
+        assert!(last_error.is_none());
         clear_sessions_for_tests().await;
     }
 }
