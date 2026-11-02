@@ -33,6 +33,15 @@ pub fn validate_action(action: &str) -> Result<&'static str, String> {
     }
 }
 
+pub fn reject_ssh_indexer(project_root: &str) -> Result<(), String> {
+    let trimmed = project_root.trim();
+    if !is_ssh_root(trimmed) {
+        return Ok(());
+    }
+    let ssh = parse_ssh_project_root(trimmed)?;
+    Err(indexer_cannot_run(&ssh.hostname))
+}
+
 pub fn validate_absolute_root(project_root: &str) -> Result<PathBuf, String> {
     let trimmed = project_root.trim();
     if trimmed.is_empty() {
@@ -41,10 +50,7 @@ pub fn validate_absolute_root(project_root: &str) -> Result<PathBuf, String> {
     if trimmed.contains('\0') {
         return Err("project_root must not contain NUL bytes".to_string());
     }
-    if is_ssh_root(trimmed) {
-        let _ = parse_ssh_project_root(trimmed)?;
-        return Ok(PathBuf::from(trimmed));
-    }
+    reject_ssh_indexer(trimmed)?;
     let path = Path::new(trimmed);
     if !path.is_absolute() {
         return Err("project_root must be an absolute path".to_string());
@@ -61,10 +67,6 @@ pub async fn codegraph_cli(
     action: String,
 ) -> Result<CodegraphCliResult, String> {
     let cli_action = validate_action(&action)?;
-    if is_ssh_root(&project_root) {
-        let ssh = parse_ssh_project_root(&project_root)?;
-        return Err(indexer_cannot_run(&ssh.hostname));
-    }
     let root = validate_absolute_root(&project_root)?;
     let root_str = root.to_string_lossy().to_string();
     let prepared = prepare_codegraph_store(&app, &root)?;
@@ -125,4 +127,16 @@ pub async fn codegraph_cli(
         stderr,
         exit_code,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_absolute_root;
+
+    #[test]
+    fn ssh_root_is_not_a_local_graph_root() {
+        let err = validate_absolute_root("ssh://johnny@appleseed.example/home/johnny/garden")
+            .expect_err("ssh root");
+        assert_eq!(err, "The graph indexer cannot run on appleseed.example.");
+    }
 }

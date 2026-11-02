@@ -21,6 +21,7 @@ import {
   writeMcpConfig,
 } from '@/services/vixl/vixl-tauri'
 import invokeErrorMessage from '@/utils/invoke-error-message'
+import { isSshProjectRoot } from '@/utils/ssh-project-root'
 
 const inFlightByRoot = new Map<string, Promise<void>>()
 let exclusive = Promise.resolve()
@@ -129,7 +130,7 @@ export default async (projectRoot: string): Promise<void> => {
   }
 
   const root = projectRoot.trim()
-  if (!root) {
+  if (!root || isSshProjectRoot(root)) {
     return
   }
 

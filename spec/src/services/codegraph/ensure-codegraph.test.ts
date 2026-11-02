@@ -74,6 +74,15 @@ describe('ensureCodeGraph', () => {
     expect(fsStat).not.toHaveBeenCalled()
   })
 
+  it('does not create a local graph for an ssh project', async () => {
+    const ensureCodeGraph = (await import('@/services/codegraph/ensure-codegraph')).default
+
+    await ensureCodeGraph('ssh://johnny@appleseed.example/home/johnny/garden')
+
+    expect(codegraphStoreStat).not.toHaveBeenCalled()
+    expect(codegraphCli).not.toHaveBeenCalled()
+  })
+
   it('runs codegraph init when the store db is missing', async () => {
     codegraphStoreStat.mockResolvedValue(storeStat(false))
     codegraphCli.mockResolvedValue({ ok: true, stdout: '', stderr: '' })
