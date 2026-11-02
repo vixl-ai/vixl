@@ -8,6 +8,7 @@ import type { ToolRun } from '@/types/harness/tool-run'
 import formatToolRunLabel from '@/utils/format-tool-run-label'
 import { parseTerminalToolView, type TerminalToolPhaseView } from '@/utils/parse-terminal-tool-view'
 import ChatTipIcon from '@/components/chat/ChatTipIcon.vue'
+import ChatRunsAtMark from '@/components/chat/ChatRunsAtMark.vue'
 import {
   terminalPhaseStatusColorClass,
   terminalPhaseStatusKind,
@@ -159,14 +160,9 @@ const handleShowTerminal = (): void => {
             :tooltip="phaseStatus(lastPhase, lastPhaseIndex).tooltip"
             :icon-class="`size-3.5 ${phaseStatus(lastPhase, lastPhaseIndex).iconClass}`"
           />
-          <span
-            v-if="view.runsAt"
-            class="shrink-0 text-xs text-muted-foreground"
-          >
-            {{ view.runsAt }}
-          </span>
+          <ChatRunsAtMark v-if="view.runsAt" :runs-at="view.runsAt" />
           <ChatTipIcon
-            v-else-if="lastPhase.badge === 'sandboxed'"
+            v-if="lastPhase.badge === 'sandboxed'"
             :icon="ShieldIcon"
             tooltip="Sandboxed"
             icon-class="size-3.5 text-sky-400"

@@ -16,6 +16,7 @@ import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.v
 import ChatArtifactLink from '@/components/chat/ChatArtifactLink.vue'
 import ChatInlineFileDiff from '@/components/chat/InlineFileDiff.vue'
 import ChatTerminalToolRun from '@/components/chat/ChatTerminalToolRun.vue'
+import ChatRunsAtMark from '@/components/chat/ChatRunsAtMark.vue'
 import { CommitFileAdditions, CommitFileDeletions } from '@/components/ai-elements/commit'
 import {
   Collapsible,
@@ -195,6 +196,7 @@ const diffCounts = computed(() => {
           {{ label }}
         </AiElementsShimmerShimmer>
         <span v-else class="min-w-0 truncate">{{ label }}</span>
+        <ChatRunsAtMark v-if="runsAt" :runs-at="runsAt" />
         <ChatArtifactLink v-if="run.artifact && hasArtifactChip" :artifact="run.artifact" />
         <span
           v-if="hasDiffs && (diffCounts.additions > 0 || diffCounts.deletions > 0)"
@@ -222,7 +224,6 @@ const diffCounts = computed(() => {
       >
         Running
       </AiElementsShimmerShimmer>
-      <p v-if="runsAt" class="text-muted-foreground">{{ runsAt }}</p>
       <p v-if="ownerTitle" class="text-muted-foreground">Held by {{ ownerTitle }}</p>
       <div v-if="argsText">
         <p class="mb-1 font-medium text-foreground/80">Input</p>

@@ -124,6 +124,7 @@ declare global {
   const resetAgentHarnessCacheForTests: typeof import('./composables/use-agent-harness').resetAgentHarnessCacheForTests
   const resetChatSessionsForTests: typeof import('./composables/use-chat-store').resetChatSessionsForTests
   const resetFleetBootstrapForTests: typeof import('./composables/use-fleet-registry').resetFleetBootstrapForTests
+  const resetSlashIndexToastsForTests: typeof import('./composables/use-slash-index').resetSlashIndexToastsForTests
   const resolveComponent: typeof import('vue').resolveComponent
   const resolveProjectRowWorkspace: typeof import('./composables/resolve-project-row-workspace').default
   const runAtomicFlip: typeof import('./composables/use-theme-flip').runAtomicFlip
@@ -554,6 +555,7 @@ declare module 'vue' {
     readonly resetAgentHarnessCacheForTests: UnwrapRef<typeof import('./composables/use-agent-harness')['resetAgentHarnessCacheForTests']>
     readonly resetChatSessionsForTests: UnwrapRef<typeof import('./composables/use-chat-store')['resetChatSessionsForTests']>
     readonly resetFleetBootstrapForTests: UnwrapRef<typeof import('./composables/use-fleet-registry')['resetFleetBootstrapForTests']>
+    readonly resetSlashIndexToastsForTests: UnwrapRef<typeof import('./composables/use-slash-index')['resetSlashIndexToastsForTests']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly resolveProjectRowWorkspace: UnwrapRef<typeof import('./composables/resolve-project-row-workspace')['default']>
     readonly runAtomicFlip: UnwrapRef<typeof import('./composables/use-theme-flip')['runAtomicFlip']>

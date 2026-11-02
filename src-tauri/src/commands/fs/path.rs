@@ -411,12 +411,6 @@ pub(crate) fn reject_sensitive_path_unless_allowed(
     reject_sensitive_path(user_path)
 }
 
-pub(crate) fn reject_resolved_sensitive_path(
-    resolved: &ResolvedWorkspacePath,
-) -> Result<(), String> {
-    reject_sensitive_path(&resolved.member_relative_path())
-}
-
 pub(crate) fn reject_resolved_sensitive_path_unless_allowed(
     resolved: &ResolvedWorkspacePath,
     allow_sensitive: Option<bool>,
@@ -691,7 +685,8 @@ mod tests {
         )
         .expect("resolve credentials member file");
         assert_eq!(resolved.member_relative_path(), "src/index.ts");
-        reject_resolved_sensitive_path(&resolved).expect("slug must not mark file sensitive");
+        reject_sensitive_path(&resolved.member_relative_path())
+            .expect("slug must not mark file sensitive");
         let _keep = dir;
     }
 
@@ -715,7 +710,8 @@ mod tests {
         let env_resolved =
             resolve_command_path(&api.path.to_string_lossy(), Some(&args), "api/.env")
                 .expect("resolve env");
-        let env_err = reject_resolved_sensitive_path(&env_resolved).expect_err("env blocked");
+        let env_err =
+            reject_sensitive_path(&env_resolved.member_relative_path()).expect_err("env blocked");
         assert_eq!(env_err, "Sensitive path blocked");
 
         let pem_resolved = resolve_command_path(
@@ -724,7 +720,8 @@ mod tests {
             "api/secrets/key.pem",
         )
         .expect("resolve pem");
-        let pem_err = reject_resolved_sensitive_path(&pem_resolved).expect_err("pem blocked");
+        let pem_err =
+            reject_sensitive_path(&pem_resolved.member_relative_path()).expect_err("pem blocked");
         assert_eq!(pem_err, "Sensitive path blocked");
 
         let _keep = (api_dir, web_dir);
@@ -737,7 +734,8 @@ mod tests {
         let resolved = resolve_command_path(&member.path.to_string_lossy(), None, ".env")
             .expect("single root env");
         assert_eq!(resolved.member_relative_path(), ".env");
-        let err = reject_resolved_sensitive_path(&resolved).expect_err("single root env blocked");
+        let err = reject_sensitive_path(&resolved.member_relative_path())
+            .expect_err("single root env blocked");
         assert_eq!(err, "Sensitive path blocked");
         let _keep = dir;
     }

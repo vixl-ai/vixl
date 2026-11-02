@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   parseSshProjectRoot,
+  parseSshRunsAsLine,
   sshCopyRemotePath,
+  sshRunsAsLine,
   sshSidebarLabel,
 } from '@/utils/ssh-project-root'
 
@@ -36,5 +38,13 @@ describe('ssh labels', () => {
     expect(sshCopyRemotePath(root, '.')).toBe(
       'aidanhibbard@eva.local:/home/aidanhibbard/proj',
     )
+  })
+
+  it('parses the remote runs-as line back to user and host', () => {
+    expect(parseSshRunsAsLine(sshRunsAsLine(root))).toEqual({
+      user: 'aidanhibbard',
+      hostname: 'eva.local',
+    })
+    expect(parseSshRunsAsLine('Runs on this Mac')).toBeNull()
   })
 })

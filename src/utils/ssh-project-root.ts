@@ -78,6 +78,26 @@ export const RUNS_ON_THIS_MAC = 'Runs on this Mac'
 export const sshRunsAsLine = (root: SshProjectRoot): string =>
   `Runs as ${root.user} on ${root.hostname}`
 
+export const parseSshRunsAsLine = (
+  line: string,
+): { user: string; hostname: string } | null => {
+  const prefix = 'Runs as '
+  if (!line.startsWith(prefix)) {
+    return null
+  }
+  const rest = line.slice(prefix.length)
+  const split = rest.lastIndexOf(' on ')
+  if (split <= 0) {
+    return null
+  }
+  const user = rest.slice(0, split)
+  const hostname = rest.slice(split + 4)
+  if (!user || !hostname || hostname.includes(' ')) {
+    return null
+  }
+  return { user, hostname }
+}
+
 export const sshRunsAsLineFromRoot = (projectRoot: string | null | undefined): string | null => {
   const parsed = tryParseSshProjectRoot(projectRoot)
   return parsed ? sshRunsAsLine(parsed) : null

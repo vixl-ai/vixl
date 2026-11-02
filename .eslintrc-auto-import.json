@@ -157,6 +157,7 @@
     "resetAgentHarnessCacheForTests": true,
     "resetChatSessionsForTests": true,
     "resetFleetBootstrapForTests": true,
+    "resetSlashIndexToastsForTests": true,
     "resolveComponent": true,
     "resolveProjectRowWorkspace": true,
     "runAtomicFlip": true,

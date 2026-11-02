@@ -2,18 +2,63 @@ import { ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { vixlFileChangeToken } from '@/composables/use-vixl-live-sync'
 import { listAgentIndex } from '@/services/agents/registry'
+import {
+  looksLikeSessionDropped,
+  looksLikeUnreachable,
+} from '@/services/harness/ssh/map-error'
 import isReservedSlashName from '@/services/skills/is-reserved-slash-name'
 import { listSlashSkillIndex } from '@/services/skills/skill-registry'
 import formatUnknownError from '@/utils/format-unknown-error'
+import { isSshProjectRoot } from '@/utils/ssh-project-root'
 import type { SlashIndexEntry } from '@/types/chat/slash-index-entry'
+
+const RECONNECT_HINT = 'Right click the project and click reconnect'
+
+const announcedOfflineRoots = new Set<string>()
+
+export const resetSlashIndexToastsForTests = (): void => {
+  announcedOfflineRoots.clear()
+}
+
+const offlineSshLoadError = (root: string | null, error: unknown): boolean => {
+  if (!root || !isSshProjectRoot(root)) {
+    return false
+  }
+  const message = formatUnknownError(error)
+  return looksLikeUnreachable(message) || looksLikeSessionDropped(message)
+}
+
+const toastLoadFailure = (
+  title: string,
+  error: unknown,
+  root: string | null,
+  announceOffline: boolean,
+): boolean => {
+  if (!offlineSshLoadError(root, error)) {
+    toast.error(title, {
+      description: formatUnknownError(error),
+    })
+    return false
+  }
+  if (!announceOffline || !root || announcedOfflineRoots.has(root)) {
+    return true
+  }
+  announcedOfflineRoots.add(root)
+  toast.error(title, {
+    description: RECONNECT_HINT,
+  })
+  return true
+}
 
 export default (projectRoot: () => string | null) => {
   const entries = ref<SlashIndexEntry[]>([])
+  let readyToAnnounce = false
 
-  const refresh = async (): Promise<void> => {
+  const refresh = async (announceOffline = true): Promise<void> => {
     const root = projectRoot()
     let skills: SlashIndexEntry[] = []
     let agents: SlashIndexEntry[] = []
+    let offline = false
     try {
       skills = (await listSlashSkillIndex(root)).map((skill) => ({
         kind: 'skill' as const,
@@ -22,9 +67,12 @@ export default (projectRoot: () => string | null) => {
         scope: skill.scope,
       }))
     } catch (error) {
-      toast.error('Failed to load skills', {
-        description: formatUnknownError(error),
-      })
+      offline = toastLoadFailure(
+        'Failed to load skills',
+        error,
+        root,
+        announceOffline,
+      ) || offline
     }
     try {
       agents = (await listAgentIndex(root))
@@ -39,9 +87,15 @@ export default (projectRoot: () => string | null) => {
           scope: agent.scope,
         }))
     } catch (error) {
-      toast.error('Failed to load agents', {
-        description: formatUnknownError(error),
-      })
+      offline = toastLoadFailure(
+        'Failed to load agents',
+        error,
+        root,
+        announceOffline,
+      ) || offline
+    }
+    if (root && !offline) {
+      announcedOfflineRoots.delete(root)
     }
     entries.value = [...skills, ...agents]
   }
@@ -49,11 +103,19 @@ export default (projectRoot: () => string | null) => {
   watch(
     [projectRoot, vixlFileChangeToken],
     () => {
-      refresh().catch((error) => {
-        toast.error('Failed to load slash commands', {
-          description: formatUnknownError(error),
+      const announceOffline = readyToAnnounce
+      refresh(announceOffline)
+        .catch((error) => {
+          toastLoadFailure(
+            'Failed to load slash commands',
+            error,
+            projectRoot(),
+            announceOffline,
+          )
         })
-      })
+        .finally(() => {
+          readyToAnnounce = true
+        })
     },
     { immediate: true },
   )
