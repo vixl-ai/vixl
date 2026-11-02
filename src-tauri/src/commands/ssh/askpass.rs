@@ -35,11 +35,18 @@ pub struct AskpassRequest {
     pub secret_kind: Option<SecretKind>,
 }
 
+pub fn prompt_is_host_confirm(prompt: &str) -> bool {
+    let lower = prompt.to_ascii_lowercase();
+    lower.contains("are you sure you want to continue connecting")
+        || lower.contains("please type 'yes'")
+        || lower.contains("authenticity of host")
+}
+
 pub fn classify_askpass(prompt_env: Option<&str>, prompt: &str) -> AskpassRequest {
-    if prompt_env
+    let hinted_confirm = prompt_env
         .map(|value| value.eq_ignore_ascii_case("confirm"))
-        .unwrap_or(false)
-    {
+        .unwrap_or(false);
+    if hinted_confirm || prompt_is_host_confirm(prompt) {
         return AskpassRequest {
             kind: AskpassKind::Confirm,
             prompt: prompt.to_string(),
@@ -239,7 +246,16 @@ mod tests {
         assert_eq!(confirm.kind, AskpassKind::Confirm);
         assert_eq!(confirm.secret_kind, None);
 
-        let password = classify_askpass(None, "aidanhibbard@eva.local's password:");
+        let host = classify_askpass(
+            None,
+            "The authenticity of host 'appleseed.example' can't be established.\nAre you sure you want to continue connecting (yes/no/[fingerprint])?",
+        );
+        assert_eq!(host.kind, AskpassKind::Confirm);
+        assert_eq!(host.secret_kind, None);
+        let again = classify_askpass(Some("none"), "Please type 'yes' or 'no': ");
+        assert_eq!(again.kind, AskpassKind::Confirm);
+
+        let password = classify_askpass(None, "johnny@appleseed.example's password:");
         assert_eq!(password.kind, AskpassKind::Secret);
         assert_eq!(password.secret_kind, Some(SecretKind::Password));
 
