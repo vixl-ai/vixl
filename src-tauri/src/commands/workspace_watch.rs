@@ -113,9 +113,9 @@ fn claim_remote(map: &mut HashMap<String, RemoteWatch>, key: String) -> RemoteCl
 }
 
 fn drop_remote_start(map: &mut HashMap<String, RemoteWatch>, key: &str, stopped: &Arc<AtomicBool>) {
-    let still_starting = map.get(key).is_some_and(|entry| {
-        Arc::ptr_eq(&entry.stopped, stopped) && entry.channel_id.is_empty()
-    });
+    let still_starting = map
+        .get(key)
+        .is_some_and(|entry| Arc::ptr_eq(&entry.stopped, stopped) && entry.channel_id.is_empty());
     if !still_starting {
         return;
     }
@@ -772,8 +772,10 @@ async fn watch_workspace_ssh(app: AppHandle, project_root: String) -> Result<Str
     drop(stdio.stdin);
     let channel_id = stdio.channel_id.clone();
     if stopped.load(Ordering::SeqCst) {
-        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
-        drop_remote_start(&mut map, &key, &stopped);
+        {
+            let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+            drop_remote_start(&mut map, &key, &stopped);
+        }
         let _ = close_channel(channel_id).await;
         return Ok(key);
     }
@@ -795,9 +797,18 @@ async fn watch_workspace_ssh(app: AppHandle, project_root: String) -> Result<Str
     }
     tokio::time::sleep(Duration::from_millis(200)).await;
     if stopped.load(Ordering::SeqCst) {
-        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
-        drop_remote_start(&mut map, &key, &stopped);
+        let unwatched = {
+            let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+            let unwatched = map
+                .get(&key)
+                .is_none_or(|entry| !Arc::ptr_eq(&entry.stopped, &stopped));
+            drop_remote_start(&mut map, &key, &stopped);
+            unwatched
+        };
         let _ = close_channel(channel_id).await;
+        if unwatched {
+            return Ok(key);
+        }
         return Err(inotify_enospc(&ssh.hostname));
     }
     let published = {
@@ -912,6 +923,50 @@ mod tests {
             &mut burst,
         );
         burst
+    }
+
+    #[test]
+    fn unwatch_during_ssh_setup_drops_the_claim() {
+        let mut map = HashMap::new();
+        let stopped = match claim_remote(
+            &mut map,
+            "ssh://johnny@appleseed.example/home/johnny".into(),
+        ) {
+            RemoteClaim::Started(stopped) => stopped,
+            RemoteClaim::Joined => panic!("first claim should start"),
+        };
+        assert!(matches!(
+            claim_remote(
+                &mut map,
+                "ssh://johnny@appleseed.example/home/johnny".into()
+            ),
+            RemoteClaim::Joined
+        ));
+        stopped.store(true, Ordering::SeqCst);
+        map.remove("ssh://johnny@appleseed.example/home/johnny");
+        assert!(!publish_remote_channel(
+            &mut map,
+            "ssh://johnny@appleseed.example/home/johnny",
+            &stopped,
+            "channel".into(),
+        ));
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn failed_ssh_setup_removes_its_claim() {
+        let mut map = HashMap::new();
+        let key = "ssh://johnny@appleseed.example/home/johnny";
+        let stopped = match claim_remote(&mut map, key.into()) {
+            RemoteClaim::Started(stopped) => stopped,
+            RemoteClaim::Joined => panic!("first claim should start"),
+        };
+        drop_remote_start(&mut map, key, &stopped);
+        assert!(map.is_empty());
+        assert!(matches!(
+            claim_remote(&mut map, key.into()),
+            RemoteClaim::Started(_)
+        ));
     }
 
     #[test]
