@@ -134,6 +134,7 @@ export const fsStat = (
   projectRoot: string,
   path: string,
   projectRoots?: IpcProjectRoot[],
+  allowSensitive?: boolean,
 ): Promise<{
   path: string
   exists: boolean
@@ -145,6 +146,7 @@ export const fsStat = (
     projectRoot,
     path,
     ...(projectRoots ? { projectRoots } : {}),
+    ...(allowSensitive ? { allowSensitive } : {}),
   })
 
 export const fsListDirTree = (

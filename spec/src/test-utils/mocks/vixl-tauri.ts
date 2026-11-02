@@ -51,6 +51,8 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
         (
           projectRoot: string,
           path: string,
+          projectRoots?: unknown,
+          allowSensitive?: boolean,
         ) => Promise<{ path: string; exists: boolean; kind: string; size: number }>
       >()
       .mockResolvedValue({

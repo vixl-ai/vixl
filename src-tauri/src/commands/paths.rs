@@ -228,9 +228,18 @@ fn get_vixl_dir_at(
     vixl_base_dir(scope, root_path, personal_dir).map(|path| path.to_string_lossy().into_owned())
 }
 
+fn remote_vixl_names_have_config(names: impl IntoIterator<Item = impl AsRef<str>>) -> bool {
+    names.into_iter().any(|name| {
+        let name = name.as_ref();
+        name == "mcp.json" || name == "settings.json"
+    })
+}
+
 async fn has_remote_project_vixl(root: &str) -> Result<bool, String> {
     match crate::commands::fs::list_dir_await(root, None, VIXL_DIR, None).await {
-        Ok(_) => Ok(true),
+        Ok(entries) => Ok(remote_vixl_names_have_config(
+            entries.iter().map(|entry| entry.name.as_str()),
+        )),
         Err(err) if err.contains("No such file on ") => Ok(false),
         Err(err) => Err(err),
     }
@@ -1517,6 +1526,14 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn remote_vixl_config_requires_settings_or_mcp() {
+        assert!(!remote_vixl_names_have_config(["agents", "skills"]));
+        assert!(!remote_vixl_names_have_config(Vec::<&str>::new()));
+        assert!(remote_vixl_names_have_config(["agents", "settings.json"]));
+        assert!(remote_vixl_names_have_config(["mcp.json"]));
     }
 
     #[test]

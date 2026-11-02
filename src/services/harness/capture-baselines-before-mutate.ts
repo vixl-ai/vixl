@@ -85,12 +85,7 @@ const captureSshBaseline = async (
   key: string,
   toolCallId: string | undefined,
 ): Promise<FileCheckpointCaptureResult> => {
-  let stat: { exists: boolean; kind: string; size: number }
-  try {
-    stat = await fsStat(projectRoot, relativePath)
-  } catch {
-    return captureSshFile(ctx, projectRoot, relativePath, key, toolCallId, false, undefined)
-  }
+  const stat = await fsStat(projectRoot, relativePath, undefined, true)
   if (!stat.exists) {
     return captureSshFile(ctx, projectRoot, relativePath, key, toolCallId, false, undefined)
   }

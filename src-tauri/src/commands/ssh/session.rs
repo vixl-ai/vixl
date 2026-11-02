@@ -186,6 +186,18 @@ pub async fn mark_master_dead(key: &SessionKey) {
     }
 }
 
+fn connect_poll_succeeded(state: &str, control_ok: bool, user_cancelled: bool) -> bool {
+    !user_cancelled && state == "connecting" && control_ok
+}
+
+async fn session_record_state(key: &SessionKey) -> Option<String> {
+    SESSIONS
+        .lock()
+        .await
+        .get(key)
+        .map(|record| record.state.clone())
+}
+
 fn emit_line(app: Option<&AppHandle>, preview: &SshPreview, line: &str) {
     emit_status(
         app,
@@ -477,8 +489,17 @@ pub async fn connect(
         if user_cancelled.load(Ordering::SeqCst) {
             break false;
         }
+        let state = session_record_state(&key).await;
+        if state.as_deref() == Some("disconnected") {
+            break false;
+        }
         if control_path.exists() && control_check(&snapshot) {
-            break true;
+            let state = session_record_state(&key).await;
+            break connect_poll_succeeded(
+                state.as_deref().unwrap_or("disconnected"),
+                true,
+                user_cancelled.load(Ordering::SeqCst),
+            );
         }
         let alive = SESSIONS
             .lock()
@@ -489,7 +510,12 @@ pub async fn connect(
         if !alive {
             let stderr_text = ctx.stderr.lock().await.clone();
             if !stderr_text.is_empty() && control_path.exists() {
-                break control_check(&snapshot);
+                let state = session_record_state(&key).await;
+                break connect_poll_succeeded(
+                    state.as_deref().unwrap_or("disconnected"),
+                    control_check(&snapshot),
+                    user_cancelled.load(Ordering::SeqCst),
+                );
             }
             if SESSIONS
                 .lock()
@@ -514,12 +540,17 @@ pub async fn connect(
         if control_path.exists() {
             let _ = set_mode_0600(&control_path);
             if control_check(&snapshot) {
-                break true;
+                let state = session_record_state(&key).await;
+                break connect_poll_succeeded(
+                    state.as_deref().unwrap_or("disconnected"),
+                    true,
+                    user_cancelled.load(Ordering::SeqCst),
+                );
             }
         }
         let sessions = SESSIONS.lock().await;
         if let Some(record) = sessions.get(&key) {
-            if record.state == "disconnected" && record.last_error.is_some() {
+            if record.state == "disconnected" {
                 break false;
             }
         }
@@ -534,6 +565,9 @@ pub async fn connect(
         emit_line(app.as_ref(), &preview, &line);
         let mut sessions = SESSIONS.lock().await;
         if let Some(record) = sessions.get_mut(&key) {
+            if record.state != "connecting" {
+                return Ok(status_from_record(record));
+            }
             record.state = "connected".to_string();
             record.line = line;
             record.master_alive = true;
@@ -541,6 +575,12 @@ pub async fn connect(
             let _ = set_mode_0600(&control_path);
             return Ok(status_from_record(record));
         }
+    }
+
+    if session_record_state(&key).await.as_deref() == Some("disconnected")
+        && !user_cancelled.load(Ordering::SeqCst)
+    {
+        return Ok(session_status(&user, &preview.hostname, preview.port).await);
     }
 
     let stderr_text = ctx.stderr.lock().await.clone();
@@ -728,6 +768,15 @@ mod tests {
         assert!(first.master_alive);
         assert!(second.master_alive);
         clear_sessions_for_tests().await;
+    }
+
+    #[test]
+    fn user_disconnect_blocks_connect_promotion() {
+        assert!(!connect_poll_succeeded("disconnected", true, false));
+        assert!(!connect_poll_succeeded("connecting", true, true));
+        assert!(!connect_poll_succeeded("disconnected", true, true));
+        assert!(connect_poll_succeeded("connecting", true, false));
+        assert!(!connect_poll_succeeded("connecting", false, false));
     }
 
     #[test]

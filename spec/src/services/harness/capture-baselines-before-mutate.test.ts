@@ -50,6 +50,8 @@ describe('captureBaselinesBeforeMutate', () => {
   beforeEach(() => {
     fileCheckpointCapture.mockReset()
     fileCheckpointCapture.mockResolvedValue(undefined)
+    vi.mocked(fsStat).mockClear()
+    vi.mocked(fsReadFile).mockClear()
   })
 
   it('omits key for a single-project path', async () => {
@@ -134,6 +136,7 @@ describe('captureBaselinesBeforeMutate', () => {
       'tc-1',
     )
 
+    expect(fsStat).toHaveBeenCalledWith(sshRoot, 'src/a.ts', undefined, true)
     expect(fsReadFile).toHaveBeenCalledWith({
       projectRoot: sshRoot,
       path: 'src/a.ts',
@@ -149,5 +152,25 @@ describe('captureBaselinesBeforeMutate', () => {
       existed: true,
       content: 'remote bytes',
     })
+  })
+
+  it('keeps a failed ssh stat from being stored as a missing file', async () => {
+    const sshRoot = 'ssh://aidanhibbard@eva/home/aidanhibbard/proj'
+    vi.mocked(fsStat).mockRejectedValue(new Error('Sensitive path blocked'))
+
+    await expect(
+      captureBaselinesBeforeMutate(
+        {
+          projectRoot: sshRoot,
+          projectSlug: 'eva-proj',
+          chatId: 'chat-1',
+          userMessageId: 'u1',
+        },
+        ['.env'],
+        'tc-1',
+      ),
+    ).rejects.toThrow('Sensitive path blocked')
+    expect(fileCheckpointCapture).not.toHaveBeenCalled()
+    expect(fsReadFile).not.toHaveBeenCalled()
   })
 })
