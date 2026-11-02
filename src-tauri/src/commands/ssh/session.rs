@@ -294,6 +294,7 @@ async fn mark_cancelled_connect(key: &SessionKey, generation: u64) {
     if record.master_generation != generation || !record.user_cancelled.load(Ordering::SeqCst) {
         return;
     }
+    record.lock.take();
     record.master_alive = false;
     record.state = "disconnected".to_string();
     record.last_error = None;
@@ -449,6 +450,7 @@ pub async fn connect(
     let _control_gate = CONTROL_SOCKET_GATE.lock().await;
     if !connect_attempt_current(&key, master_generation).await {
         drop(_control_gate);
+        mark_cancelled_connect(&key, master_generation).await;
         clear_connect_cancel(&key, &user_cancelled).await;
         return Ok(session_status(&user, &preview.hostname, preview.port).await);
     }
@@ -541,6 +543,14 @@ pub async fn connect(
                 Ok(())
             });
         }
+    }
+
+    if user_cancelled.load(Ordering::SeqCst) {
+        drop(_control_gate);
+        stop_askpass(listener_stop_tx, listener).await;
+        mark_cancelled_connect(&key, master_generation).await;
+        clear_connect_cancel(&key, &user_cancelled).await;
+        return Ok(session_status(&user, &preview.hostname, preview.port).await);
     }
 
     let mut child = match command.spawn() {
@@ -1348,6 +1358,52 @@ mod tests {
             .expect("cancel");
         assert!(flag.load(Ordering::SeqCst));
         assert!(!SESSIONS.lock().await.contains_key(&key));
+        clear_sessions_for_tests().await;
+    }
+
+    #[tokio::test]
+    async fn cancelled_insert_releases_the_control_lock() {
+        let _lock = SESSION_TEST_LOCK.lock().await;
+        clear_sessions_for_tests().await;
+        let hostname = "appleseed.example";
+        let dir = tempdir().expect("tempdir");
+        let paths = SshPaths::from_roots(dir.path().join("vixl"), dir.path().join("user"));
+        let key = session_key("johnny", hostname, 2222);
+        let flag = begin_connect_cancel(&key).await;
+        flag.store(true, Ordering::SeqCst);
+        let control_lock = acquire_control_lock(&paths.lock_path("cancel-lock")).expect("lock");
+        let generation = next_master_generation();
+        SESSIONS.lock().await.insert(
+            key.clone(),
+            SessionRecord {
+                key: key.clone(),
+                paths: paths.clone(),
+                destination: hostname.to_string(),
+                control_path: dir.path().join("cm-cancel-lock"),
+                state: "connecting".to_string(),
+                line: format!("Connecting to {hostname} port 2222."),
+                last_error: None,
+                kill_tx: None,
+                lock: Some(control_lock),
+                master_alive: false,
+                user_cancelled: flag,
+                master_generation: generation,
+            },
+        );
+        mark_cancelled_connect(&key, generation).await;
+        let (state, held, last_error) = {
+            let sessions = SESSIONS.lock().await;
+            let record = sessions.get(&key).expect("session");
+            (
+                record.state.clone(),
+                record.lock.is_some(),
+                record.last_error.clone(),
+            )
+        };
+        assert_eq!(state, "disconnected");
+        assert!(!held, "cancelled connect kept the control lock");
+        assert!(last_error.is_none());
+        acquire_control_lock(&paths.lock_path("cancel-lock")).expect("lock after cancel");
         clear_sessions_for_tests().await;
     }
 }
