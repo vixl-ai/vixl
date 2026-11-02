@@ -96,10 +96,6 @@ pub async fn cancel_prompt(request_id: String) -> Result<(), String> {
         .map_err(|_| "SSH prompt is no longer open".to_string())
 }
 
-pub async fn prompt_owner_cancelled(owner: u64) -> bool {
-    PROMPTS.lock().await.cancelled.contains(&owner)
-}
-
 pub async fn cancel_owned_prompts(owner: u64) {
     let mut prompts = PROMPTS.lock().await;
     prompts.cancelled.insert(owner);
@@ -114,17 +110,43 @@ pub async fn cancel_owned_prompts(owner: u64) {
     prompts.pending = kept;
 }
 
-async fn wait_for_user(request_id: String, owner: u64) -> PromptAnswer {
-    let (tx, rx) = oneshot::channel();
-    {
-        let mut prompts = PROMPTS.lock().await;
-        if prompts.cancelled.contains(&owner) {
-            return PromptAnswer::Abort;
-        }
-        prompts
-            .pending
-            .insert(request_id, PendingPrompt { tx, owner });
+fn register_prompt(
+    prompts: &mut PromptTable,
+    request_id: String,
+    owner: u64,
+) -> Result<oneshot::Receiver<PromptAnswer>, ()> {
+    if prompts.cancelled.contains(&owner) {
+        return Err(());
     }
+    let (tx, rx) = oneshot::channel();
+    prompts
+        .pending
+        .insert(request_id, PendingPrompt { tx, owner });
+    Ok(rx)
+}
+
+async fn wait_for_user(request_id: String, owner: u64) -> PromptAnswer {
+    let rx = {
+        let mut prompts = PROMPTS.lock().await;
+        match register_prompt(&mut prompts, request_id, owner) {
+            Ok(rx) => rx,
+            Err(()) => return PromptAnswer::Abort,
+        }
+    };
+    rx.await.unwrap_or(PromptAnswer::Abort)
+}
+
+async fn open_prompt(request_id: String, owner: u64, emit: impl FnOnce()) -> PromptAnswer {
+    let rx = {
+        let mut prompts = PROMPTS.lock().await;
+        match register_prompt(&mut prompts, request_id, owner) {
+            Ok(rx) => {
+                emit();
+                rx
+            }
+            Err(()) => return PromptAnswer::Abort,
+        }
+    };
     rx.await.unwrap_or(PromptAnswer::Abort)
 }
 
@@ -275,24 +297,24 @@ pub async fn serve_askpass_client(
         AskpassKind::Confirm => {
             if ctx.auth.lock().await.host_key_blocked() {
                 AskpassResponse::Cancel
-            } else if prompt_owner_cancelled(ctx.prompt_owner).await {
-                AskpassResponse::Cancel
             } else {
                 let meta = parse_confirm_metadata(&prompt, &stderr);
                 let request_id = Uuid::new_v4().to_string();
-                emit_confirm(
-                    app.as_ref(),
-                    &SshConfirmEvent {
-                        request_id: request_id.clone(),
-                        hostname: meta.host.clone().unwrap_or_else(|| ctx.hostname.clone()),
-                        port: meta.port.unwrap_or(ctx.port),
-                        fingerprint: meta.fingerprint,
-                        key_type: meta.key_type,
-                        prompt: prompt.clone(),
-                        address: meta.address,
-                    },
-                );
-                let answer = wait_for_user(request_id, ctx.prompt_owner).await;
+                let answer = open_prompt(request_id.clone(), ctx.prompt_owner, || {
+                    emit_confirm(
+                        app.as_ref(),
+                        &SshConfirmEvent {
+                            request_id: request_id.clone(),
+                            hostname: meta.host.clone().unwrap_or_else(|| ctx.hostname.clone()),
+                            port: meta.port.unwrap_or(ctx.port),
+                            fingerprint: meta.fingerprint.clone(),
+                            key_type: meta.key_type.clone(),
+                            prompt: prompt.clone(),
+                            address: meta.address.clone(),
+                        },
+                    );
+                })
+                .await;
                 if matches!(answer, PromptAnswer::Cancel) {
                     ctx.user_cancelled.store(true, Ordering::SeqCst);
                 }
@@ -354,10 +376,8 @@ pub async fn serve_askpass_client(
                     AskpassResponse::Submit(value)
                 }
                 SecretDisposition::AskUser { saveable } => {
-                    if prompt_owner_cancelled(ctx.prompt_owner).await {
-                        AskpassResponse::Cancel
-                    } else {
-                        let request_id = Uuid::new_v4().to_string();
+                    let request_id = Uuid::new_v4().to_string();
+                    let answer = open_prompt(request_id.clone(), ctx.prompt_owner, || {
                         emit_secret(
                             app.as_ref(),
                             &SshSecretEvent {
@@ -369,12 +389,12 @@ pub async fn serve_askpass_client(
                                 saveable: saveable && secret_kind_is_saveable(kind),
                             },
                         );
-                        let answer = wait_for_user(request_id, ctx.prompt_owner).await;
-                        if matches!(answer, PromptAnswer::Cancel) {
-                            ctx.user_cancelled.store(true, Ordering::SeqCst);
-                        }
-                        askpass_from_prompt_answer(answer).0
+                    })
+                    .await;
+                    if matches!(answer, PromptAnswer::Cancel) {
+                        ctx.user_cancelled.store(true, Ordering::SeqCst);
                     }
+                    askpass_from_prompt_answer(answer).0
                 }
             }
         }
