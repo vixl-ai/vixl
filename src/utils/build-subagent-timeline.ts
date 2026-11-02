@@ -148,18 +148,27 @@ const pushTurnIfContent = (
   }
 }
 
+const attachedSummaryText = (
+  subagent: SubagentTimelineItem,
+  summaryText: string,
+): string => (subagent.status === 'running' ? '' : summaryText)
+
 const buildLegacyTimeline = (
   items: ChatTimelineItem[],
   subagent: SubagentTimelineItem,
   boundaries: TimelineBoundary[],
 ): ChatTimelineItem[] => {
+  const summaryText = attachedSummaryText(
+    subagent,
+    subagent.summary?.trim() ?? '',
+  )
   const segmented = boundaries.length > 0
   if (!segmented) {
     const turn = buildLegacyTurn(
       subagent,
       0,
       subagent.tools,
-      subagent.summary?.trim() ?? '',
+      summaryText,
       false,
     )
     pushTurnIfContent(items, turn, subagent)
@@ -187,7 +196,7 @@ const buildLegacyTimeline = (
     subagent,
     turnIndex,
     subagent.tools.slice(previousBoundary),
-    subagent.summary?.trim() ?? '',
+    summaryText,
     true,
   )
   pushTurnIfContent(items, trailing, subagent)
@@ -201,7 +210,10 @@ const buildSteppedTimeline = (
   steps: AgentStep[],
   boundaries: TimelineBoundary[],
 ): ChatTimelineItem[] => {
-  const summaryText = trailingSubagentSummary(subagent.summary, steps)
+  const summaryText = attachedSummaryText(
+    subagent,
+    trailingSubagentSummary(subagent.summary, steps),
+  )
   const segmented = boundaries.length > 0
   if (!segmented) {
     const turn = buildTurnFromSteps(subagent, 0, steps, summaryText, false)

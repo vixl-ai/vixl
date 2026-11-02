@@ -622,6 +622,140 @@ describe('buildSubagentTimeline', () => {
     expect(turnItem.turn.text).toBe('parent wrap-up')
   })
 
+  it('keeps the interrupted summary as trailing turn text while status is error', () => {
+    const interrupted =
+      'Interrupted when the app closed. Steer this subagent to resume.'
+    const items = buildSubagentTimeline(
+      subagent({
+        status: 'error',
+        summary: interrupted,
+        steps: [
+          {
+            id: 's1',
+            text: 'found things',
+            reasoning: '',
+            tools: [tool('t1')],
+          },
+        ],
+      }),
+    )
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.text).toBe(interrupted)
+  })
+
+  it('does not attach the interrupted summary as turn text while status is running', () => {
+    const items = buildSubagentTimeline(
+      subagent({
+        status: 'running',
+        summary:
+          'Interrupted when the app closed. Steer this subagent to resume.',
+        steps: [
+          {
+            id: 's1',
+            text: 'found things',
+            reasoning: '',
+            tools: [tool('t1')],
+          },
+        ],
+      }),
+    )
+    expect(items.map((item) => item.type)).toEqual(['user', 'agent-turn'])
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.text).toBe('')
+  })
+
+  it('keeps post-steer steps on the last turn without interrupted summary text', () => {
+    const interrupted =
+      'Interrupted when the app closed. Steer this subagent to resume.'
+    const items = buildSubagentTimeline(
+      subagent({
+        status: 'running',
+        summary: interrupted,
+        tools: [tool('t1'), tool('t2', 'grep')],
+        steps: [
+          {
+            id: 's1',
+            text: 'found things',
+            reasoning: '',
+            tools: [tool('t1')],
+          },
+          {
+            id: 's2',
+            text: 'looking further',
+            reasoning: '',
+            tools: [tool('t2', 'grep')],
+          },
+        ],
+        steers: [{ message: 'keep going', toolBoundary: 1 }],
+      }),
+    )
+    expect(items.map((item) => item.type)).toEqual([
+      'user',
+      'agent-turn',
+      'user',
+      'agent-turn',
+    ])
+    const preTurn = items[1]
+    expect(preTurn?.type).toBe('agent-turn')
+    if (preTurn?.type !== 'agent-turn') {
+      return
+    }
+    expect(preTurn.turn.text).toBe('')
+    const steer = items[2]
+    expect(steer?.type).toBe('user')
+    if (steer?.type !== 'user') {
+      return
+    }
+    expect(steer.message.parts).toEqual([{ type: 'text', text: 'keep going' }])
+    const postTurn = items[3]
+    expect(postTurn?.type).toBe('agent-turn')
+    if (postTurn?.type !== 'agent-turn') {
+      return
+    }
+    expect(postTurn.turn.text).toBe('')
+    expect(postTurn.turn.steps).toEqual([
+      {
+        id: 's2',
+        text: 'looking further',
+        reasoning: '',
+        tools: [tool('t2', 'grep')],
+      },
+    ])
+  })
+
+  it('does not attach the interrupted summary as turn text on the running legacy path', () => {
+    const items = buildSubagentTimeline(
+      subagent({
+        status: 'running',
+        summary:
+          'Interrupted when the app closed. Steer this subagent to resume.',
+        steps: [],
+      }),
+    )
+    const turnItem = items[1]
+    expect(turnItem?.type).toBe('agent-turn')
+    if (turnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(turnItem.turn.text).toBe('')
+    expect(turnItem.turn.steps).toEqual([
+      {
+        id: 'sub-1-step',
+        text: '',
+        reasoning: '',
+        tools: [tool('t1')],
+      },
+    ])
+  })
+
   it('backfills steps from subagent-history messages when tools exist and steps do not', () => {
     const items = buildSubagentTimeline(
       subagent({
