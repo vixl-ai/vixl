@@ -1812,6 +1812,14 @@ pub(crate) async fn apply_patch_await(
     apply_patch_ssh(project_root, project_roots, patch, allow_sensitive).await
 }
 
+async fn on_blocking<T, F>(work: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    super::read::off_the_webview(work).await
+}
+
 async fn apply_patch_ssh(
     project_root: String,
     project_roots: Option<Vec<WorkspaceRootArg>>,
@@ -1825,11 +1833,16 @@ async fn apply_patch_ssh(
             super::edit::PatchOperation::Add { path, content } => {
                 match resolve_target(&project_root, project_roots.as_deref(), &path)? {
                     FsTarget::Local(resolved) => {
-                        diffs.push(super::edit::apply_local_member(
-                            resolved,
-                            super::edit::PatchOperation::Add { path, content },
-                            allow_sensitive,
-                        )?);
+                        diffs.push(
+                            on_blocking(move || {
+                                super::edit::apply_local_member(
+                                    resolved,
+                                    super::edit::PatchOperation::Add { path, content },
+                                    allow_sensitive,
+                                )
+                            })
+                            .await?,
+                        );
                     }
                     FsTarget::Ssh(resolved) => {
                         gate_sensitive(&resolved.relative, allow_sensitive)?;
@@ -1857,11 +1870,16 @@ async fn apply_patch_ssh(
             super::edit::PatchOperation::Update { path, content } => {
                 match resolve_target(&project_root, project_roots.as_deref(), &path)? {
                     FsTarget::Local(resolved) => {
-                        diffs.push(super::edit::apply_local_member(
-                            resolved,
-                            super::edit::PatchOperation::Update { path, content },
-                            allow_sensitive,
-                        )?);
+                        diffs.push(
+                            on_blocking(move || {
+                                super::edit::apply_local_member(
+                                    resolved,
+                                    super::edit::PatchOperation::Update { path, content },
+                                    allow_sensitive,
+                                )
+                            })
+                            .await?,
+                        );
                     }
                     FsTarget::Ssh(resolved) => {
                         gate_sensitive(&resolved.relative, allow_sensitive)?;
@@ -1901,11 +1919,16 @@ async fn apply_patch_ssh(
             super::edit::PatchOperation::Delete { path } => {
                 match resolve_target(&project_root, project_roots.as_deref(), &path)? {
                     FsTarget::Local(resolved) => {
-                        diffs.push(super::edit::apply_local_member(
-                            resolved,
-                            super::edit::PatchOperation::Delete { path },
-                            allow_sensitive,
-                        )?);
+                        diffs.push(
+                            on_blocking(move || {
+                                super::edit::apply_local_member(
+                                    resolved,
+                                    super::edit::PatchOperation::Delete { path },
+                                    allow_sensitive,
+                                )
+                            })
+                            .await?,
+                        );
                     }
                     FsTarget::Ssh(resolved) => {
                         gate_sensitive(&resolved.relative, allow_sensitive)?;
@@ -1966,11 +1989,16 @@ async fn stage_preview_ssh(
     match request {
         FsStagePreviewRequest::Write { path, content } => {
             match resolve_target(&project_root, roots, &path)? {
-                FsTarget::Local(resolved) => super::edit::stage_preview_local_member(
-                    resolved,
-                    FsStagePreviewRequest::Write { path, content },
-                    allow_sensitive,
-                ),
+                FsTarget::Local(resolved) => {
+                    on_blocking(move || {
+                        super::edit::stage_preview_local_member(
+                            resolved,
+                            FsStagePreviewRequest::Write { path, content },
+                            allow_sensitive,
+                        )
+                    })
+                    .await
+                }
                 FsTarget::Ssh(resolved) => {
                     gate_sensitive(&resolved.relative, allow_sensitive)?;
                     let old_content = with_sftp(&resolved.ssh, |client| {
@@ -2007,11 +2035,16 @@ async fn stage_preview_ssh(
                 return Err("At least one replacement is required".to_string());
             }
             match resolve_target(&project_root, roots, &path)? {
-                FsTarget::Local(resolved) => super::edit::stage_preview_local_member(
-                    resolved,
-                    FsStagePreviewRequest::Edit { path, replacements },
-                    allow_sensitive,
-                ),
+                FsTarget::Local(resolved) => {
+                    on_blocking(move || {
+                        super::edit::stage_preview_local_member(
+                            resolved,
+                            FsStagePreviewRequest::Edit { path, replacements },
+                            allow_sensitive,
+                        )
+                    })
+                    .await
+                }
                 FsTarget::Ssh(resolved) => {
                     gate_sensitive(&resolved.relative, allow_sensitive)?;
                     let old_content = with_sftp(&resolved.ssh, |client| {
@@ -2041,11 +2074,16 @@ async fn stage_preview_ssh(
         }
         FsStagePreviewRequest::Delete { path } => {
             match resolve_target(&project_root, roots, &path)? {
-                FsTarget::Local(resolved) => super::edit::stage_preview_local_member(
-                    resolved,
-                    FsStagePreviewRequest::Delete { path },
-                    allow_sensitive,
-                ),
+                FsTarget::Local(resolved) => {
+                    on_blocking(move || {
+                        super::edit::stage_preview_local_member(
+                            resolved,
+                            FsStagePreviewRequest::Delete { path },
+                            allow_sensitive,
+                        )
+                    })
+                    .await
+                }
                 FsTarget::Ssh(resolved) => {
                     gate_sensitive(&resolved.relative, allow_sensitive)?;
                     let old_content = with_sftp(&resolved.ssh, |client| {
@@ -2085,11 +2123,16 @@ async fn preview_patch_ssh(
             super::edit::PatchOperation::Add { path, content } => {
                 match resolve_target(project_root, project_roots, &path)? {
                     FsTarget::Local(resolved) => {
-                        diffs.push(super::edit::preview_local_member(
-                            resolved,
-                            super::edit::PatchOperation::Add { path, content },
-                            allow_sensitive,
-                        )?);
+                        diffs.push(
+                            on_blocking(move || {
+                                super::edit::preview_local_member(
+                                    resolved,
+                                    super::edit::PatchOperation::Add { path, content },
+                                    allow_sensitive,
+                                )
+                            })
+                            .await?,
+                        );
                     }
                     FsTarget::Ssh(resolved) => {
                         gate_sensitive(&resolved.relative, allow_sensitive)?;
@@ -2105,11 +2148,16 @@ async fn preview_patch_ssh(
             super::edit::PatchOperation::Update { path, content } => {
                 match resolve_target(project_root, project_roots, &path)? {
                     FsTarget::Local(resolved) => {
-                        diffs.push(super::edit::preview_local_member(
-                            resolved,
-                            super::edit::PatchOperation::Update { path, content },
-                            allow_sensitive,
-                        )?);
+                        diffs.push(
+                            on_blocking(move || {
+                                super::edit::preview_local_member(
+                                    resolved,
+                                    super::edit::PatchOperation::Update { path, content },
+                                    allow_sensitive,
+                                )
+                            })
+                            .await?,
+                        );
                     }
                     FsTarget::Ssh(resolved) => {
                         gate_sensitive(&resolved.relative, allow_sensitive)?;
@@ -2138,11 +2186,16 @@ async fn preview_patch_ssh(
             super::edit::PatchOperation::Delete { path } => {
                 match resolve_target(project_root, project_roots, &path)? {
                     FsTarget::Local(resolved) => {
-                        diffs.push(super::edit::preview_local_member(
-                            resolved,
-                            super::edit::PatchOperation::Delete { path },
-                            allow_sensitive,
-                        )?);
+                        diffs.push(
+                            on_blocking(move || {
+                                super::edit::preview_local_member(
+                                    resolved,
+                                    super::edit::PatchOperation::Delete { path },
+                                    allow_sensitive,
+                                )
+                            })
+                            .await?,
+                        );
                     }
                     FsTarget::Ssh(resolved) => {
                         gate_sensitive(&resolved.relative, allow_sensitive)?;
