@@ -19,6 +19,7 @@ import {
   type WorkspaceTreeChanged,
 } from './merge-directory-children'
 import { recoverTreeSyncError, relistDirectories } from './workspace-tree-relist'
+import { reportWatchError, retryWorkspaceWatch } from './watch-error'
 
 const HOME_WATCH_DEBOUNCE_MS = 200
 const FOCUS_RELIST_DEBOUNCE_MS = 400
@@ -33,9 +34,12 @@ export type FileTreeWorkspaceSyncState = {
   projectRoot: ComputedRef<string | null>
   refreshGit: () => Promise<void>
   onTreeChanged: () => void
+  watchError?: Ref<string | null>
 }
 
-export const bindFileTreeWorkspaceSync = (state: FileTreeWorkspaceSyncState): void => {
+export const bindFileTreeWorkspaceSync = (
+  state: FileTreeWorkspaceSyncState,
+): { retryWatch: () => Promise<void> } => {
   let watchedRoot: string | null = null
   let watchedCanonicalRoot: string | null = null
   let watchedShallow: boolean | null = null
@@ -166,6 +170,9 @@ export const bindFileTreeWorkspaceSync = (state: FileTreeWorkspaceSyncState): vo
     if (!isTauri()) {
       return
     }
+    if (state.watchError) {
+      state.watchError.value = null
+    }
     const shallow = state.isHome()
     const canonicalRoot = await watchWorkspace(
       shallow ? { projectRoot: root, mode: 'shallow' } : { projectRoot: root },
@@ -224,9 +231,7 @@ export const bindFileTreeWorkspaceSync = (state: FileTreeWorkspaceSyncState): vo
     try {
       await startWorkspaceWatch(nextRoot)
     } catch (error) {
-      toast.error('Failed to watch workspace', {
-        description: treeErrorMessage(error),
-      })
+      reportWatchError(error, state.watchError)
     }
   }
 
@@ -249,11 +254,7 @@ export const bindFileTreeWorkspaceSync = (state: FileTreeWorkspaceSyncState): vo
     document.addEventListener('visibilitychange', handleVisibilityChange)
     const root = state.projectRoot.value
     if (root) {
-      startWorkspaceWatch(root).catch((error) => {
-        toast.error('Failed to watch workspace', {
-          description: treeErrorMessage(error),
-        })
-      })
+      startWorkspaceWatch(root).catch((error) => reportWatchError(error, state.watchError))
     }
     subscribeWorkspaceTreeChanged().catch((error) => {
       if (treeListenCancelled) {
@@ -311,6 +312,9 @@ export const bindFileTreeWorkspaceSync = (state: FileTreeWorkspaceSyncState): vo
     pushHomeWatchPathsDebounced()
   })
 
+  const retryWatch = (): Promise<void> =>
+    retryWorkspaceWatch(state.projectRoot.value, startWorkspaceWatch, state.watchError)
+
   watch(workspaceFsMutationNotice, (notice) => {
     if (!notice) {
       return
@@ -319,4 +323,6 @@ export const bindFileTreeWorkspaceSync = (state: FileTreeWorkspaceSyncState): vo
       enqueueTreeMerge(() => applyWorkspaceTreeChanged(payload))
     }
   })
+
+  return { retryWatch }
 }

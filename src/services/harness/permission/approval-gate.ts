@@ -25,6 +25,7 @@ export type PendingApproval = {
   diff?: FileDiff[]
   subagentId?: string
   subagentLabel?: string
+  runsAt?: string
   resolve: (result: ApprovalResolution) => void
 }
 

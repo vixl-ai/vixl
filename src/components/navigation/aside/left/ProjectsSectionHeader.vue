@@ -4,10 +4,17 @@ import {
   Filter,
   FolderPlus,
   Search,
+  Server,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import { SidebarGroupLabel } from '@/components/shadcn/ui/sidebar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/shadcn/ui/dropdown-menu'
 import {
   Tooltip,
   TooltipContent,
@@ -17,7 +24,7 @@ import useAddProject from '@/composables/use-add-project'
 import useProjectsExpansion from '@/composables/use-projects-expansion'
 import useProjectsSection from '@/composables/use-projects-section'
 
-const { addingProject, addProjectFromPicker } = useAddProject()
+const { addingProject, addProjectFromPicker, addSshProject } = useAddProject()
 const { runningOnly, toggleRunningFilter, openSearch } = useProjectsSection()
 const { expansionMode, toggleCollapseAll } = useProjectsExpansion()
 
@@ -67,21 +74,34 @@ const handleSearchClick = async (): Promise<void> => {
         </TooltipTrigger>
         <TooltipContent>Filter by running status</TooltipContent>
       </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="size-6"
-            :disabled="addingProject"
-            aria-label="Add project"
-            @click="addProjectFromPicker"
-          >
-            <FolderPlus class="size-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Add project</TooltipContent>
-      </Tooltip>
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <DropdownMenuTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="size-6"
+                :disabled="addingProject"
+                aria-label="Add project"
+              >
+                <FolderPlus class="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Add project</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="end" class="w-44">
+          <DropdownMenuItem @select="addProjectFromPicker">
+            <FolderPlus />
+            Add folder
+          </DropdownMenuItem>
+          <DropdownMenuItem @select="addSshProject">
+            <Server />
+            Add SSH
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Tooltip>
         <TooltipTrigger as-child>
           <Button

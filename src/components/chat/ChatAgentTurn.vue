@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import type { ChatStatus } from 'ai'
+import useFleetRegistry from '@/composables/use-fleet-registry'
+import { isSshProjectRoot, RUNS_ON_THIS_MAC } from '@/utils/ssh-project-root'
 import { PlayIcon, RotateCcwIcon } from '@lucide/vue'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
@@ -77,6 +80,14 @@ const errorTitle = computed(() => {
     return 'Timed out'
   }
   return 'Something went wrong'
+})
+
+const route = useRoute()
+const fleet = useFleetRegistry()
+const modelRunsOnThisMac = computed(() => {
+  const slug = String(route?.params?.slug ?? '')
+  const project = fleet.projects.value.find((item) => item.slug === slug)
+  return isSshProjectRoot(project?.rootPath)
 })
 
 const isStepStreaming = (index: number): boolean => {
@@ -227,6 +238,7 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
       <AlertTitle>{{ errorTitle }}</AlertTitle>
       <AlertDescription class="flex flex-col gap-3">
         <span>{{ turn.error.message }}</span>
+        <span v-if="modelRunsOnThisMac" class="text-muted-foreground">{{ RUNS_ON_THIS_MAC }}</span>
         <div class="flex gap-2">
           <Button
             v-if="canContinue"

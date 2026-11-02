@@ -11,6 +11,7 @@ import {
 import { loadInternalSkill } from '@/services/skills/discover-internal-skills'
 import { loadUserSkill } from '@/services/skills/discover-user-skills'
 import { loadSkill } from '@/services/skills/skill-registry'
+import { catchUnlessUnreachable } from '@/services/harness/ssh/map-error'
 import { MAX_SKILL_CONTENT_CHARS } from '@/services/skills/strip-skill-frontmatter'
 import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import type { LoadedSkill } from '@/types/skills/skill'
@@ -45,7 +46,10 @@ const membersWithProjectSkill = async (
     if (await isHomeWorkspaceRoot(member.rootPath)) {
       continue
     }
-    const index = await discoverProjectSkillIndex(member.rootPath).catch(() => [])
+    const index = await catchUnlessUnreachable(
+      () => discoverProjectSkillIndex(member.rootPath),
+      [],
+    )
     if (index.some((skill) => skill.name.toLowerCase() === skillName)) {
       hits.push(member)
     }

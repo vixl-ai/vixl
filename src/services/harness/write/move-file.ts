@@ -127,7 +127,12 @@ const moveFile = (ctx: HarnessToolContext) =>
       } else {
         await captureBaselinesBeforeMutate(ctx, [from, to], toolCallId)
       }
-      await fsMove(withProjectRoots({ projectRoot: ctx.projectRoot, from, to }, ctx))
+      await fsMove(
+        withProjectRoots(
+          { projectRoot: ctx.projectRoot, from, to, allowSensitive: true },
+          ctx,
+        ),
+      )
       notifyWorkspaceMutations(ctx, [gatedFrom, gatedTo])
       return { ok: true, from: gatedFrom, to: gatedTo, diffs }
     },

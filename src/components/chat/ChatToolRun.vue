@@ -81,6 +81,13 @@ const ownerTitle = computed((): string | null => {
   const title = props.run.result.ownerTitle
   return typeof title === 'string' && title.length > 0 ? title : null
 })
+const runsAt = computed((): string | null => {
+  if (!isRecord(props.run.result)) {
+    return null
+  }
+  const value = props.run.result.runsAt
+  return typeof value === 'string' && value.length > 0 ? value : null
+})
 const diffs = computed((): FileDiff[] => props.run.diffs ?? [])
 const hasDiffs = computed(() => diffs.value.length > 0 && props.run.status === 'done')
 const showInput = computed(() => props.run.args !== undefined && !hasDiffs.value)
@@ -147,6 +154,7 @@ const hasCollapsibleContent = computed(
     codebaseArtifacts.value.length > 0 ||
     showRawOutput.value ||
     Boolean(ownerTitle.value) ||
+    Boolean(runsAt.value) ||
     hasArtifactChip.value,
 )
 const diffCounts = computed(() => {
@@ -214,6 +222,7 @@ const diffCounts = computed(() => {
       >
         Running
       </AiElementsShimmerShimmer>
+      <p v-if="runsAt" class="text-muted-foreground">{{ runsAt }}</p>
       <p v-if="ownerTitle" class="text-muted-foreground">Held by {{ ownerTitle }}</p>
       <div v-if="argsText">
         <p class="mb-1 font-medium text-foreground/80">Input</p>

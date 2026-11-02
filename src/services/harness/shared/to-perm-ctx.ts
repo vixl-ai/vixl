@@ -3,6 +3,7 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const toPermCtx = (ctx: HarnessToolContext): PermissionGateContext => ({
   chatId: ctx.chatId,
+  projectRoot: ctx.projectRoot,
   settings: ctx.settings,
   permissionLevel: ctx.permissionLevel,
   sessionAllows: ctx.sessionAllows,

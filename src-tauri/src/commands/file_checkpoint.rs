@@ -270,7 +270,14 @@ fn capture_directory(
     })
 }
 
-pub(crate) fn capture_into(
+pub(crate) fn refuse_ssh_local_fallback(project_root: &str) -> Result<(), String> {
+    if project_root.trim().to_ascii_lowercase().starts_with("ssh://") {
+        return Err("SSH file checkpoints cannot use a local project path".to_string());
+    }
+    Ok(())
+}
+
+fn capture_into(
     dir: &Path,
     project_root: &str,
     path: &str,
@@ -280,6 +287,7 @@ pub(crate) fn capture_into(
     if project_root.trim().is_empty() {
         return Err("Project root is required to capture file checkpoints".to_string());
     }
+    refuse_ssh_local_fallback(project_root)?;
 
     let _root = canonical_project_root(project_root)?;
     let absolute = resolve_workspace_path(project_root, path)?;
@@ -313,6 +321,60 @@ pub(crate) fn capture_into(
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileCheckpointLoadResult {
+    pub skipped: bool,
+    pub existed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+}
+
+fn capture_provided(
+    dir: &Path,
+    path: &str,
+    key: Option<&str>,
+    tool_call_id: Option<String>,
+    content: Option<&str>,
+    existed: bool,
+) -> Result<FileCheckpointCaptureResult, String> {
+    let stored_path = manifest_key(path, key);
+    let mut entries = read_manifest(dir)?;
+    if let Some(existing) = find_entry(&entries, &stored_path) {
+        return Ok(FileCheckpointCaptureResult {
+            captured: vec![existing.clone()],
+            skipped_oversize: Vec::new(),
+        });
+    }
+    let hash = path_hash(&stored_path);
+    if existed {
+        let bytes = content.unwrap_or("").as_bytes();
+        if bytes.len() as u64 > MAX_BASELINE_BYTES {
+            return Ok(FileCheckpointCaptureResult {
+                captured: Vec::new(),
+                skipped_oversize: vec![stored_path],
+            });
+        }
+        fs::write(content_path(dir, &hash), bytes).map_err(|error| error.to_string())?;
+    } else {
+        fs::write(content_path(dir, &hash), ABSENT_MARKER.as_bytes())
+            .map_err(|error| error.to_string())?;
+    }
+    let entry = FileCheckpointBaseline {
+        path: stored_path,
+        path_hash: hash,
+        existed,
+        captured_at: now_iso(),
+        tool_call_id,
+    };
+    entries.push(entry.clone());
+    write_manifest(dir, &entries)?;
+    Ok(FileCheckpointCaptureResult {
+        captured: vec![entry],
+        skipped_oversize: Vec::new(),
+    })
+}
+
 /// Capture a first-touch baseline for `path` under the given user message.
 /// Directories are expanded into one baseline per contained file (no gitignore).
 /// Idempotent: if a baseline already exists for a path, it is reused.
@@ -326,12 +388,64 @@ pub fn file_checkpoint_capture(
     path: String,
     key: Option<String>,
     tool_call_id: Option<String>,
+    content: Option<String>,
+    existed: Option<bool>,
 ) -> Result<FileCheckpointCaptureResult, String> {
     if user_message_id.trim().is_empty() {
         return Err("User message id is required to capture file checkpoints".to_string());
     }
     let dir = message_dir(&app, &project_slug, &chat_id, &user_message_id)?;
+    if content.is_some() || existed == Some(false) {
+        return capture_provided(
+            &dir,
+            &path,
+            key.as_deref(),
+            tool_call_id,
+            content.as_deref(),
+            existed.unwrap_or(false),
+        );
+    }
     capture_into(&dir, &project_root, &path, key.as_deref(), tool_call_id)
+}
+
+#[tauri::command]
+pub fn file_checkpoint_load(
+    app: AppHandle,
+    project_slug: String,
+    chat_id: String,
+    user_message_id: String,
+    path: String,
+    key: Option<String>,
+) -> Result<FileCheckpointLoadResult, String> {
+    let dir = message_dir(&app, &project_slug, &chat_id, &user_message_id)?;
+    let entries = read_manifest(&dir)?;
+    let lookup = manifest_key(&path, key.as_deref());
+    let Some(entry) = find_entry(&entries, &lookup) else {
+        return Ok(FileCheckpointLoadResult {
+            skipped: true,
+            existed: false,
+            content: None,
+        });
+    };
+    if !entry.existed {
+        return Ok(FileCheckpointLoadResult {
+            skipped: false,
+            existed: false,
+            content: None,
+        });
+    }
+    let bytes = fs::read(content_path(&dir, &entry.path_hash)).map_err(|error| error.to_string())?;
+    if bytes == ABSENT_MARKER.as_bytes() {
+        return Err(format!("Corrupt checkpoint content for {path}"));
+    }
+    let content = String::from_utf8(bytes).unwrap_or_else(|error| {
+        String::from_utf8_lossy(error.as_bytes()).into_owned()
+    });
+    Ok(FileCheckpointLoadResult {
+        skipped: false,
+        existed: true,
+        content: Some(content),
+    })
 }
 
 /// Restore explicit path baselines. Frontend supplies which (path, userMessageId) to use.
@@ -346,6 +460,7 @@ pub fn file_checkpoint_restore(
     if project_root.trim().is_empty() {
         return Err("Project root is required to restore file checkpoints".to_string());
     }
+    refuse_ssh_local_fallback(&project_root)?;
     let _root = canonical_project_root(&project_root)?;
 
     let mut restored = Vec::new();
@@ -491,6 +606,20 @@ mod tests {
             .iter()
             .find(|entry| entry.path == path)
             .unwrap_or_else(|| panic!("missing baseline {path}"))
+    }
+
+    #[test]
+    fn capture_into_refuses_ssh_local_fallback() {
+        let checkpoints = tempfile::TempDir::new().expect("checkpoints");
+        let err = capture_into(
+            checkpoints.path(),
+            "ssh://aidanhibbard@eva/home/aidanhibbard/proj",
+            "src/a.ts",
+            None,
+            None,
+        )
+        .expect_err("ssh capture");
+        assert!(err.contains("cannot use a local project path"));
     }
 
     #[test]

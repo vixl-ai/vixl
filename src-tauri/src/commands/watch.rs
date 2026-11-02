@@ -8,6 +8,7 @@ use tauri::async_runtime::JoinHandle;
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::paths::{resolve_project_vixl_dir, user_vixl_dir};
+use super::ssh::is_ssh_root;
 
 const PERSONAL_CONFIG_DIRS: [&str; 4] = ["agents", "rules", "skills", "plans"];
 const PERSONAL_ROOT_FILES: [&str; 4] = ["settings.json", "mcp.json", "AGENTS.md", "agents.md"];
@@ -308,9 +309,13 @@ fn same_watch_dir(personal_dir: &Path, project_dir: &Path) -> bool {
 #[tauri::command]
 pub fn watch_vixl_paths(app: AppHandle, project_root: Option<String>) -> Result<(), String> {
     let personal_dir = user_vixl_dir(&app)?;
-    let project_dir = project_root
-        .as_ref()
-        .map(|root| resolve_project_vixl_dir(root));
+    let project_dir = project_root.as_ref().and_then(|root| {
+        if is_ssh_root(root) {
+            None
+        } else {
+            Some(resolve_project_vixl_dir(root))
+        }
+    });
 
     let state = app.state::<WatchState>();
     let mut guard = state.inner.lock().map_err(|e| e.to_string())?;

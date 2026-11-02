@@ -430,6 +430,7 @@ declare module 'vue' {
     SourcesContent: typeof import('./components/ai-elements/sources/SourcesContent.vue')['default']
     SourcesTrigger: typeof import('./components/ai-elements/sources/SourcesTrigger.vue')['default']
     SpeechInput: typeof import('./components/ai-elements/speech-input/SpeechInput.vue')['default']
+    SshSecretsSection: typeof import('./components/settings/sections/SshSecretsSection.vue')['default']
     StackTrace: typeof import('./components/ai-elements/stack-trace/StackTrace.vue')['default']
     StackTraceActions: typeof import('./components/ai-elements/stack-trace/StackTraceActions.vue')['default']
     StackTraceContent: typeof import('./components/ai-elements/stack-trace/StackTraceContent.vue')['default']

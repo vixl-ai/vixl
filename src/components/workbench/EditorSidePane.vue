@@ -32,6 +32,7 @@ import {
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
 import type { FleetProject } from '@/types/fleet/fleet-project'
+import { isSshProjectRoot } from '@/utils/ssh-project-root'
 import type { WorkspaceSearchMember } from '@/types/workbench/search-member'
 
 export type EditorSidePaneMode = 'explorer' | 'search'
@@ -64,6 +65,8 @@ const emit = defineEmits<{
   'update:autoSave': [value: boolean]
   'update:formatOnSave': [value: boolean]
 }>()
+
+const isSshRoot = computed(() => isSshProjectRoot(props.projectRoot))
 
 const fileTreeRef = ref<{
   handleNewFile: (parentDirPath?: string) => void
@@ -171,7 +174,7 @@ defineExpose({
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="emit('reveal-in-finder')">
                     <FolderSearch class="mr-2 h-4 w-4" />
-                    Reveal in Finder
+                    {{ isSshRoot ? 'Copy remote path' : 'Reveal in Finder' }}
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="emit('copy-relative-path')">
                     <ClipboardCopy class="mr-2 h-4 w-4" />

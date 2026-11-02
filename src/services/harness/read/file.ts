@@ -1,7 +1,17 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { fsReadFile } from '@/services/vixl/vixl-tauri'
-import { withMultiRootPathHint, withProjectRoots } from '@/services/harness/tool-roots'
+import { gateToolPermission } from '@/services/harness/permission/gate'
+import { fsWriteCapability, isSensitivePath } from '@/services/harness/permission/policy'
+import toPermCtx from '@/services/harness/shared/to-perm-ctx'
+import {
+  permissionPath,
+  sensitiveCheckPaths,
+  withMultiRootPathHint,
+  withProjectRoots,
+} from '@/services/harness/tool-roots'
+import { wrapRemoteUntrustedFile } from '@/services/harness/ssh/wrap-guidance'
+import { isSshProjectRoot } from '@/utils/ssh-project-root'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const imageReadResult = (args: {
@@ -31,7 +41,24 @@ const readFile = (ctx: HarnessToolContext) =>
       limit: z.number().optional().describe('Max lines to return'),
       include_base64: z.boolean().optional().describe('Include base64 for images'),
     }),
-    execute: async ({ path, offset, limit, include_base64 }) => {
+    execute: async ({ path, offset, limit, include_base64 }, { toolCallId }) => {
+      const gatedPath = permissionPath(ctx.members, path)
+      const sensitive = isSensitivePath(sensitiveCheckPaths(ctx.members, [path])[0] ?? path)
+      if (isSshProjectRoot(ctx.projectRoot) && sensitive) {
+        const allowed = await gateToolPermission({
+          ctx: toPermCtx(ctx),
+          toolCallId,
+          name: 'read_file',
+          kind: 'fs',
+          action: 'fs.write',
+          capability: fsWriteCapability(gatedPath),
+          title: `Read ${gatedPath}`,
+          paths: sensitiveCheckPaths(ctx.members, [path]),
+        })
+        if (!allowed) {
+          return { rejected: true, error: 'Read not approved' }
+        }
+      }
       const result = await fsReadFile(
         withProjectRoots(
           {
@@ -40,13 +67,17 @@ const readFile = (ctx: HarnessToolContext) =>
             offset,
             limit,
             includeBase64: include_base64,
+            ...(isSshProjectRoot(ctx.projectRoot) && sensitive ? { allowSensitive: true } : {}),
           },
           ctx,
         ),
       )
 
       if (!result.isImage) {
-        return result
+        return {
+          ...result,
+          content: wrapRemoteUntrustedFile(ctx.projectRoot, path, result.content),
+        }
       }
 
       if (!ctx.stageImage) {
@@ -71,6 +102,7 @@ const readFile = (ctx: HarnessToolContext) =>
               projectRoot: ctx.projectRoot,
               path,
               includeBase64: true,
+              ...(isSshProjectRoot(ctx.projectRoot) && sensitive ? { allowSensitive: true } : {}),
             },
             ctx,
           ),

@@ -53,6 +53,7 @@ export const fsReadFile = (args: {
   offset?: number
   limit?: number
   includeBase64?: boolean
+  allowSensitive?: boolean
   projectRoots?: IpcProjectRoot[]
 }): Promise<{
   path: string
@@ -94,12 +95,14 @@ export const fsEditFile = (args: {
   projectRoot: string
   path: string
   replacements: FsEditReplacement[]
+  allowSensitive?: boolean
   projectRoots?: IpcProjectRoot[]
 }): Promise<FileDiffRecord> => call('fs_edit_file', args)
 
 export const fsApplyPatch = (args: {
   projectRoot: string
   patch: string
+  allowSensitive?: boolean
   projectRoots?: IpcProjectRoot[]
 }): Promise<unknown> => call('fs_apply_patch', args)
 

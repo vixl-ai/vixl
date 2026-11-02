@@ -2,7 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Folder, FolderOpen, FolderCog, PanelLeftClose, Plus, FileCode, Terminal } from '@lucide/vue'
+import { Folder, FolderOpen, FolderCog, PanelLeftClose, Plus, FileCode, Terminal, Unplug, Plug, Cable } from '@lucide/vue'
+import useProjectRowSsh from '@/composables/use-project-row-ssh'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
 import {
   Collapsible,
@@ -61,6 +62,17 @@ const manualOpen = ref<boolean | null>(null)
 const isGroup = computed(() => props.project.kind === 'group')
 const resolveRowWorkspace = () => resolveProjectRowWorkspace(props.project, fleet)
 const parentRootPath = computed(() => resolveRowWorkspace()?.projectRoot ?? null)
+const {
+  isSshProject,
+  sshStatusLine,
+  handleReconnect,
+  handleDisconnect,
+  handleForwardPort,
+} = useProjectRowSsh(
+  computed(() => props.project),
+  isGroup,
+  resolveRowWorkspace,
+)
 const worktrees = computed(() => props.project.worktrees ?? [])
 const timeline = computed(() =>
   buildSidebarProjectTimeline(
@@ -227,7 +239,15 @@ const handleOpenTerminal = async (): Promise<void> => {
                   class="pointer-events-none absolute inset-0 size-4 shrink-0 scale-90 -rotate-6 opacity-0 transition-all duration-150 group-data-[state=open]/collapsible:scale-100 group-data-[state=open]/collapsible:rotate-0 group-data-[state=open]/collapsible:opacity-100"
                 />
               </span>
-              <span class="min-w-0 flex-1 truncate">{{ project.displayName }}</span>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate">{{ project.displayName }}</span>
+                <span
+                  v-if="sshStatusLine"
+                  class="block truncate text-[11px] text-muted-foreground"
+                >
+                  {{ sshStatusLine }}
+                </span>
+              </span>
             </SidebarMenuButton>
           </CollapsibleTrigger>
         </ContextMenuTrigger>
@@ -244,6 +264,21 @@ const handleOpenTerminal = async (): Promise<void> => {
             <Terminal />
             Open Terminal
           </ContextMenuItem>
+          <template v-if="isSshProject">
+            <ContextMenuSeparator />
+            <ContextMenuItem @select="handleReconnect">
+              <Plug />
+              Reconnect
+            </ContextMenuItem>
+            <ContextMenuItem @select="handleDisconnect">
+              <Unplug />
+              Disconnect
+            </ContextMenuItem>
+            <ContextMenuItem @select="handleForwardPort">
+              <Cable />
+              Forward a port
+            </ContextMenuItem>
+          </template>
           <ContextMenuSeparator />
           <ContextMenuItem
             :disabled="removingProject"

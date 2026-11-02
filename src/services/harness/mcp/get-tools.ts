@@ -36,7 +36,7 @@ const catalogEntry = async (
   settings: VixlSettings,
   includeSchemas: boolean,
 ) => {
-  const fingerprint = mcpServerFingerprint(server.config)
+  const fingerprint = mcpServerFingerprint(server.config, server.scopeKey)
   const trusted = isMcpTrusted(
     settings,
     server.id,

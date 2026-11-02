@@ -9,8 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use super::walk::walk_builder;
 use crate::commands::fs::{
-    canonical_project_root, resolve_command_path, workspace_roots_from_args, WorkspaceRootArg,
+    canonical_project_root, resolve_command_path, uses_ssh_transport, workspace_roots_from_args,
+    WorkspaceRootArg,
 };
+use crate::commands::ssh::is_ssh_root;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,6 +70,10 @@ pub async fn workspace_grep(request: WorkspaceGrepRequest) -> Result<WorkspaceGr
         return Err("Search pattern is required".to_string());
     }
 
+    if uses_ssh_transport(&request.project_root, request.project_roots.as_deref()) {
+        return grep_with_ssh(request).await;
+    }
+
     let scopes = grep_scopes(&request)?;
 
     tokio::task::spawn_blocking(move || {
@@ -106,6 +112,83 @@ pub async fn workspace_grep(request: WorkspaceGrepRequest) -> Result<WorkspaceGr
     })
     .await
     .map_err(|error| format!("Grep search failed: {error}"))?
+}
+
+async fn grep_with_ssh(request: WorkspaceGrepRequest) -> Result<WorkspaceGrepResult, String> {
+    let max_results = request.max_results.unwrap_or(200) as usize;
+    let mut matches = Vec::new();
+    let mut truncated = false;
+    if let Some(args) = request
+        .project_roots
+        .as_deref()
+        .filter(|roots| !roots.is_empty())
+    {
+        for arg in args {
+            let remaining = max_results.saturating_sub(matches.len());
+            if remaining == 0 {
+                truncated = true;
+                break;
+            }
+            if arg.path.trim().starts_with("ssh://") {
+                let ssh = crate::commands::fs::parse_ssh_project_root(&arg.path)?;
+                let partial = super::ssh::grep_ssh(
+                    &ssh,
+                    &request,
+                    request.path.as_deref().unwrap_or(""),
+                    Some(arg.slug.trim()),
+                    remaining,
+                )
+                .await?;
+                matches.extend(partial.matches);
+                truncated = truncated || partial.truncated;
+            } else if !arg.path.trim().is_empty() {
+                let root = canonical_project_root(&arg.path)?;
+                let search_path = root.clone();
+                let prefix = Some(arg.slug.trim().to_string());
+                let mut scoped = request.clone();
+                scoped.max_results = Some(remaining as u32);
+                let root_clone = root.clone();
+                let partial = tokio::task::spawn_blocking(move || {
+                    collect_grep_matches(&root_clone, &search_path, &scoped)
+                })
+                .await
+                .map_err(|error| format!("Grep search failed: {error}"))??;
+                for mut item in partial.matches {
+                    if let Some(prefix) = &prefix {
+                        item.path = if item.path.is_empty() {
+                            prefix.clone()
+                        } else {
+                            format!("{prefix}/{}", item.path)
+                        };
+                    }
+                    matches.push(item);
+                    if matches.len() >= max_results {
+                        truncated = true;
+                        break;
+                    }
+                }
+                truncated = truncated || partial.truncated;
+            }
+            if truncated {
+                break;
+            }
+        }
+        return Ok(WorkspaceGrepResult { matches, truncated });
+    }
+
+    if is_ssh_root(&request.project_root) {
+        let ssh = crate::commands::fs::parse_ssh_project_root(&request.project_root)?;
+        return super::ssh::grep_ssh(
+            &ssh,
+            &request,
+            request.path.as_deref().unwrap_or(""),
+            None,
+            max_results,
+        )
+        .await;
+    }
+
+    Err("SSH search root is required".to_string())
 }
 
 struct GrepScope {

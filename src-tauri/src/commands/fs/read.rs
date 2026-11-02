@@ -4,6 +4,7 @@ use std::path::Path;
 use super::path::{
     entry_kind, modified_ms, resolve_command_path, ResolvedWorkspacePath, WorkspaceRootArg,
 };
+use super::remote::{self, FsTarget};
 use super::types::{FsDirEntry, FsReadFileResult, FsStatResult, FsTreeNode};
 
 fn image_mime_type(path: &Path) -> Option<&'static str> {
@@ -35,7 +36,26 @@ pub fn fs_read_file(
     limit: Option<u32>,
     include_base64: Option<bool>,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<FsReadFileResult, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        match remote::resolve_target(&project_root, project_roots.as_deref(), &path)? {
+            FsTarget::Ssh(_) => {
+                return remote::read_file(
+                    &project_root,
+                    project_roots.as_deref(),
+                    &path,
+                    offset,
+                    limit,
+                    include_base64,
+                    allow_sensitive,
+                );
+            }
+            FsTarget::Local(resolved) => {
+                return read_resolved(resolved, offset, limit, include_base64);
+            }
+        }
+    }
     let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
     let absolute = resolved.path.clone();
     let rel = resolved.reported_path();
@@ -111,12 +131,73 @@ pub fn fs_read_file(
     })
 }
 
+fn relative_or_dot(resolved: &ResolvedWorkspacePath) -> String {
+    let rel = resolved.member_relative_path();
+    if rel.is_empty() {
+        ".".to_string()
+    } else {
+        rel
+    }
+}
+
+fn read_resolved(
+    resolved: ResolvedWorkspacePath,
+    offset: Option<u32>,
+    limit: Option<u32>,
+    include_base64: Option<bool>,
+) -> Result<FsReadFileResult, String> {
+    fs_read_file(
+        resolved.root.to_string_lossy().into_owned(),
+        relative_or_dot(&resolved),
+        offset,
+        limit,
+        include_base64,
+        None,
+        None,
+    )
+    .map(|mut result| {
+        result.path = resolved.reported_path();
+        result
+    })
+}
+
 #[tauri::command]
 pub fn fs_list_dir(
     project_root: String,
     path: String,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<Vec<FsDirEntry>, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        match remote::resolve_target(&project_root, project_roots.as_deref(), &path)? {
+            FsTarget::Ssh(_) => {
+                return remote::list_dir(
+                    &project_root,
+                    project_roots.as_deref(),
+                    &path,
+                    allow_sensitive,
+                );
+            }
+            FsTarget::Local(resolved) => {
+                let mut entries = fs_list_dir(
+                    resolved.root.to_string_lossy().into_owned(),
+                    relative_or_dot(&resolved),
+                    None,
+                    None,
+                )?;
+                if let Some(slug) = &resolved.slug {
+                    for entry in &mut entries {
+                        entry.path = if entry.path.is_empty() {
+                            slug.clone()
+                        } else {
+                            format!("{slug}/{}", entry.path)
+                        };
+                    }
+                }
+                return Ok(entries);
+            }
+        }
+    }
     let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
     let absolute = resolved.path.clone();
     if !absolute.is_dir() {
@@ -189,7 +270,30 @@ pub fn fs_list_dir_tree(
     path: String,
     max_depth: Option<u32>,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<FsTreeNode, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        match remote::resolve_target(&project_root, project_roots.as_deref(), &path)? {
+            FsTarget::Ssh(_) => {
+                return remote::list_dir_tree(
+                    &project_root,
+                    project_roots.as_deref(),
+                    &path,
+                    max_depth,
+                    allow_sensitive,
+                );
+            }
+            FsTarget::Local(resolved) => {
+                return fs_list_dir_tree(
+                    resolved.root.to_string_lossy().into_owned(),
+                    relative_or_dot(&resolved),
+                    max_depth,
+                    None,
+                    None,
+                );
+            }
+        }
+    }
     let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
     let absolute = resolved.path.clone();
     if !absolute.is_dir() {
@@ -204,7 +308,30 @@ pub fn fs_stat(
     project_root: String,
     path: String,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<FsStatResult, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        match remote::resolve_target(&project_root, project_roots.as_deref(), &path)? {
+            FsTarget::Ssh(_) => {
+                return remote::stat(
+                    &project_root,
+                    project_roots.as_deref(),
+                    &path,
+                    allow_sensitive,
+                );
+            }
+            FsTarget::Local(resolved) => {
+                let mut result = fs_stat(
+                    resolved.root.to_string_lossy().into_owned(),
+                    relative_or_dot(&resolved),
+                    None,
+                    None,
+                )?;
+                result.path = resolved.reported_path();
+                return Ok(result);
+            }
+        }
+    }
     let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
     let absolute = resolved.path.clone();
     if !absolute.exists() {

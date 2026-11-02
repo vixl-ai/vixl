@@ -42,6 +42,7 @@ import type { QueuedChatMessage } from '@/types/chat/queued-chat-message'
 import ModelsOptionsModelOptionsRow from '@/components/models/options/ModelOptionsRow.vue'
 import { CHAT_MODES, getChatModeMeta } from '@/constants/chat-modes'
 import useFleetRegistry from '@/composables/use-fleet-registry'
+import useSshSession from '@/composables/use-ssh-session'
 import useGitBranches from '@/composables/use-git-branches'
 import useChatStore from '@/composables/use-chat-store'
 import useChatContextBudgetSync from '@/composables/use-chat-context-budget-sync'
@@ -116,7 +117,9 @@ const emit = defineEmits<{
 }>()
 
 const fleet = useFleetRegistry()
+const ssh = useSshSession()
 const config = useVixlConfig()
+const secretPromptOpen = computed(() => ssh.secretEvent.value !== null)
 const git = useGitBranches()
 const chatStore = useChatStore()
 const contextBudgetSync = useChatContextBudgetSync()
@@ -497,6 +500,10 @@ const enrichMentionsBeforeSend = async (
 let submitErrorAlreadyToasted = false
 
 const handleSubmit = async (payload: PromptInputMessage): Promise<void> => {
+  if (secretPromptOpen.value) {
+    ssh.focusSecretDialog()
+    return
+  }
   const text = payload.text.trim()
   const files: FileUIPart[] = payload.files ?? []
   if ((!text && files.length === 0) || props.disabled) {
@@ -707,6 +714,22 @@ watch(
     </DropdownMenu>
 
     <div
+      v-if="secretPromptOpen"
+      class="mb-2 flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/40 px-3 py-1.5 text-sm text-muted-foreground"
+    >
+      <span>Don't paste a password here. Use the password prompt.</span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        class="h-7 shrink-0 px-2"
+        @click="ssh.focusSecretDialog"
+      >
+        Use the password prompt
+      </Button>
+    </div>
+
+    <div
       v-if="isEditing"
       class="mb-2 flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/40 px-3 py-1.5 text-sm text-muted-foreground"
     >
@@ -795,7 +818,7 @@ watch(
             <PromptInputSubmit
               v-if="showSubmit"
               class="shrink-0"
-              :disabled="disabled"
+              :disabled="disabled || secretPromptOpen"
             />
             <Tooltip v-if="showStop">
               <TooltipTrigger as-child>

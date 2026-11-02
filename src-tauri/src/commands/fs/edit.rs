@@ -1,7 +1,6 @@
 use super::diff::build_file_diff;
-use super::path::{
-    reject_resolved_sensitive_path, resolve_command_path, WorkspaceRootArg,
-};
+use super::path::{reject_resolved_sensitive_path, resolve_command_path, WorkspaceRootArg};
+use super::remote::{self, FsTarget};
 use super::types::{FileDiff, FsEditReplacement, FsStagePreviewRequest};
 use std::fs;
 
@@ -36,13 +35,13 @@ pub(crate) fn apply_replacements(
 }
 
 #[derive(Debug)]
-enum PatchOperation {
+pub(crate) enum PatchOperation {
     Add { path: String, content: String },
     Update { path: String, content: String },
     Delete { path: String },
 }
 
-fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, String> {
+pub(crate) fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, String> {
     let trimmed = patch.trim();
     if trimmed.is_empty() {
         return Err("Patch is empty".to_string());
@@ -149,7 +148,10 @@ fn seek_matching_line<'a>(
     Ok(())
 }
 
-fn apply_update_patch<'a>(existing: &'a str, patched: &'a str) -> Result<String, String> {
+pub(crate) fn apply_update_patch<'a>(
+    existing: &'a str,
+    patched: &'a str,
+) -> Result<String, String> {
     let mut result: Vec<&'a str> = Vec::new();
     let mut old_index = 0usize;
     let old_lines: Vec<&str> = existing.lines().collect();
@@ -309,9 +311,34 @@ pub fn fs_edit_file(
     path: String,
     replacements: Vec<FsEditReplacement>,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<FileDiff, String> {
     if replacements.is_empty() {
         return Err("At least one replacement is required".to_string());
+    }
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        match remote::resolve_target(&project_root, project_roots.as_deref(), &path)? {
+            FsTarget::Ssh(_) => {
+                return remote::edit_file(
+                    &project_root,
+                    project_roots.as_deref(),
+                    &path,
+                    replacements,
+                    allow_sensitive,
+                );
+            }
+            FsTarget::Local(resolved) => {
+                let rel = resolved.member_relative_path();
+                let rel = if rel.is_empty() { ".".to_string() } else { rel };
+                return fs_edit_file(
+                    resolved.root.to_string_lossy().into_owned(),
+                    rel,
+                    replacements,
+                    None,
+                    None,
+                );
+            }
+        }
     }
     let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
     reject_resolved_sensitive_path(&resolved)?;
@@ -331,7 +358,16 @@ pub fn fs_apply_patch(
     project_root: String,
     patch: String,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<Vec<FileDiff>, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        return remote::apply_patch(
+            &project_root,
+            project_roots.as_deref(),
+            &patch,
+            allow_sensitive,
+        );
+    }
     apply_patch_operations(&project_root, project_roots.as_deref(), &patch)
 }
 #[tauri::command]
@@ -339,7 +375,16 @@ pub fn fs_stage_preview(
     project_root: String,
     request: FsStagePreviewRequest,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<Vec<FileDiff>, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        return remote::stage_preview(
+            &project_root,
+            project_roots.as_deref(),
+            request,
+            allow_sensitive,
+        );
+    }
     let roots = project_roots.as_deref();
     match request {
         FsStagePreviewRequest::Write { path, content } => {

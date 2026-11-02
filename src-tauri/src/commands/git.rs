@@ -2,8 +2,15 @@ use std::process::Command;
 
 use serde::Serialize;
 
-use super::fs::{relative_path, resolve_command_path, WorkspaceRootArg};
+use super::fs::{
+    relative_path, resolve_command_path, resolve_target, uses_ssh_transport, FsTarget,
+    WorkspaceRootArg,
+};
 use super::git_binary::git_binary;
+use super::ssh::{
+    block_on, exec_on, is_ssh_root, join_remote_argv, looks_like_missing_program, missing_program,
+    parse_root, ssh_uri_for,
+};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,7 +19,14 @@ pub struct GitRepoInfo {
     pub current_branch: Option<String>,
 }
 
-fn run_git(root_path: &str, args: &[&str]) -> Result<String, String> {
+pub(crate) fn run_git(root_path: &str, args: &[&str]) -> Result<String, String> {
+    if is_ssh_root(root_path) {
+        return block_on(run_git_ssh(root_path, args));
+    }
+    run_git_local(root_path, args)
+}
+
+fn run_git_local(root_path: &str, args: &[&str]) -> Result<String, String> {
     let git = git_binary()?;
     let output = Command::new(&git)
         .arg("-C")
@@ -22,7 +36,6 @@ fn run_git(root_path: &str, args: &[&str]) -> Result<String, String> {
         .map_err(|error| format!("Failed to run git: {error}"))?;
 
     if output.status.success() {
-        // trim_end only: porcelain status lines can start with a space (e.g. " M path").
         return Ok(String::from_utf8_lossy(&output.stdout)
             .trim_end()
             .to_string());
@@ -40,10 +53,40 @@ fn run_git(root_path: &str, args: &[&str]) -> Result<String, String> {
     }
 }
 
-fn is_git_repo(root_path: &str) -> bool {
-    run_git(root_path, &["rev-parse", "--is-inside-work-tree"])
-        .map(|value| value == "true")
-        .unwrap_or(false)
+async fn run_git_ssh(root_path: &str, args: &[&str]) -> Result<String, String> {
+    let ssh = parse_root(root_path)?;
+    let mut parts = vec!["git", "-C", ssh.remote_path.as_str()];
+    parts.extend(args.iter().copied());
+    let command = join_remote_argv(&parts);
+    let result = exec_on(&ssh, command).await?;
+    if looks_like_missing_program("git", &result.stdout, &result.stderr, result.exit_code) {
+        return Err(missing_program("git", &ssh.hostname));
+    }
+    if result.exit_code == 0 {
+        return Ok(result.stdout.trim_end().to_string());
+    }
+    let stderr = result.stderr.trim().to_string();
+    if stderr.is_empty() {
+        Err(format!(
+            "git {} failed with status {}",
+            args.join(" "),
+            result.exit_code
+        ))
+    } else {
+        Err(stderr)
+    }
+}
+
+fn is_fatal_git_transport(err: &str) -> bool {
+    err.contains("is not installed on") || err.contains("is unreachable.")
+}
+
+fn git_inside_work_tree(root_path: &str) -> Result<bool, String> {
+    match run_git(root_path, &["rev-parse", "--is-inside-work-tree"]) {
+        Ok(value) => Ok(value == "true"),
+        Err(err) if is_fatal_git_transport(&err) => Err(err),
+        Err(_) => Ok(false),
+    }
 }
 
 fn git_repo_cwd(
@@ -51,14 +94,41 @@ fn git_repo_cwd(
     project_roots: Option<&[WorkspaceRootArg]>,
     user_path: Option<&str>,
 ) -> Result<(String, Option<String>), String> {
+    if uses_ssh_transport(project_root, project_roots) {
+        return git_repo_cwd_ssh(project_root, project_roots, user_path);
+    }
     match user_path {
         Some(path) if project_roots.is_some_and(|roots| !roots.is_empty()) => {
             let resolved = resolve_command_path(project_root, project_roots, path)?;
             let rel = relative_path(&resolved.root, &resolved.path);
-            Ok((
-                resolved.root.to_string_lossy().to_string(),
-                Some(rel),
-            ))
+            Ok((resolved.root.to_string_lossy().to_string(), Some(rel)))
+        }
+        Some(path) => Ok((project_root.to_string(), Some(path.to_string()))),
+        None => Ok((project_root.to_string(), None)),
+    }
+}
+
+fn git_repo_cwd_ssh(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+    user_path: Option<&str>,
+) -> Result<(String, Option<String>), String> {
+    match user_path {
+        Some(path) if project_roots.is_some_and(|roots| !roots.is_empty()) => {
+            match resolve_target(project_root, project_roots, path)? {
+                FsTarget::Ssh(resolved) => Ok((
+                    ssh_uri_for(&resolved.ssh, &resolved.ssh.remote_path),
+                    if resolved.relative.is_empty() {
+                        None
+                    } else {
+                        Some(resolved.relative)
+                    },
+                )),
+                FsTarget::Local(resolved) => Ok((
+                    resolved.root.to_string_lossy().to_string(),
+                    Some(relative_path(&resolved.root, &resolved.path)),
+                )),
+            }
         }
         Some(path) => Ok((project_root.to_string(), Some(path.to_string()))),
         None => Ok((project_root.to_string(), None)),
@@ -71,7 +141,7 @@ pub fn git_repo_info(
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<GitRepoInfo, String> {
     let _ = project_roots;
-    if !is_git_repo(&root_path) {
+    if !git_inside_work_tree(&root_path)? {
         return Ok(GitRepoInfo {
             is_repo: false,
             current_branch: None,
@@ -94,7 +164,7 @@ pub fn git_list_branches(
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<Vec<String>, String> {
     let _ = project_roots;
-    if !is_git_repo(&root_path) {
+    if !git_inside_work_tree(&root_path)? {
         return Ok(vec![]);
     }
 
@@ -124,7 +194,7 @@ pub fn git_checkout_branch(
         return Err("Branch name is required".to_string());
     }
 
-    if !is_git_repo(&root_path) {
+    if !git_inside_work_tree(&root_path)? {
         return Err("Not a git repository".to_string());
     }
 
@@ -145,7 +215,7 @@ pub fn git_branch_create(
         return Err("Branch name is required".to_string());
     }
 
-    if !is_git_repo(&project_root) {
+    if !git_inside_work_tree(&project_root)? {
         return Err("Not a git repository".to_string());
     }
 
@@ -203,7 +273,7 @@ pub async fn git_commit(
     }
 
     let git_root = repo.unwrap_or(project_root);
-    if !is_git_repo(&git_root) {
+    if !git_inside_work_tree(&git_root)? {
         return Err("Not a git repository".to_string());
     }
 
@@ -273,6 +343,9 @@ pub struct GitLogResult {
 }
 
 async fn run_git_async(root_path: &str, args: &[&str]) -> Result<String, String> {
+    if is_ssh_root(root_path) {
+        return run_git_ssh(root_path, args).await;
+    }
     let git = git_binary()?;
     let output = AsyncCommand::new(&git)
         .arg("-C")
@@ -283,7 +356,6 @@ async fn run_git_async(root_path: &str, args: &[&str]) -> Result<String, String>
         .map_err(|error| format!("Failed to run git: {error}"))?;
 
     if output.status.success() {
-        // trim_end only: porcelain status lines can start with a space (e.g. " M path").
         return Ok(String::from_utf8_lossy(&output.stdout)
             .trim_end()
             .to_string());
@@ -360,7 +432,7 @@ pub async fn git_status(
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<GitStatusResult, String> {
     let _ = project_roots;
-    if !is_git_repo(&project_root) {
+    if !git_inside_work_tree(&project_root)? {
         return Err("Not a git repository".to_string());
     }
 
@@ -418,7 +490,7 @@ pub async fn git_diff(
 ) -> Result<GitDiffResult, String> {
     let (git_root, rel_path) =
         git_repo_cwd(&project_root, project_roots.as_deref(), path.as_deref())?;
-    if !is_git_repo(&git_root) {
+    if !git_inside_work_tree(&git_root)? {
         return Err("Not a git repository".to_string());
     }
 
@@ -435,7 +507,7 @@ pub async fn git_show_file(
 ) -> Result<GitShowFileResult, String> {
     let (git_root, rel_path) =
         git_repo_cwd(&project_root, project_roots.as_deref(), Some(path.trim()))?;
-    if !is_git_repo(&git_root) {
+    if !git_inside_work_tree(&git_root)? {
         return Err("Not a git repository".to_string());
     }
 
@@ -447,8 +519,10 @@ pub async fn git_show_file(
         return Err("Invalid path".to_string());
     }
 
-    // Do not trim file content: trailing newlines matter for accurate diffs.
     let spec = format!("HEAD:{trimmed}");
+    if is_ssh_root(&git_root) {
+        return git_show_file_ssh(&git_root, &spec).await;
+    }
     let git = git_binary()?;
     let output = AsyncCommand::new(&git)
         .arg("-C")
@@ -465,11 +539,34 @@ pub async fn git_show_file(
         });
     }
 
-    let stderr = String::from_utf8_lossy(&output.stderr).to_lowercase();
-    if stderr.contains("does not exist")
-        || stderr.contains("exists on disk")
-        || stderr.contains("bad revision")
-        || stderr.contains("invalid object name")
+    git_show_from_failure(
+        &String::from_utf8_lossy(&output.stderr),
+        output.status.code(),
+    )
+}
+
+async fn git_show_file_ssh(git_root: &str, spec: &str) -> Result<GitShowFileResult, String> {
+    let ssh = parse_root(git_root)?;
+    let command = join_remote_argv(&["git", "-C", ssh.remote_path.as_str(), "show", spec]);
+    let result = exec_on(&ssh, command).await?;
+    if looks_like_missing_program("git", &result.stdout, &result.stderr, result.exit_code) {
+        return Err(missing_program("git", &ssh.hostname));
+    }
+    if result.exit_code == 0 {
+        return Ok(GitShowFileResult {
+            content: result.stdout,
+            exists: true,
+        });
+    }
+    git_show_from_failure(&result.stderr, Some(result.exit_code))
+}
+
+fn git_show_from_failure(stderr: &str, status: Option<i32>) -> Result<GitShowFileResult, String> {
+    let lower = stderr.to_lowercase();
+    if lower.contains("does not exist")
+        || lower.contains("exists on disk")
+        || lower.contains("bad revision")
+        || lower.contains("invalid object name")
     {
         return Ok(GitShowFileResult {
             content: String::new(),
@@ -477,9 +574,14 @@ pub async fn git_show_file(
         });
     }
 
-    let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let message = stderr.trim().to_string();
     if message.is_empty() {
-        Err(format!("git show failed with status {}", output.status))
+        Err(format!(
+            "git show failed with status {}",
+            status
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        ))
     } else {
         Err(message)
     }
@@ -492,7 +594,7 @@ pub async fn git_log(
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<GitLogResult, String> {
     let _ = project_roots;
-    if !is_git_repo(&project_root) {
+    if !git_inside_work_tree(&project_root)? {
         return Err("Not a git repository".to_string());
     }
 

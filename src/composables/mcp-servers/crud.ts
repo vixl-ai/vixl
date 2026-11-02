@@ -103,7 +103,7 @@ export const upsertServer = async (
     : scoped.servers[serverId]
   if (
     existing &&
-    mcpServerFingerprint(existing) !== mcpServerFingerprint(serverConfig)
+    mcpServerFingerprint(existing, scopeKey) !== mcpServerFingerprint(serverConfig, scopeKey)
   ) {
     for (const key of mcpKnownSecretKeys(
       previousId && previousId !== serverId ? previousId : serverId,

@@ -427,4 +427,25 @@ describe('bindFileTreeWorkspaceSync', () => {
     expect(firstChanged).toHaveBeenCalled()
     expect(secondChanged).toHaveBeenCalled()
   })
+
+  it('sets watchError on inotify ENOSPC and does not poll', async () => {
+    watchWorkspace.mockRejectedValue(new Error('inotify ENOSPC on eva.local.'))
+    const watchError = ref<string | null>(null)
+
+    await mountSync({
+      isHome: () => false,
+      tree: ref(sampleTree()),
+      expandedPaths: ref(new Set(['.'])),
+      selectedPath: ref(''),
+      renamingPath: ref(null),
+      deleteTarget: ref(null),
+      projectRoot: computed(() => 'ssh://aidanhibbard@eva.local/home/aidanhibbard/proj'),
+      refreshGit: vi.fn<() => Promise<void>>(async () => undefined),
+      onTreeChanged: vi.fn<() => void>(),
+      watchError,
+    })
+
+    expect(watchError.value).toBe('inotify ENOSPC on eva.local.')
+    expect(watchWorkspace).toHaveBeenCalledTimes(1)
+  })
 })

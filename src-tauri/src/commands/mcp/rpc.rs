@@ -35,15 +35,12 @@ pub(crate) async fn json_rpc(
     let line = format!("{}\n", request);
     {
         let mut guard = process.lock().await;
-        if let Some(stdin) = guard.child.stdin.as_mut() {
-            stdin
-                .write_all(line.as_bytes())
-                .await
-                .map_err(|e| e.to_string())?;
-            stdin.flush().await.map_err(|e| e.to_string())?;
-        } else {
-            return Err("MCP process stdin unavailable".to_string());
-        }
+        guard
+            .stdin
+            .write_all(line.as_bytes())
+            .await
+            .map_err(|e| e.to_string())?;
+        guard.stdin.flush().await.map_err(|e| e.to_string())?;
     }
 
     match tokio::time::timeout(MCP_REQUEST_TIMEOUT, rx).await {
@@ -72,16 +69,13 @@ pub(crate) async fn json_rpc_notify(
     });
     let line = format!("{}\n", request);
     let mut guard = process.lock().await;
-    if let Some(stdin) = guard.child.stdin.as_mut() {
-        stdin
-            .write_all(line.as_bytes())
-            .await
-            .map_err(|e| e.to_string())?;
-        stdin.flush().await.map_err(|e| e.to_string())?;
-        Ok(())
-    } else {
-        Err("MCP process stdin unavailable".to_string())
-    }
+    guard
+        .stdin
+        .write_all(line.as_bytes())
+        .await
+        .map_err(|e| e.to_string())?;
+    guard.stdin.flush().await.map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn response_id_as_u64(value: &serde_json::Value) -> Option<u64> {
@@ -107,7 +101,7 @@ pub(crate) fn spawn_reader(
     tokio::spawn(async move {
         let stdout = {
             let mut guard = process.lock().await;
-            guard.child.stdout.take()
+            guard.child.take_stdout()
         };
 
         let Some(stdout) = stdout else {

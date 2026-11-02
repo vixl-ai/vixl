@@ -8,8 +8,9 @@ use tokio::process::Command;
 use super::env::codegraph_store_env_vars;
 use super::prepare::prepare_codegraph_store;
 use super::safety_net::safety_net_after_cli;
-use crate::commands::fs::canonical_project_root;
+use crate::commands::fs::{canonical_project_root, parse_ssh_project_root};
 use crate::commands::mcp::{apply_resolved_path_env, resolve_command};
+use crate::commands::ssh::{indexer_cannot_run, is_ssh_root};
 
 const CODEGRAPH_NPM_PACKAGE: &str = "@colbymchenry/codegraph";
 
@@ -40,6 +41,10 @@ pub fn validate_absolute_root(project_root: &str) -> Result<PathBuf, String> {
     if trimmed.contains('\0') {
         return Err("project_root must not contain NUL bytes".to_string());
     }
+    if is_ssh_root(trimmed) {
+        let _ = parse_ssh_project_root(trimmed)?;
+        return Ok(PathBuf::from(trimmed));
+    }
     let path = Path::new(trimmed);
     if !path.is_absolute() {
         return Err("project_root must be an absolute path".to_string());
@@ -56,6 +61,10 @@ pub async fn codegraph_cli(
     action: String,
 ) -> Result<CodegraphCliResult, String> {
     let cli_action = validate_action(&action)?;
+    if is_ssh_root(&project_root) {
+        let ssh = parse_ssh_project_root(&project_root)?;
+        return Err(indexer_cannot_run(&ssh.hostname));
+    }
     let root = validate_absolute_root(&project_root)?;
     let root_str = root.to_string_lossy().to_string();
     let prepared = prepare_codegraph_store(&app, &root)?;

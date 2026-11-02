@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
+import useSshSession from '@/composables/use-ssh-session'
 import { openFolderPicker, registryAddProject } from '@/services/vixl/vixl-tauri'
 
 const folderBasename = (rootPath: string): string => {
@@ -48,8 +49,14 @@ export default () => {
     }
   }
 
+  const addSshProject = async (): Promise<void> => {
+    const ssh = useSshSession()
+    await ssh.openAddSsh()
+  }
+
   return {
     addingProject,
     addProjectFromPicker,
+    addSshProject,
   }
 }

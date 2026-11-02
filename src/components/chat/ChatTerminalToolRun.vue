@@ -159,8 +159,14 @@ const handleShowTerminal = (): void => {
             :tooltip="phaseStatus(lastPhase, lastPhaseIndex).tooltip"
             :icon-class="`size-3.5 ${phaseStatus(lastPhase, lastPhaseIndex).iconClass}`"
           />
+          <span
+            v-if="view.runsAt"
+            class="shrink-0 text-xs text-muted-foreground"
+          >
+            {{ view.runsAt }}
+          </span>
           <ChatTipIcon
-            v-if="lastPhase.badge === 'sandboxed'"
+            v-else-if="lastPhase.badge === 'sandboxed'"
             :icon="ShieldIcon"
             tooltip="Sandboxed"
             icon-class="size-3.5 text-sky-400"

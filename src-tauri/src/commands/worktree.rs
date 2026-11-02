@@ -10,6 +10,7 @@ use tauri::AppHandle;
 use super::git_binary::git_binary;
 use super::paths::user_vixl_dir;
 use super::registry::{fleet_projects, roots_match, slugify_or_fallback, FleetProject};
+use super::ssh::{is_ssh_root, parse_root, ssh_uri_for};
 
 #[path = "worktree_copy_plans.rs"]
 mod worktree_copy_plans;
@@ -46,6 +47,9 @@ pub struct WorktreeParentMatch {
 }
 
 fn run_git(root_path: &str, args: &[&str]) -> Result<String, String> {
+    if is_ssh_root(root_path) {
+        return super::git::run_git(root_path, args);
+    }
     let git = git_binary()?;
     let output = Command::new(&git)
         .env_remove("GIT_DIR")
@@ -350,6 +354,10 @@ pub fn git_worktree_add_in_dir(
         return Err(format!("Branch {branch} already exists"));
     }
 
+    if is_ssh_root(root_path) {
+        return git_worktree_add_on_ssh(root_path, &name, &base, parent_slug);
+    }
+
     let parent_slug = parent_dir_slug(parent_slug);
     let worktrees_root = user_vixl_dir.join(WORKTREES_DIR);
     fs::create_dir_all(worktrees_root.join(&parent_slug)).map_err(|error| error.to_string())?;
@@ -381,6 +389,39 @@ pub fn git_worktree_add_in_dir(
         .to_string_lossy()
         .to_string();
     Ok(GitWorktreeAddResult { path, branch, name })
+}
+
+fn git_worktree_add_on_ssh(
+    root_path: &str,
+    name: &str,
+    base: &str,
+    parent_slug: &str,
+) -> Result<GitWorktreeAddResult, String> {
+    let ssh = parse_root(root_path)?;
+    let parent_slug = parent_dir_slug(parent_slug);
+    let branch = format!("vixl/{name}");
+    if branch_exists(root_path, &branch) {
+        return Err(format!("Branch {branch} already exists"));
+    }
+    let remote_parent = match ssh.remote_path.rsplit_once('/') {
+        Some(("", _)) => "/".to_string(),
+        Some((parent, _)) => parent.to_string(),
+        None => "/".to_string(),
+    };
+    let target = if remote_parent == "/" {
+        format!("/{name}")
+    } else {
+        format!("{remote_parent}/{parent_slug}-{name}")
+    };
+    run_git(
+        root_path,
+        &["worktree", "add", "-b", &branch, &target, base],
+    )?;
+    Ok(GitWorktreeAddResult {
+        path: ssh_uri_for(&ssh, &target),
+        branch,
+        name: name.to_string(),
+    })
 }
 
 pub fn git_worktree_list(root_path: String) -> Result<Vec<GitWorktreeEntry>, String> {

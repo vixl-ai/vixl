@@ -20,7 +20,13 @@ use super::progress::{
 use super::instance::lsp_instance_key;
 use super::resolve::{resolve_lsp_command, LspServerEntry};
 use super::rpc::{
-    json_rpc_request, send_notification, spawn_keepalive, LspProcess, ManagedLspServer, LSP_SERVERS,
+    json_rpc_request, send_notification, spawn_keepalive, LspChild, LspProcess, ManagedLspServer,
+    LSP_SERVERS,
+};
+use crate::commands::fs::parse_ssh_project_root;
+use crate::commands::ssh::{
+    is_ssh_root, key_for, login_command, map_unreachable, open_exec, posix_quote,
+    probe_remote_program, take_channel_stdio,
 };
 use super::state::{transition, transition_with, LspActivity, LspPhase, LspStatePatch};
 use super::typescript::{build_initialization_options, inject_vue_tsdk_arg};
@@ -42,6 +48,18 @@ pub(crate) async fn start_server(
 ) -> Result<StartOutcome, String> {
     let instance_key = lsp_instance_key(&server_id, &workspace_root);
     let trusted = workspace_is_trusted(&app, Some(workspace_root.as_str()));
+    if is_ssh_root(&workspace_root) {
+        return start_remote_server(
+            server_id,
+            entry,
+            workspace_root,
+            app,
+            classic_typescript,
+            generation,
+            trusted,
+        )
+        .await;
+    }
     let mut resolved = resolve_lsp_command(
         &app,
         &server_id,
@@ -97,7 +115,7 @@ pub(crate) async fn start_server(
     }
 
     let process = Arc::new(Mutex::new(LspProcess {
-        child,
+        child: LspChild::Local(child),
         stdin,
         workspace_root: workspace_root.clone(),
         open_documents: HashMap::new(),
@@ -239,6 +257,200 @@ pub(crate) async fn start_server(
     let published = transition(&app, &instance_key, generation, LspPhase::Running, patch).await;
     if published.is_none() {
         log::info!("retiring {server_id} after a dropped running publish");
+        super::retire_server_process(&instance_key).await;
+        return Ok(StartOutcome::Superseded);
+    }
+    let latest = current_running_activity(&process).await;
+    if latest != activity {
+        super::commit_running_activity(&app, &instance_key, generation, &process).await;
+    }
+    if server_awaits_project_load(&server_id) {
+        let project_loading = {
+            let guard = process.lock().await;
+            Arc::clone(&guard.project_loading)
+        };
+        if project_loading.load(Ordering::SeqCst) {
+            spawn_project_load_fuse(app.clone(), instance_key.clone(), generation, project_loading);
+        }
+    }
+    Ok(StartOutcome::Started)
+}
+
+async fn start_remote_server(
+    server_id: String,
+    entry: LspServerEntry,
+    workspace_root: String,
+    app: AppHandle,
+    classic_typescript: bool,
+    generation: u64,
+    _trusted: bool,
+) -> Result<StartOutcome, String> {
+    let instance_key = lsp_instance_key(&server_id, &workspace_root);
+    let ssh = parse_ssh_project_root(&workspace_root)?;
+    let mut entry_command = entry.command.clone();
+    if server_id == "typescript" {
+        super::typescript::apply_typescript_stack_command(&mut entry_command, classic_typescript);
+    }
+    let program = entry_command
+        .first()
+        .cloned()
+        .ok_or_else(|| "LSP command missing".to_string())?;
+    let program_name = Path::new(&program)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(program.as_str())
+        .to_string();
+    probe_remote_program(&ssh, &program_name)
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let args = entry_command.iter().skip(1).cloned().collect::<Vec<_>>();
+    let mut parts = vec![posix_quote(&program_name)];
+    for arg in &args {
+        parts.push(posix_quote(arg));
+    }
+    let remote_cmd = parts.join(" ");
+    let info = open_exec(key_for(&ssh), login_command(&ssh.remote_path, &remote_cmd))
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let mut stdio = take_channel_stdio(&info.channel_id)
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let stderr_tail = Arc::new(Mutex::new(String::new()));
+    if let Some(stderr) = stdio.stderr.take() {
+        spawn_stderr_tail(stderr, stderr_tail.clone());
+    }
+    let process = Arc::new(Mutex::new(LspProcess {
+        child: LspChild::Remote {
+            channel_id: info.channel_id.clone(),
+            stdout: Some(stdio.stdout),
+        },
+        stdin: stdio.stdin,
+        workspace_root: workspace_root.clone(),
+        open_documents: HashMap::new(),
+        diagnostics_by_uri: HashMap::new(),
+        diagnostic_provider: None,
+        pending: Mutex::new(HashMap::new()),
+        next_id: Mutex::new(0),
+        uses_classic_typescript: server_id == "typescript" && classic_typescript,
+        stderr_tail,
+        generation,
+        pid: None,
+        stop_requested: Arc::new(AtomicBool::new(false)),
+        exit_handled: Arc::new(AtomicBool::new(false)),
+        progress: ActiveProgress::default(),
+        project_loading: Arc::new(AtomicBool::new(server_awaits_project_load(&server_id))),
+    }));
+    let mut child_guard = ChildGuard {
+        process: process.clone(),
+        published: false,
+    };
+
+    super::spawn_reader(process.clone(), instance_key.clone(), generation, app.clone());
+
+    let remote_path = ssh.remote_path.clone();
+    let root_uri = format!("file://{remote_path}");
+    let init_options = if entry.initialization.is_null() {
+        serde_json::json!({})
+    } else {
+        entry.initialization.clone()
+    };
+
+    let init_result = match json_rpc_request(
+        &process,
+        "initialize",
+        serde_json::json!({
+          "processId": std::process::id(),
+          "rootPath": remote_path,
+          "rootUri": root_uri,
+          "capabilities": {
+            "textDocument": {
+              "synchronization": {
+                "dynamicRegistration": false,
+                "didSave": false,
+                "willSave": false,
+                "willSaveWaitUntil": false
+              },
+              "publishDiagnostics": {},
+              "diagnostic": {
+                "dynamicRegistration": true,
+                "relatedDocumentSupport": false
+              },
+              "hover": {
+                "contentFormat": ["markdown", "plaintext"]
+              },
+              "completion": {
+                "completionItem": {
+                  "snippetSupport": true,
+                  "documentationFormat": ["markdown", "plaintext"]
+                }
+              },
+              "definition": { "linkSupport": true },
+              "formatting": {
+                "dynamicRegistration": false
+              },
+              "references": {},
+              "documentSymbol": {
+                "hierarchicalDocumentSymbolSupport": true
+              }
+            },
+            "workspace": {
+              "configuration": true,
+              "workspaceFolders": true,
+              "symbol": {},
+              "diagnostics": {
+                "refreshSupport": false
+              }
+            },
+            "window": {
+              "workDoneProgress": true
+            }
+          },
+          "initializationOptions": init_options,
+          "trace": "off",
+          "workspaceFolders": [{
+            "uri": root_uri,
+            "name": Path::new(&remote_path)
+              .file_name()
+              .and_then(|name| name.to_str())
+              .unwrap_or("workspace")
+          }]
+        }),
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(error) => {
+            log::warn!("initialize failed for {server_id}: {error}");
+            return Err(error);
+        }
+    };
+
+    {
+        let mut guard = process.lock().await;
+        guard.diagnostic_provider = parse_diagnostic_provider(&init_result);
+    }
+
+    send_notification(&process, "initialized", serde_json::json!({})).await?;
+
+    {
+        let mut servers = LSP_SERVERS.lock().await;
+        servers.insert(
+            instance_key.clone(),
+            Arc::new(ManagedLspServer {
+                process: process.clone(),
+                generation,
+            }),
+        );
+    }
+    child_guard.published = true;
+
+    spawn_keepalive(app.clone(), instance_key.clone(), generation, process.clone());
+
+    let activity = current_running_activity(&process).await;
+    let mut patch = LspStatePatch::running("path".to_string(), workspace_root, None);
+    patch.activity = Some(activity.clone());
+    let published = transition(&app, &instance_key, generation, LspPhase::Running, patch).await;
+    if published.is_none() {
         super::retire_server_process(&instance_key).await;
         return Ok(StartOutcome::Superseded);
     }

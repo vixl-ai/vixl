@@ -12,6 +12,7 @@ import PlansSection from '@/components/settings/sections/PlansSection.vue'
 import SkillsSection from '@/components/settings/sections/SkillsSection.vue'
 import RulesSection from '@/components/settings/sections/RulesSection.vue'
 import LspServersSection from '@/components/settings/sections/LspServersSection.vue'
+import SshSecretsSection from '@/components/settings/sections/SshSecretsSection.vue'
 import type { SettingsSectionId } from '@/types/settings/settings-section'
 
 const props = defineProps<{
@@ -46,6 +47,8 @@ const sectionComponent = computed(() => {
       return RulesSection
     case 'lsp':
       return LspServersSection
+    case 'ssh':
+      return SshSecretsSection
     default:
       return GeneralSection
   }

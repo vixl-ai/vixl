@@ -73,6 +73,12 @@ const open = ref(false)
         >
           {{ subagentLabel }}
         </span>
+        <span
+          v-if="approval.runsAt"
+          class="shrink-0 text-xs text-muted-foreground"
+        >
+          {{ approval.runsAt }}
+        </span>
       </CollapsibleTrigger>
       <ChatApprovalActions
         :approval="approval"

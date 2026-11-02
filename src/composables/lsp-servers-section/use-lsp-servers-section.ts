@@ -5,11 +5,13 @@ import {
   Loader2,
   Play,
   RotateCcw,
+  ShieldCheck,
   Trash2,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import useVixlConfig from '@/composables/use-vixl-config'
 import useFleetRegistry from '@/composables/use-fleet-registry'
+import useSshSession from '@/composables/use-ssh-session'
 import { bindListeners } from '@/composables/lsp-status/listeners'
 import { refreshCatalog } from '@/composables/lsp-status/catalog'
 import { installMessage, servers } from '@/composables/lsp-status/state'
@@ -28,6 +30,7 @@ import { buildStatusBadges } from './status-badges'
 export default () => {
   const config = useVixlConfig()
   const fleet = useFleetRegistry()
+  const ssh = useSshSession()
   const busyIds = ref<Set<string>>(new Set())
   const prefetching = ref(false)
 
@@ -47,6 +50,26 @@ export default () => {
     const records = config.effectiveSettings.value['workspace.trust'] ?? []
     return records.some((record) => record.rootPath === root && record.trusted)
   })
+
+  const needsTrustButton = computed(() => {
+    const root = activeRoot.value
+    if (!root) {
+      return false
+    }
+    return catalog.value.some(
+      (entry) =>
+        !entry.disabled &&
+        (entry.state.phase === 'needs_trust' || (entry.requiresTrust && !workspaceTrusted.value)),
+    )
+  })
+
+  const trustWorkspace = (): void => {
+    const root = activeRoot.value
+    if (!root) {
+      return
+    }
+    ssh.openTrustWorkspace(root)
+  }
 
   const setBusy = (serverId: string, busy: boolean): void => {
     const next = new Set(busyIds.value)
@@ -167,5 +190,8 @@ export default () => {
     Play,
     RotateCcw,
     Trash2,
+    ShieldCheck,
+    needsTrustButton,
+    trustWorkspace,
   }
 }

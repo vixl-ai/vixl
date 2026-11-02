@@ -16,7 +16,7 @@ const createAssertTrustedOrThrow = (
   if (isInternalMcpServer(serverId)) {
     return
   }
-  const fingerprint = mcpServerFingerprint(serverConfig)
+  const fingerprint = mcpServerFingerprint(serverConfig, scopeKey)
   if (
     !isMcpTrusted(
       settings ?? config.effectiveSettings.value,

@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use tauri::AppHandle;
 use tokio::io::AsyncWriteExt;
-use tokio::process::{Child, ChildStdin};
+use tokio::process::{Child, ChildStdin, ChildStdout};
+
+use crate::commands::ssh::close_channel;
 use tokio::sync::{oneshot, Mutex};
 use tokio::time::{sleep, Duration};
 
@@ -61,8 +63,57 @@ pub struct LspDiagnosticProvider {
     pub identifier: Option<String>,
 }
 
+pub(crate) enum LspChild {
+    Local(Child),
+    Remote {
+        channel_id: String,
+        stdout: Option<ChildStdout>,
+    },
+}
+
+impl LspChild {
+    pub(crate) fn take_stdout(&mut self) -> Option<ChildStdout> {
+        match self {
+            Self::Local(child) => child.stdout.take(),
+            Self::Remote { stdout, .. } => stdout.take(),
+        }
+    }
+
+    pub(crate) fn try_wait(
+        &mut self,
+    ) -> std::io::Result<Option<std::process::ExitStatus>> {
+        match self {
+            Self::Local(child) => child.try_wait(),
+            Self::Remote { .. } => Ok(None),
+        }
+    }
+
+    pub(crate) fn start_kill(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Local(child) => child.start_kill(),
+            Self::Remote { channel_id, .. } => {
+                let id = channel_id.clone();
+                tokio::spawn(async move {
+                    let _ = close_channel(id).await;
+                });
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) async fn kill(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Local(child) => child.kill().await,
+            Self::Remote { channel_id, .. } => {
+                let _ = close_channel(channel_id.clone()).await;
+                Ok(())
+            }
+        }
+    }
+}
+
 pub(crate) struct LspProcess {
-    pub(crate) child: Child,
+    pub(crate) child: LspChild,
     pub(crate) stdin: ChildStdin,
     pub(crate) workspace_root: String,
     pub(crate) open_documents: HashMap<String, i32>,

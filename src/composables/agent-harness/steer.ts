@@ -59,6 +59,7 @@ export default (state: AgentHarnessState, deps: SteerDeps) => {
           diff: entry.diff ?? [],
           subagentId: entry.subagentId,
           subagentLabel: entry.subagentLabel,
+          runsAt: entry.runsAt,
         })
       },
       persistPermission: deps.persistPermission,

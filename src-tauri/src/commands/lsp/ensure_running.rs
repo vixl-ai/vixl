@@ -262,30 +262,32 @@ async fn ensure_locked(
     } else {
         server_id
     };
-    record_install(
-        &mut note,
-        ensure_server_installed(
-            app,
-            install_id,
-            install_generation(server_id, install_id, generation).await,
-            install_id != server_id,
-        )
-        .await,
-    );
-    if server_id == "vue" {
-        let classic_generation = current_generation("typescript-classic").await;
+    if !crate::commands::ssh::is_ssh_root(workspace_root) {
         record_install(
             &mut note,
-            ensure_server_installed(app, "typescript-classic", classic_generation, true).await,
+            ensure_server_installed(
+                app,
+                install_id,
+                install_generation(server_id, install_id, generation).await,
+                install_id != server_id,
+            )
+            .await,
         );
-    }
+        if server_id == "vue" {
+            let classic_generation = current_generation("typescript-classic").await;
+            record_install(
+                &mut note,
+                ensure_server_installed(app, "typescript-classic", classic_generation, true).await,
+            );
+        }
 
-    if builtin_spec_by_id(install_id)
-        .or_else(|| builtin_spec_by_id(server_id))
-        .map(|spec| spec.npm.is_some())
-        .unwrap_or(false)
-    {
-        let _ = ensure_portable_node(app).await;
+        if builtin_spec_by_id(install_id)
+            .or_else(|| builtin_spec_by_id(server_id))
+            .map(|spec| spec.npm.is_some())
+            .unwrap_or(false)
+        {
+            let _ = ensure_portable_node(app).await;
+        }
     }
 
     let source = install_source_label(app, server_id);

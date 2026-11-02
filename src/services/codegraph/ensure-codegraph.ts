@@ -87,7 +87,7 @@ const ensureCodeGraphOnce = async (root: string): Promise<void> => {
   await pruneObsoleteCodegraphTrust(root)
 
   const server = buildCodegraphServer(root)
-  sessionTrusts.set(connectionKey(root, CODEGRAPH_SERVER_ID), mcpServerFingerprint(server))
+  sessionTrusts.set(connectionKey(root, CODEGRAPH_SERVER_ID), mcpServerFingerprint(server, root))
 
   const mcp = useMcpServers()
   await mcp.loadConfigs(root)

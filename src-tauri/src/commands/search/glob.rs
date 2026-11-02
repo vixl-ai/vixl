@@ -3,7 +3,11 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::walk::walk_builder;
-use crate::commands::fs::{canonical_project_root, workspace_roots_from_args, WorkspaceRootArg};
+use crate::commands::fs::{
+    canonical_project_root, parse_ssh_project_root, uses_ssh_transport, workspace_roots_from_args,
+    WorkspaceRootArg,
+};
+use crate::commands::ssh::is_ssh_root;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +37,10 @@ pub struct WorkspaceGlobResult {
 pub async fn workspace_glob(request: WorkspaceGlobRequest) -> Result<WorkspaceGlobResult, String> {
     if request.pattern.trim().is_empty() {
         return Err("Glob pattern is required".to_string());
+    }
+
+    if uses_ssh_transport(&request.project_root, request.project_roots.as_deref()) {
+        return glob_with_ssh(request).await;
     }
 
     let scopes = glob_scopes(&request)?;
@@ -81,6 +89,44 @@ pub async fn workspace_glob(request: WorkspaceGlobRequest) -> Result<WorkspaceGl
     })
     .await
     .map_err(|error| format!("Glob search failed: {error}"))?
+}
+
+async fn glob_with_ssh(request: WorkspaceGlobRequest) -> Result<WorkspaceGlobResult, String> {
+    let limit = request.limit.unwrap_or(500) as usize;
+    if let Some(args) = request
+        .project_roots
+        .as_deref()
+        .filter(|roots| !roots.is_empty())
+    {
+        let mut files = Vec::new();
+        let mut truncated = false;
+        for arg in args {
+            let remaining = limit.saturating_sub(files.len());
+            if remaining == 0 {
+                truncated = true;
+                break;
+            }
+            if arg.path.trim().starts_with("ssh://") {
+                let ssh = parse_ssh_project_root(&arg.path)?;
+                let partial = super::ssh::glob_ssh(
+                    &ssh,
+                    &request.pattern,
+                    Some(arg.slug.trim()),
+                    remaining,
+                )
+                .await?;
+                files.extend(partial.files);
+                truncated = truncated || partial.truncated;
+            }
+        }
+        files.sort_by(|left, right| left.path.cmp(&right.path));
+        return Ok(WorkspaceGlobResult { files, truncated });
+    }
+    if is_ssh_root(&request.project_root) {
+        let ssh = parse_ssh_project_root(&request.project_root)?;
+        return super::ssh::glob_ssh(&ssh, &request.pattern, None, limit).await;
+    }
+    Err("SSH search root is required".to_string())
 }
 
 struct GlobScope {

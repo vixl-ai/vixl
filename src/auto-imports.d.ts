@@ -129,6 +129,7 @@ declare global {
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
+  const sshSecretsSection: typeof import('./composables/ssh-secrets-section').default
   const syncRef: typeof import('@vueuse/core').syncRef
   const syncRefs: typeof import('@vueuse/core').syncRefs
   const templateRef: typeof import('@vueuse/core').templateRef
@@ -294,6 +295,7 @@ declare global {
   const usePreferredReducedMotion: typeof import('@vueuse/core').usePreferredReducedMotion
   const usePreferredReducedTransparency: typeof import('@vueuse/core').usePreferredReducedTransparency
   const usePrevious: typeof import('@vueuse/core').usePrevious
+  const useProjectRowSsh: typeof import('./composables/use-project-row-ssh').default
   const useProjectsExpansion: typeof import('./composables/use-projects-expansion').default
   const useProjectsSection: typeof import('./composables/use-projects-section').default
   const useProviderModelsCatalog: typeof import('./composables/use-provider-models-catalog').default
@@ -315,6 +317,7 @@ declare global {
   const useSorted: typeof import('@vueuse/core').useSorted
   const useSpeechRecognition: typeof import('@vueuse/core').useSpeechRecognition
   const useSpeechSynthesis: typeof import('@vueuse/core').useSpeechSynthesis
+  const useSshSession: typeof import('./composables/use-ssh-session').default
   const useStartHomeChat: typeof import('./composables/use-start-home-chat').default
   const useStartPlanBuild: typeof import('./composables/use-start-plan-build').default
   const useStartVixlFilesChat: typeof import('./composables/use-start-vixl-files-chat').default
@@ -415,6 +418,9 @@ declare global {
   // @ts-ignore
   export type { UseProviderModelsCatalogOptions } from './composables/use-provider-models-catalog'
   import('./composables/use-provider-models-catalog')
+  // @ts-ignore
+  export type { SshConnectMode, SshConnectPhase } from './composables/use-ssh-session'
+  import('./composables/use-ssh-session')
   // @ts-ignore
   export type { PlanExecutionMode, StartPlanBuildInput } from './composables/use-start-plan-build'
   import('./composables/use-start-plan-build')
@@ -552,6 +558,7 @@ declare module 'vue' {
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
+    readonly sshSecretsSection: UnwrapRef<typeof import('./composables/ssh-secrets-section')['default']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>
     readonly templateRef: UnwrapRef<typeof import('@vueuse/core')['templateRef']>
@@ -717,6 +724,7 @@ declare module 'vue' {
     readonly usePreferredReducedMotion: UnwrapRef<typeof import('@vueuse/core')['usePreferredReducedMotion']>
     readonly usePreferredReducedTransparency: UnwrapRef<typeof import('@vueuse/core')['usePreferredReducedTransparency']>
     readonly usePrevious: UnwrapRef<typeof import('@vueuse/core')['usePrevious']>
+    readonly useProjectRowSsh: UnwrapRef<typeof import('./composables/use-project-row-ssh')['default']>
     readonly useProjectsExpansion: UnwrapRef<typeof import('./composables/use-projects-expansion')['default']>
     readonly useProjectsSection: UnwrapRef<typeof import('./composables/use-projects-section')['default']>
     readonly useProviderModelsCatalog: UnwrapRef<typeof import('./composables/use-provider-models-catalog')['default']>
@@ -738,6 +746,7 @@ declare module 'vue' {
     readonly useSorted: UnwrapRef<typeof import('@vueuse/core')['useSorted']>
     readonly useSpeechRecognition: UnwrapRef<typeof import('@vueuse/core')['useSpeechRecognition']>
     readonly useSpeechSynthesis: UnwrapRef<typeof import('@vueuse/core')['useSpeechSynthesis']>
+    readonly useSshSession: UnwrapRef<typeof import('./composables/use-ssh-session')['default']>
     readonly useStartHomeChat: UnwrapRef<typeof import('./composables/use-start-home-chat')['default']>
     readonly useStartPlanBuild: UnwrapRef<typeof import('./composables/use-start-plan-build')['default']>
     readonly useStartVixlFilesChat: UnwrapRef<typeof import('./composables/use-start-vixl-files-chat')['default']>

@@ -14,11 +14,16 @@ use super::env::{merge_mcp_env_file, validate_mcp_env};
 use super::resolve_cmd::{apply_resolved_path_env, resolve_command};
 use super::rpc::{json_rpc, json_rpc_notify, list_tools_internal, spawn_reader};
 use super::types::{
-    mcp_connection_key, parse_mcp_icons, set_state, McpProcess, McpServerState, MCP_PROCESSES,
+    mcp_connection_key, parse_mcp_icons, set_state, McpChild, McpProcess, McpServerState,
+    MCP_PROCESSES,
 };
 use crate::commands::codegraph::{codegraph_store_env_vars, prepare_codegraph_store};
-use crate::commands::fs::canonical_project_root;
+use crate::commands::fs::{canonical_project_root, parse_ssh_project_root};
 use crate::commands::paths::user_vixl_dir;
+use crate::commands::ssh::{
+    is_ssh_root, join_remote_argv, key_for, login_command, map_unreachable, open_exec, posix_quote,
+    probe_remote_program, take_channel_stdio,
+};
 
 #[tauri::command]
 pub async fn mcp_start(
@@ -31,6 +36,18 @@ pub async fn mcp_start(
     env_file: Option<String>,
 ) -> Result<McpServerState, String> {
     validate_mcp_spawn(&command, &args)?;
+    if scope_key.as_deref().is_some_and(is_ssh_root) {
+        return mcp_start_remote(
+            app,
+            server_id,
+            command,
+            args,
+            env,
+            scope_key,
+            env_file,
+        )
+        .await;
+    }
     let working_dir = mcp_stdio_working_dir(scope_key.as_deref())?;
     let personal_dir = user_vixl_dir(&app)?;
     let env_overlay = merge_mcp_env_file(
@@ -117,8 +134,13 @@ pub async fn mcp_start(
         });
     }
 
+    let stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| "MCP process stdin unavailable".to_string())?;
     let process = std::sync::Arc::new(Mutex::new(McpProcess {
-        child,
+        child: McpChild::Local(child),
+        stdin,
         pending: Mutex::new(HashMap::new()),
         next_id: Mutex::new(0),
     }));
@@ -218,6 +240,194 @@ pub async fn mcp_start(
     })
 }
 
+async fn mcp_start_remote(
+    app: AppHandle,
+    server_id: String,
+    command: String,
+    args: Vec<String>,
+    env: Option<HashMap<String, String>>,
+    scope_key: Option<String>,
+    env_file: Option<String>,
+) -> Result<McpServerState, String> {
+    let scope = scope_key.as_deref().unwrap_or_default();
+    let ssh = parse_ssh_project_root(scope)?;
+    let personal_dir = user_vixl_dir(&app)?;
+    let env_overlay = merge_mcp_env_file(
+        env_file.as_deref(),
+        scope_key.as_deref(),
+        &personal_dir,
+        env.unwrap_or_default(),
+    )?;
+    validate_mcp_env(&env_overlay)?;
+    let program_name = Path::new(command.trim())
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(command.trim())
+        .to_string();
+    probe_remote_program(&ssh, &program_name)
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let mut parts = vec![program_name.clone()];
+    parts.extend(args.iter().cloned());
+    let remote_cmd = with_remote_env_assignments(&env_overlay, &join_remote_argv(&parts));
+    let resolved_scope = scope_key.as_deref().unwrap_or("personal").to_string();
+    let connection_key = mcp_connection_key(scope_key.as_deref(), &server_id);
+    mcp_stop(server_id.clone(), scope_key.clone()).await.ok();
+    set_state(
+        scope_key.as_deref(),
+        &server_id,
+        "starting",
+        None,
+        vec![],
+        None,
+    )
+    .await;
+    let info = open_exec(key_for(&ssh), login_command(&ssh.remote_path, &remote_cmd))
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let mut stdio = take_channel_stdio(&info.channel_id)
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let stderr_tail = std::sync::Arc::new(Mutex::new(String::new()));
+    if let Some(stderr) = stdio.stderr.take() {
+        let stderr_tail = stderr_tail.clone();
+        tokio::spawn(async move {
+            let mut lines = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                let mut guard = stderr_tail.lock().await;
+                if guard.len() < 4_000 {
+                    if !guard.is_empty() {
+                        guard.push('\n');
+                    }
+                    guard.push_str(&line);
+                }
+            }
+        });
+    }
+    let process = std::sync::Arc::new(Mutex::new(McpProcess {
+        child: McpChild::Remote {
+            channel_id: info.channel_id,
+            stdout: Some(stdio.stdout),
+        },
+        stdin: stdio.stdin,
+        pending: Mutex::new(HashMap::new()),
+        next_id: Mutex::new(0),
+    }));
+    spawn_reader(
+        process.clone(),
+        connection_key.clone(),
+        resolved_scope.clone(),
+        server_id.clone(),
+    );
+    {
+        let mut processes = MCP_PROCESSES.lock().await;
+        processes.insert(connection_key, process.clone());
+    }
+    let fail = |message: String| async {
+        let stderr_text = stderr_tail.lock().await.clone();
+        let full = if stderr_text.trim().is_empty() {
+            message
+        } else {
+            format!("{message}\n{stderr_text}")
+        };
+        let _ = mcp_stop(server_id.clone(), scope_key.clone()).await;
+        set_state(
+            scope_key.as_deref(),
+            &server_id,
+            "error",
+            Some(full.clone()),
+            vec![],
+            None,
+        )
+        .await;
+        Err(full)
+    };
+    let init = match json_rpc(
+        &process,
+        "initialize",
+        serde_json::json!({
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": { "name": "vixl", "version": "0.1.0" }
+        }),
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(message) => return fail(message).await,
+    };
+    if init.get("error").is_some() {
+        let message = init
+            .get("error")
+            .and_then(|e| e.get("message"))
+            .and_then(|m| m.as_str())
+            .unwrap_or("initialize failed")
+            .to_string();
+        return fail(message).await;
+    }
+    if let Err(message) =
+        json_rpc_notify(&process, "notifications/initialized", serde_json::json!({})).await
+    {
+        return fail(message).await;
+    }
+    let icons = parse_mcp_icons(
+        init.get("result")
+            .and_then(|result| result.get("serverInfo"))
+            .and_then(|info| info.get("icons")),
+    );
+    let tools = match list_tools_internal(&process).await {
+        Ok(tools) => tools,
+        Err(message) => return fail(message).await,
+    };
+    set_state(
+        scope_key.as_deref(),
+        &server_id,
+        "connected",
+        None,
+        tools.clone(),
+        icons.clone(),
+    )
+    .await;
+    Ok(McpServerState {
+        server_id,
+        scope_key: resolved_scope,
+        status: "connected".to_string(),
+        error: None,
+        tools,
+        icons,
+    })
+}
+
+fn blocked_remote_env_key(key: &str) -> bool {
+    matches!(
+        key.trim().to_ascii_uppercase().as_str(),
+        "SSH_AUTH_SOCK" | "SSH_ASKPASS"
+    )
+}
+
+fn remote_env_assignments(overlay: &HashMap<String, String>) -> String {
+    let mut keys: Vec<_> = overlay.keys().cloned().collect();
+    keys.sort();
+    let mut parts = Vec::new();
+    for key in keys {
+        if blocked_remote_env_key(&key) {
+            continue;
+        }
+        let value = overlay.get(&key).map(String::as_str).unwrap_or("");
+        parts.push(format!("{key}={}", posix_quote(value)));
+    }
+    parts.join(" ")
+}
+
+fn with_remote_env_assignments(overlay: &HashMap<String, String>, command: &str) -> String {
+    let assigns = remote_env_assignments(overlay);
+    if assigns.is_empty() {
+        command.to_string()
+    } else {
+        format!("{assigns} {command}")
+    }
+}
+
 fn extract_codegraph_project_path(args: &[String]) -> Option<String> {
     let mut saw_path_flag = false;
     for arg in args {
@@ -301,4 +511,34 @@ pub async fn mcp_stop(server_id: String, scope_key: Option<String>) -> Result<()
     )
     .await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remote_assignments_quote_values_and_drop_ssh_agent_keys() {
+        let mut overlay = HashMap::new();
+        overlay.insert("FOO".into(), "bar baz".into());
+        overlay.insert("SSH_AUTH_SOCK".into(), "/tmp/agent".into());
+        overlay.insert("SSH_ASKPASS".into(), "/usr/bin/askpass".into());
+        overlay.insert("ssh_auth_sock".into(), "/other".into());
+        overlay.insert("TOKEN".into(), "a'b".into());
+        let assigns = remote_env_assignments(&overlay);
+        assert!(assigns.contains("FOO='bar baz'"), "got {assigns}");
+        assert!(assigns.contains("TOKEN='a'\\''b'"), "got {assigns}");
+        assert!(!assigns.contains("SSH_AUTH_SOCK"), "got {assigns}");
+        assert!(!assigns.contains("SSH_ASKPASS"), "got {assigns}");
+        assert!(!assigns.contains("/tmp/agent"), "got {assigns}");
+        let command = with_remote_env_assignments(&overlay, "'npx' '-y' 'pkg'");
+        assert!(command.ends_with("'npx' '-y' 'pkg'"), "got {command}");
+        assert!(command.contains("FOO='bar baz'"), "got {command}");
+    }
+
+    #[test]
+    fn empty_overlay_leaves_command_unchanged() {
+        let command = with_remote_env_assignments(&HashMap::new(), "'rg'");
+        assert_eq!(command, "'rg'");
+    }
 }

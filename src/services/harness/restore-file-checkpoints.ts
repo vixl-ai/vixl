@@ -1,5 +1,7 @@
 import aggregateToolRunFileDiffs from '@/services/harness/aggregate-tool-run-file-diffs'
+import { restoreSshCheckpointGroup } from '@/services/harness/ssh/restore-checkpoints'
 import { fileCheckpointRestore } from '@/services/vixl/vixl-tauri'
+import { isSshProjectRoot } from '@/utils/ssh-project-root'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type {
   ChatTimelineItem,
@@ -257,6 +259,16 @@ export const restoreFileCheckpoints = async (args: {
           error: 'Project is no longer available',
         })),
       )
+      continue
+    }
+    if (isSshProjectRoot(group.projectRoot)) {
+      const result = await restoreSshCheckpointGroup({
+        projectSlug: args.projectSlug, chatId: args.chatId, group,
+      })
+      merged.restored.push(...result.restored)
+      merged.deleted.push(...result.deleted)
+      merged.skipped.push(...result.skipped)
+      merged.errors.push(...result.errors)
       continue
     }
     const result = await fileCheckpointRestore({

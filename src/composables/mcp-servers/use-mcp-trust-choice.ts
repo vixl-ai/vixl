@@ -114,8 +114,8 @@ export default (root?: () => string | null) => {
     action: () => Promise<void>,
     scopeKey?: string | null,
   ): Promise<void> => {
-    const fingerprint = mcpServerFingerprint(serverConfig)
     const resolvedScope = scopeKey?.trim() || root?.()?.trim() || 'personal'
+    const fingerprint = mcpServerFingerprint(serverConfig, resolvedScope)
     const settings = root
       ? await loadEffectiveSettings(root() ?? null)
       : config.effectiveSettings.value

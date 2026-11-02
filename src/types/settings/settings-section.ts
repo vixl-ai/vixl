@@ -10,6 +10,7 @@ export type SettingsSectionId =
   | 'skills'
   | 'lsp'
   | 'permissions'
+  | 'ssh'
 
 export const PERSONAL_SECTIONS: SettingsSectionId[] = [
   'general',
@@ -19,6 +20,7 @@ export const PERSONAL_SECTIONS: SettingsSectionId[] = [
   'models',
   'lsp',
   'permissions',
+  'ssh',
   'plans',
   'skills',
   'agents',
@@ -37,4 +39,5 @@ export const SECTION_LABELS: Record<SettingsSectionId, string> = {
   skills: 'Skills',
   lsp: 'LSP',
   permissions: 'Permissions',
+  ssh: 'SSH',
 }

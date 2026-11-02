@@ -217,6 +217,7 @@ describe('build-tools stage preview wiring', () => {
       projectRoot: '/project',
       path: 'src/main.ts',
       content: 'next',
+      allowSensitive: true,
     })
     expect(fileCheckpointCapture).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -248,6 +249,7 @@ describe('build-tools stage preview wiring', () => {
       projectRoot: '/project',
       path: 'src/main.ts',
       replacements: [{ oldString: 'old', newString: 'new' }],
+      allowSensitive: true,
     })
   })
 
@@ -264,6 +266,7 @@ describe('build-tools stage preview wiring', () => {
     expect(fsApplyPatch).toHaveBeenCalledWith({
       projectRoot: '/project',
       patch,
+      allowSensitive: true,
     })
   })
 

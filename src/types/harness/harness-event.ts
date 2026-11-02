@@ -36,6 +36,7 @@ export type HarnessEvent =
       diff: FileDiff[]
       subagentId?: string
       subagentLabel?: string
+      runsAt?: string
     }
   | {
       type: 'tool-result'

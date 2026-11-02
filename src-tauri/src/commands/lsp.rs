@@ -112,7 +112,7 @@ pub(crate) fn spawn_reader(
     tokio::spawn(async move {
         let stdout = {
             let mut guard = process.lock().await;
-            guard.child.stdout.take()
+            guard.child.take_stdout()
         };
 
         let Some(stdout) = stdout else {
@@ -772,7 +772,7 @@ mod retire_tests {
         let stdin = child.stdin.take().expect("sleep stdin");
         let generation = 4;
         let process = Arc::new(Mutex::new(LspProcess {
-            child,
+            child: super::rpc::LspChild::Local(child),
             stdin,
             workspace_root: "/tmp/app".to_string(),
             open_documents: HashMap::new(),

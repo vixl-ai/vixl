@@ -243,6 +243,28 @@ pub(crate) fn workspace_is_trusted(app: &AppHandle, project_root: Option<&str>) 
     let Some(root) = project_root else {
         return false;
     };
+    if root.trim().starts_with("ssh://") {
+        let Ok(personal) = read_settings_internal(app, "personal", None) else {
+            return false;
+        };
+        if let Some(records) = personal.get("workspace.trust").and_then(|v| v.as_array()) {
+            for record in records {
+                let path = record
+                    .get("rootPath")
+                    .or_else(|| record.get("root_path"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let trusted = record
+                    .get("trusted")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                if trusted && path.trim() == root.trim() {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     let Ok(canonical) = std::fs::canonicalize(root) else {
         return false;
     };

@@ -12,8 +12,10 @@ import {
   Pause,
   Settings,
   ShieldAlert,
+  ShieldCheck,
   TriangleAlert,
 } from '@lucide/vue'
+import useSshSession from '@/composables/use-ssh-session'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/shadcn/ui/button'
 import {
@@ -48,7 +50,12 @@ const router = useRouter()
 const fleet = useFleetRegistry()
 const workbench = useWorkbenchStore()
 const lsp = useLspStatus()
+const ssh = useSshSession()
 const open = ref(false)
+
+const needsTrust = computed(() =>
+  lsp.visibleRows.value.some((row) => row.displayState === 'needs_trust'),
+)
 
 const healthClass = (health: LspHealth): string => {
   switch (health) {
@@ -250,6 +257,22 @@ const handleOpenSettings = async (): Promise<void> => {
     })
   }
 }
+
+const handleTrustWorkspace = async (): Promise<void> => {
+  const root = fleet.activeProject.value?.rootPath
+  if (!root) {
+    toast.error('No active project')
+    return
+  }
+  try {
+    await afterMenuClosed()
+    ssh.openTrustWorkspace(root)
+  } catch (error) {
+    toast.error('Could not open workspace trust', {
+      description: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
+}
 </script>
 
 <template>
@@ -331,6 +354,16 @@ const handleOpenSettings = async (): Promise<void> => {
               >
                 {{ lsp.installMessage.value }}
               </p>
+              <Button
+                v-if="needsTrust"
+                variant="outline"
+                size="sm"
+                class="mt-2 h-7 w-full gap-1.5 px-2 text-xs"
+                @click="handleTrustWorkspace"
+              >
+                <ShieldCheck class="h-3.5 w-3.5" />
+                Trust workspace
+              </Button>
             </DropdownMenuLabel>
 
             <template v-if="lsp.problems.value.length > 0">
