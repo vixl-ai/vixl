@@ -334,6 +334,10 @@ pub struct FileCheckpointLoadResult {
     pub content: Option<String>,
 }
 
+fn provided_baseline_existed(content: Option<&str>, existed: Option<bool>) -> bool {
+    existed.unwrap_or(content.is_some())
+}
+
 fn capture_provided(
     dir: &Path,
     path: &str,
@@ -406,7 +410,7 @@ pub fn file_checkpoint_capture(
             key.as_deref(),
             tool_call_id,
             content.as_deref(),
-            existed.unwrap_or(false),
+            provided_baseline_existed(content.as_deref(), existed),
         );
     }
     capture_into(&dir, &project_root, &path, key.as_deref(), tool_call_id)
@@ -588,8 +592,9 @@ fn copy_dir_recursive(from: &Path, to: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        capture_into, content_path, manifest_key, path_hash, read_manifest, restore_from_dir,
-        FileCheckpointBaseline, MAX_BASELINE_BYTES,
+        capture_into, capture_provided, content_path, manifest_key, path_hash,
+        provided_baseline_existed, read_manifest, restore_from_dir, FileCheckpointBaseline,
+        MAX_BASELINE_BYTES,
     };
     use std::fs;
     use std::path::Path;
@@ -610,6 +615,34 @@ mod tests {
             .iter()
             .find(|entry| entry.path == path)
             .unwrap_or_else(|| panic!("missing baseline {path}"))
+    }
+
+    #[test]
+    fn omitted_existed_keeps_provided_content() {
+        assert!(provided_baseline_existed(Some("hello"), None));
+        assert!(!provided_baseline_existed(Some("hello"), Some(false)));
+        assert!(!provided_baseline_existed(None, Some(false)));
+    }
+
+    #[test]
+    fn provided_content_is_stored_when_existed_is_omitted() {
+        let checkpoints = tempfile::TempDir::new().expect("checkpoints");
+        let result = capture_provided(
+            checkpoints.path(),
+            "src/a.ts",
+            None,
+            None,
+            Some("hello"),
+            true,
+        )
+        .expect("capture");
+        assert!(result.captured[0].existed);
+        let bytes = fs::read(content_path(
+            checkpoints.path(),
+            &result.captured[0].path_hash,
+        ))
+        .expect("bytes");
+        assert_eq!(bytes, b"hello");
     }
 
     #[test]

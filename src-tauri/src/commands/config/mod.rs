@@ -258,7 +258,7 @@ pub(crate) fn workspace_is_trusted(app: &AppHandle, project_root: Option<&str>) 
                     .get("trusted")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
-                if trusted && path.trim() == root.trim() {
+                if trusted && crate::commands::registry::roots_match(path.trim(), root.trim()) {
                     return true;
                 }
             }
