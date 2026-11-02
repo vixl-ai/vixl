@@ -27,11 +27,10 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
 } from '@/components/shadcn/ui/sidebar'
 import NavigationAsideLeftChatListItem from '@/components/navigation/aside/left/ChatListItem.vue'
 import NavigationAsideLeftWorktreeRow from '@/components/navigation/aside/left/WorktreeRow.vue'
+import NavigationAsideLeftSidebarVirtualList from '@/components/navigation/aside/left/SidebarVirtualList.vue'
 import GroupStackIcon from '@/components/navigation/aside/left/GroupStackIcon.vue'
 import useChatStore from '@/composables/use-chat-store'
 import useFleetRegistry from '@/composables/use-fleet-registry'
@@ -80,6 +79,40 @@ const timeline = computed(() =>
     parentRootPath.value ? worktrees.value : [],
   ),
 )
+
+const timelineKey = (index: number): string => {
+  const item = timeline.value[index]
+  if (!item) {
+    return `missing:${index}`
+  }
+  return item.kind === 'chat'
+    ? `chat:${item.chat.id}`
+    : `worktree:${item.project.slug}`
+}
+
+const timelineChat = (index: number) => {
+  const item = timeline.value[index]
+  return item?.kind === 'chat' ? item.chat : null
+}
+
+const timelineWorktree = (index: number) => {
+  const item = timeline.value[index]
+  return item?.kind === 'worktree' ? item.project : null
+}
+
+const worktreeAt = (index: number): { project: FleetSidebarProject; root: string }[] => {
+  const root = parentRootPath.value
+  const project = timelineWorktree(index)
+  if (!root || !project) {
+    return []
+  }
+  return [{ project, root }]
+}
+
+const chatAt = (index: number) => {
+  const chat = timelineChat(index)
+  return chat ? [chat] : []
+}
 
 const projectOpen = computed({
   get: (): boolean =>
@@ -321,26 +354,26 @@ const handleOpenTerminal = async (): Promise<void> => {
       <CollapsibleContent
         class="overflow-hidden data-[state=closed]:animate-sidebar-collapsible-up data-[state=open]:animate-sidebar-collapsible-down"
       >
-        <div class="min-w-0 max-h-42 scroll-fade-b scrollbar-none overflow-x-hidden overflow-y-auto pl-3.5">
-          <SidebarMenuSub class="mx-0 gap-0.5">
-            <template
-              v-for="item in timeline"
-              :key="item.kind === 'chat' ? `chat:${item.chat.id}` : `worktree:${item.project.slug}`"
-            >
-              <NavigationAsideLeftWorktreeRow
-                v-if="item.kind === 'worktree' && parentRootPath"
-                :project="item.project"
-                :parent-root-path="parentRootPath"
-              />
-              <SidebarMenuSubItem v-else-if="item.kind === 'chat'">
-                <NavigationAsideLeftChatListItem
-                  :chat="item.chat"
-                  :project-slug="project.slug"
-                />
-              </SidebarMenuSubItem>
-            </template>
-          </SidebarMenuSub>
-        </div>
+        <NavigationAsideLeftSidebarVirtualList
+          class="pl-3.5"
+          :count="timeline.length"
+          :key-at="timelineKey"
+        >
+          <template #default="{ index }">
+            <NavigationAsideLeftWorktreeRow
+              v-for="row in worktreeAt(index)"
+              :key="row.project.slug"
+              :project="row.project"
+              :parent-root-path="row.root"
+            />
+            <NavigationAsideLeftChatListItem
+              v-for="chat in chatAt(index)"
+              :key="chat.id"
+              :chat="chat"
+              :project-slug="project.slug"
+            />
+          </template>
+        </NavigationAsideLeftSidebarVirtualList>
       </CollapsibleContent>
     </SidebarMenuItem>
   </Collapsible>

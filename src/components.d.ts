@@ -418,6 +418,7 @@ declare module 'vue' {
     SettingsNav: typeof import('./components/settings/SettingsNav.vue')['default']
     SettingsSectionScroll: typeof import('./components/settings/SettingsSectionScroll.vue')['default']
     Shimmer: typeof import('./components/ai-elements/shimmer/Shimmer.vue')['default']
+    SidebarVirtualList: typeof import('./components/navigation/aside/left/SidebarVirtualList.vue')['default']
     SkillCreateForm: typeof import('./components/settings/vixl-files/SkillCreateForm.vue')['default']
     SkillsSection: typeof import('./components/settings/sections/SkillsSection.vue')['default']
     Snippet: typeof import('./components/ai-elements/snippet/Snippet.vue')['default']

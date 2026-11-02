@@ -35,10 +35,10 @@ import {
 import {
   SidebarMenuAction,
   SidebarMenuButton,
-  SidebarMenuSub,
   SidebarMenuSubItem,
 } from '@/components/shadcn/ui/sidebar'
 import NavigationAsideLeftChatListItem from '@/components/navigation/aside/left/ChatListItem.vue'
+import NavigationAsideLeftSidebarVirtualList from '@/components/navigation/aside/left/SidebarVirtualList.vue'
 import FileTreeGitLetter from '@/components/workbench/FileTreeGitLetter.vue'
 import {
   confirmRemoveWorktree,
@@ -78,6 +78,14 @@ const removing = ref(false)
 const loadingPreview = ref(false)
 const forceRemove = ref(false)
 const preview = ref<WorktreeRemovePreview | null>(null)
+
+const chatKey = (index: number): string =>
+  props.project.chats[index]?.id ?? `missing:${index}`
+
+const chatAt = (index: number) => {
+  const chat = props.project.chats[index]
+  return chat ? [chat] : []
+}
 
 const worktreeOpen = computed({
   get: (): boolean =>
@@ -238,17 +246,19 @@ const handleConfirmRemove = async (): Promise<void> => {
       <CollapsibleContent
         class="overflow-hidden data-[state=closed]:animate-sidebar-collapsible-up data-[state=open]:animate-sidebar-collapsible-down"
       >
-        <SidebarMenuSub class="mx-0 gap-0.5">
-          <SidebarMenuSubItem
-            v-for="chat in project.chats"
-            :key="chat.id"
-          >
+        <NavigationAsideLeftSidebarVirtualList
+          :count="project.chats.length"
+          :key-at="chatKey"
+        >
+          <template #default="{ index }">
             <NavigationAsideLeftChatListItem
+              v-for="chat in chatAt(index)"
+              :key="chat.id"
               :chat="chat"
               :project-slug="project.slug"
             />
-          </SidebarMenuSubItem>
-        </SidebarMenuSub>
+          </template>
+        </NavigationAsideLeftSidebarVirtualList>
       </CollapsibleContent>
     </SidebarMenuSubItem>
   </Collapsible>

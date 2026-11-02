@@ -62,6 +62,7 @@ vi.mock('@/services/mcp/mcp-runtime', () => ({
 
 import useFleetRegistry, {
   getFleetProjects,
+  resetFleetBootstrapForTests,
   upsertFleetProject,
 } from '@/composables/use-fleet-registry'
 
@@ -357,5 +358,40 @@ describe('useFleetRegistry hasProjectVixl', () => {
     expect(fleet.activeProjectId.value).toBe(sshProject.id)
     expect(fleet.hasProjectVixl.value).toBe(false)
     expect(fleet.loaded.value).toBe(true)
+  })
+})
+
+describe('useFleetRegistry bootstrap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetFleetBootstrapForTests()
+    isTauri.mockReturnValue(true)
+    registryListProjects.mockResolvedValue([projectA])
+    getActiveProjectId.mockResolvedValue(projectA.id)
+    hasProjectVixl.mockResolvedValue(true)
+    const fleet = useFleetRegistry()
+    fleet.loaded.value = false
+    fleet.projects.value = []
+    fleet.activeProjectId.value = null
+  })
+
+  it('checks the active project once when many sidebar rows mount', async () => {
+    const { defineComponent } = await import('vue')
+    const { flushPromises, mount } = await import('@vue/test-utils')
+    const Probe = defineComponent({
+      setup() {
+        useFleetRegistry()
+        return () => null
+      },
+    })
+
+    const first = mount(Probe)
+    const second = mount(Probe)
+    await flushPromises()
+
+    expect(ensureCodeGraph).toHaveBeenCalledTimes(1)
+    expect(ensureCodeGraph).toHaveBeenCalledWith('/tmp/project-a')
+    first.unmount()
+    second.unmount()
   })
 })

@@ -31,6 +31,11 @@ const activeProjectId = ref<string | null>(null)
 const hasProjectVixlFlag = ref(false)
 const loaded = ref(false)
 let bootstrapPromise: Promise<void> | null = null
+let fleetBootstrapStarted = false
+
+export const resetFleetBootstrapForTests = (): void => {
+  fleetBootstrapStarted = false
+}
 
 type FleetProjectSnakeRecord = {
   id: string
@@ -252,11 +257,16 @@ export default () => {
   }
 
   onMounted(() => {
+    if (fleetBootstrapStarted) {
+      return
+    }
+    fleetBootstrapStarted = true
     void (async () => {
       try {
         await ensureFleetLoaded()
         await ensureDefaultProject()
       } catch (error) {
+        fleetBootstrapStarted = false
         toast.error('Failed to load fleet registry', {
           description: error instanceof Error ? error.message : 'Unknown error',
         })
