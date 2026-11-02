@@ -80,9 +80,7 @@ pub fn line_matches_host(line: &str, hostname: &str, port: u16) -> bool {
         return false;
     };
     let token = host_match_token(hostname, port);
-    names
-        .split(',')
-        .any(|name| name == token || name == hostname)
+    names.split(',').any(|name| name == token)
 }
 
 pub fn remove_vixl_known_host_lines(
@@ -240,5 +238,27 @@ mod tests {
         assert!(vixl_text.contains("other.example"));
         let user_text = fs::read_to_string(&user).expect("read user");
         assert!(user_text.contains("IUserLine"));
+    }
+
+    #[test]
+    fn remove_nonstandard_port_keeps_the_port_22_line() {
+        let dir = tempdir().expect("tempdir");
+        let vixl = dir.path().join("known_hosts");
+        fs::write(
+            &vixl,
+            "[appleseed.example]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAlt\nappleseed.example ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDefault\n",
+        )
+        .expect("write");
+        let removed =
+            remove_vixl_known_host_lines(&vixl, "appleseed.example", 2222).expect("remove");
+        assert_eq!(removed, 1);
+        let text = fs::read_to_string(&vixl).expect("read");
+        assert!(!text.contains("IAlt"));
+        assert!(text.contains("IDefault"));
+        let removed_default =
+            remove_vixl_known_host_lines(&vixl, "appleseed.example", 22).expect("remove 22");
+        assert_eq!(removed_default, 1);
+        let text = fs::read_to_string(&vixl).expect("read");
+        assert!(!text.contains("IDefault"));
     }
 }
