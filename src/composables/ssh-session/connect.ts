@@ -37,7 +37,21 @@ const rememberFormIdentity = (user: string, hostname: string, port: number): voi
   rememberSshIdentity(user, hostname, port, state.connectIdentity.value.trim())
 }
 
+const abandonOpenConnect = async (): Promise<void> => {
+  const current = state.activePreview.value
+  const connecting = state.connectPhase.value === 'connecting'
+  state.connectAttempt.value += 1
+  if (connecting && current) {
+    try {
+      await sshCancelConnect(current.user, current.hostname, current.port)
+    } catch {
+      void 0
+    }
+  }
+}
+
 export const openAddSsh = async (): Promise<void> => {
+  await abandonOpenConnect()
   state.resetConnectForm()
   state.connectMode.value = 'add'
   state.connectOpen.value = true
@@ -45,6 +59,7 @@ export const openAddSsh = async (): Promise<void> => {
 }
 
 export const openReconnect = async (project: FleetProject): Promise<void> => {
+  await abandonOpenConnect()
   state.resetConnectForm()
   state.connectMode.value = 'reconnect'
   fillFromProject(project)
@@ -167,10 +182,13 @@ export const confirmPreviewConnect = async (attempt: number): Promise<void> => {
   try {
     const status = await sshConnect(request)
     state.stopElapsed()
-    state.upsertSession(status)
     if (attempt !== state.connectAttempt.value) {
+      if (status.state !== 'connected') {
+        state.upsertSession(status)
+      }
       return
     }
+    state.upsertSession(status)
     state.toastedDeath.delete(state.sessionKeyOf(status.user, status.hostname, status.port))
     state.connectStatus.value = status.line
     if (status.state !== 'connected' && !status.masterAlive) {
