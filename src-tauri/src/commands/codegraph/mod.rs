@@ -13,7 +13,7 @@ mod stat;
 pub use cli::{codegraph_cli, validate_action};
 pub use delete::{delete_graph, resolve_graph_delete_dir};
 pub use env::codegraph_store_env_vars;
-pub use id::graph_id_for_root;
+pub use id::{graph_id_for_identity, graph_id_for_root};
 pub use list::list_graphs;
 pub use paths::{dir_size, graph_dir_for_root, graph_store_dir};
 pub use preload::{ensure_preload_file, rewrite_codegraph_path};

@@ -9,9 +9,15 @@ use notify::event::{ModifyKind, RenameMode};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tauri::async_runtime::JoinHandle;
 use tauri::{AppHandle, Emitter, Manager};
+use tokio::io::{AsyncBufReadExt, BufReader};
 
-use super::fs::{canonical_project_root, resolve_workspace_path};
+use super::fs::{canonical_project_root, parse_ssh_project_root, resolve_workspace_path};
 use super::skip_dirs::skip_directory;
+use super::ssh::{
+    close_channel, inotify_enospc, inotifywait_missing, is_ssh_root, key_for, login_command,
+    looks_like_enospc, map_unreachable, open_exec, posix_quote, probe_remote_program,
+    take_channel_stdio,
+};
 
 const DEBOUNCE_MS: u64 = 150;
 const MAX_PARENTS: usize = 50;
@@ -75,14 +81,133 @@ struct RootEntry {
     shared: Arc<Shared>,
 }
 
+struct RemoteWatch {
+    refcount: usize,
+    channel_id: String,
+    stopped: Arc<AtomicBool>,
+    done: tokio::sync::watch::Sender<Option<Result<(), String>>>,
+}
+
+enum RemoteClaim {
+    Joined(tokio::sync::watch::Receiver<Option<Result<(), String>>>),
+    Started(Arc<AtomicBool>),
+}
+
+fn claim_remote(map: &mut HashMap<String, RemoteWatch>, key: String) -> RemoteClaim {
+    if let Some(entry) = map.get_mut(&key) {
+        if !entry.stopped.load(Ordering::SeqCst) {
+            entry.refcount = entry.refcount.saturating_add(1);
+            return RemoteClaim::Joined(entry.done.subscribe());
+        }
+        if let Some(old) = map.remove(&key) {
+            let _ = old.done.send(Some(Ok(())));
+        }
+    }
+    let stopped = Arc::new(AtomicBool::new(false));
+    let (done, _) = tokio::sync::watch::channel(None);
+    map.insert(
+        key,
+        RemoteWatch {
+            refcount: 1,
+            channel_id: String::new(),
+            stopped: stopped.clone(),
+            done,
+        },
+    );
+    RemoteClaim::Started(stopped)
+}
+
+fn finish_remote_start(
+    map: &mut HashMap<String, RemoteWatch>,
+    key: &str,
+    stopped: &Arc<AtomicBool>,
+    result: Result<(), String>,
+) {
+    let still_starting = map
+        .get(key)
+        .is_some_and(|entry| Arc::ptr_eq(&entry.stopped, stopped) && entry.channel_id.is_empty());
+    if !still_starting {
+        return;
+    }
+    let Some(entry) = map.remove(key) else {
+        return;
+    };
+    entry.stopped.store(true, Ordering::SeqCst);
+    let _ = entry.done.send(Some(result));
+}
+
+fn release_remote_watch(map: &mut HashMap<String, RemoteWatch>, key: &str) -> String {
+    let Some(entry) = map.get_mut(key) else {
+        return String::new();
+    };
+    entry.refcount = entry.refcount.saturating_sub(1);
+    if entry.refcount > 0 {
+        return String::new();
+    }
+    entry.stopped.store(true, Ordering::SeqCst);
+    let channel_id = std::mem::take(&mut entry.channel_id);
+    let _ = entry.done.send(Some(Ok(())));
+    map.remove(key);
+    channel_id
+}
+
+async fn await_remote_claim(
+    mut rx: tokio::sync::watch::Receiver<Option<Result<(), String>>>,
+    key: String,
+) -> Result<String, String> {
+    loop {
+        let current = rx.borrow_and_update().clone();
+        if let Some(result) = current {
+            return result.map(|()| key);
+        }
+        if rx.changed().await.is_err() {
+            return Ok(key);
+        }
+    }
+}
+
+fn publish_remote_channel(
+    map: &mut HashMap<String, RemoteWatch>,
+    key: &str,
+    stopped: &Arc<AtomicBool>,
+    channel_id: String,
+) -> bool {
+    let Some(entry) = map.get_mut(key) else {
+        return false;
+    };
+    if !Arc::ptr_eq(&entry.stopped, stopped) || entry.stopped.load(Ordering::SeqCst) {
+        return false;
+    }
+    entry.channel_id = channel_id;
+    let _ = entry.done.send(Some(Ok(())));
+    true
+}
+
+fn fail_unpublished_remote(
+    map: &mut HashMap<String, RemoteWatch>,
+    key: &str,
+    stopped: &Arc<AtomicBool>,
+    err: String,
+) -> bool {
+    let still_ours = map
+        .get(key)
+        .is_some_and(|entry| Arc::ptr_eq(&entry.stopped, stopped));
+    if still_ours {
+        finish_remote_start(map, key, stopped, Err(err));
+    }
+    still_ours
+}
+
 pub struct WorkspaceWatchState {
     inner: Mutex<HashMap<String, RootEntry>>,
+    remote: Mutex<HashMap<String, RemoteWatch>>,
 }
 
 impl WorkspaceWatchState {
     pub fn new() -> Self {
         Self {
             inner: Mutex::new(HashMap::new()),
+            remote: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -537,11 +662,14 @@ fn start_session(app: AppHandle, root: PathBuf, shallow: bool) -> Result<Arc<Sha
 }
 
 #[tauri::command]
-pub fn watch_workspace(
+pub async fn watch_workspace(
     app: AppHandle,
     project_root: String,
     mode: Option<WorkspaceWatchMode>,
 ) -> Result<String, String> {
+    if is_ssh_root(&project_root) {
+        return watch_workspace_ssh(app, project_root).await;
+    }
     let root = canonical_project_root(&project_root)?;
     let key = root.to_string_lossy().to_string();
     let shallow = is_shallow_mode(mode);
@@ -604,8 +732,19 @@ fn unwatch_session_key(project_root: &str, contains_key: impl Fn(&str) -> bool) 
 }
 
 #[tauri::command]
-pub fn unwatch_workspace(app: AppHandle, project_root: String) -> Result<(), String> {
+pub async fn unwatch_workspace(app: AppHandle, project_root: String) -> Result<(), String> {
     let state = app.state::<WorkspaceWatchState>();
+    if is_ssh_root(&project_root) {
+        let key = project_root.trim().to_string();
+        let channel_id = {
+            let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+            release_remote_watch(&mut map, &key)
+        };
+        if !channel_id.is_empty() {
+            let _ = close_channel(channel_id).await;
+        }
+        return Ok(());
+    }
     let mut map = state.inner.lock().map_err(|error| error.to_string())?;
     let Some(key) = unwatch_session_key(&project_root, |candidate| map.contains_key(candidate))
     else {
@@ -629,6 +768,15 @@ pub fn watch_workspace_paths(
     project_root: String,
     paths: Vec<String>,
 ) -> Result<(), String> {
+    if is_ssh_root(&project_root) {
+        let key = project_root.trim().to_string();
+        let state = app.state::<WorkspaceWatchState>();
+        let map = state.remote.lock().map_err(|error| error.to_string())?;
+        if map.contains_key(&key) {
+            return Ok(());
+        }
+        return Err("Workspace is not being watched".to_string());
+    }
     let root = canonical_project_root(&project_root)?;
     let key = root.to_string_lossy().to_string();
     let state = app.state::<WorkspaceWatchState>();
@@ -642,6 +790,165 @@ pub fn watch_workspace_paths(
     let shared = Arc::clone(&entry.shared);
     drop(map);
     replace_non_recursive_watches(&shared, &paths)
+}
+
+async fn watch_workspace_ssh(app: AppHandle, project_root: String) -> Result<String, String> {
+    let key = project_root.trim().to_string();
+    let ssh = parse_ssh_project_root(&key)?;
+    let state = app.state::<WorkspaceWatchState>();
+    let claim = {
+        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+        claim_remote(&mut map, key.clone())
+    };
+    let stopped = match claim {
+        RemoteClaim::Joined(rx) => return await_remote_claim(rx, key).await,
+        RemoteClaim::Started(stopped) => stopped,
+    };
+    if let Err(err) = open_remote_inotify(&ssh).await {
+        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+        finish_remote_start(&mut map, &key, &stopped, Err(err.clone()));
+        return Err(err);
+    }
+    let mut stdio = match take_remote_inotify_stdio(&ssh).await {
+        Ok(stdio) => stdio,
+        Err(err) => {
+            let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+            finish_remote_start(&mut map, &key, &stopped, Err(err.clone()));
+            return Err(err);
+        }
+    };
+    drop(stdio.stdin);
+    let channel_id = stdio.channel_id.clone();
+    if stopped.load(Ordering::SeqCst) {
+        {
+            let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+            finish_remote_start(&mut map, &key, &stopped, Ok(()));
+        }
+        let _ = close_channel(channel_id).await;
+        return Ok(key);
+    }
+    let hostname = ssh.hostname.clone();
+    let stderr_stopped = stopped.clone();
+    let stderr_channel = channel_id.clone();
+    if let Some(stderr) = stdio.stderr.take() {
+        tokio::spawn(async move {
+            let mut lines = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                if looks_like_enospc(&line) {
+                    stderr_stopped.store(true, Ordering::SeqCst);
+                    log::warn!("{}", inotify_enospc(&hostname));
+                    let _ = close_channel(stderr_channel).await;
+                    break;
+                }
+            }
+        });
+    }
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    if stopped.load(Ordering::SeqCst) {
+        let unwatched = {
+            let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+            let unwatched = map
+                .get(&key)
+                .is_none_or(|entry| !Arc::ptr_eq(&entry.stopped, &stopped));
+            if !unwatched {
+                finish_remote_start(&mut map, &key, &stopped, Err(inotify_enospc(&ssh.hostname)));
+            }
+            unwatched
+        };
+        let _ = close_channel(channel_id).await;
+        if unwatched {
+            return Ok(key);
+        }
+        return Err(inotify_enospc(&ssh.hostname));
+    }
+    let published = {
+        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+        publish_remote_channel(&mut map, &key, &stopped, channel_id.clone())
+    };
+    if !published {
+        let owned = {
+            let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+            fail_unpublished_remote(&mut map, &key, &stopped, inotify_enospc(&ssh.hostname))
+        };
+        stopped.store(true, Ordering::SeqCst);
+        let _ = close_channel(channel_id).await;
+        if owned {
+            return Err(inotify_enospc(&ssh.hostname));
+        }
+        return Ok(key);
+    }
+    let remote_path = ssh.remote_path.clone();
+    let root_path = key.clone();
+    let stdout_stopped = stopped.clone();
+    let app_watch = app.clone();
+    tokio::spawn(async move {
+        let mut lines = BufReader::new(stdio.stdout).lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            if stdout_stopped.load(Ordering::SeqCst) {
+                break;
+            }
+            if let Some(payload) = remote_watch_payload(&root_path, &remote_path, &line) {
+                let _ = app_watch.emit("workspace-tree-changed", payload);
+            }
+        }
+    });
+    Ok(key)
+}
+
+async fn open_remote_inotify(ssh: &crate::commands::fs::SshProjectRoot) -> Result<(), String> {
+    probe_remote_program(ssh, "inotifywait")
+        .await
+        .map_err(|err| {
+            if err.contains("is not installed") {
+                inotifywait_missing(&ssh.hostname)
+            } else {
+                err
+            }
+        })?;
+    Ok(())
+}
+
+async fn take_remote_inotify_stdio(
+    ssh: &crate::commands::fs::SshProjectRoot,
+) -> Result<crate::commands::ssh::ChannelStdio, String> {
+    let command = format!(
+        "inotifywait -m -r -e create,delete,move,modify --format '%w%f|%e' {}",
+        posix_quote(&ssh.remote_path)
+    );
+    let info = open_exec(key_for(ssh), login_command(&ssh.remote_path, &command))
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    take_channel_stdio(&info.channel_id)
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))
+}
+
+fn remote_watch_payload(
+    root_path: &str,
+    remote_path: &str,
+    line: &str,
+) -> Option<WorkspaceTreeChanged> {
+    let path = line.split('|').next().unwrap_or(line).trim();
+    if path.is_empty() {
+        return None;
+    }
+    let relative = path
+        .strip_prefix(remote_path)
+        .unwrap_or(path)
+        .trim_start_matches('/');
+    let relative_path = Path::new(relative);
+    if relative_is_excluded(relative_path) {
+        return None;
+    }
+    let parent = relative_path
+        .parent()
+        .map(normalize_rel)
+        .unwrap_or_else(|| ".".to_string());
+    Some(WorkspaceTreeChanged {
+        root_path: root_path.to_string(),
+        directories: vec![parent],
+        rescan: false,
+    })
 }
 
 #[cfg(test)]
@@ -673,6 +980,96 @@ mod tests {
             &mut burst,
         );
         burst
+    }
+
+    #[test]
+    fn unwatch_during_ssh_setup_drops_the_claim() {
+        let mut map = HashMap::new();
+        let stopped = match claim_remote(
+            &mut map,
+            "ssh://johnny@appleseed.example/home/johnny".into(),
+        ) {
+            RemoteClaim::Started(stopped) => stopped,
+            RemoteClaim::Joined(_) => panic!("first claim should start"),
+        };
+        let joined = match claim_remote(
+            &mut map,
+            "ssh://johnny@appleseed.example/home/johnny".into(),
+        ) {
+            RemoteClaim::Joined(joined) => joined,
+            RemoteClaim::Started(_) => panic!("second claim should join"),
+        };
+        assert!(
+            release_remote_watch(&mut map, "ssh://johnny@appleseed.example/home/johnny").is_empty()
+        );
+        assert!(map.contains_key("ssh://johnny@appleseed.example/home/johnny"));
+        release_remote_watch(&mut map, "ssh://johnny@appleseed.example/home/johnny");
+        assert_eq!(joined.borrow().clone(), Some(Ok(())));
+        assert!(!publish_remote_channel(
+            &mut map,
+            "ssh://johnny@appleseed.example/home/johnny",
+            &stopped,
+            "channel".into(),
+        ));
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn failed_ssh_setup_removes_its_claim() {
+        let mut map = HashMap::new();
+        let key = "ssh://johnny@appleseed.example/home/johnny";
+        let stopped = match claim_remote(&mut map, key.into()) {
+            RemoteClaim::Started(stopped) => stopped,
+            RemoteClaim::Joined(_) => panic!("first claim should start"),
+        };
+        let joined = match claim_remote(&mut map, key.into()) {
+            RemoteClaim::Joined(joined) => joined,
+            RemoteClaim::Started(_) => panic!("second claim should join"),
+        };
+        finish_remote_start(
+            &mut map,
+            key,
+            &stopped,
+            Err("appleseed.example is unreachable.".into()),
+        );
+        assert_eq!(
+            joined.borrow().clone(),
+            Some(Err("appleseed.example is unreachable.".into()))
+        );
+        assert!(map.is_empty());
+        assert!(matches!(
+            claim_remote(&mut map, key.into()),
+            RemoteClaim::Started(_)
+        ));
+    }
+
+    #[test]
+    fn stopped_watch_publish_wakes_the_joiner() {
+        let mut map = HashMap::new();
+        let key = "ssh://johnny@appleseed.example/home/johnny";
+        let stopped = match claim_remote(&mut map, key.into()) {
+            RemoteClaim::Started(stopped) => stopped,
+            RemoteClaim::Joined(_) => panic!("first claim should start"),
+        };
+        let joined = match claim_remote(&mut map, key.into()) {
+            RemoteClaim::Joined(joined) => joined,
+            RemoteClaim::Started(_) => panic!("second claim should join"),
+        };
+        stopped.store(true, Ordering::SeqCst);
+        assert!(!publish_remote_channel(
+            &mut map,
+            key,
+            &stopped,
+            "channel".into(),
+        ));
+        assert!(fail_unpublished_remote(
+            &mut map,
+            key,
+            &stopped,
+            "inotify limit".into(),
+        ));
+        assert_eq!(joined.borrow().clone(), Some(Err("inotify limit".into())));
+        assert!(map.is_empty());
     }
 
     #[test]

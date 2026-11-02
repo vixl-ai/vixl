@@ -13,6 +13,7 @@ import {
   withProjectRoots,
 } from '@/services/harness/tool-roots'
 import withEditFileLock from './edit-file-lock'
+import { previewIgnoringSensitiveBlock } from '@/services/harness/ssh/preview'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const editFile = (ctx: HarnessToolContext) =>
@@ -31,15 +32,19 @@ const editFile = (ctx: HarnessToolContext) =>
       const lockKey = `${ctx.projectRoot}\0${gatedPath}`
       return withEditFileLock(lockKey, async () => {
         const previewDiffs = mapDiffs(
-          await fsStagePreviewEdit(
-            withProjectRoots(
-              {
-                projectRoot: ctx.projectRoot,
-                path,
-                replacements,
-              },
-              ctx,
-            ),
+          await previewIgnoringSensitiveBlock(
+            () =>
+              fsStagePreviewEdit(
+                withProjectRoots(
+                  {
+                    projectRoot: ctx.projectRoot,
+                    path,
+                    replacements,
+                  },
+                  ctx,
+                ),
+              ),
+            [],
           ),
         )
         const allowed = await gateToolPermission({
@@ -63,6 +68,7 @@ const editFile = (ctx: HarnessToolContext) =>
               projectRoot: ctx.projectRoot,
               path,
               replacements,
+              allowSensitive: true,
             },
             ctx,
           ),

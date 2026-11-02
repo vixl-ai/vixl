@@ -3,6 +3,7 @@ import {
   HOME_PROJECT_SCOPE_ERROR,
   isHomeWorkspaceRoot,
 } from '@/services/config/is-home-workspace-root'
+import { webviewMustNotCallGenericSecrets } from '@/utils/ssh-secret-keys'
 import { call } from './helpers'
 import type {
   ConfigScope,
@@ -111,12 +112,20 @@ export const writeLspConfig = async (config: Record<string, unknown> | boolean):
 export const watchVixlPaths = (projectRoot?: string | null): Promise<void> =>
   call('watch_vixl_paths', { projectRoot: projectRoot ?? null })
 
-export const getSecret = (key: string): Promise<string | null> => call('get_secret', { key })
+export const getSecret = (key: string): Promise<string | null> => {
+  webviewMustNotCallGenericSecrets(key)
+  return call('get_secret', { key })
+}
 
-export const setSecret = (key: string, value: string): Promise<void> =>
-  call('set_secret', { key, value })
+export const setSecret = (key: string, value: string): Promise<void> => {
+  webviewMustNotCallGenericSecrets(key)
+  return call('set_secret', { key, value })
+}
 
-export const deleteSecret = (key: string): Promise<void> => call('delete_secret', { key })
+export const deleteSecret = (key: string): Promise<void> => {
+  webviewMustNotCallGenericSecrets(key)
+  return call('delete_secret', { key })
+}
 
 export const configExists = (scope: ConfigScope, rootPath?: string | null): Promise<boolean> =>
   call('config_exists', { scope, rootPath: rootPath ?? null })

@@ -2,7 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Folder, FolderOpen, FolderCog, PanelLeftClose, Plus, FileCode, Terminal } from '@lucide/vue'
+import { Folder, FolderOpen, FolderSymlink, FolderCog, PanelLeftClose, Plus, FileCode, Terminal, Unplug, Plug, Cable } from '@lucide/vue'
+import useProjectRowSsh from '@/composables/use-project-row-ssh'
 import type { FleetSidebarProject } from '@/types/fleet/fleet-sidebar-project'
 import {
   Collapsible,
@@ -26,11 +27,10 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
 } from '@/components/shadcn/ui/sidebar'
 import NavigationAsideLeftChatListItem from '@/components/navigation/aside/left/ChatListItem.vue'
 import NavigationAsideLeftWorktreeRow from '@/components/navigation/aside/left/WorktreeRow.vue'
+import NavigationAsideLeftSidebarVirtualList from '@/components/navigation/aside/left/SidebarVirtualList.vue'
 import GroupStackIcon from '@/components/navigation/aside/left/GroupStackIcon.vue'
 import useChatStore from '@/composables/use-chat-store'
 import useFleetRegistry from '@/composables/use-fleet-registry'
@@ -61,6 +61,17 @@ const manualOpen = ref<boolean | null>(null)
 const isGroup = computed(() => props.project.kind === 'group')
 const resolveRowWorkspace = () => resolveProjectRowWorkspace(props.project, fleet)
 const parentRootPath = computed(() => resolveRowWorkspace()?.projectRoot ?? null)
+const {
+  isSshProject,
+  sshConnected,
+  handleReconnect,
+  handleDisconnect,
+  handleForwardPort,
+} = useProjectRowSsh(
+  computed(() => props.project),
+  isGroup,
+  resolveRowWorkspace,
+)
 const worktrees = computed(() => props.project.worktrees ?? [])
 const timeline = computed(() =>
   buildSidebarProjectTimeline(
@@ -68,6 +79,40 @@ const timeline = computed(() =>
     parentRootPath.value ? worktrees.value : [],
   ),
 )
+
+const timelineKey = (index: number): string => {
+  const item = timeline.value[index]
+  if (!item) {
+    return `missing:${index}`
+  }
+  return item.kind === 'chat'
+    ? `chat:${item.chat.id}`
+    : `worktree:${item.project.slug}`
+}
+
+const timelineChat = (index: number) => {
+  const item = timeline.value[index]
+  return item?.kind === 'chat' ? item.chat : null
+}
+
+const timelineWorktree = (index: number) => {
+  const item = timeline.value[index]
+  return item?.kind === 'worktree' ? item.project : null
+}
+
+const worktreeAt = (index: number): { project: FleetSidebarProject; root: string }[] => {
+  const root = parentRootPath.value
+  const project = timelineWorktree(index)
+  if (!root || !project) {
+    return []
+  }
+  return [{ project, root }]
+}
+
+const chatAt = (index: number) => {
+  const chat = timelineChat(index)
+  return chat ? [chat] : []
+}
 
 const projectOpen = computed({
   get: (): boolean =>
@@ -219,6 +264,26 @@ const handleOpenTerminal = async (): Promise<void> => {
               <span v-if="isGroup" class="inline-flex size-4 shrink-0">
                 <GroupStackIcon :slug="project.slug" :open="projectOpen" />
               </span>
+              <Tooltip v-else-if="isSshProject">
+                <TooltipTrigger as-child>
+                  <span
+                    class="relative inline-flex size-4 shrink-0"
+                    :class="sshConnected
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'"
+                  >
+                    <FolderSymlink
+                      class="size-4 shrink-0 opacity-100 transition-all duration-150 group-data-[state=open]/collapsible:scale-90 group-data-[state=open]/collapsible:rotate-6 group-data-[state=open]/collapsible:opacity-0"
+                    />
+                    <FolderOpen
+                      class="pointer-events-none absolute inset-0 size-4 shrink-0 scale-90 -rotate-6 opacity-0 transition-all duration-150 group-data-[state=open]/collapsible:scale-100 group-data-[state=open]/collapsible:rotate-0 group-data-[state=open]/collapsible:opacity-100"
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {{ sshConnected ? 'connected' : 'offline' }}
+                </TooltipContent>
+              </Tooltip>
               <span v-else class="relative inline-flex size-4 shrink-0">
                 <Folder
                   class="size-4 shrink-0 opacity-100 transition-all duration-150 group-data-[state=open]/collapsible:scale-90 group-data-[state=open]/collapsible:rotate-6 group-data-[state=open]/collapsible:opacity-0"
@@ -244,6 +309,21 @@ const handleOpenTerminal = async (): Promise<void> => {
             <Terminal />
             Open Terminal
           </ContextMenuItem>
+          <template v-if="isSshProject">
+            <ContextMenuSeparator />
+            <ContextMenuItem @select="handleReconnect">
+              <Plug />
+              Reconnect
+            </ContextMenuItem>
+            <ContextMenuItem v-if="sshConnected" @select="handleDisconnect">
+              <Unplug />
+              Disconnect
+            </ContextMenuItem>
+            <ContextMenuItem @select="handleForwardPort">
+              <Cable />
+              Forward a port
+            </ContextMenuItem>
+          </template>
           <ContextMenuSeparator />
           <ContextMenuItem
             :disabled="removingProject"
@@ -274,26 +354,26 @@ const handleOpenTerminal = async (): Promise<void> => {
       <CollapsibleContent
         class="overflow-hidden data-[state=closed]:animate-sidebar-collapsible-up data-[state=open]:animate-sidebar-collapsible-down"
       >
-        <div class="min-w-0 max-h-42 scroll-fade-b scrollbar-none overflow-x-hidden overflow-y-auto pl-3.5">
-          <SidebarMenuSub class="mx-0 gap-0.5">
-            <template
-              v-for="item in timeline"
-              :key="item.kind === 'chat' ? `chat:${item.chat.id}` : `worktree:${item.project.slug}`"
-            >
-              <NavigationAsideLeftWorktreeRow
-                v-if="item.kind === 'worktree' && parentRootPath"
-                :project="item.project"
-                :parent-root-path="parentRootPath"
-              />
-              <SidebarMenuSubItem v-else-if="item.kind === 'chat'">
-                <NavigationAsideLeftChatListItem
-                  :chat="item.chat"
-                  :project-slug="project.slug"
-                />
-              </SidebarMenuSubItem>
-            </template>
-          </SidebarMenuSub>
-        </div>
+        <NavigationAsideLeftSidebarVirtualList
+          class="pl-3.5"
+          :count="timeline.length"
+          :key-at="timelineKey"
+        >
+          <template #default="{ index }">
+            <NavigationAsideLeftWorktreeRow
+              v-for="row in worktreeAt(index)"
+              :key="row.project.slug"
+              :project="row.project"
+              :parent-root-path="row.root"
+            />
+            <NavigationAsideLeftChatListItem
+              v-for="chat in chatAt(index)"
+              :key="chat.id"
+              :chat="chat"
+              :project-slug="project.slug"
+            />
+          </template>
+        </NavigationAsideLeftSidebarVirtualList>
       </CollapsibleContent>
     </SidebarMenuItem>
   </Collapsible>

@@ -8,6 +8,7 @@ import RightSidebarProvider from '@/components/navigation/aside/right/RightSideb
 import RightSidebar from '@/components/navigation/aside/right/RightSidebar.vue'
 import WorkbenchWorkbenchShell from '@/components/workbench/WorkbenchShell.vue'
 import WorkbenchWorkbenchTabDuplicateDialog from '@/components/workbench/WorkbenchTabDuplicateDialog.vue'
+import SshSessionHost from '@/components/ssh/SshSessionHost.vue'
 import WorkbenchHeader from '@/components/workbench/WorkbenchHeader.vue'
 import TitleBar from '@/components/navigation/header/TitleBar.vue'
 import WindowResizeHandles from '@/components/navigation/header/WindowResizeHandles.vue'
@@ -167,6 +168,7 @@ watch(rightSidebarOpen, (open) => {
     <Toaster />
     <NavigationCommandPalette />
     <WorkbenchWorkbenchTabDuplicateDialog />
+    <SshSessionHost />
   </SidebarProvider>
   <WindowResizeHandles />
 </template>

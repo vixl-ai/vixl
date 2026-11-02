@@ -40,6 +40,7 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
     unwatchWorkspace: vi.fn<() => Promise<void>>(async () => undefined),
     watchWorkspacePaths: vi.fn<() => Promise<void>>(async () => undefined),
     fsWriteFile: vi.fn<() => Promise<unknown>>(),
+    fsDelete: vi.fn<() => Promise<void>>(async () => undefined),
     fsEditFile: vi.fn<() => Promise<unknown>>(),
     fsApplyPatch: vi.fn<() => Promise<unknown>>(),
     fsStagePreviewWrite: vi.fn<() => Promise<unknown>>(),
@@ -50,6 +51,8 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
         (
           projectRoot: string,
           path: string,
+          projectRoots?: unknown,
+          allowSensitive?: boolean,
         ) => Promise<{ path: string; exists: boolean; kind: string; size: number }>
       >()
       .mockResolvedValue({
@@ -81,6 +84,28 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
           },
         ],
         skippedOversize: [],
+      }),
+    fileCheckpointLoad: vi
+      .fn<
+        () => Promise<{ skipped: boolean; existed: boolean; content?: string | null }>
+      >()
+      .mockResolvedValue({ skipped: true, existed: false, content: null }),
+    sshSessionStatus: vi
+      .fn<
+        () => Promise<{
+          user: string
+          hostname: string
+          port: number
+          state: string
+          masterAlive: boolean
+        }>
+      >()
+      .mockResolvedValue({
+        user: 'aidanhibbard',
+        hostname: 'eva',
+        port: 22,
+        state: 'connected',
+        masterAlive: true,
       }),
     fileCheckpointRestore: vi
       .fn<

@@ -75,6 +75,7 @@ export default defineConfigWithVueTs(
       'src/components/workbench/tabs/PlanTab.vue',
       'src/components/navigation/aside/left/ChatListItem.vue',
       'src/components/workbench/WorkbenchLspStatus.vue',
+      'src/components/navigation/aside/left/ProjectRow.vue',
     ],
     rules: {
       'max-lines': 'off',

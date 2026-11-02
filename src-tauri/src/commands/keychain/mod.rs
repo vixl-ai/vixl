@@ -17,8 +17,9 @@ pub use backend::{
 };
 pub use file::{read_vault_file, vault_file_path, write_vault_file};
 pub use vault::{
-    merge_legacy_into_map, parse_vault, require_vixl_key, serialize_vault, vault_from_file_read,
-    vault_from_os_read, LoadedVault, VaultMap, VAULT_ACCOUNT,
+    deny_ssh_vault_from_webview, merge_legacy_into_map, parse_vault, require_vixl_key,
+    serialize_vault, vault_from_file_read, vault_from_os_read, webview_secret_command_prepare,
+    LoadedVault, VaultMap, SSH_PASSPHRASE_PREFIX, SSH_PASSWORD_PREFIX, VAULT_ACCOUNT,
 };
 
 struct VaultState {
@@ -91,48 +92,77 @@ fn migrate_legacy_into_vault(state: &mut VaultState, key: &str) -> Result<Option
     Ok(value)
 }
 
-#[tauri::command]
-pub fn get_secret(app: AppHandle, key: String) -> Result<Option<String>, String> {
-    require_vixl_key(&key)?;
+pub(crate) fn vault_get(app: &AppHandle, key: &str) -> Result<Option<String>, String> {
+    require_vixl_key(key)?;
     let mut state = VAULT
         .lock()
         .map_err(|_| "Keychain vault lock poisoned".to_string())?;
-    ensure_vault_loaded(&app, &mut state)?;
-    if let Some(value) = state.map.get(&key) {
+    ensure_vault_loaded(app, &mut state)?;
+    if let Some(value) = state.map.get(key) {
         return Ok(Some(value.clone()));
     }
     if !state.allow_legacy_probe {
         return Ok(None);
     }
-    migrate_legacy_into_vault(&mut state, &key)
+    migrate_legacy_into_vault(&mut state, key)
+}
+
+pub(crate) fn vault_set(app: &AppHandle, key: &str, value: String) -> Result<(), String> {
+    require_vixl_key(key)?;
+    let mut state = VAULT
+        .lock()
+        .map_err(|_| "Keychain vault lock poisoned".to_string())?;
+    ensure_vault_loaded(app, &mut state)?;
+    state.map.insert(key.to_string(), value);
+    persist_vault(app, &mut state)?;
+    if state.allow_legacy_probe {
+        let _ = delete_legacy_secret(key);
+    }
+    Ok(())
+}
+
+pub(crate) fn vault_delete(app: &AppHandle, key: &str) -> Result<(), String> {
+    require_vixl_key(key)?;
+    let mut state = VAULT
+        .lock()
+        .map_err(|_| "Keychain vault lock poisoned".to_string())?;
+    ensure_vault_loaded(app, &mut state)?;
+    state.map.remove(key);
+    persist_vault(app, &mut state)?;
+    if state.allow_legacy_probe {
+        let _ = delete_legacy_secret(key);
+    }
+    Ok(())
+}
+
+pub(crate) fn vault_keys_prefixed(app: &AppHandle, prefix: &str) -> Result<Vec<String>, String> {
+    require_vixl_key(prefix)?;
+    let mut state = VAULT
+        .lock()
+        .map_err(|_| "Keychain vault lock poisoned".to_string())?;
+    ensure_vault_loaded(app, &mut state)?;
+    Ok(state
+        .map
+        .keys()
+        .filter(|key| key.starts_with(prefix))
+        .cloned()
+        .collect())
+}
+
+#[tauri::command]
+pub fn get_secret(app: AppHandle, key: String) -> Result<Option<String>, String> {
+    webview_secret_command_prepare(&key)?;
+    vault_get(&app, &key)
 }
 
 #[tauri::command]
 pub fn set_secret(app: AppHandle, key: String, value: String) -> Result<(), String> {
-    require_vixl_key(&key)?;
-    let mut state = VAULT
-        .lock()
-        .map_err(|_| "Keychain vault lock poisoned".to_string())?;
-    ensure_vault_loaded(&app, &mut state)?;
-    state.map.insert(key.clone(), value);
-    persist_vault(&app, &mut state)?;
-    if state.allow_legacy_probe {
-        let _ = delete_legacy_secret(&key);
-    }
-    Ok(())
+    webview_secret_command_prepare(&key)?;
+    vault_set(&app, &key, value)
 }
 
 #[tauri::command]
 pub fn delete_secret(app: AppHandle, key: String) -> Result<(), String> {
-    require_vixl_key(&key)?;
-    let mut state = VAULT
-        .lock()
-        .map_err(|_| "Keychain vault lock poisoned".to_string())?;
-    ensure_vault_loaded(&app, &mut state)?;
-    state.map.remove(&key);
-    persist_vault(&app, &mut state)?;
-    if state.allow_legacy_probe {
-        let _ = delete_legacy_secret(&key);
-    }
-    Ok(())
+    webview_secret_command_prepare(&key)?;
+    vault_delete(&app, &key)
 }

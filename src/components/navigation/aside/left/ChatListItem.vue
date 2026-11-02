@@ -2,7 +2,9 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { CircleAlert, GitFork, KeyRound, MessageCircleQuestion, Pencil, Pin, PinOff, ShieldAlert, Trash2 } from '@lucide/vue'
+import { CircleAlert, GitFork, KeyRound, MessageCircleQuestion, Pencil, Pin, PinOff, ShieldAlert, Trash2, Unplug } from '@lucide/vue'
+import { chatStatusKind } from '@/utils/chat-status-kind'
+import useSshSession from '@/composables/use-ssh-session'
 import type { FleetSidebarChat } from '@/types/fleet/fleet-sidebar-chat'
 import NavigationAsideLeftChatRunningDots from '@/components/navigation/aside/left/ChatRunningDots.vue'
 import {
@@ -35,7 +37,9 @@ import { Input } from '@/components/shadcn/ui/input'
 import { SidebarMenuSubButton } from '@/components/shadcn/ui/sidebar'
 import { dropAgentHarness } from '@/composables/use-agent-harness'
 import useChatStore from '@/composables/use-chat-store'
+import useFleetRegistry from '@/composables/use-fleet-registry'
 import useFleetSidebar, { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
+import useWorkbenchStore from '@/composables/use-workbench-store'
 import { isHomeChatSlug } from '@/constants/home-chat'
 import { dropPlanExecutionSession } from '@/services/harness/plan-execution-session'
 import { killShellsForChat } from '@/services/harness/shell/registry'
@@ -95,26 +99,26 @@ const displayAttention = computed(
   () => liveMeta.value?.attention ?? props.chat.attention ?? null,
 )
 
+const ssh = useSshSession()
+const projectRoot = computed(
+  () =>
+    fleet.projects.value.find((project) => project.slug === props.projectSlug)?.rootPath ??
+    null,
+)
+const statusDisplay = computed(() =>
+  chatStatusKind({
+    status: displayStatus.value,
+    attention: displayAttention.value,
+    sshDisconnected: ssh.isDisconnectedRoot(projectRoot.value),
+    sshNeedsInput: ssh.needsInputForRoot(projectRoot.value),
+  }),
+)
+
 const statusLabel = computed((): string | null => {
-  if (displayStatus.value === 'running') {
-    return 'Running'
+  if (statusDisplay.value.kind === 'idle') {
+    return null
   }
-  if (displayAttention.value === 'needs_approval') {
-    return 'Needs approval'
-  }
-  if (displayAttention.value === 'needs_input') {
-    return 'Needs input'
-  }
-  if (displayAttention.value === 'needs_mcp_auth') {
-    return 'Needs MCP auth'
-  }
-  if (displayAttention.value === 'completed') {
-    return 'Done'
-  }
-  if (displayAttention.value === 'error') {
-    return 'Error'
-  }
-  return null
+  return statusDisplay.value.label
 })
 
 const openChat = async (): Promise<void> => {
@@ -270,30 +274,35 @@ watch(
           {{ chat.title }}
         </span>
         <NavigationAsideLeftChatRunningDots
-          v-if="displayStatus === 'running'"
+          v-if="statusDisplay.kind === 'running'"
         />
         <ShieldAlert
-          v-else-if="displayAttention === 'needs_approval'"
+          v-else-if="statusDisplay.kind === 'needs_approval'"
           class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
           aria-label="Needs approval"
         />
         <MessageCircleQuestion
-          v-else-if="displayAttention === 'needs_input'"
+          v-else-if="statusDisplay.kind === 'needs_input'"
           class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
           aria-label="Needs input"
         />
         <KeyRound
-          v-else-if="displayAttention === 'needs_mcp_auth'"
+          v-else-if="statusDisplay.kind === 'needs_mcp_auth'"
           class="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
           aria-label="Needs MCP auth"
         />
+        <Unplug
+          v-else-if="statusDisplay.kind === 'disconnected'"
+          class="size-3.5 shrink-0 text-muted-foreground"
+          aria-label="Disconnected"
+        />
         <span
-          v-else-if="displayAttention === 'completed'"
+          v-else-if="statusDisplay.kind === 'completed'"
           class="size-1.5 shrink-0 rounded-full bg-[#D4C1EC]"
           aria-label="Done"
         />
         <CircleAlert
-          v-else-if="displayAttention === 'error'"
+          v-else-if="statusDisplay.kind === 'error'"
           class="size-3.5 shrink-0 text-destructive"
           aria-label="Error"
         />

@@ -4,13 +4,16 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
-use super::copy_active_plan::copy_active_plan_to_root;
+use super::copy_active_plan::copy_active_plan_for_move;
 use super::meta::{now_iso, ChatMeta};
 use super::paths::chat_dir_path;
 use super::rewrite_checkpoints::rewrite_file_checkpoints_for_root;
 use super::store;
-use crate::commands::fs::canonical_project_root;
-use crate::commands::registry::{add_or_update_project, registry_set_active_project, FleetProject};
+use crate::commands::fs::{canonical_project_root, ensure_ssh_project_directory_await};
+use crate::commands::registry::{
+    add_or_update_project, registry_set_active_project, roots_match, FleetProject,
+};
+use crate::commands::ssh::{is_ssh_root, parse_root, ssh_uri_for};
 use crate::db::AppDb;
 
 #[derive(Serialize)]
@@ -45,12 +48,44 @@ impl From<FleetProject> for FleetProjectView {
 pub(crate) fn resolve_destination_root(
     root_path: &str,
     current_root: &str,
-) -> Result<PathBuf, String> {
+) -> Result<String, String> {
+    resolve_local_destination(root_path, current_root)
+}
+
+async fn resolve_destination_root_command(
+    root_path: &str,
+    current_root: &str,
+) -> Result<String, String> {
+    if is_ssh_root(root_path) {
+        let uri = prepare_ssh_destination(root_path, current_root)?;
+        ensure_ssh_project_directory_await(&uri).await?;
+        return Ok(uri);
+    }
+    let root_path = root_path.to_string();
+    let current_root = current_root.to_string();
+    tokio::task::spawn_blocking(move || resolve_local_destination(&root_path, &current_root))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+fn resolve_local_destination(root_path: &str, current_root: &str) -> Result<String, String> {
     let canonical = canonical_project_root(root_path)?;
     if same_project_root(current_root, &canonical) {
         return Err("Destination is the chat's current project root".to_string());
     }
-    Ok(canonical)
+    Ok(canonical.to_string_lossy().to_string())
+}
+
+pub(crate) fn prepare_ssh_destination(
+    root_path: &str,
+    current_root: &str,
+) -> Result<String, String> {
+    let parsed = parse_root(root_path)?;
+    let uri = ssh_uri_for(&parsed, &parsed.remote_path);
+    if roots_match(current_root, &uri) {
+        return Err("Destination is the chat's current project root".to_string());
+    }
+    Ok(uri)
 }
 
 fn same_project_root(current_root: &str, dest: &Path) -> bool {
@@ -123,9 +158,9 @@ fn rollback_chat_directory(
 }
 
 #[tauri::command]
-pub fn move_chat_to_workspace(
+pub async fn move_chat_to_workspace(
     app: AppHandle,
-    db: State<AppDb>,
+    db: State<'_, AppDb>,
     from_project_slug: String,
     chat_id: String,
     root_path: String,
@@ -135,9 +170,9 @@ pub fn move_chat_to_workspace(
         store::get_chat(&conn, &from_project_slug, &chat_id)?
     };
     let old_root = record.meta.project_root.clone();
-    let dest_root = resolve_destination_root(&root_path, &old_root)?;
-    let dest_root_str = dest_root.to_string_lossy().to_string();
-    let project = add_or_update_project(&app, folder_name(&dest_root), dest_root_str)?;
+    let dest_root_str = resolve_destination_root_command(&root_path, &old_root).await?;
+    let project =
+        add_or_update_project(&app, folder_name(Path::new(&dest_root_str)), dest_root_str)?;
     registry_set_active_project(app.clone(), Some(project.id.clone()))?;
 
     let dest_dir = rename_chat_directory(&app, &from_project_slug, &project.slug, &chat_id)?;
@@ -167,7 +202,9 @@ pub fn move_chat_to_workspace(
     }
 
     if let Some(plan_path) = meta.active_plan_path.as_deref() {
-        if let Err(error) = copy_active_plan_to_root(&old_root, &project.root_path, plan_path) {
+        if let Err(error) =
+            copy_active_plan_for_move(&old_root, &project.root_path, plan_path).await
+        {
             log::warn!("Failed to copy active plan after workspace move: {error}");
         }
     }
@@ -180,7 +217,7 @@ pub fn move_chat_to_workspace(
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_destination_root;
+    use super::{prepare_ssh_destination, resolve_destination_root};
     use std::fs;
     use std::path::PathBuf;
     use uuid::Uuid;
@@ -227,5 +264,29 @@ mod tests {
         let error = resolve_destination_root(file.to_str().expect("utf-8"), "/tmp/other")
             .expect_err("file is not a dir");
         assert!(error.contains("not a directory") || error.contains("Invalid project root"));
+    }
+
+    #[test]
+    fn reject_same_ssh_root_without_connecting() {
+        let root = "ssh://aidanhibbard@eva.local/home/aidanhibbard/proj";
+        let error = prepare_ssh_destination(root, root).expect_err("same ssh root");
+        assert!(error.contains("current project root"));
+    }
+
+    #[test]
+    fn prepare_ssh_destination_keeps_the_remote_folder() {
+        let current = "ssh://aidanhibbard@eva.local/home/aidanhibbard";
+        let dest = "ssh://aidanhibbard@eva.local/home/aidanhibbard/src/llama.cpp";
+        assert_eq!(prepare_ssh_destination(dest, current).expect("dest"), dest);
+    }
+
+    #[test]
+    fn reject_opening_remote_root() {
+        let error = prepare_ssh_destination(
+            "ssh://aidanhibbard@eva.local/",
+            "ssh://aidanhibbard@eva.local/home/aidanhibbard",
+        )
+        .expect_err("slash");
+        assert!(error.contains("Opening / on eva.local is refused."));
     }
 }

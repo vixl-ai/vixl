@@ -21,12 +21,18 @@ vi.mock('vue-sonner', () => ({
 }))
 
 const rekeyAgentHarness = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
+const forgetSidebarChats = vi.hoisted(() => vi.fn<(slug: string) => void>())
 
 vi.mock('@/composables/agent-harness/cache', () => ({
   rekeyAgentHarness: (...args: unknown[]) => rekeyAgentHarness(...args),
 }))
 
+vi.mock('@/composables/use-fleet-sidebar', () => ({
+  forgetSidebarChats: (slug: string) => forgetSidebarChats(slug),
+}))
+
 import rebindWorkspace from '@/composables/agent-harness/rebind-workspace'
+import { revealedProjectSlug } from '@/composables/fleet-project-reveal'
 import {
   dropPlanExecutionSession,
   setActivePlanPath,
@@ -61,6 +67,7 @@ const buildState = (): AgentHarnessState =>
     },
     fleetSidebar: {
       refreshSlug: vi.fn<(slug: string) => Promise<void>>().mockResolvedValue(undefined),
+      refreshAll: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     },
     chatStore: {
       rekeySession: vi.fn<(...args: unknown[]) => void>(),
@@ -70,6 +77,7 @@ const buildState = (): AgentHarnessState =>
 describe('rebind-workspace plan tab', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    revealedProjectSlug.value = null
     const { tabs, activeTabId } = await import('@/composables/workbench-store/state')
     tabs.value = []
     activeTabId.value = null
@@ -164,5 +172,26 @@ describe('rebind-workspace plan tab', () => {
     await rebindWorkspace(state, workspaceMoved)
 
     expect(loadedThreadKey.value).toBe('dest:chat-1')
+    expect(forgetSidebarChats).toHaveBeenCalledWith('_home_')
+    expect(forgetSidebarChats).not.toHaveBeenCalledWith('dest')
+    expect(state.fleetSidebar.refreshAll).toHaveBeenCalledTimes(1)
+    expect(revealedProjectSlug.value).toBe('dest')
+  })
+
+  it('still reveals the destination when fleet refresh fails', async () => {
+    const refresh = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('vixl check failed'))
+    const state = {
+      ...buildState(),
+      fleet: {
+        refresh,
+        setActiveProject: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined),
+      },
+    } as unknown as AgentHarnessState
+
+    await rebindWorkspace(state, workspaceMoved)
+
+    expect(state.fleetSidebar.refreshAll).toHaveBeenCalledTimes(1)
+    expect(revealedProjectSlug.value).toBe('dest')
+    expect(routerReplace).toHaveBeenCalledWith('/project/dest/chat/chat-1')
   })
 })

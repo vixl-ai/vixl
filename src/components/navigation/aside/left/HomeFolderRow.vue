@@ -18,17 +18,23 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
 } from '@/components/shadcn/ui/sidebar'
 import NavigationAsideLeftChatListItem from '@/components/navigation/aside/left/ChatListItem.vue'
+import NavigationAsideLeftSidebarVirtualList from '@/components/navigation/aside/left/SidebarVirtualList.vue'
 import useProjectsExpansion from '@/composables/use-projects-expansion'
 import useStartHomeChat from '@/composables/use-start-home-chat'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 
-defineProps<{
+const props = defineProps<{
   chats: FleetSidebarChat[]
 }>()
+
+const chatKey = (index: number): string => props.chats[index]?.id ?? `missing:${index}`
+
+const chatAt = (index: number): FleetSidebarChat[] => {
+  const chat = props.chats[index]
+  return chat ? [chat] : []
+}
 
 const route = useRoute()
 const expansion = useProjectsExpansion()
@@ -99,19 +105,20 @@ watch(
       <CollapsibleContent
         class="overflow-hidden data-[state=closed]:animate-sidebar-collapsible-up data-[state=open]:animate-sidebar-collapsible-down"
       >
-        <div class="min-w-0 max-h-42 scroll-fade-b scrollbar-none overflow-x-hidden overflow-y-auto pl-3.5">
-          <SidebarMenuSub class="mx-0 gap-0.5">
-            <SidebarMenuSubItem
-              v-for="chat in chats"
+        <NavigationAsideLeftSidebarVirtualList
+          class="pl-3.5"
+          :count="chats.length"
+          :key-at="chatKey"
+        >
+          <template #default="{ index }">
+            <NavigationAsideLeftChatListItem
+              v-for="chat in chatAt(index)"
               :key="chat.id"
-            >
-              <NavigationAsideLeftChatListItem
-                :chat="chat"
-                :project-slug="HOME_CHAT_SLUG"
-              />
-            </SidebarMenuSubItem>
-          </SidebarMenuSub>
-        </div>
+              :chat="chat"
+              :project-slug="HOME_CHAT_SLUG"
+            />
+          </template>
+        </NavigationAsideLeftSidebarVirtualList>
       </CollapsibleContent>
     </SidebarMenuItem>
   </Collapsible>

@@ -4,7 +4,25 @@ import { isMcpHttpServer, isMcpStdioServer } from '@/types/vixl/mcp-config'
 const normalizeArgs = (args: string[] | undefined): string[] =>
   (args ?? []).map((arg) => arg.trim())
 
-const fingerprintPayload = (config: McpServerConfig): string => {
+export const sshUserHostFromScope = (scopeKey?: string | null): string | undefined => {
+  const trimmed = scopeKey?.trim()
+  if (!trimmed?.startsWith('ssh://')) {
+    return undefined
+  }
+  try {
+    const url = new URL(trimmed)
+    const user = url.username
+    const host = url.hostname
+    if (!host) {
+      return undefined
+    }
+    return user ? `${user}@${host}` : host
+  } catch {
+    return undefined
+  }
+}
+
+const fingerprintPayload = (config: McpServerConfig, scopeKey?: string | null): string => {
   if (isMcpHttpServer(config)) {
     return JSON.stringify({
       kind: 'http',
@@ -13,18 +31,23 @@ const fingerprintPayload = (config: McpServerConfig): string => {
     })
   }
   if (isMcpStdioServer(config)) {
+    const userHost = sshUserHostFromScope(scopeKey)
     return JSON.stringify({
       kind: 'stdio',
       command: config.command.trim(),
       args: normalizeArgs(config.args),
+      ...(userHost ? { userHost } : {}),
     })
   }
   return JSON.stringify({ kind: 'unknown' })
 }
 
 /** Sync FNV-1a 64-bit hex fingerprint of transport identity (url or command+args). */
-export const mcpServerFingerprint = (config: McpServerConfig): string => {
-  const payload = fingerprintPayload(config)
+export const mcpServerFingerprint = (
+  config: McpServerConfig,
+  scopeKey?: string | null,
+): string => {
+  const payload = fingerprintPayload(config, scopeKey)
   let hash = 0xcbf29ce484222325n
   const prime = 0x100000001b3n
   for (let i = 0; i < payload.length; i += 1) {

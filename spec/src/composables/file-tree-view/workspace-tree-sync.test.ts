@@ -123,6 +123,65 @@ describe('bindFileTreeWorkspaceSync', () => {
     vi.restoreAllMocks()
   })
 
+  it('releases an in-flight watch once when the tree unmounts', async () => {
+    let resolveWatch: (root: string) => void = () => undefined
+    watchWorkspace.mockReturnValue(
+      new Promise((resolve) => {
+        resolveWatch = resolve
+      }),
+    )
+    await mountSync({
+      isHome: () => false,
+      tree: ref(sampleTree()),
+      expandedPaths: ref(new Set(['.'])),
+      selectedPath: ref(''),
+      renamingPath: ref(null),
+      deleteTarget: ref(null),
+      projectRoot: computed(() => '/Users/me'),
+      refreshGit: vi.fn<() => Promise<void>>(async () => undefined),
+      onTreeChanged: vi.fn<() => void>(),
+    })
+
+    wrappers.pop()?.unmount()
+    wrapper = null
+    resolveWatch('/canonical/me')
+    await flushPromises()
+
+    expect(unwatchWorkspace).toHaveBeenCalledTimes(1)
+    expect(unwatchWorkspace).toHaveBeenCalledWith({ projectRoot: '/canonical/me' })
+  })
+
+  it('drops a stale in-flight watch when the project changes', async () => {
+    let resolveFirst: (root: string) => void = () => undefined
+    watchWorkspace.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFirst = resolve
+      }),
+    )
+    const projectRoot = ref('/Users/me')
+    await mountSync({
+      isHome: () => false,
+      tree: ref(sampleTree()),
+      expandedPaths: ref(new Set(['.'])),
+      selectedPath: ref(''),
+      renamingPath: ref(null),
+      deleteTarget: ref(null),
+      projectRoot: computed(() => projectRoot.value),
+      refreshGit: vi.fn<() => Promise<void>>(async () => undefined),
+      onTreeChanged: vi.fn<() => void>(),
+    })
+
+    watchWorkspace.mockResolvedValue('/canonical/other')
+    projectRoot.value = '/Users/other'
+    await flushPromises()
+    resolveFirst('/canonical/me')
+    await flushPromises()
+
+    expect(unwatchWorkspace).toHaveBeenCalledTimes(1)
+    expect(unwatchWorkspace).toHaveBeenCalledWith({ projectRoot: '/canonical/me' })
+    expect(watchWorkspace).toHaveBeenCalledWith({ projectRoot: '/Users/other' })
+  })
+
   it('matches workspace events against the canonical root from watch_workspace', async () => {
     const tree = ref<TreeNode | null>(sampleTree())
     const projectRoot = computed(() => '/Users/me')
@@ -426,5 +485,26 @@ describe('bindFileTreeWorkspaceSync', () => {
     expect(fsListDir.mock.calls.filter((call) => call[1] === 'src')).toHaveLength(2)
     expect(firstChanged).toHaveBeenCalled()
     expect(secondChanged).toHaveBeenCalled()
+  })
+
+  it('sets watchError on inotify ENOSPC and does not poll', async () => {
+    watchWorkspace.mockRejectedValue(new Error('inotify ENOSPC on eva.local.'))
+    const watchError = ref<string | null>(null)
+
+    await mountSync({
+      isHome: () => false,
+      tree: ref(sampleTree()),
+      expandedPaths: ref(new Set(['.'])),
+      selectedPath: ref(''),
+      renamingPath: ref(null),
+      deleteTarget: ref(null),
+      projectRoot: computed(() => 'ssh://aidanhibbard@eva.local/home/aidanhibbard/proj'),
+      refreshGit: vi.fn<() => Promise<void>>(async () => undefined),
+      onTreeChanged: vi.fn<() => void>(),
+      watchError,
+    })
+
+    expect(watchError.value).toBe('inotify ENOSPC on eva.local.')
+    expect(watchWorkspace).toHaveBeenCalledTimes(1)
   })
 })

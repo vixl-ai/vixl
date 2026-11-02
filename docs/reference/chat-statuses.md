@@ -5,14 +5,15 @@ description: Sidebar and project table chat labels, what they mean, and what to 
 
 # Chat statuses
 
-The left sidebar and the project Chats table show a short label (or an icon with that accessible name) for each chat. Running always wins. If the chat is not running, the attention label is shown instead.
+The left sidebar and the project Chats table show a short label (or an icon with that accessible name) for each chat. Running always wins. Needs approval, Needs input, and Needs MCP auth beat Disconnected. Disconnected beats Done and Error. If the chat is not running, the attention label is shown instead. An open SSH password or host-key dialog uses Needs input, not a chat card.
 
 | Label | Where | Meaning | What to do |
 | --- | --- | --- | --- |
 | Running | Sidebar (dots) and table | A parent turn is in flight, or background sub-agents are still working after the parent finished | Wait, or [stop](/using/queue-and-stop-messages) from that chat |
 | Needs approval | Sidebar and table | A tool is waiting on Allow / Deny | Open the chat and approve or deny |
-| Needs input | Sidebar and table | A question card is waiting for an answer | Open the chat and answer |
+| Needs input | Sidebar and table | A question card is waiting, or an SSH password or host-key dialog is open | Open the chat and answer, or use the SSH dialog |
 | Needs MCP auth | Sidebar and table | An MCP server needs sign-in or secrets | Open the chat and complete auth |
+| Disconnected | Sidebar and table | The SSH session for this chat's project is down | Reconnect on the project row, then send again |
 | Done | Sidebar (dot) and table | The last turn succeeded while this chat was not the open session | Open the chat to read the result |
 | Error | Sidebar and table | The last turn failed while this chat was not the open session | Open the chat to see the error |
 | Idle | Project table only | Not running, and nothing needs you | Nothing. The sidebar shows no extra label for this state |

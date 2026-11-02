@@ -32,6 +32,9 @@ const {
   Play,
   RotateCcw,
   Trash2,
+  ShieldCheck,
+  needsTrustButton,
+  trustWorkspace,
 } = useLspServersSection()
 </script>
 
@@ -60,6 +63,16 @@ const {
         </TooltipTrigger>
         <TooltipContent>Install defaults</TooltipContent>
       </Tooltip>
+      <Button
+        v-if="needsTrustButton"
+        variant="outline"
+        size="sm"
+        class="h-8 gap-1.5 px-2"
+        @click="trustWorkspace"
+      >
+        <ShieldCheck class="h-4 w-4" />
+        Trust workspace
+      </Button>
     </template>
 
     <div class="space-y-6">

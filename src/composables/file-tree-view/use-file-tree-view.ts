@@ -214,7 +214,8 @@ export default (
 
   provide(FileTreeStartCreateKey, startCreate)
 
-  bindFileTreeWorkspaceSync({
+  const watchError = ref<string | null>(null)
+  const { retryWatch } = bindFileTreeWorkspaceSync({
     isHome: () => isHomeChatSlug(props.projectId),
     tree,
     expandedPaths,
@@ -224,6 +225,7 @@ export default (
     projectRoot,
     refreshGit: gitStatus.refresh,
     onTreeChanged: () => emit('tree-changed'),
+    watchError,
   })
 
   onMounted(() => {
@@ -317,5 +319,7 @@ export default (
     handleSelect,
     handleExpandedChange,
     handlePointerDownOutsideRename,
+    watchError,
+    retryWatch,
   }
 }

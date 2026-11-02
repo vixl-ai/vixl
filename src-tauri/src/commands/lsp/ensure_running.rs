@@ -12,11 +12,9 @@ use super::super::lsp_install::{
     ensure_portable_node, ensure_server_installed, install_source_label, named_lock_for,
 };
 use super::super::lsp_registry::builtin_spec_by_id;
-use super::resolve::{active_project_root, find_server_for_extension, load_effective_servers};
 use super::instance::lsp_instance_key;
-use super::rpc::{
-    has_logical_server, lookup_managed, lookup_managed_key, LSP_SERVERS,
-};
+use super::resolve::{active_project_root, find_server_for_extension, load_effective_servers};
+use super::rpc::{has_logical_server, lookup_managed, lookup_managed_key, LSP_SERVERS};
 use super::start::{start_server, StartOutcome};
 use super::state::{
     current_generation, ephemeral_state, next_generation, snapshot, transition, LspPhase,
@@ -262,30 +260,32 @@ async fn ensure_locked(
     } else {
         server_id
     };
-    record_install(
-        &mut note,
-        ensure_server_installed(
-            app,
-            install_id,
-            install_generation(server_id, install_id, generation).await,
-            install_id != server_id,
-        )
-        .await,
-    );
-    if server_id == "vue" {
-        let classic_generation = current_generation("typescript-classic").await;
+    if !crate::commands::ssh::is_ssh_root(workspace_root) {
         record_install(
             &mut note,
-            ensure_server_installed(app, "typescript-classic", classic_generation, true).await,
+            ensure_server_installed(
+                app,
+                install_id,
+                install_generation(server_id, install_id, generation).await,
+                install_id != server_id,
+            )
+            .await,
         );
-    }
+        if server_id == "vue" {
+            let classic_generation = current_generation("typescript-classic").await;
+            record_install(
+                &mut note,
+                ensure_server_installed(app, "typescript-classic", classic_generation, true).await,
+            );
+        }
 
-    if builtin_spec_by_id(install_id)
-        .or_else(|| builtin_spec_by_id(server_id))
-        .map(|spec| spec.npm.is_some())
-        .unwrap_or(false)
-    {
-        let _ = ensure_portable_node(app).await;
+        if builtin_spec_by_id(install_id)
+            .or_else(|| builtin_spec_by_id(server_id))
+            .map(|spec| spec.npm.is_some())
+            .unwrap_or(false)
+        {
+            let _ = ensure_portable_node(app).await;
+        }
     }
 
     let source = install_source_label(app, server_id);
@@ -320,9 +320,15 @@ async fn ensure_locked(
             )
             .await)
         }
-        Ok(StartOutcome::Superseded) => {
-            Ok(adopted(&instance_key, None, LspPhase::Stopped, generation, None, None).await)
-        }
+        Ok(StartOutcome::Superseded) => Ok(adopted(
+            &instance_key,
+            None,
+            LspPhase::Stopped,
+            generation,
+            None,
+            None,
+        )
+        .await),
         Err(error) => {
             let error = match note {
                 Some(note) => format!("{note}\n{error}"),

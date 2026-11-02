@@ -7,9 +7,11 @@ use std::sync::Mutex;
 use serde::Serialize;
 use tauri::AppHandle;
 
+use super::fs::SshProjectRoot;
 use super::git_binary::git_binary;
 use super::paths::user_vixl_dir;
 use super::registry::{fleet_projects, roots_match, slugify_or_fallback, FleetProject};
+use super::ssh::{is_ssh_root, parse_root, ssh_uri_for};
 
 #[path = "worktree_copy_plans.rs"]
 mod worktree_copy_plans;
@@ -46,6 +48,9 @@ pub struct WorktreeParentMatch {
 }
 
 fn run_git(root_path: &str, args: &[&str]) -> Result<String, String> {
+    if is_ssh_root(root_path) {
+        return super::git::run_git(root_path, args);
+    }
     let git = git_binary()?;
     let output = Command::new(&git)
         .env_remove("GIT_DIR")
@@ -169,6 +174,44 @@ fn resolve_reported_path(cwd: &Path, reported: &str) -> PathBuf {
 
 fn paths_equal(left: &str, right: &str) -> bool {
     roots_match(left, right)
+}
+
+fn normalize_remote_path(path: &str) -> String {
+    let trimmed = path.trim();
+    if trimmed == "/" {
+        return "/".to_string();
+    }
+    trimmed.trim_end_matches('/').to_string()
+}
+
+fn path_on_ssh_repo(repo: &SshProjectRoot, path: &str) -> Option<String> {
+    if let Ok(ssh) = parse_root(path) {
+        if ssh.user == repo.user && ssh.hostname == repo.hostname && ssh.port == repo.port {
+            return Some(normalize_remote_path(&ssh.remote_path));
+        }
+        return None;
+    }
+    let trimmed = path.trim();
+    if trimmed.starts_with('/') {
+        return Some(normalize_remote_path(trimmed));
+    }
+    None
+}
+
+fn worktree_paths_equal(repo_root: &str, listed: &str, requested: &str) -> bool {
+    if paths_equal(listed, requested) {
+        return true;
+    }
+    let Ok(repo) = parse_root(repo_root) else {
+        return false;
+    };
+    match (
+        path_on_ssh_repo(&repo, listed),
+        path_on_ssh_repo(&repo, requested),
+    ) {
+        (Some(left), Some(right)) => left == right,
+        _ => false,
+    }
 }
 
 fn path_is_within(parent: &Path, child: &Path) -> bool {
@@ -350,6 +393,10 @@ pub fn git_worktree_add_in_dir(
         return Err(format!("Branch {branch} already exists"));
     }
 
+    if is_ssh_root(root_path) {
+        return git_worktree_add_on_ssh(root_path, &name, &base, parent_slug);
+    }
+
     let parent_slug = parent_dir_slug(parent_slug);
     let worktrees_root = user_vixl_dir.join(WORKTREES_DIR);
     fs::create_dir_all(worktrees_root.join(&parent_slug)).map_err(|error| error.to_string())?;
@@ -381,6 +428,39 @@ pub fn git_worktree_add_in_dir(
         .to_string_lossy()
         .to_string();
     Ok(GitWorktreeAddResult { path, branch, name })
+}
+
+fn git_worktree_add_on_ssh(
+    root_path: &str,
+    name: &str,
+    base: &str,
+    parent_slug: &str,
+) -> Result<GitWorktreeAddResult, String> {
+    let ssh = parse_root(root_path)?;
+    let parent_slug = parent_dir_slug(parent_slug);
+    let branch = format!("vixl/{name}");
+    if branch_exists(root_path, &branch) {
+        return Err(format!("Branch {branch} already exists"));
+    }
+    let remote_parent = match ssh.remote_path.rsplit_once('/') {
+        Some(("", _)) => "/".to_string(),
+        Some((parent, _)) => parent.to_string(),
+        None => "/".to_string(),
+    };
+    let target = if remote_parent == "/" {
+        format!("/{name}")
+    } else {
+        format!("{remote_parent}/{parent_slug}-{name}")
+    };
+    run_git(
+        root_path,
+        &["worktree", "add", "-b", &branch, &target, base],
+    )?;
+    Ok(GitWorktreeAddResult {
+        path: ssh_uri_for(&ssh, &target),
+        branch,
+        name: name.to_string(),
+    })
 }
 
 pub fn git_worktree_list(root_path: String) -> Result<Vec<GitWorktreeEntry>, String> {
@@ -419,7 +499,7 @@ pub fn git_worktree_remove(
     let entries = git_worktree_list(root_path.clone())?;
     let Some(matched) = entries
         .iter()
-        .find(|entry| paths_equal(&entry.path, &worktree_path))
+        .find(|entry| worktree_paths_equal(&root_path, &entry.path, &worktree_path))
     else {
         return Err("Path is not a worktree of this repository".to_string());
     };
@@ -455,4 +535,29 @@ pub async fn worktree_detect_parent(
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::worktree_paths_equal;
+
+    #[test]
+    fn ssh_worktree_uri_matches_the_listed_remote_path() {
+        let repo = "ssh://johnny@appleseed.example/home/johnny/garden";
+        let listed = "/home/johnny/garden-fix";
+        let requested = "ssh://johnny@appleseed.example/home/johnny/garden-fix";
+        assert!(worktree_paths_equal(repo, listed, requested));
+        assert!(worktree_paths_equal(repo, listed, listed));
+        assert!(worktree_paths_equal(
+            repo,
+            "ssh://johnny@appleseed.example:22/home/johnny/garden-fix/",
+            listed
+        ));
+        assert!(!worktree_paths_equal(
+            repo,
+            listed,
+            "ssh://johnny@other.example/home/johnny/garden-fix"
+        ));
+        assert!(!worktree_paths_equal(repo, listed, "/home/johnny/other"));
+    }
 }

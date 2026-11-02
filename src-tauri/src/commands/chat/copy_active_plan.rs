@@ -2,6 +2,12 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::time::SystemTime;
 
+use crate::commands::fs::{
+    ensure_dir_await, entry_kind_await, list_children_await, modified_ms_await, read_bytes_await,
+    write_bytes_await,
+};
+use crate::commands::ssh::is_ssh_root;
+
 #[derive(Clone, Copy)]
 enum ExistingCopyPolicy {
     SkipExisting,
@@ -13,6 +19,9 @@ pub fn copy_active_plan_to_root(
     new_root: &str,
     active_plan_path: &str,
 ) -> Result<(), String> {
+    if is_ssh_root(old_root) || is_ssh_root(new_root) {
+        return Err("SSH workspace plan copy uses the async copier.".to_string());
+    }
     let relative = active_plan_path.trim();
     if relative.is_empty() {
         return Ok(());
@@ -112,6 +121,78 @@ fn copy_tree(from: &Path, to: &Path, policy: ExistingCopyPolicy) -> Result<(), S
     }
     fs::copy(from, to).map_err(|error| error.to_string())?;
     Ok(())
+}
+
+pub async fn copy_active_plan_for_move(
+    old_root: &str,
+    new_root: &str,
+    active_plan_path: &str,
+) -> Result<(), String> {
+    if !is_ssh_root(old_root) && !is_ssh_root(new_root) {
+        let old_root = old_root.to_string();
+        let new_root = new_root.to_string();
+        let active_plan_path = active_plan_path.to_string();
+        return tauri::async_runtime::spawn_blocking(move || {
+            copy_active_plan_to_root(&old_root, &new_root, &active_plan_path)
+        })
+        .await
+        .map_err(|error| error.to_string())?;
+    }
+    let relative = active_plan_path.trim();
+    if relative.is_empty() || !is_safe_relative(Path::new(relative)) {
+        return Ok(());
+    }
+    let kind = entry_kind_await(old_root, relative).await?;
+    let Some(plan_rel) = plan_dir_rel(relative, kind.as_deref()) else {
+        return Ok(());
+    };
+    copy_plan_tree(old_root, new_root, &plan_rel).await
+}
+
+fn plan_dir_rel(relative: &str, kind: Option<&str>) -> Option<String> {
+    match kind {
+        Some("directory") => Some(relative.to_string()),
+        Some("file") => Path::new(relative).parent().and_then(|parent| {
+            let text = parent.to_string_lossy().replace('\\', "/");
+            if text.is_empty() {
+                None
+            } else {
+                Some(text)
+            }
+        }),
+        _ => None,
+    }
+}
+
+async fn copy_plan_tree(from_root: &str, to_root: &str, relative: &str) -> Result<(), String> {
+    match entry_kind_await(from_root, relative).await?.as_deref() {
+        Some("directory") => {
+            ensure_dir_await(to_root, relative).await?;
+            for child in list_children_await(from_root, relative).await? {
+                Box::pin(copy_plan_tree(from_root, to_root, &child.path)).await?;
+            }
+            Ok(())
+        }
+        Some("file") => copy_plan_file(from_root, to_root, relative).await,
+        _ => Ok(()),
+    }
+}
+
+async fn copy_plan_file(from_root: &str, to_root: &str, relative: &str) -> Result<(), String> {
+    if !source_is_newer(from_root, to_root, relative).await? {
+        return Ok(());
+    }
+    let bytes = read_bytes_await(from_root, relative).await?;
+    write_bytes_await(to_root, relative, bytes).await
+}
+
+async fn source_is_newer(from_root: &str, to_root: &str, relative: &str) -> Result<bool, String> {
+    if entry_kind_await(to_root, relative).await?.is_none() {
+        return Ok(true);
+    }
+    let source = modified_ms_await(from_root, relative).await?;
+    let dest = modified_ms_await(to_root, relative).await?;
+    Ok(matches!((source, dest), (Some(source), Some(dest)) if source > dest))
 }
 
 pub(crate) fn copy_tree_skip_existing(from: &Path, to: &Path) -> Result<(), String> {

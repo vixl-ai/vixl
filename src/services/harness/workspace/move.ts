@@ -9,7 +9,13 @@ import {
 } from '@/services/harness/tool-roots'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
 import filePathBasename from '@/utils/file-path-basename'
+import {
+  isSshProjectRoot,
+  resolveSshMoveRoot,
+} from '@/utils/ssh-project-root'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+
+const isWindowsDrivePath = (value: string): boolean => /^[A-Za-z]:[/\\]/.test(value)
 
 const resolveRootPath = (
   rootPath: string,
@@ -18,6 +24,19 @@ const resolveRootPath = (
   const trimmed = rootPath.trim()
   if (!trimmed) {
     return { error: 'rootPath is required' }
+  }
+  if (
+    isSshProjectRoot(trimmed) ||
+    (isSshProjectRoot(projectRoot) && !isWindowsDrivePath(trimmed))
+  ) {
+    try {
+      const base = isSshProjectRoot(projectRoot) ? projectRoot : trimmed
+      return { resolved: resolveSshMoveRoot(base, trimmed) }
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : 'Invalid SSH project root',
+      }
+    }
   }
   if (isAbsolutePath(trimmed)) {
     return { resolved: trimmed }

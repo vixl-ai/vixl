@@ -30,7 +30,7 @@ const resolveTrustedMcpServer = async (
   if ('error' in resolved) {
     return { trusted: false, reason: 'missing', error: resolved.error }
   }
-  const fingerprint = mcpServerFingerprint(resolved.config)
+  const fingerprint = mcpServerFingerprint(resolved.config, resolved.scopeKey)
   if (!isMcpTrusted(ctx.settings, resolved.id, fingerprint, sessionTrusts, resolved.scopeKey)) {
     return { trusted: false, reason: 'untrusted' }
   }

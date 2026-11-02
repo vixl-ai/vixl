@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use super::diff::build_file_diff;
 use super::path::{
     reject_resolved_sensitive_path_unless_allowed, reject_sensitive_path_unless_allowed,
-    resolve_command_path, WorkspaceRootArg,
+    resolve_command_path, ResolvedWorkspacePath, WorkspaceRootArg,
 };
+use super::remote::{self, FsTarget};
 use super::types::{FileDiff, WriteTempHandoffResult};
 
-#[tauri::command]
 pub fn fs_write_file(
     project_root: String,
     path: String,
@@ -16,6 +16,28 @@ pub fn fs_write_file(
     allow_sensitive: Option<bool>,
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<FileDiff, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        match remote::resolve_target(&project_root, project_roots.as_deref(), &path)? {
+            FsTarget::Ssh(_) => {
+                return remote::write_file(
+                    &project_root,
+                    project_roots.as_deref(),
+                    &path,
+                    content,
+                    allow_sensitive,
+                );
+            }
+            FsTarget::Local(resolved) => {
+                return fs_write_file(
+                    resolved.root.to_string_lossy().into_owned(),
+                    local_rel(&resolved),
+                    content,
+                    allow_sensitive,
+                    None,
+                );
+            }
+        }
+    }
     let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
     reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
     let absolute = resolved.path.clone();
@@ -58,6 +80,15 @@ fn copy_recursive(from: &Path, to: &Path) -> Result<(), String> {
     }
 }
 
+fn local_rel(resolved: &ResolvedWorkspacePath) -> String {
+    let rel = resolved.member_relative_path();
+    if rel.is_empty() {
+        ".".to_string()
+    } else {
+        rel
+    }
+}
+
 fn resolve_copy_destination(from: &Path, to: &Path) -> PathBuf {
     if to.exists() && to.is_dir() {
         let file_name = from
@@ -70,7 +101,6 @@ fn resolve_copy_destination(from: &Path, to: &Path) -> PathBuf {
     }
 }
 
-#[tauri::command]
 pub fn fs_rename(
     project_root: String,
     from: String,
@@ -79,8 +109,25 @@ pub fn fs_rename(
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<(), String> {
     let roots = project_roots.as_deref();
-    let resolved_from = resolve_command_path(&project_root, roots, &from)?;
-    let resolved_to = resolve_command_path(&project_root, roots, &to)?;
+    let (resolved_from, resolved_to) = if remote::uses_ssh_transport(&project_root, roots) {
+        match (
+            remote::resolve_target(&project_root, roots, &from)?,
+            remote::resolve_target(&project_root, roots, &to)?,
+        ) {
+            (FsTarget::Ssh(_), FsTarget::Ssh(_)) => {
+                return remote::rename(&project_root, roots, &from, &to, allow_sensitive);
+            }
+            (FsTarget::Local(from_resolved), FsTarget::Local(to_resolved)) => {
+                (from_resolved, to_resolved)
+            }
+            _ => return Err("Rename paths must belong to a single project member".to_string()),
+        }
+    } else {
+        (
+            resolve_command_path(&project_root, roots, &from)?,
+            resolve_command_path(&project_root, roots, &to)?,
+        )
+    };
     reject_resolved_sensitive_path_unless_allowed(&resolved_from, allow_sensitive)?;
     reject_resolved_sensitive_path_unless_allowed(&resolved_to, allow_sensitive)?;
     let absolute_from = resolved_from.path;
@@ -97,7 +144,6 @@ pub fn fs_rename(
     fs::rename(&absolute_from, &absolute_to).map_err(|error| error.to_string())
 }
 
-#[tauri::command]
 pub fn fs_delete(
     project_root: String,
     path: String,
@@ -105,6 +151,28 @@ pub fn fs_delete(
     allow_sensitive: Option<bool>,
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<(), String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        match remote::resolve_target(&project_root, project_roots.as_deref(), &path)? {
+            FsTarget::Ssh(_) => {
+                return remote::delete(
+                    &project_root,
+                    project_roots.as_deref(),
+                    &path,
+                    recursive,
+                    allow_sensitive,
+                );
+            }
+            FsTarget::Local(resolved) => {
+                return fs_delete(
+                    resolved.root.to_string_lossy().into_owned(),
+                    local_rel(&resolved),
+                    recursive,
+                    allow_sensitive,
+                    None,
+                );
+            }
+        }
+    }
     let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
     reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
     let absolute = resolved.path;
@@ -124,7 +192,6 @@ pub fn fs_delete(
     }
 }
 
-#[tauri::command]
 pub fn fs_copy(
     project_root: String,
     from: String,
@@ -133,8 +200,25 @@ pub fn fs_copy(
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<(), String> {
     let roots = project_roots.as_deref();
-    let resolved_from = resolve_command_path(&project_root, roots, &from)?;
-    let resolved_to = resolve_command_path(&project_root, roots, &to)?;
+    let (resolved_from, resolved_to) = if remote::uses_ssh_transport(&project_root, roots) {
+        match (
+            remote::resolve_target(&project_root, roots, &from)?,
+            remote::resolve_target(&project_root, roots, &to)?,
+        ) {
+            (FsTarget::Ssh(_), FsTarget::Ssh(_)) => {
+                return remote::copy(&project_root, roots, &from, &to, allow_sensitive);
+            }
+            (FsTarget::Local(from_resolved), FsTarget::Local(to_resolved)) => {
+                (from_resolved, to_resolved)
+            }
+            _ => return Err("Copy paths must belong to a single project member".to_string()),
+        }
+    } else {
+        (
+            resolve_command_path(&project_root, roots, &from)?,
+            resolve_command_path(&project_root, roots, &to)?,
+        )
+    };
     reject_resolved_sensitive_path_unless_allowed(&resolved_from, allow_sensitive)?;
     reject_resolved_sensitive_path_unless_allowed(&resolved_to, allow_sensitive)?;
     let absolute_from = resolved_from.path;
@@ -154,7 +238,6 @@ pub fn fs_copy(
     copy_recursive(&absolute_from, &destination)
 }
 
-#[tauri::command]
 pub fn fs_move(
     project_root: String,
     from: String,
@@ -163,8 +246,25 @@ pub fn fs_move(
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<(), String> {
     let roots = project_roots.as_deref();
-    let resolved_from = resolve_command_path(&project_root, roots, &from)?;
-    let resolved_to = resolve_command_path(&project_root, roots, &to)?;
+    let (resolved_from, resolved_to) = if remote::uses_ssh_transport(&project_root, roots) {
+        match (
+            remote::resolve_target(&project_root, roots, &from)?,
+            remote::resolve_target(&project_root, roots, &to)?,
+        ) {
+            (FsTarget::Ssh(_), FsTarget::Ssh(_)) => {
+                return remote::move_path(&project_root, roots, &from, &to, allow_sensitive);
+            }
+            (FsTarget::Local(from_resolved), FsTarget::Local(to_resolved)) => {
+                (from_resolved, to_resolved)
+            }
+            _ => return Err("Move paths must belong to a single project member".to_string()),
+        }
+    } else {
+        (
+            resolve_command_path(&project_root, roots, &from)?,
+            resolve_command_path(&project_root, roots, &to)?,
+        )
+    };
     if roots.is_some_and(|entries| !entries.is_empty()) {
         let same_member = match (&resolved_from.slug, &resolved_to.slug) {
             (Some(from_slug), Some(to_slug)) => from_slug == to_slug,
@@ -207,14 +307,190 @@ pub fn fs_move(
     }
 }
 
-#[tauri::command]
 pub fn fs_mkdir(
     project_root: String,
     path: String,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<(), String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        match remote::resolve_target(&project_root, project_roots.as_deref(), &path)? {
+            FsTarget::Ssh(_) => {
+                return remote::mkdir(
+                    &project_root,
+                    project_roots.as_deref(),
+                    &path,
+                    allow_sensitive,
+                );
+            }
+            FsTarget::Local(resolved) => {
+                return fs_mkdir(
+                    resolved.root.to_string_lossy().into_owned(),
+                    local_rel(&resolved),
+                    None,
+                    None,
+                );
+            }
+        }
+    }
     let absolute = resolve_command_path(&project_root, project_roots.as_deref(), &path)?.path;
     fs::create_dir_all(&absolute).map_err(|error| error.to_string())
+}
+
+fn both_ssh(left: &FsTarget, right: &FsTarget) -> bool {
+    matches!((left, right), (FsTarget::Ssh(_), FsTarget::Ssh(_)))
+}
+
+#[tauri::command(rename = "fs_write_file")]
+pub async fn fs_write_file_command(
+    project_root: String,
+    path: String,
+    content: String,
+    allow_sensitive: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<FileDiff, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref())
+        && matches!(
+            remote::resolve_target(&project_root, project_roots.as_deref(), &path)?,
+            FsTarget::Ssh(_)
+        )
+    {
+        return remote::write_file_await(
+            project_root,
+            project_roots,
+            path,
+            content,
+            allow_sensitive,
+        )
+        .await;
+    }
+    super::read::off_the_webview(move || {
+        fs_write_file(project_root, path, content, allow_sensitive, project_roots)
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_rename")]
+pub async fn fs_rename_command(
+    project_root: String,
+    from: String,
+    to: String,
+    allow_sensitive: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<(), String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref())
+        && both_ssh(
+            &remote::resolve_target(&project_root, project_roots.as_deref(), &from)?,
+            &remote::resolve_target(&project_root, project_roots.as_deref(), &to)?,
+        )
+    {
+        return remote::rename_await(project_root, project_roots, from, to, allow_sensitive).await;
+    }
+    super::read::off_the_webview(move || {
+        fs_rename(project_root, from, to, allow_sensitive, project_roots)
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_delete")]
+pub async fn fs_delete_command(
+    project_root: String,
+    path: String,
+    recursive: Option<bool>,
+    allow_sensitive: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<(), String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref())
+        && matches!(
+            remote::resolve_target(&project_root, project_roots.as_deref(), &path)?,
+            FsTarget::Ssh(_)
+        )
+    {
+        return remote::delete_await(
+            project_root,
+            project_roots,
+            path,
+            recursive,
+            allow_sensitive,
+        )
+        .await;
+    }
+    super::read::off_the_webview(move || {
+        fs_delete(
+            project_root,
+            path,
+            recursive,
+            allow_sensitive,
+            project_roots,
+        )
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_copy")]
+pub async fn fs_copy_command(
+    project_root: String,
+    from: String,
+    to: String,
+    allow_sensitive: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<(), String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref())
+        && both_ssh(
+            &remote::resolve_target(&project_root, project_roots.as_deref(), &from)?,
+            &remote::resolve_target(&project_root, project_roots.as_deref(), &to)?,
+        )
+    {
+        return remote::copy_await(project_root, project_roots, from, to, allow_sensitive).await;
+    }
+    super::read::off_the_webview(move || {
+        fs_copy(project_root, from, to, allow_sensitive, project_roots)
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_move")]
+pub async fn fs_move_command(
+    project_root: String,
+    from: String,
+    to: String,
+    allow_sensitive: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+) -> Result<(), String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref())
+        && both_ssh(
+            &remote::resolve_target(&project_root, project_roots.as_deref(), &from)?,
+            &remote::resolve_target(&project_root, project_roots.as_deref(), &to)?,
+        )
+    {
+        return remote::move_path_await(project_root, project_roots, from, to, allow_sensitive)
+            .await;
+    }
+    super::read::off_the_webview(move || {
+        fs_move(project_root, from, to, allow_sensitive, project_roots)
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_mkdir")]
+pub async fn fs_mkdir_command(
+    project_root: String,
+    path: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<(), String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref())
+        && matches!(
+            remote::resolve_target(&project_root, project_roots.as_deref(), &path)?,
+            FsTarget::Ssh(_)
+        )
+    {
+        return remote::mkdir_await(project_root, project_roots, path, allow_sensitive).await;
+    }
+    super::read::off_the_webview(move || {
+        fs_mkdir(project_root, path, project_roots, allow_sensitive)
+    })
+    .await
 }
 
 fn sanitize_temp_kind(kind: &str) -> Result<String, String> {

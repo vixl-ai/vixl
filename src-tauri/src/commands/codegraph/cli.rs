@@ -8,8 +8,9 @@ use tokio::process::Command;
 use super::env::codegraph_store_env_vars;
 use super::prepare::prepare_codegraph_store;
 use super::safety_net::safety_net_after_cli;
-use crate::commands::fs::canonical_project_root;
+use crate::commands::fs::{canonical_project_root, parse_ssh_project_root};
 use crate::commands::mcp::{apply_resolved_path_env, resolve_command};
+use crate::commands::ssh::{indexer_cannot_run, is_ssh_root};
 
 const CODEGRAPH_NPM_PACKAGE: &str = "@colbymchenry/codegraph";
 
@@ -32,6 +33,15 @@ pub fn validate_action(action: &str) -> Result<&'static str, String> {
     }
 }
 
+pub fn reject_ssh_indexer(project_root: &str) -> Result<(), String> {
+    let trimmed = project_root.trim();
+    if !is_ssh_root(trimmed) {
+        return Ok(());
+    }
+    let ssh = parse_ssh_project_root(trimmed)?;
+    Err(indexer_cannot_run(&ssh.hostname))
+}
+
 pub fn validate_absolute_root(project_root: &str) -> Result<PathBuf, String> {
     let trimmed = project_root.trim();
     if trimmed.is_empty() {
@@ -40,6 +50,7 @@ pub fn validate_absolute_root(project_root: &str) -> Result<PathBuf, String> {
     if trimmed.contains('\0') {
         return Err("project_root must not contain NUL bytes".to_string());
     }
+    reject_ssh_indexer(trimmed)?;
     let path = Path::new(trimmed);
     if !path.is_absolute() {
         return Err("project_root must be an absolute path".to_string());
@@ -116,4 +127,16 @@ pub async fn codegraph_cli(
         stderr,
         exit_code,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_absolute_root;
+
+    #[test]
+    fn ssh_root_is_not_a_local_graph_root() {
+        let err = validate_absolute_root("ssh://johnny@appleseed.example/home/johnny/garden")
+            .expect_err("ssh root");
+        assert_eq!(err, "The graph indexer cannot run on appleseed.example.");
+    }
 }

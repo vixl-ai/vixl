@@ -9,8 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use super::walk::walk_builder;
 use crate::commands::fs::{
-    canonical_project_root, resolve_command_path, workspace_roots_from_args, WorkspaceRootArg,
+    canonical_project_root, resolve_command_path, resolve_target, uses_ssh_transport,
+    workspace_roots_from_args, FsTarget, WorkspaceRootArg,
 };
+use crate::commands::ssh::is_ssh_root;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,6 +70,10 @@ pub async fn workspace_grep(request: WorkspaceGrepRequest) -> Result<WorkspaceGr
         return Err("Search pattern is required".to_string());
     }
 
+    if uses_ssh_transport(&request.project_root, request.project_roots.as_deref()) {
+        return grep_with_ssh(request).await;
+    }
+
     let scopes = grep_scopes(&request)?;
 
     tokio::task::spawn_blocking(move || {
@@ -106,6 +112,131 @@ pub async fn workspace_grep(request: WorkspaceGrepRequest) -> Result<WorkspaceGr
     })
     .await
     .map_err(|error| format!("Grep search failed: {error}"))?
+}
+
+async fn grep_with_ssh(request: WorkspaceGrepRequest) -> Result<WorkspaceGrepResult, String> {
+    let max_results = request.max_results.unwrap_or(200) as usize;
+    if let Some(path) = request
+        .path
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+    {
+        return grep_one_target(&request, path, max_results).await;
+    }
+    let mut matches = Vec::new();
+    let mut truncated = false;
+    if let Some(args) = request
+        .project_roots
+        .as_deref()
+        .filter(|roots| !roots.is_empty())
+    {
+        for arg in args {
+            let remaining = max_results.saturating_sub(matches.len());
+            if remaining == 0 {
+                truncated = true;
+                break;
+            }
+            if arg.path.trim().starts_with("ssh://") {
+                let ssh = crate::commands::fs::parse_ssh_project_root(&arg.path)?;
+                let partial =
+                    super::ssh::grep_ssh(&ssh, &request, "", Some(arg.slug.trim()), remaining)
+                        .await?;
+                matches.extend(partial.matches);
+                truncated = truncated || partial.truncated;
+            } else if !arg.path.trim().is_empty() {
+                let root = canonical_project_root(&arg.path)?;
+                let search_path = root.clone();
+                let prefix = Some(arg.slug.trim().to_string());
+                let mut scoped = request.clone();
+                scoped.max_results = Some(remaining as u32);
+                let root_clone = root.clone();
+                let partial = tokio::task::spawn_blocking(move || {
+                    collect_grep_matches(&root_clone, &search_path, &scoped)
+                })
+                .await
+                .map_err(|error| format!("Grep search failed: {error}"))??;
+                for mut item in partial.matches {
+                    if let Some(prefix) = &prefix {
+                        item.path = if item.path.is_empty() {
+                            prefix.clone()
+                        } else {
+                            format!("{prefix}/{}", item.path)
+                        };
+                    }
+                    matches.push(item);
+                    if matches.len() >= max_results {
+                        truncated = true;
+                        break;
+                    }
+                }
+                truncated = truncated || partial.truncated;
+            }
+            if truncated {
+                break;
+            }
+        }
+        return Ok(WorkspaceGrepResult { matches, truncated });
+    }
+
+    if is_ssh_root(&request.project_root) {
+        let ssh = crate::commands::fs::parse_ssh_project_root(&request.project_root)?;
+        return super::ssh::grep_ssh(&ssh, &request, "", None, max_results).await;
+    }
+
+    Err("SSH search root is required".to_string())
+}
+
+async fn grep_one_target(
+    request: &WorkspaceGrepRequest,
+    path: &str,
+    max_results: usize,
+) -> Result<WorkspaceGrepResult, String> {
+    match resolve_target(
+        &request.project_root,
+        request.project_roots.as_deref(),
+        path,
+    )? {
+        FsTarget::Ssh(resolved) => {
+            super::ssh::grep_ssh(
+                &resolved.ssh,
+                request,
+                &resolved.relative,
+                resolved.slug.as_deref(),
+                max_results,
+            )
+            .await
+        }
+        FsTarget::Local(resolved) => {
+            let mut scoped = request.clone();
+            scoped.max_results = Some(max_results as u32);
+            let root = resolved.root.clone();
+            let search_path = resolved.path.clone();
+            let prefix = resolved.slug.clone();
+            let partial = tokio::task::spawn_blocking(move || {
+                collect_grep_matches(&root, &search_path, &scoped)
+            })
+            .await
+            .map_err(|error| format!("Grep search failed: {error}"))??;
+            let mut matches = Vec::new();
+            let mut truncated = partial.truncated;
+            for mut item in partial.matches {
+                if let Some(prefix) = &prefix {
+                    item.path = if item.path.is_empty() {
+                        prefix.clone()
+                    } else {
+                        format!("{prefix}/{}", item.path)
+                    };
+                }
+                matches.push(item);
+                if matches.len() >= max_results {
+                    truncated = true;
+                    break;
+                }
+            }
+            Ok(WorkspaceGrepResult { matches, truncated })
+        }
+    }
 }
 
 struct GrepScope {
@@ -251,4 +382,75 @@ fn collect_grep_matches(
     }
 
     Ok(WorkspaceGrepResult { matches, truncated })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn grep_request(path: Option<&str>, roots: Vec<WorkspaceRootArg>) -> WorkspaceGrepRequest {
+        WorkspaceGrepRequest {
+            project_root: "ssh://johnny@vixl-grep.example/tmp/remote".into(),
+            pattern: "needle".into(),
+            path: path.map(str::to_string),
+            glob: None,
+            case_insensitive: None,
+            max_results: None,
+            regex: Some(false),
+            whole_word: None,
+            exclude_glob: None,
+            project_roots: Some(roots),
+        }
+    }
+
+    #[tokio::test]
+    async fn mixed_workspace_grep_scopes_a_slug_path() {
+        let local = tempfile::tempdir().expect("local");
+        let src = local.path().join("src");
+        std::fs::create_dir(&src).expect("src");
+        std::fs::write(src.join("hello.txt"), "needle\n").expect("write");
+        std::fs::write(local.path().join("other.txt"), "needle\n").expect("write");
+        let result = workspace_grep(grep_request(
+            Some("local/src"),
+            vec![
+                WorkspaceRootArg {
+                    slug: "local".into(),
+                    path: local.path().to_string_lossy().to_string(),
+                },
+                WorkspaceRootArg {
+                    slug: "remote".into(),
+                    path: "ssh://johnny@vixl-grep.example/tmp/remote".into(),
+                },
+            ],
+        ))
+        .await
+        .expect("grep");
+        let paths: Vec<&str> = result
+            .matches
+            .iter()
+            .map(|item| item.path.as_str())
+            .collect();
+        assert_eq!(paths, vec!["local/src/hello.txt"]);
+    }
+
+    #[tokio::test]
+    async fn mixed_workspace_grep_requires_a_slug_prefix() {
+        let local = tempfile::tempdir().expect("local");
+        let err = workspace_grep(grep_request(
+            Some("src"),
+            vec![
+                WorkspaceRootArg {
+                    slug: "local".into(),
+                    path: local.path().to_string_lossy().to_string(),
+                },
+                WorkspaceRootArg {
+                    slug: "remote".into(),
+                    path: "ssh://johnny@vixl-grep.example/tmp/remote".into(),
+                },
+            ],
+        ))
+        .await
+        .expect_err("unprefixed");
+        assert!(err.contains("project slug"), "{err}");
+    }
 }

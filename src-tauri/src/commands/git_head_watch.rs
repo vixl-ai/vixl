@@ -7,6 +7,7 @@ use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watche
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::git_binary::git_binary;
+use super::ssh::is_ssh_root;
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,6 +62,10 @@ pub fn watch_git_head(app: AppHandle, root_path: Option<String>) -> Result<(), S
     let Some(root) = root_path.filter(|path| !path.trim().is_empty()) else {
         return Ok(());
     };
+
+    if is_ssh_root(&root) {
+        return Ok(());
+    }
 
     let Some(git_dir) = resolve_git_dir(&root) else {
         return Ok(());

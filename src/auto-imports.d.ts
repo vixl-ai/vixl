@@ -24,6 +24,7 @@ declare global {
   const chatProjectSlugForId: typeof import('./composables/use-fleet-sidebar').chatProjectSlugForId
   const chatTitleForId: typeof import('./composables/use-fleet-sidebar').chatTitleForId
   const chatTurnOpenKeys: typeof import('./composables/use-chat-turn-open-state').chatTurnOpenKeys
+  const clearRevealedFleetProject: typeof import('./composables/fleet-project-reveal').clearRevealedFleetProject
   const collectChatTurnOpenLiveIds: typeof import('./composables/use-chat-turn-open-state').collectChatTurnOpenLiveIds
   const computed: typeof import('vue').computed
   const computedAsync: typeof import('@vueuse/core').computedAsync
@@ -55,6 +56,7 @@ declare global {
   const effectScope: typeof import('vue').effectScope
   const ensureFleetLoaded: typeof import('./composables/use-fleet-registry').ensureFleetLoaded
   const extendRef: typeof import('@vueuse/core').extendRef
+  const forgetSidebarChats: typeof import('./composables/use-fleet-sidebar').forgetSidebarChats
   const getActiveFleetProjectId: typeof import('./composables/use-fleet-registry').getActiveFleetProjectId
   const getCachedAgentHarness: typeof import('./composables/use-agent-harness').getCachedAgentHarness
   const getCurrentInstance: typeof import('vue').getCurrentInstance
@@ -123,12 +125,18 @@ declare global {
   const rekeyAgentHarness: typeof import('./composables/use-agent-harness').rekeyAgentHarness
   const resetAgentHarnessCacheForTests: typeof import('./composables/use-agent-harness').resetAgentHarnessCacheForTests
   const resetChatSessionsForTests: typeof import('./composables/use-chat-store').resetChatSessionsForTests
+  const resetFleetBootstrapForTests: typeof import('./composables/use-fleet-registry').resetFleetBootstrapForTests
+  const resetSlashIndexToastsForTests: typeof import('./composables/use-slash-index').resetSlashIndexToastsForTests
   const resolveComponent: typeof import('vue').resolveComponent
   const resolveProjectRowWorkspace: typeof import('./composables/resolve-project-row-workspace').default
+  const revealFleetProject: typeof import('./composables/fleet-project-reveal').revealFleetProject
+  const revealedProjectNonce: typeof import('./composables/fleet-project-reveal').revealedProjectNonce
+  const revealedProjectSlug: typeof import('./composables/fleet-project-reveal').revealedProjectSlug
   const runAtomicFlip: typeof import('./composables/use-theme-flip').runAtomicFlip
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
+  const sshSecretsSection: typeof import('./composables/ssh-secrets-section').default
   const syncRef: typeof import('@vueuse/core').syncRef
   const syncRefs: typeof import('@vueuse/core').syncRefs
   const templateRef: typeof import('@vueuse/core').templateRef
@@ -294,6 +302,7 @@ declare global {
   const usePreferredReducedMotion: typeof import('@vueuse/core').usePreferredReducedMotion
   const usePreferredReducedTransparency: typeof import('@vueuse/core').usePreferredReducedTransparency
   const usePrevious: typeof import('@vueuse/core').usePrevious
+  const useProjectRowSsh: typeof import('./composables/use-project-row-ssh').default
   const useProjectsExpansion: typeof import('./composables/use-projects-expansion').default
   const useProjectsSection: typeof import('./composables/use-projects-section').default
   const useProviderModelsCatalog: typeof import('./composables/use-provider-models-catalog').default
@@ -315,6 +324,7 @@ declare global {
   const useSorted: typeof import('@vueuse/core').useSorted
   const useSpeechRecognition: typeof import('@vueuse/core').useSpeechRecognition
   const useSpeechSynthesis: typeof import('@vueuse/core').useSpeechSynthesis
+  const useSshSession: typeof import('./composables/use-ssh-session').default
   const useStartHomeChat: typeof import('./composables/use-start-home-chat').default
   const useStartPlanBuild: typeof import('./composables/use-start-plan-build').default
   const useStartVixlFilesChat: typeof import('./composables/use-start-vixl-files-chat').default
@@ -416,6 +426,9 @@ declare global {
   export type { UseProviderModelsCatalogOptions } from './composables/use-provider-models-catalog'
   import('./composables/use-provider-models-catalog')
   // @ts-ignore
+  export type { SshConnectMode, SshConnectPhase } from './composables/use-ssh-session'
+  import('./composables/use-ssh-session')
+  // @ts-ignore
   export type { PlanExecutionMode, StartPlanBuildInput } from './composables/use-start-plan-build'
   import('./composables/use-start-plan-build')
   // @ts-ignore
@@ -447,6 +460,7 @@ declare module 'vue' {
     readonly chatProjectSlugForId: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['chatProjectSlugForId']>
     readonly chatTitleForId: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['chatTitleForId']>
     readonly chatTurnOpenKeys: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['chatTurnOpenKeys']>
+    readonly clearRevealedFleetProject: UnwrapRef<typeof import('./composables/fleet-project-reveal')['clearRevealedFleetProject']>
     readonly collectChatTurnOpenLiveIds: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['collectChatTurnOpenLiveIds']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('@vueuse/core')['computedAsync']>
@@ -478,6 +492,7 @@ declare module 'vue' {
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly ensureFleetLoaded: UnwrapRef<typeof import('./composables/use-fleet-registry')['ensureFleetLoaded']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
+    readonly forgetSidebarChats: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['forgetSidebarChats']>
     readonly getActiveFleetProjectId: UnwrapRef<typeof import('./composables/use-fleet-registry')['getActiveFleetProjectId']>
     readonly getCachedAgentHarness: UnwrapRef<typeof import('./composables/use-agent-harness')['getCachedAgentHarness']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
@@ -546,12 +561,18 @@ declare module 'vue' {
     readonly rekeyAgentHarness: UnwrapRef<typeof import('./composables/use-agent-harness')['rekeyAgentHarness']>
     readonly resetAgentHarnessCacheForTests: UnwrapRef<typeof import('./composables/use-agent-harness')['resetAgentHarnessCacheForTests']>
     readonly resetChatSessionsForTests: UnwrapRef<typeof import('./composables/use-chat-store')['resetChatSessionsForTests']>
+    readonly resetFleetBootstrapForTests: UnwrapRef<typeof import('./composables/use-fleet-registry')['resetFleetBootstrapForTests']>
+    readonly resetSlashIndexToastsForTests: UnwrapRef<typeof import('./composables/use-slash-index')['resetSlashIndexToastsForTests']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly resolveProjectRowWorkspace: UnwrapRef<typeof import('./composables/resolve-project-row-workspace')['default']>
+    readonly revealFleetProject: UnwrapRef<typeof import('./composables/fleet-project-reveal')['revealFleetProject']>
+    readonly revealedProjectNonce: UnwrapRef<typeof import('./composables/fleet-project-reveal')['revealedProjectNonce']>
+    readonly revealedProjectSlug: UnwrapRef<typeof import('./composables/fleet-project-reveal')['revealedProjectSlug']>
     readonly runAtomicFlip: UnwrapRef<typeof import('./composables/use-theme-flip')['runAtomicFlip']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
+    readonly sshSecretsSection: UnwrapRef<typeof import('./composables/ssh-secrets-section')['default']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>
     readonly templateRef: UnwrapRef<typeof import('@vueuse/core')['templateRef']>
@@ -717,6 +738,7 @@ declare module 'vue' {
     readonly usePreferredReducedMotion: UnwrapRef<typeof import('@vueuse/core')['usePreferredReducedMotion']>
     readonly usePreferredReducedTransparency: UnwrapRef<typeof import('@vueuse/core')['usePreferredReducedTransparency']>
     readonly usePrevious: UnwrapRef<typeof import('@vueuse/core')['usePrevious']>
+    readonly useProjectRowSsh: UnwrapRef<typeof import('./composables/use-project-row-ssh')['default']>
     readonly useProjectsExpansion: UnwrapRef<typeof import('./composables/use-projects-expansion')['default']>
     readonly useProjectsSection: UnwrapRef<typeof import('./composables/use-projects-section')['default']>
     readonly useProviderModelsCatalog: UnwrapRef<typeof import('./composables/use-provider-models-catalog')['default']>
@@ -738,6 +760,7 @@ declare module 'vue' {
     readonly useSorted: UnwrapRef<typeof import('@vueuse/core')['useSorted']>
     readonly useSpeechRecognition: UnwrapRef<typeof import('@vueuse/core')['useSpeechRecognition']>
     readonly useSpeechSynthesis: UnwrapRef<typeof import('@vueuse/core')['useSpeechSynthesis']>
+    readonly useSshSession: UnwrapRef<typeof import('./composables/use-ssh-session')['default']>
     readonly useStartHomeChat: UnwrapRef<typeof import('./composables/use-start-home-chat')['default']>
     readonly useStartPlanBuild: UnwrapRef<typeof import('./composables/use-start-plan-build')['default']>
     readonly useStartVixlFilesChat: UnwrapRef<typeof import('./composables/use-start-vixl-files-chat')['default']>

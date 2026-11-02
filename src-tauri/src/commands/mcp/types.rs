@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use tokio::process::{Child, ChildStdin, ChildStdout};
 use tokio::sync::{oneshot, Mutex};
+
+use crate::commands::ssh::close_channel;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,8 +40,73 @@ pub(crate) fn mcp_connection_key(scope_key: Option<&str>, server_id: &str) -> St
     format!("{scope}\u{1f}{server_id}")
 }
 
+pub(crate) enum McpChild {
+    Local(Child),
+    Remote {
+        channel_id: String,
+        stdout: Option<ChildStdout>,
+    },
+}
+
+impl McpChild {
+    pub(crate) fn take_stdout(&mut self) -> Option<ChildStdout> {
+        match self {
+            Self::Local(child) => child.stdout.take(),
+            Self::Remote { stdout, .. } => stdout.take(),
+        }
+    }
+
+    pub(crate) fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
+        match self {
+            Self::Local(child) => child.try_wait(),
+            Self::Remote { .. } => Ok(None),
+        }
+    }
+
+    pub(crate) fn id(&self) -> Option<u32> {
+        match self {
+            Self::Local(child) => child.id(),
+            Self::Remote { .. } => None,
+        }
+    }
+
+    pub(crate) async fn kill(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Local(child) => child.kill().await,
+            Self::Remote { channel_id, .. } => {
+                let _ = close_channel(channel_id.clone()).await;
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) async fn wait(&mut self) -> std::io::Result<std::process::ExitStatus> {
+        match self {
+            Self::Local(child) => child.wait().await,
+            Self::Remote { channel_id, .. } => {
+                let _ = close_channel(channel_id.clone()).await;
+                Ok(dummy_exit_status())
+            }
+        }
+    }
+}
+
+fn dummy_exit_status() -> std::process::ExitStatus {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        std::process::ExitStatus::from_raw(0)
+    }
+    #[cfg(not(unix))]
+    {
+        use std::os::windows::process::ExitStatusExt;
+        std::process::ExitStatus::from_raw(0)
+    }
+}
+
 pub(crate) struct McpProcess {
-    pub(crate) child: tokio::process::Child,
+    pub(crate) child: McpChild,
+    pub(crate) stdin: ChildStdin,
     pub(crate) pending: Mutex<HashMap<u64, oneshot::Sender<serde_json::Value>>>,
     pub(crate) next_id: Mutex<u64>,
 }

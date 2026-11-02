@@ -1,4 +1,4 @@
-import { inject, type InjectionKey, type Ref } from 'vue'
+import { computed, inject, type InjectionKey, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useFileTreeContext } from '@/components/ai-elements/file-tree/context'
@@ -15,6 +15,7 @@ import {
   fsMove,
   revealInFolder,
 } from '@/services/vixl/vixl-tauri'
+import { isSshProjectRoot, sshCopyRemotePath, tryParseSshProjectRoot } from '@/utils/ssh-project-root'
 
 export const FileTreeProjectRootKey: InjectionKey<Ref<string | null>> =
   Symbol('FileTreeProjectRoot')
@@ -133,6 +134,20 @@ export default () => {
     await copyText(toAbsolutePath(root, relativePath), 'Failed to copy path')
   }
 
+  const copyRemotePath = async (relativePath: string): Promise<void> => {
+    const root = requireProjectRoot()
+    if (!root) {
+      return
+    }
+    const parsed = tryParseSshProjectRoot(root)
+    if (!parsed) {
+      return
+    }
+    await copyText(sshCopyRemotePath(parsed, relativePath), 'Failed to copy path')
+  }
+
+  const isSshRoot = computed(() => isSshProjectRoot(projectRoot?.value ?? null))
+
   const copyName = async (name: string): Promise<void> => {
     await copyText(name, 'Failed to copy name')
   }
@@ -143,6 +158,12 @@ export default () => {
   ): Promise<void> => {
     const root = requireProjectRoot()
     if (!root) {
+      return
+    }
+
+    const parsed = tryParseSshProjectRoot(root)
+    if (parsed) {
+      await copyRemotePath(relativePath)
       return
     }
 
@@ -305,8 +326,10 @@ export default () => {
     clipboard,
     copyRelativePath,
     copyAbsolutePath,
+    copyRemotePath,
     copyName,
     revealInFinder,
+    isSshRoot,
     openInEditor,
     handleRename,
     handleDelete,

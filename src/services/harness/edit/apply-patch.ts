@@ -17,6 +17,7 @@ import {
   withMultiRootPathHint,
   withProjectRoots,
 } from '@/services/harness/tool-roots'
+import { previewIgnoringSensitiveBlock } from '@/services/harness/ssh/preview'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const applyPatch = (ctx: HarnessToolContext) =>
@@ -30,8 +31,12 @@ const applyPatch = (ctx: HarnessToolContext) =>
     }),
     execute: async ({ patch }, { toolCallId }) => {
       const diffs = mapDiffs(
-        await fsStagePreviewApplyPatch(
-          withProjectRoots({ projectRoot: ctx.projectRoot, patch }, ctx),
+        await previewIgnoringSensitiveBlock(
+          () =>
+            fsStagePreviewApplyPatch(
+              withProjectRoots({ projectRoot: ctx.projectRoot, patch }, ctx),
+            ),
+          [],
         ),
       )
       const paths = diffs.map((diff) => diff.path)
@@ -77,7 +82,9 @@ const applyPatch = (ctx: HarnessToolContext) =>
       if (paths.length > 0) {
         await captureBaselinesBeforeMutate(ctx, paths, toolCallId)
       }
-      await fsApplyPatch(withProjectRoots({ projectRoot: ctx.projectRoot, patch }, ctx))
+      await fsApplyPatch(
+        withProjectRoots({ projectRoot: ctx.projectRoot, patch, allowSensitive: true }, ctx),
+      )
       notifyWorkspaceMutations(ctx, gatedPaths)
       return {
         ok: true,

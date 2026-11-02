@@ -225,20 +225,10 @@ export default (
       session.finishAgentStep()
     }
     if (event.type === 'tool-pending-approval') {
-      const view: PendingApprovalView = {
-        toolCallId: event.toolCallId,
-        name: event.name,
-        kind: event.kind,
-        title: event.title,
-        detail: event.detail,
-        unsandboxed: event.unsandboxed,
-        needsNetwork: event.needsNetwork,
-        allowedScopes: event.allowedScopes,
-        diff: event.diff,
-        subagentId: event.subagentId,
-        subagentLabel: event.subagentLabel,
-      }
-      pendingApprovals.value = [...pendingApprovals.value, view]
+      pendingApprovals.value = [
+        ...pendingApprovals.value,
+        event as unknown as PendingApprovalView,
+      ]
       attention.setChatAttention('needs_approval')
     }
     if (event.type === 'billable-usage') {

@@ -7,6 +7,10 @@ import {
   rekeyPlanExecutionSession,
 } from '@/services/harness/plan-execution-session'
 import { rekeyPlanTab } from '@/composables/workbench-store/rekey-plan-tab'
+import { revealFleetProject } from '@/composables/fleet-project-reveal'
+import useProjectsExpansion from '@/composables/use-projects-expansion'
+import { upsertFleetProject } from '@/composables/use-fleet-registry'
+import { forgetSidebarChats } from '@/composables/use-fleet-sidebar'
 import { rekeyAgentHarness } from './cache'
 import type { AgentHarnessState } from './types'
 
@@ -57,16 +61,49 @@ export default async (
     options.loadedThreadKey.value = `${event.projectSlug}:${event.chatId}`
   }
 
-  try {
-    await state.fleet.refresh()
-    await state.fleet.setActiveProject(event.project.id)
-    await router.replace(chatRouteFor(event.projectSlug, event.chatId))
-    await state.fleetSidebar.refreshSlug(fromProjectSlug)
-    await state.fleetSidebar.refreshSlug(event.projectSlug)
-  } catch (error: unknown) {
+  upsertFleetProject({
+    id: event.project.id,
+    name: event.project.name,
+    slug: event.project.slug,
+    root_path: event.project.rootPath,
+    last_opened: new Date().toISOString(),
+  })
+  forgetSidebarChats(fromProjectSlug)
+
+  const report = (error: unknown): void => {
     toast.error('Failed to rebind workspace', {
       description: error instanceof Error ? error.message : 'Unknown error',
     })
+  }
+
+  try {
+    await state.fleet.refresh()
+  } catch (error: unknown) {
+    report(error)
+  }
+
+  try {
+    await state.fleet.setActiveProject(event.project.id)
+  } catch (error: unknown) {
+    report(error)
+  }
+
+  const expansion = useProjectsExpansion()
+  if (expansion.expansionMode.value === 'all-collapsed') {
+    expansion.expansionMode.value = 'natural'
+  }
+  revealFleetProject(event.projectSlug)
+
+  try {
+    await state.fleetSidebar.refreshAll()
+  } catch (error: unknown) {
+    report(error)
+  }
+
+  try {
+    await router.replace(chatRouteFor(event.projectSlug, event.chatId))
+  } catch (error: unknown) {
+    report(error)
     throw error
   }
 }

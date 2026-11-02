@@ -102,6 +102,9 @@ const queueSubagentResumeSnapshot = vi.hoisted(() =>
 const flushSubagentResumePersist = vi.hoisted(() =>
   vi.fn<(subagentId?: string) => Promise<void>>(async () => undefined),
 )
+const sshMasterIsDead = vi.hoisted(() =>
+  vi.fn<(projectRoot: string) => Promise<boolean>>(async () => false),
+)
 
 vi.mock('ai', () => ({
   streamText: (...args: unknown[]) => streamText(...args),
@@ -122,6 +125,17 @@ vi.mock('@/services/agents/resolve-agent-definition', () => ({
 
 vi.mock('@/services/harness/build-harness-tools', () => ({
   default: (...args: unknown[]) => buildHarnessTools(...args),
+}))
+
+vi.mock('@/services/harness/ssh/session-alive', () => ({
+  sshMasterIsDead: (projectRoot: string) => sshMasterIsDead(projectRoot),
+  throwIfSshSubagentSessionDown: async (projectRoot: string) => {
+    if (await sshMasterIsDead(projectRoot)) {
+      throw new Error(
+        'SSH session to eva is down. This subagent stopped. Steer this subagent after you reconnect.',
+      )
+    }
+  },
 }))
 
 vi.mock('@/services/harness/subagent/prepare-compact-step', () => ({
@@ -1907,6 +1921,65 @@ describe('runSubagentGenerate nested step stream', () => {
     expect(dropIndex).toBeGreaterThan(0)
     expect(retryStartIndex).toBeGreaterThan(dropIndex)
     expect(contentIndex).toBeGreaterThan(retryStartIndex)
+  })
+})
+
+describe('runSubagentGenerate ssh session', () => {
+  const sshRoot = 'ssh://aidanhibbard@eva/home/aidanhibbard/proj'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetSubagentRegistryForTests()
+    sshMasterIsDead.mockResolvedValue(false)
+    createModel.mockResolvedValue({ id: 'stub-model' })
+    resolveAgentDefinition.mockResolvedValue(null)
+    streamText.mockReturnValue(
+      resolvedStream({
+        text: 'summary',
+        usage: {},
+        response: { messages: [{ role: 'assistant', content: 'summary' }] },
+      }),
+    )
+  })
+
+  it('copies the parent ssh root and does not retarget this Mac', async () => {
+    const ctx = { ...baseCtx(), projectRoot: sshRoot }
+    await runSubagentGenerate({
+      ctx,
+      subagentId: 'sub-1',
+      agentName: 'explore',
+      prompt: 'look around',
+      toolCallId: 'call-1',
+      signal: new AbortController().signal,
+      model: 'local::qwen',
+      capabilities: 'read-only',
+    })
+    const nestedCtx = buildHarnessTools.mock.calls[0]?.[0] as HarnessToolContext
+    expect(nestedCtx.projectRoot).toBe(sshRoot)
+    expect(nestedCtx.projectRoot).not.toBe('/tmp/project')
+    expect(sshMasterIsDead).toHaveBeenCalledWith(sshRoot)
+  })
+
+  it('fails a dead session with the plan sentence and does not retarget this Mac', async () => {
+    sshMasterIsDead.mockResolvedValue(true)
+    const ctx = { ...baseCtx(), projectRoot: sshRoot }
+    await expect(
+      runSubagentGenerate({
+        ctx,
+        subagentId: 'sub-1',
+        agentName: 'explore',
+        prompt: 'look around',
+        toolCallId: 'call-1',
+        signal: new AbortController().signal,
+        model: 'local::qwen',
+        capabilities: 'read-only',
+      }),
+    ).rejects.toThrow(
+      'SSH session to eva is down. This subagent stopped. Steer this subagent after you reconnect.',
+    )
+    expect(buildHarnessTools).not.toHaveBeenCalled()
+    expect(streamText).not.toHaveBeenCalled()
+    expect(ctx.projectRoot).toBe(sshRoot)
   })
 })
 

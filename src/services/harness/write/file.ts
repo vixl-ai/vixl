@@ -13,6 +13,7 @@ import {
   withMultiRootPathHint,
   withProjectRoots,
 } from '@/services/harness/tool-roots'
+import { previewIgnoringSensitiveBlock } from '@/services/harness/ssh/preview'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const writeFile = (ctx: HarnessToolContext) =>
@@ -30,8 +31,12 @@ const writeFile = (ctx: HarnessToolContext) =>
     execute: async ({ path, content }, { toolCallId }) => {
       const gatedPath = permissionPath(ctx.members, path)
       const diffs = mapDiffs(
-        await fsStagePreviewWrite(
-          withProjectRoots({ projectRoot: ctx.projectRoot, path, content }, ctx),
+        await previewIgnoringSensitiveBlock(
+          () =>
+            fsStagePreviewWrite(
+              withProjectRoots({ projectRoot: ctx.projectRoot, path, content }, ctx),
+            ),
+          [],
         ),
       )
       const allowed = await gateToolPermission({
@@ -50,7 +55,10 @@ const writeFile = (ctx: HarnessToolContext) =>
       }
       await captureBaselinesBeforeMutate(ctx, [path], toolCallId)
       await fsWriteFile(
-        withProjectRoots({ projectRoot: ctx.projectRoot, path, content }, ctx),
+        withProjectRoots(
+          { projectRoot: ctx.projectRoot, path, content, allowSensitive: true },
+          ctx,
+        ),
       )
       notifyWorkspaceMutations(ctx, [gatedPath])
       const resultPath = diffs[0]?.path ?? path
