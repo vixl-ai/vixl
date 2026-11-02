@@ -74,34 +74,36 @@ const handleSearchClick = async (): Promise<void> => {
         </TooltipTrigger>
         <TooltipContent>Filter by running status</TooltipContent>
       </Tooltip>
-      <DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <DropdownMenuTrigger as-child>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="size-6"
-                :disabled="addingProject"
-                aria-label="Add project"
-              >
-                <FolderPlus class="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Add project</TooltipContent>
-        </Tooltip>
-        <DropdownMenuContent align="end" class="w-44">
-          <DropdownMenuItem @select="addProjectFromPicker">
-            <FolderPlus />
-            Add folder
-          </DropdownMenuItem>
-          <DropdownMenuItem @select="addSshProject">
-            <Server />
-            Add SSH
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Tooltip :disable-closing-trigger="true">
+        <TooltipTrigger as-child>
+          <span class="inline-flex shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="size-6"
+                  :disabled="addingProject"
+                  aria-label="Add project"
+                >
+                  <FolderPlus class="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" class="w-44">
+                <DropdownMenuItem @select="addProjectFromPicker">
+                  <FolderPlus />
+                  Add folder
+                </DropdownMenuItem>
+                <DropdownMenuItem @select="addSshProject">
+                  <Server />
+                  Add SSH
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Add project</TooltipContent>
+      </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
           <Button

@@ -31,6 +31,53 @@ const statusLine = computed((): string => {
   }
   return line
 })
+
+const dialogTitle = computed((): string | null => {
+  if (ssh.connectPhase.value === 'error') {
+    return ssh.connectErrorTitle.value || 'Could not connect.'
+  }
+  return null
+})
+
+const creatingFolder = ref(false)
+const newFolderName = ref('')
+
+const addFolderLabel = computed((): string => {
+  const count = ssh.folderSelected.value.length
+  if (count === 0) {
+    return 'Add this folder'
+  }
+  if (count === 1) {
+    return 'Add selected'
+  }
+  return `Add ${count} folders`
+})
+
+const startCreateFolder = (): void => {
+  creatingFolder.value = true
+  newFolderName.value = ''
+  ssh.folderError.value = ''
+}
+
+const cancelCreateFolder = (): void => {
+  creatingFolder.value = false
+  newFolderName.value = ''
+}
+
+const submitNewFolder = async (): Promise<void> => {
+  await ssh.createRemoteFolder(newFolderName.value)
+  if (!ssh.folderError.value) {
+    creatingFolder.value = false
+    newFolderName.value = ''
+  }
+}
+
+const folderChecked = (name: string): boolean =>
+  ssh.folderSelected.value.includes(ssh.folderChildPath(name))
+
+const onFolderChecked = (name: string, checked: boolean | 'indeterminate'): void => {
+  ssh.setFolderSelected(ssh.folderChildPath(name), checked === true)
+}
 </script>
 
 <template>
@@ -41,22 +88,12 @@ const statusLine = computed((): string => {
       @pointer-down-outside="preventOutside"
       @interact-outside="preventOutside"
     >
-      <DialogHeader>
-        <DialogTitle>
-          <template v-if="ssh.connectPhase.value === 'confirm'">
-            Connect to {{ ssh.preview.value?.hostname ?? ssh.connectHost.value }}?
-          </template>
-          <template v-else-if="ssh.connectPhase.value === 'error'">
-            {{ ssh.connectErrorTitle.value || 'Could not connect.' }}
-          </template>
-          <template v-else-if="ssh.connectPhase.value === 'pick-folder'">
-            Choose a folder on {{ ssh.preview.value?.hostname ?? ssh.connectHost.value }}
-          </template>
-          <template v-else>
-            Connect over SSH
-          </template>
-        </DialogTitle>
+      <DialogHeader v-if="dialogTitle">
+        <DialogTitle>{{ dialogTitle }}</DialogTitle>
       </DialogHeader>
+      <DialogTitle v-else class="sr-only">
+        {{ ssh.connectPhase.value === 'pick-folder' ? 'Choose a folder' : 'SSH connection' }}
+      </DialogTitle>
 
       <div
         v-if="ssh.banner.value"
@@ -121,13 +158,6 @@ const statusLine = computed((): string => {
       </div>
 
       <p
-        v-else-if="ssh.connectPhase.value === 'confirm'"
-        class="text-sm text-muted-foreground"
-      >
-        {{ ssh.confirmBody.value }}
-      </p>
-
-      <p
         v-else-if="ssh.connectPhase.value === 'connecting'"
         class="text-sm text-muted-foreground"
       >
@@ -147,34 +177,64 @@ const statusLine = computed((): string => {
       </div>
 
       <div v-else-if="ssh.connectPhase.value === 'pick-folder'" class="space-y-3">
-        <p class="truncate text-xs text-muted-foreground">{{ ssh.folderAbsolute.value }}</p>
+        <div class="flex flex-wrap gap-1 pr-6">
+          <Button
+            v-for="crumb in ssh.folderCrumbs.value"
+            :key="crumb.path"
+            type="button"
+            variant="outline"
+            size="sm"
+            class="h-7 max-w-full"
+            :disabled="ssh.folderListing.value"
+            @click="ssh.enterFolder(crumb.path)"
+          >
+            {{ crumb.label }}
+          </Button>
+        </div>
         <p v-if="ssh.folderError.value" class="text-sm text-destructive">
           {{ ssh.folderError.value }}
         </p>
-        <div class="max-h-56 overflow-y-auto rounded-md border border-border/60">
-          <button
-            v-if="ssh.folderRelative.value !== '.'"
-            type="button"
-            class="flex w-full px-3 py-1.5 text-left text-sm hover:bg-accent/50"
-            @click="ssh.enterFolder(ssh.folderParent())"
-          >
-            ..
-          </button>
-          <button
+        <div class="flex max-h-56 flex-wrap content-start gap-1 overflow-y-auto">
+          <div
             v-for="entry in ssh.folderEntries.value"
-            :key="entry.path"
-            type="button"
-            class="flex w-full px-3 py-1.5 text-left text-sm hover:bg-accent/50"
-            @click="ssh.enterFolder(entry.path)"
+            :key="entry.name"
+            class="inline-flex h-7 max-w-full items-center gap-1.5 rounded-md border border-input px-2"
           >
-            {{ entry.name }}
-          </button>
+            <Checkbox
+              :model-value="folderChecked(entry.name)"
+              :disabled="ssh.folderListing.value"
+              :aria-label="`Select ${entry.name}`"
+              @click.stop
+              @update:model-value="onFolderChecked(entry.name, $event)"
+            />
+            <button
+              type="button"
+              class="truncate text-sm"
+              :disabled="ssh.folderListing.value"
+              @click="ssh.enterFolder(ssh.folderChildPath(entry.name))"
+            >
+              {{ entry.name }}
+            </button>
+          </div>
           <p
             v-if="!ssh.folderListing.value && ssh.folderEntries.value.length === 0"
-            class="px-3 py-2 text-sm text-muted-foreground"
+            class="text-sm text-muted-foreground"
           >
             No folders
           </p>
+        </div>
+        <div v-if="creatingFolder" class="flex gap-2">
+          <Input
+            v-model="newFolderName"
+            placeholder="Folder name"
+            @keydown.enter.prevent="submitNewFolder"
+          />
+          <Button type="button" :disabled="ssh.folderListing.value" @click="submitNewFolder">
+            Create
+          </Button>
+          <Button type="button" variant="outline" @click="cancelCreateFolder">
+            Cancel
+          </Button>
         </div>
       </div>
 
@@ -184,14 +244,6 @@ const statusLine = computed((): string => {
             Cancel
           </Button>
           <Button type="button" @click="ssh.submitConnectForm">
-            Connect
-          </Button>
-        </template>
-        <template v-else-if="ssh.connectPhase.value === 'confirm'">
-          <Button type="button" variant="outline" @click="ssh.closeConnect">
-            Cancel
-          </Button>
-          <Button type="button" @click="ssh.confirmPreviewConnect">
             Connect
           </Button>
         </template>
@@ -214,6 +266,16 @@ const statusLine = computed((): string => {
           </Button>
         </template>
         <template v-else-if="ssh.connectPhase.value === 'pick-folder'">
+          <Button
+            v-if="!creatingFolder"
+            type="button"
+            variant="outline"
+            class="sm:mr-auto"
+            :disabled="ssh.folderListing.value"
+            @click="startCreateFolder"
+          >
+            New folder
+          </Button>
           <Button type="button" variant="outline" @click="ssh.closeConnect">
             Cancel
           </Button>
@@ -222,7 +284,7 @@ const statusLine = computed((): string => {
             :disabled="ssh.folderListing.value"
             @click="ssh.registerPickedFolder"
           >
-            Open this folder
+            {{ addFolderLabel }}
           </Button>
         </template>
       </DialogFooter>

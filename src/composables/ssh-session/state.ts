@@ -4,7 +4,7 @@ import type { SshBannerEvent, SshConfirmEvent, SshPreview, SshSecretEvent, SshSe
 import { sshSessionKey } from '@/utils/ssh-project-root'
 import type { SshProjectRoot } from '@/utils/ssh-project-root'
 
-export type SshConnectPhase = 'form' | 'confirm' | 'connecting' | 'error' | 'pick-folder'
+export type SshConnectPhase = 'form' | 'connecting' | 'error' | 'pick-folder'
 export type SshConnectMode = 'add' | 'reconnect'
 
 export type FolderEntry = { name: string; path: string; kind: string }
@@ -48,8 +48,10 @@ export const disconnectConfirm = ref<{
   sharedCount: number
 } | null>(null)
 export const folderHome = ref('')
+export const folderCurrent = ref('')
 export const folderRelative = ref('.')
 export const folderEntries = ref<FolderEntry[]>([])
+export const folderSelected = ref<string[]>([])
 export const folderListing = ref(false)
 export const folderError = ref('')
 export const portForwardOpen = ref(false)
@@ -165,8 +167,10 @@ export const resetConnectForm = (): void => {
   usedSavedSecret.value = false
   secretAttempt.value = 0
   folderHome.value = ''
+  folderCurrent.value = ''
   folderRelative.value = '.'
   folderEntries.value = []
+  folderSelected.value = []
   folderError.value = ''
   connectPhase.value = 'form'
   resetSecretField()

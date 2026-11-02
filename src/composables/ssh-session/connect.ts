@@ -1,4 +1,3 @@
-import { computed } from 'vue'
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import type { FleetProject } from '@/types/fleet/fleet-project'
 import {
@@ -88,6 +87,8 @@ export const submitConnectForm = async (): Promise<void> => {
     state.connectErrorBody.value = portError.body
     return
   }
+  state.connectPhase.value = 'connecting'
+  state.connectStatus.value = 'Reading SSH config.'
   try {
     const portRaw = state.connectPort.value.trim()
     const port = portRaw ? Number(portRaw) : undefined
@@ -99,7 +100,6 @@ export const submitConnectForm = async (): Promise<void> => {
     if (state.connectUser.value.trim()) {
       state.preview.value = { ...state.preview.value, user: state.connectUser.value.trim() }
     }
-    state.connectPhase.value = 'confirm'
     state.connectErrorTitle.value = ''
     state.connectErrorBody.value = ''
   } catch (error) {
@@ -107,20 +107,10 @@ export const submitConnectForm = async (): Promise<void> => {
     state.connectPhase.value = 'error'
     state.connectErrorTitle.value = copy.title
     state.connectErrorBody.value = copy.body
+    return
   }
+  await confirmPreviewConnect()
 }
-
-export const confirmBody = computed((): string => {
-  const current = state.preview.value
-  if (!current) {
-    return ''
-  }
-  let body = current.confirmBody
-  if (state.connectPasswordOnly.value) {
-    body += ' This attempt will not offer a key. Your SSH config is not changed.'
-  }
-  return body
-})
 
 export const confirmPreviewConnect = async (): Promise<void> => {
   const current = state.preview.value

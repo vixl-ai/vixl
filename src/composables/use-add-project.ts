@@ -50,8 +50,14 @@ export default () => {
   }
 
   const addSshProject = async (): Promise<void> => {
-    const ssh = useSshSession()
-    await ssh.openAddSsh()
+    try {
+      const ssh = useSshSession()
+      await ssh.openAddSsh()
+    } catch (error) {
+      toast.error('Could not add project', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
   }
 
   return {
