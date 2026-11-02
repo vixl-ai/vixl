@@ -44,13 +44,10 @@ const newFolderName = ref('')
 
 const addFolderLabel = computed((): string => {
   const count = ssh.folderSelected.value.length
-  if (count === 0) {
-    return 'Add this folder'
+  if (count > 1) {
+    return `Add ${count} folders`
   }
-  if (count === 1) {
-    return 'Add selected'
-  }
-  return `Add ${count} folders`
+  return 'Add folder'
 })
 
 const startCreateFolder = (): void => {
@@ -177,28 +174,31 @@ const onFolderChecked = (name: string, checked: boolean | 'indeterminate'): void
       </div>
 
       <div v-else-if="ssh.connectPhase.value === 'pick-folder'" class="space-y-3">
-        <div class="flex flex-wrap gap-1 pr-6">
-          <Button
-            v-for="crumb in ssh.folderCrumbs.value"
+        <div class="flex flex-wrap items-center gap-1 pr-6 text-sm">
+          <template
+            v-for="(crumb, index) in ssh.folderCrumbs.value"
             :key="crumb.path"
-            type="button"
-            variant="outline"
-            size="sm"
-            class="h-7 max-w-full"
-            :disabled="ssh.folderListing.value"
-            @click="ssh.enterFolder(crumb.path)"
           >
-            {{ crumb.label }}
-          </Button>
+            <span v-if="index > 0" class="text-muted-foreground">/</span>
+            <button
+              type="button"
+              class="rounded-md bg-muted px-2 py-0.5 hover:bg-accent disabled:pointer-events-none disabled:opacity-60"
+              :disabled="ssh.folderListing.value || index === ssh.folderCrumbs.value.length - 1"
+              @click="ssh.enterFolder(crumb.path)"
+            >
+              {{ crumb.label }}
+            </button>
+          </template>
         </div>
         <p v-if="ssh.folderError.value" class="text-sm text-destructive">
           {{ ssh.folderError.value }}
         </p>
-        <div class="flex max-h-56 flex-wrap content-start gap-1 overflow-y-auto">
+        <div class="max-h-56 overflow-y-auto rounded-md border border-border/60">
           <div
             v-for="entry in ssh.folderEntries.value"
             :key="entry.name"
-            class="inline-flex h-7 max-w-full items-center gap-1.5 rounded-md border border-input px-2"
+            class="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent/50"
+            :class="folderChecked(entry.name) ? 'bg-accent/40' : ''"
           >
             <Checkbox
               :model-value="folderChecked(entry.name)"
@@ -209,7 +209,7 @@ const onFolderChecked = (name: string, checked: boolean | 'indeterminate'): void
             />
             <button
               type="button"
-              class="truncate text-sm"
+              class="min-w-0 flex-1 truncate text-left"
               :disabled="ssh.folderListing.value"
               @click="ssh.enterFolder(ssh.folderChildPath(entry.name))"
             >
@@ -218,7 +218,7 @@ const onFolderChecked = (name: string, checked: boolean | 'indeterminate'): void
           </div>
           <p
             v-if="!ssh.folderListing.value && ssh.folderEntries.value.length === 0"
-            class="text-sm text-muted-foreground"
+            class="px-3 py-2 text-sm text-muted-foreground"
           >
             No folders
           </p>
@@ -281,7 +281,7 @@ const onFolderChecked = (name: string, checked: boolean | 'indeterminate'): void
           </Button>
           <Button
             type="button"
-            :disabled="ssh.folderListing.value"
+            :disabled="ssh.folderListing.value || ssh.folderSelected.value.length < 1"
             @click="ssh.registerPickedFolder"
           >
             {{ addFolderLabel }}

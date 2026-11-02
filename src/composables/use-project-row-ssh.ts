@@ -21,11 +21,12 @@ export default (
   const sshStatus = computed(() =>
     isSshProject.value ? ssh.sessionForRoot(sshRootPath.value) : null,
   )
-  const sshStatusLine = computed((): string | null => {
+  const sshConnected = computed(() => {
     if (!isSshProject.value) {
-      return null
+      return false
     }
-    return sshStatus.value?.line || `Disconnected from ${sshStatus.value?.hostname ?? 'host'}.`
+    const status = sshStatus.value
+    return Boolean(status && status.masterAlive && status.state === 'connected')
   })
 
   const projectForActions = () => {
@@ -64,7 +65,7 @@ export default (
 
   return {
     isSshProject,
-    sshStatusLine,
+    sshConnected,
     handleReconnect,
     handleDisconnect,
     handleForwardPort,

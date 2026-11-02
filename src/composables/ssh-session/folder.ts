@@ -216,9 +216,10 @@ export const registerPickedFolder = async (): Promise<void> => {
   if (!current) {
     return
   }
-  const targets = state.folderSelected.value.length > 0
-    ? [...state.folderSelected.value]
-    : [state.folderCurrent.value]
+  if (state.folderSelected.value.length < 1) {
+    return
+  }
+  const targets = [...state.folderSelected.value]
   const fleet = useFleetRegistry()
   let added = 0
   let existing = 0

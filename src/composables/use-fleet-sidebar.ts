@@ -11,7 +11,6 @@ import { isTauri, listPinnedChats } from '@/services/vixl/vixl-tauri'
 import type { FleetPinnedChat } from '@/types/fleet/fleet-pinned-chat'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import { sidebarChatSortKey } from '@/utils/sidebar-chat-sort-key'
-import { sshSidebarLabel, tryParseSshProjectRoot } from '@/utils/ssh-project-root'
 
 export type FleetSidebarActivityItem =
   | {
@@ -98,15 +97,12 @@ export default () => {
       options?: { nested?: boolean },
     ): FleetSidebarProject => {
       const isActive = fleet.activeProjectId.value === project.id
-      const sshRoot = tryParseSshProjectRoot(project.rootPath)
       return {
         slug: project.slug,
         displayName:
           options?.nested && project.worktree
             ? project.worktree.branch
-            : sshRoot
-              ? sshSidebarLabel(sshRoot)
-              : project.name,
+            : project.name,
         kind: 'project',
         isActiveProject: isActive,
         defaultExpanded: isActive,
