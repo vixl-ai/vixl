@@ -163,6 +163,19 @@ impl SftpClient {
         Ok(client)
     }
 
+    #[cfg(test)]
+    pub(crate) fn from_stdio_for_test(stdio: ChannelStdio, hostname: String) -> Self {
+        Self {
+            stdin: stdio.stdin,
+            stdout: stdio.stdout,
+            hostname,
+            next_id: 1,
+            extensions: HashSet::new(),
+            channel_id: stdio.channel_id,
+            stderr_text: Arc::new(Mutex::new(String::new())),
+        }
+    }
+
     pub(crate) async fn realpath(&mut self, path: &str) -> Result<String, String> {
         let id = self
             .send(SSH_FXP_REALPATH, |buf| put_str(buf, path))

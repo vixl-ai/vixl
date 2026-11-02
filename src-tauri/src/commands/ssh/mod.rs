@@ -38,6 +38,7 @@ pub(crate) use remote_cmd::{
     map_unreachable, missing_program, parse_root, posix_quote, probe_remote_program,
     reject_git_hooks_write, ssh_uri_for, tty_login_command,
 };
+pub(crate) use session::require_live_master;
 pub use session::{session_key, SessionKey, SshConnectRequest, SshSessionStatus};
 
 #[cfg(test)]

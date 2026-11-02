@@ -7,8 +7,8 @@ use crate::commands::fs::{
     fs_list_dir, fs_read_file, fs_read_file_command, fs_stat, fs_write_file, WorkspaceRootArg,
 };
 use crate::commands::ssh::{
-    clear_sessions_for_tests, connect, disconnect, insert_test_session, SshConnectRequest,
-    SshPaths, SshSessionStatus, SESSION_TEST_LOCK,
+    clear_sessions_for_tests, connect, disconnect, insert_test_session, session_key,
+    SshConnectRequest, SshPaths, SshSessionStatus, SESSION_TEST_LOCK,
 };
 
 use super::remote::{force_next_write_size_mismatch, parse_ssh_project_root};
@@ -279,6 +279,57 @@ fn sensitive_path_allow_true_still_requires_a_live_master() {
     )
     .expect_err("no master");
     assert!(err.contains("host.example is unreachable."), "got {err}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn dead_master_does_not_reuse_a_cached_sftp_channel() {
+    let _lock = SESSION_TEST_LOCK.lock().await;
+    clear_sessions_for_tests().await;
+    let user = "aidanhibbard";
+    let hostname = "vixl-dead-sftp.example";
+    let port = 2222u16;
+    let key = session_key(user, hostname, port);
+    let mut child =
+        super::remote::insert_silent_sftp_for_test(key.clone(), hostname.to_string()).await;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let paths = SshPaths::from_roots(dir.path().join("vixl"), dir.path().join("user"));
+    insert_test_session(
+        SshSessionStatus {
+            user: user.to_string(),
+            hostname: hostname.to_string(),
+            port,
+            destination: hostname.to_string(),
+            state: "disconnected".to_string(),
+            line: format!("{hostname} is not connected."),
+            last_error: None,
+            master_alive: false,
+        },
+        paths,
+        dir.path().join("cm-missing"),
+    )
+    .await;
+    let started = std::time::Instant::now();
+    let err = fs_read_file(
+        format!("ssh://{user}@{hostname}/tmp/proj"),
+        "README.md".into(),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .expect_err("dead cached channel");
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "cached channel was reused"
+    );
+    assert!(
+        err.contains("vixl-dead-sftp.example is not connected."),
+        "got {err}"
+    );
+    let _ = child.kill().await;
+    let _ = child.wait().await;
+    clear_sessions_for_tests().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

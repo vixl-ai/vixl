@@ -10,7 +10,8 @@ use tokio::sync::Mutex;
 use url::Url;
 
 use crate::commands::ssh::{
-    open_sftp, reject_git_hooks_write, session_key, take_channel_stdio, SessionKey,
+    open_sftp, reject_git_hooks_write, require_live_master, session_key, take_channel_stdio,
+    SessionKey,
 };
 
 use super::diff::build_file_diff;
@@ -395,11 +396,59 @@ where
     crate::commands::ssh::block_on(fut)
 }
 
+#[cfg(test)]
+pub(crate) async fn insert_silent_sftp_for_test(
+    key: SessionKey,
+    hostname: String,
+) -> tokio::process::Child {
+    use std::process::Stdio;
+
+    use crate::commands::ssh::ChannelStdio;
+
+    let mut child = tokio::process::Command::new("cat")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("cat");
+    let stdin = child.stdin.take().expect("stdin");
+    let stdout = child.stdout.take().expect("stdout");
+    let client = SftpClient::from_stdio_for_test(
+        ChannelStdio {
+            stdin,
+            stdout,
+            stderr: None,
+            channel_id: format!("test-silent-{}", key.hostname),
+        },
+        hostname,
+    );
+    SFTP_POOL
+        .lock()
+        .await
+        .insert(key, Arc::new(Mutex::new(Some(client))));
+    child
+}
+
+pub(crate) async fn close_pooled_sftp(key: &SessionKey) {
+    let slot = {
+        let pool = SFTP_POOL.lock().await;
+        pool.get(key).cloned()
+    };
+    if let Some(slot) = slot {
+        let mut guard = slot.lock().await;
+        *guard = None;
+    }
+}
+
 async fn with_sftp<T, F>(ssh: &SshProjectRoot, f: F) -> Result<T, String>
 where
     F: for<'a> FnOnce(&'a mut SftpClient) -> BoxFuture<'a, Result<T, String>>,
 {
     let key = session_key(&ssh.user, &ssh.hostname, ssh.port);
+    if let Err(err) = require_live_master(&key).await {
+        close_pooled_sftp(&key).await;
+        return Err(map_transport(&ssh.hostname, err));
+    }
     let slot = {
         let mut pool = SFTP_POOL.lock().await;
         pool.entry(key.clone())

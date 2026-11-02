@@ -184,6 +184,10 @@ pub async fn mark_master_dead(key: &SessionKey) {
         record.state = "disconnected".to_string();
         record.line = errors::not_connected(&key.hostname);
     }
+    let key = key.clone();
+    tokio::spawn(async move {
+        crate::commands::fs::close_pooled_sftp(&key).await;
+    });
 }
 
 fn connect_poll_succeeded(state: &str, control_ok: bool, user_cancelled: bool) -> bool {
@@ -606,30 +610,33 @@ pub async fn connect(
 
 pub async fn disconnect(user: &str, hostname: &str, port: u16) -> Result<SshSessionStatus, String> {
     let key = session_key(user, hostname, port);
-    let (kill_tx, destination, control_path, paths) = {
+    let open = {
         let mut sessions = SESSIONS.lock().await;
-        let Some(record) = sessions.get_mut(&key) else {
-            return Ok(SshSessionStatus {
-                user: user.to_string(),
-                hostname: hostname.to_string(),
-                port,
-                destination: String::new(),
-                state: "disconnected".to_string(),
-                line: format!("Disconnected from {hostname}."),
-                last_error: None,
-                master_alive: false,
-            });
-        };
-        record.master_alive = false;
-        record.state = "disconnected".to_string();
-        record.line = format!("Disconnected from {hostname}.");
-        record.last_error = None;
-        (
-            record.kill_tx.clone(),
-            record.destination.clone(),
-            record.control_path.clone(),
-            record.paths.clone(),
-        )
+        sessions.get_mut(&key).map(|record| {
+            record.master_alive = false;
+            record.state = "disconnected".to_string();
+            record.line = format!("Disconnected from {hostname}.");
+            record.last_error = None;
+            (
+                record.kill_tx.clone(),
+                record.destination.clone(),
+                record.control_path.clone(),
+                record.paths.clone(),
+            )
+        })
+    };
+    crate::commands::fs::close_pooled_sftp(&key).await;
+    let Some((kill_tx, destination, control_path, paths)) = open else {
+        return Ok(SshSessionStatus {
+            user: user.to_string(),
+            hostname: hostname.to_string(),
+            port,
+            destination: String::new(),
+            state: "disconnected".to_string(),
+            line: format!("Disconnected from {hostname}."),
+            last_error: None,
+            master_alive: false,
+        });
     };
     let snapshot = SessionSnapshot {
         key: key.clone(),

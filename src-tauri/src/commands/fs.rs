@@ -22,8 +22,9 @@ pub use read::{
     fs_read_file_command, fs_stat, fs_stat_command,
 };
 pub(crate) use remote::{
-    ensure_ssh_project_directory, list_dir_await, parse_ssh_project_root, read_file_await,
-    resolve_target, stat_await, uses_ssh_transport, validate_relative, FsTarget, SshProjectRoot,
+    close_pooled_sftp, ensure_ssh_project_directory, list_dir_await, parse_ssh_project_root,
+    read_file_await, resolve_target, stat_await, uses_ssh_transport, validate_relative, FsTarget,
+    SshProjectRoot,
 };
 pub use types::{
     DiffLine, FileDiff, FileDiffHunk, FsDirEntry, FsEditReplacement, FsReadFileResult,
