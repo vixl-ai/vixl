@@ -121,8 +121,14 @@ fn write_permits_env_templates_without_allow_sensitive() {
         "KEY=\n"
     );
 
-    fs_write_file(root.clone(), ".env.sample".into(), "KEY=\n".into(), None, None)
-        .expect("write .env.sample");
+    fs_write_file(
+        root.clone(),
+        ".env.sample".into(),
+        "KEY=\n".into(),
+        None,
+        None,
+    )
+    .expect("write .env.sample");
     fs_write_file(root, ".env.template".into(), "KEY=\n".into(), None, None)
         .expect("write .env.template");
 }
@@ -140,8 +146,8 @@ fn write_rename_delete_block_env_when_allow_sensitive_is_none() {
         .expect_err("rename .env should be blocked");
     assert_eq!(rename_err, "Sensitive path blocked");
 
-    let delete_err =
-        fs_delete(root, ".env".into(), None, None, None).expect_err("delete .env should be blocked");
+    let delete_err = fs_delete(root, ".env".into(), None, None, None)
+        .expect_err("delete .env should be blocked");
     assert_eq!(delete_err, "Sensitive path blocked");
 }
 
@@ -163,16 +169,28 @@ fn write_rename_delete_permit_env_when_allow_sensitive_is_true() {
         "SECRET=1\n"
     );
 
-    fs_rename(root.clone(), ".env".into(), "env.bak".into(), Some(true), None)
-        .expect("rename .env with allow_sensitive");
+    fs_rename(
+        root.clone(),
+        ".env".into(),
+        "env.bak".into(),
+        Some(true),
+        None,
+    )
+    .expect("rename .env with allow_sensitive");
     assert!(!dir.path().join(".env").exists());
     assert_eq!(
         fs::read_to_string(dir.path().join("env.bak")).expect("read env.bak"),
         "SECRET=1\n"
     );
 
-    fs_write_file(root.clone(), ".env".into(), "SECRET=2\n".into(), Some(true), None)
-        .expect("rewrite .env with allow_sensitive");
+    fs_write_file(
+        root.clone(),
+        ".env".into(),
+        "SECRET=2\n".into(),
+        Some(true),
+        None,
+    )
+    .expect("rewrite .env with allow_sensitive");
     fs_delete(root, ".env".into(), None, Some(true), None)
         .expect("delete .env with allow_sensitive");
     assert!(!dir.path().join(".env").exists());
@@ -215,8 +233,14 @@ fn copy_move_permit_env_when_allow_sensitive_is_true() {
     )
     .expect("write .env with allow_sensitive");
 
-    fs_copy(root.clone(), ".env".into(), "env.copy".into(), Some(true), None)
-        .expect("copy .env with allow_sensitive");
+    fs_copy(
+        root.clone(),
+        ".env".into(),
+        "env.copy".into(),
+        Some(true),
+        None,
+    )
+    .expect("copy .env with allow_sensitive");
     assert_eq!(
         fs::read_to_string(dir.path().join("env.copy")).expect("read env.copy"),
         "SECRET=1\n"

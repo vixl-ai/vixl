@@ -37,16 +37,7 @@ pub async fn mcp_start(
 ) -> Result<McpServerState, String> {
     validate_mcp_spawn(&command, &args)?;
     if scope_key.as_deref().is_some_and(is_ssh_root) {
-        return mcp_start_remote(
-            app,
-            server_id,
-            command,
-            args,
-            env,
-            scope_key,
-            env_file,
-        )
-        .await;
+        return mcp_start_remote(app, server_id, command, args, env, scope_key, env_file).await;
     }
     let working_dir = mcp_stdio_working_dir(scope_key.as_deref())?;
     let personal_dir = user_vixl_dir(&app)?;

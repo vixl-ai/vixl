@@ -3,17 +3,19 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use crate::commands::codegraph::graph_id_for_identity;
-use crate::commands::fs::fs_write_file;
-use crate::commands::git::git_status;
-use crate::commands::search::{workspace_grep, WorkspaceGrepRequest};
 use super::channels::{open_exec, wait_channel_exit};
-use super::remote_cmd::{git_hooks_refused, indexer_cannot_run, login_command, missing_program, probe_remote_program};
+use super::remote_cmd::{
+    git_hooks_refused, indexer_cannot_run, login_command, missing_program, probe_remote_program,
+};
 use super::session::{
     clear_sessions_for_tests, connect, disconnect, insert_test_session, session_key,
     SshConnectRequest, SshSessionStatus, SESSION_TEST_LOCK,
 };
 use super::SshPaths;
+use crate::commands::codegraph::graph_id_for_identity;
+use crate::commands::fs::fs_write_file;
+use crate::commands::git::git_status;
+use crate::commands::search::{workspace_grep, WorkspaceGrepRequest};
 
 const SSHD_BIN: &str = "/usr/sbin/sshd";
 const KEYGEN_BIN: &str = "/usr/bin/ssh-keygen";
@@ -211,12 +213,9 @@ async fn dead_master_names_the_host() {
         dir.path().join("cm-missing"),
     )
     .await;
-    let err = git_status(
-        "ssh://tester@testhost.example/tmp/proj".into(),
-        None,
-    )
-    .await
-    .expect_err("dead");
+    let err = git_status("ssh://tester@testhost.example/tmp/proj".into(), None)
+        .await
+        .expect_err("dead");
     assert!(
         err.contains("testhost.example is unreachable."),
         "got {err}"
@@ -310,9 +309,15 @@ async fn run_live_exec_cases(user: &str, port: u16, short_root: &Path) {
     let status = git_status(root.clone(), None)
         .await
         .expect("remote git status");
-    let paths: Vec<_> = status.entries.iter().map(|entry| entry.path.as_str()).collect();
+    let paths: Vec<_> = status
+        .entries
+        .iter()
+        .map(|entry| entry.path.as_str())
+        .collect();
     assert!(
-        paths.iter().any(|path| path.contains("unstaged-remote.txt")),
+        paths
+            .iter()
+            .any(|path| path.contains("unstaged-remote.txt")),
         "remote git status was {paths:?}"
     );
     assert!(
@@ -412,9 +417,5 @@ async fn run_live_exec_cases(user: &str, port: u16, short_root: &Path) {
     let missing = probe_remote_program(&ssh, "vixl-no-such-program")
         .await
         .expect_err("missing program");
-    assert_eq!(
-        missing,
-        missing_program("vixl-no-such-program", hostname)
-    );
-
+    assert_eq!(missing, missing_program("vixl-no-such-program", hostname));
 }

@@ -224,9 +224,8 @@ fn classify_scoped_change(
     let personal_worktrees = personal_dir.join("worktrees");
     if path.starts_with(&personal_worktrees) {
         let in_open_worktree_project = !overlaps_personal
-            && project_dir.is_some_and(|dir| {
-                dir.starts_with(&personal_worktrees) && path.starts_with(dir)
-            });
+            && project_dir
+                .is_some_and(|dir| dir.starts_with(&personal_worktrees) && path.starts_with(dir));
         if !in_open_worktree_project {
             return None;
         }

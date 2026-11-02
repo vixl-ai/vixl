@@ -79,9 +79,7 @@ impl LspChild {
         }
     }
 
-    pub(crate) fn try_wait(
-        &mut self,
-    ) -> std::io::Result<Option<std::process::ExitStatus>> {
+    pub(crate) fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
         match self {
             Self::Local(child) => child.try_wait(),
             Self::Remote { .. } => Ok(None),

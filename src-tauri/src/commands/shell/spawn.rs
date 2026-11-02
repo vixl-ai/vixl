@@ -13,8 +13,8 @@ use std::os::unix::process::ExitStatusExt;
 use super::builders::spawn_child;
 use crate::commands::fs::parse_ssh_project_root;
 use crate::commands::ssh::{
-    channel_exit_rx, close_channel, is_ssh_root, key_for, login_command, map_unreachable, open_exec,
-    recv_channel_exit, take_channel_stdio, wait_channel_exit,
+    channel_exit_rx, close_channel, is_ssh_root, key_for, login_command, map_unreachable,
+    open_exec, recv_channel_exit, take_channel_stdio, wait_channel_exit,
 };
 
 /// Live tracked shell: wait task owns the Child and listens on `kill_rx`.
@@ -257,7 +257,9 @@ async fn spawn_tracked_remote(
         .await
         .map_err(|err| map_unreachable(&ssh.hostname, err))?;
     let stdout = stdio.stdout;
-    let stderr = stdio.stderr.ok_or_else(|| "stderr unavailable".to_string())?;
+    let stderr = stdio
+        .stderr
+        .ok_or_else(|| "stderr unavailable".to_string())?;
     drop(stdio.stdin);
 
     let (kill_tx, mut kill_rx) = tokio::sync::mpsc::channel::<()>(1);

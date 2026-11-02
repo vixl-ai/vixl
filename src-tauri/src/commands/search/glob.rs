@@ -108,13 +108,9 @@ async fn glob_with_ssh(request: WorkspaceGlobRequest) -> Result<WorkspaceGlobRes
             }
             if arg.path.trim().starts_with("ssh://") {
                 let ssh = parse_ssh_project_root(&arg.path)?;
-                let partial = super::ssh::glob_ssh(
-                    &ssh,
-                    &request.pattern,
-                    Some(arg.slug.trim()),
-                    remaining,
-                )
-                .await?;
+                let partial =
+                    super::ssh::glob_ssh(&ssh, &request.pattern, Some(arg.slug.trim()), remaining)
+                        .await?;
                 files.extend(partial.files);
                 truncated = truncated || partial.truncated;
             }

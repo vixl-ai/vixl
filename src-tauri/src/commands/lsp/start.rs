@@ -12,25 +12,25 @@ use tokio::sync::Mutex;
 use super::super::config::workspace_is_trusted;
 use super::super::fs::canonical_project_root;
 use super::helpers::path_to_uri;
+use super::instance::lsp_instance_key;
 use super::io::spawn_stderr_tail;
 use super::progress::{
     activity_for_running, clear_loading_activity, server_awaits_project_load, ActiveProgress,
     PROJECT_LOAD_FUSE_MS,
 };
-use super::instance::lsp_instance_key;
 use super::resolve::{resolve_lsp_command, LspServerEntry};
 use super::rpc::{
     json_rpc_request, send_notification, spawn_keepalive, LspChild, LspProcess, ManagedLspServer,
     LSP_SERVERS,
 };
+use super::state::{transition, transition_with, LspActivity, LspPhase, LspStatePatch};
+use super::typescript::{build_initialization_options, inject_vue_tsdk_arg};
+use super::workspace_diagnostics::parse_diagnostic_provider;
 use crate::commands::fs::parse_ssh_project_root;
 use crate::commands::ssh::{
     is_ssh_root, key_for, login_command, map_unreachable, open_exec, posix_quote,
     probe_remote_program, take_channel_stdio,
 };
-use super::state::{transition, transition_with, LspActivity, LspPhase, LspStatePatch};
-use super::typescript::{build_initialization_options, inject_vue_tsdk_arg};
-use super::workspace_diagnostics::parse_diagnostic_provider;
 
 pub(crate) enum StartOutcome {
     Started,
@@ -138,7 +138,12 @@ pub(crate) async fn start_server(
         published: false,
     };
 
-    super::spawn_reader(process.clone(), instance_key.clone(), generation, app.clone());
+    super::spawn_reader(
+        process.clone(),
+        instance_key.clone(),
+        generation,
+        app.clone(),
+    );
 
     let root_uri = path_to_uri(&canonical_project_root(&workspace_root)?);
     let init_options = build_initialization_options(
@@ -239,7 +244,12 @@ pub(crate) async fn start_server(
     }
     child_guard.published = true;
 
-    spawn_keepalive(app.clone(), instance_key.clone(), generation, process.clone());
+    spawn_keepalive(
+        app.clone(),
+        instance_key.clone(),
+        generation,
+        process.clone(),
+    );
 
     let still_alive = {
         let mut guard = process.lock().await;
@@ -270,7 +280,12 @@ pub(crate) async fn start_server(
             Arc::clone(&guard.project_loading)
         };
         if project_loading.load(Ordering::SeqCst) {
-            spawn_project_load_fuse(app.clone(), instance_key.clone(), generation, project_loading);
+            spawn_project_load_fuse(
+                app.clone(),
+                instance_key.clone(),
+                generation,
+                project_loading,
+            );
         }
     }
     Ok(StartOutcome::Started)
@@ -345,7 +360,12 @@ async fn start_remote_server(
         published: false,
     };
 
-    super::spawn_reader(process.clone(), instance_key.clone(), generation, app.clone());
+    super::spawn_reader(
+        process.clone(),
+        instance_key.clone(),
+        generation,
+        app.clone(),
+    );
 
     let remote_path = ssh.remote_path.clone();
     let root_uri = format!("file://{remote_path}");
@@ -444,7 +464,12 @@ async fn start_remote_server(
     }
     child_guard.published = true;
 
-    spawn_keepalive(app.clone(), instance_key.clone(), generation, process.clone());
+    spawn_keepalive(
+        app.clone(),
+        instance_key.clone(),
+        generation,
+        process.clone(),
+    );
 
     let activity = current_running_activity(&process).await;
     let mut patch = LspStatePatch::running("path".to_string(), workspace_root, None);
@@ -464,7 +489,12 @@ async fn start_remote_server(
             Arc::clone(&guard.project_loading)
         };
         if project_loading.load(Ordering::SeqCst) {
-            spawn_project_load_fuse(app.clone(), instance_key.clone(), generation, project_loading);
+            spawn_project_load_fuse(
+                app.clone(),
+                instance_key.clone(),
+                generation,
+                project_loading,
+            );
         }
     }
     Ok(StartOutcome::Started)

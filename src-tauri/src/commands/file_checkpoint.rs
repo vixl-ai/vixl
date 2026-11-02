@@ -271,7 +271,11 @@ fn capture_directory(
 }
 
 pub(crate) fn refuse_ssh_local_fallback(project_root: &str) -> Result<(), String> {
-    if project_root.trim().to_ascii_lowercase().starts_with("ssh://") {
+    if project_root
+        .trim()
+        .to_ascii_lowercase()
+        .starts_with("ssh://")
+    {
         return Err("SSH file checkpoints cannot use a local project path".to_string());
     }
     Ok(())
@@ -434,13 +438,13 @@ pub fn file_checkpoint_load(
             content: None,
         });
     }
-    let bytes = fs::read(content_path(&dir, &entry.path_hash)).map_err(|error| error.to_string())?;
+    let bytes =
+        fs::read(content_path(&dir, &entry.path_hash)).map_err(|error| error.to_string())?;
     if bytes == ABSENT_MARKER.as_bytes() {
         return Err(format!("Corrupt checkpoint content for {path}"));
     }
-    let content = String::from_utf8(bytes).unwrap_or_else(|error| {
-        String::from_utf8_lossy(error.as_bytes()).into_owned()
-    });
+    let content = String::from_utf8(bytes)
+        .unwrap_or_else(|error| String::from_utf8_lossy(error.as_bytes()).into_owned());
     Ok(FileCheckpointLoadResult {
         skipped: false,
         existed: true,
@@ -631,7 +635,10 @@ mod tests {
 
     #[test]
     fn manifest_key_uses_explicit_key() {
-        assert_eq!(manifest_key("src/a.ts", Some("web/src/a.ts")), "web/src/a.ts");
+        assert_eq!(
+            manifest_key("src/a.ts", Some("web/src/a.ts")),
+            "web/src/a.ts"
+        );
     }
 
     #[test]

@@ -721,10 +721,9 @@ mod tests {
 
     #[test]
     fn connect_request_password_only_is_a_field() {
-        let request: SshConnectRequest = serde_json::from_str(
-            r#"{"destination":"eva","passwordOnly":true,"port":22}"#,
-        )
-        .expect("request");
+        let request: SshConnectRequest =
+            serde_json::from_str(r#"{"destination":"eva","passwordOnly":true,"port":22}"#)
+                .expect("request");
         assert_eq!(request.destination, "eva");
         assert_eq!(request.password_only, Some(true));
         assert_eq!(request.port, Some(22));

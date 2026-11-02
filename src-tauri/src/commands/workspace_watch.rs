@@ -15,8 +15,8 @@ use super::fs::{canonical_project_root, parse_ssh_project_root, resolve_workspac
 use super::skip_dirs::skip_directory;
 use super::ssh::{
     block_on, close_channel, inotify_enospc, inotifywait_missing, is_ssh_root, key_for,
-    login_command, looks_like_enospc, map_unreachable, open_exec, posix_quote, probe_remote_program,
-    take_channel_stdio,
+    login_command, looks_like_enospc, map_unreachable, open_exec, posix_quote,
+    probe_remote_program, take_channel_stdio,
 };
 
 const DEBOUNCE_MS: u64 = 150;

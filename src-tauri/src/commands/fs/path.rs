@@ -606,11 +606,9 @@ mod tests {
         write_file(&api.path, "src/foo.ts", "api");
         let absolute = api.path.join("src/foo.ts");
 
-        let (slug, resolved) = resolve_multi_root_path(
-            &[api.clone(), web],
-            &absolute.to_string_lossy(),
-        )
-        .expect("absolute in root");
+        let (slug, resolved) =
+            resolve_multi_root_path(&[api.clone(), web], &absolute.to_string_lossy())
+                .expect("absolute in root");
         assert_eq!(slug, "api");
         assert_eq!(resolved, absolute.canonicalize().expect("file"));
 
@@ -627,10 +625,7 @@ mod tests {
 
         let error = resolve_multi_root_path(&[api, web], &file.to_string_lossy())
             .expect_err("absolute outside");
-        assert!(
-            error.contains("outside all project roots"),
-            "got: {error}"
-        );
+        assert!(error.contains("outside all project roots"), "got: {error}");
 
         let _keep = (api_dir, web_dir, outside);
     }
@@ -717,12 +712,9 @@ mod tests {
             },
         ];
 
-        let env_resolved = resolve_command_path(
-            &api.path.to_string_lossy(),
-            Some(&args),
-            "api/.env",
-        )
-        .expect("resolve env");
+        let env_resolved =
+            resolve_command_path(&api.path.to_string_lossy(), Some(&args), "api/.env")
+                .expect("resolve env");
         let env_err = reject_resolved_sensitive_path(&env_resolved).expect_err("env blocked");
         assert_eq!(env_err, "Sensitive path blocked");
 

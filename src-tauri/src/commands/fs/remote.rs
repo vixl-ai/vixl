@@ -1416,82 +1416,110 @@ async fn apply_patch_ssh(
     for operation in operations {
         match operation {
             super::edit::PatchOperation::Add { path, content } => {
-                let FsTarget::Ssh(resolved) =
-                    resolve_target(&project_root, project_roots.as_deref(), &path)?
-                else {
-                    return Err("Patch path is not on an SSH project".to_string());
-                };
-                gate_sensitive(&resolved.relative, allow_sensitive)?;
-                reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
-                with_sftp(&resolved.ssh, |client| {
-                    let resolved = resolved.clone();
-                    let content = content.clone();
-                    Box::pin(async move {
-                        let remote = jail_path(client, &resolved.ssh, &resolved.relative).await?;
-                        sftp_atomic_write(client, &remote, content.as_bytes()).await?;
-                        Ok(())
-                    })
-                })
-                .await?;
-                diffs.push(build_file_diff(
-                    resolved.reported_path(),
-                    "create",
-                    None,
-                    Some(content),
-                ));
+                match resolve_target(&project_root, project_roots.as_deref(), &path)? {
+                    FsTarget::Local(resolved) => {
+                        diffs.push(super::edit::apply_local_member(
+                            resolved,
+                            super::edit::PatchOperation::Add { path, content },
+                            allow_sensitive,
+                        )?);
+                    }
+                    FsTarget::Ssh(resolved) => {
+                        gate_sensitive(&resolved.relative, allow_sensitive)?;
+                        reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
+                        with_sftp(&resolved.ssh, |client| {
+                            let resolved = resolved.clone();
+                            let content = content.clone();
+                            Box::pin(async move {
+                                let remote =
+                                    jail_path(client, &resolved.ssh, &resolved.relative).await?;
+                                sftp_atomic_write(client, &remote, content.as_bytes()).await?;
+                                Ok(())
+                            })
+                        })
+                        .await?;
+                        diffs.push(build_file_diff(
+                            resolved.reported_path(),
+                            "create",
+                            None,
+                            Some(content),
+                        ));
+                    }
+                }
             }
             super::edit::PatchOperation::Update { path, content } => {
-                let FsTarget::Ssh(resolved) =
-                    resolve_target(&project_root, project_roots.as_deref(), &path)?
-                else {
-                    return Err("Patch path is not on an SSH project".to_string());
-                };
-                gate_sensitive(&resolved.relative, allow_sensitive)?;
-                reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
-                let (reported, old_content, new_content) = with_sftp(&resolved.ssh, |client| {
-                    let resolved = resolved.clone();
-                    let content = content.clone();
-                    Box::pin(async move {
-                        let remote = jail_path(client, &resolved.ssh, &resolved.relative).await?;
-                        let bytes = client.read_all(&remote).await?;
-                        let old_content = String::from_utf8(bytes).map_err(|_| {
-                            format!("File is not valid UTF-8 on {}.", resolved.hostname())
-                        })?;
-                        let new_content = super::edit::apply_update_patch(&old_content, &content)?;
-                        sftp_atomic_write(client, &remote, new_content.as_bytes()).await?;
-                        Ok((resolved.reported_path(), old_content, new_content))
-                    })
-                })
-                .await?;
-                diffs.push(build_file_diff(
-                    reported,
-                    "update",
-                    Some(old_content),
-                    Some(new_content),
-                ));
+                match resolve_target(&project_root, project_roots.as_deref(), &path)? {
+                    FsTarget::Local(resolved) => {
+                        diffs.push(super::edit::apply_local_member(
+                            resolved,
+                            super::edit::PatchOperation::Update { path, content },
+                            allow_sensitive,
+                        )?);
+                    }
+                    FsTarget::Ssh(resolved) => {
+                        gate_sensitive(&resolved.relative, allow_sensitive)?;
+                        reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
+                        let (reported, old_content, new_content) =
+                            with_sftp(&resolved.ssh, |client| {
+                                let resolved = resolved.clone();
+                                let content = content.clone();
+                                Box::pin(async move {
+                                    let remote =
+                                        jail_path(client, &resolved.ssh, &resolved.relative)
+                                            .await?;
+                                    let bytes = client.read_all(&remote).await?;
+                                    let old_content = String::from_utf8(bytes).map_err(|_| {
+                                        format!(
+                                            "File is not valid UTF-8 on {}.",
+                                            resolved.hostname()
+                                        )
+                                    })?;
+                                    let new_content =
+                                        super::edit::apply_update_patch(&old_content, &content)?;
+                                    sftp_atomic_write(client, &remote, new_content.as_bytes())
+                                        .await?;
+                                    Ok((resolved.reported_path(), old_content, new_content))
+                                })
+                            })
+                            .await?;
+                        diffs.push(build_file_diff(
+                            reported,
+                            "update",
+                            Some(old_content),
+                            Some(new_content),
+                        ));
+                    }
+                }
             }
             super::edit::PatchOperation::Delete { path } => {
-                let FsTarget::Ssh(resolved) =
-                    resolve_target(&project_root, project_roots.as_deref(), &path)?
-                else {
-                    return Err("Patch path is not on an SSH project".to_string());
-                };
-                gate_sensitive(&resolved.relative, allow_sensitive)?;
-                reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
-                let (reported, old_content) = with_sftp(&resolved.ssh, |client| {
-                    let resolved = resolved.clone();
-                    Box::pin(async move {
-                        let remote = jail_path(client, &resolved.ssh, &resolved.relative).await?;
-                        let bytes = client.read_all(&remote).await?;
-                        let old_content = String::from_utf8(bytes).map_err(|_| {
-                            format!("File is not valid UTF-8 on {}.", resolved.hostname())
-                        })?;
-                        client.remove(&remote).await?;
-                        Ok((resolved.reported_path(), old_content))
-                    })
-                })
-                .await?;
-                diffs.push(build_file_diff(reported, "delete", Some(old_content), None));
+                match resolve_target(&project_root, project_roots.as_deref(), &path)? {
+                    FsTarget::Local(resolved) => {
+                        diffs.push(super::edit::apply_local_member(
+                            resolved,
+                            super::edit::PatchOperation::Delete { path },
+                            allow_sensitive,
+                        )?);
+                    }
+                    FsTarget::Ssh(resolved) => {
+                        gate_sensitive(&resolved.relative, allow_sensitive)?;
+                        reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
+                        let (reported, old_content) = with_sftp(&resolved.ssh, |client| {
+                            let resolved = resolved.clone();
+                            Box::pin(async move {
+                                let remote =
+                                    jail_path(client, &resolved.ssh, &resolved.relative).await?;
+                                let bytes = client.read_all(&remote).await?;
+                                let old_content = String::from_utf8(bytes).map_err(|_| {
+                                    format!("File is not valid UTF-8 on {}.", resolved.hostname())
+                                })?;
+                                client.remove(&remote).await?;
+                                Ok((resolved.reported_path(), old_content))
+                            })
+                        })
+                        .await?;
+                        diffs.push(build_file_diff(reported, "delete", Some(old_content), None));
+                    }
+                }
             }
         }
     }
@@ -1521,86 +1549,109 @@ async fn stage_preview_ssh(
     let roots = project_roots.as_deref();
     match request {
         FsStagePreviewRequest::Write { path, content } => {
-            let FsTarget::Ssh(resolved) = resolve_target(&project_root, roots, &path)? else {
-                return Err("Preview path is not on an SSH project".to_string());
-            };
-            gate_sensitive(&resolved.relative, allow_sensitive)?;
-            let old_content = with_sftp(&resolved.ssh, |client| {
-                let resolved = resolved.clone();
-                Box::pin(async move {
-                    let remote = jail_path(client, &resolved.ssh, &resolved.relative).await?;
-                    match client.read_all(&remote).await {
-                        Ok(bytes) => Ok(Some(
-                            String::from_utf8(bytes).map_err(|err| err.to_string())?,
-                        )),
-                        Err(err) if err.contains("No such file") => Ok(None),
-                        Err(err) => Err(err),
-                    }
-                })
-            })
-            .await?;
-            let operation = if old_content.is_some() {
-                "update"
-            } else {
-                "create"
-            };
-            Ok(vec![build_file_diff(
-                resolved.reported_path(),
-                operation,
-                old_content,
-                Some(content),
-            )])
+            match resolve_target(&project_root, roots, &path)? {
+                FsTarget::Local(resolved) => super::edit::stage_preview_local_member(
+                    resolved,
+                    FsStagePreviewRequest::Write { path, content },
+                    allow_sensitive,
+                ),
+                FsTarget::Ssh(resolved) => {
+                    gate_sensitive(&resolved.relative, allow_sensitive)?;
+                    let old_content = with_sftp(&resolved.ssh, |client| {
+                        let resolved = resolved.clone();
+                        Box::pin(async move {
+                            let remote =
+                                jail_path(client, &resolved.ssh, &resolved.relative).await?;
+                            match client.read_all(&remote).await {
+                                Ok(bytes) => Ok(Some(
+                                    String::from_utf8(bytes).map_err(|err| err.to_string())?,
+                                )),
+                                Err(err) if err.contains("No such file") => Ok(None),
+                                Err(err) => Err(err),
+                            }
+                        })
+                    })
+                    .await?;
+                    let operation = if old_content.is_some() {
+                        "update"
+                    } else {
+                        "create"
+                    };
+                    Ok(vec![build_file_diff(
+                        resolved.reported_path(),
+                        operation,
+                        old_content,
+                        Some(content),
+                    )])
+                }
+            }
         }
         FsStagePreviewRequest::Edit { path, replacements } => {
             if replacements.is_empty() {
                 return Err("At least one replacement is required".to_string());
             }
-            let FsTarget::Ssh(resolved) = resolve_target(&project_root, roots, &path)? else {
-                return Err("Preview path is not on an SSH project".to_string());
-            };
-            gate_sensitive(&resolved.relative, allow_sensitive)?;
-            let old_content = with_sftp(&resolved.ssh, |client| {
-                let resolved = resolved.clone();
-                Box::pin(async move {
-                    let remote = jail_path(client, &resolved.ssh, &resolved.relative).await?;
-                    let bytes = client.read_all(&remote).await?;
-                    String::from_utf8(bytes)
-                        .map_err(|_| format!("File is not valid UTF-8 on {}.", resolved.hostname()))
-                })
-            })
-            .await?;
-            let new_content = super::edit::apply_replacements(&old_content, &replacements)?;
-            Ok(vec![build_file_diff(
-                resolved.reported_path(),
-                "update",
-                Some(old_content),
-                Some(new_content),
-            )])
+            match resolve_target(&project_root, roots, &path)? {
+                FsTarget::Local(resolved) => super::edit::stage_preview_local_member(
+                    resolved,
+                    FsStagePreviewRequest::Edit { path, replacements },
+                    allow_sensitive,
+                ),
+                FsTarget::Ssh(resolved) => {
+                    gate_sensitive(&resolved.relative, allow_sensitive)?;
+                    let old_content = with_sftp(&resolved.ssh, |client| {
+                        let resolved = resolved.clone();
+                        Box::pin(async move {
+                            let remote =
+                                jail_path(client, &resolved.ssh, &resolved.relative).await?;
+                            let bytes = client.read_all(&remote).await?;
+                            String::from_utf8(bytes).map_err(|_| {
+                                format!("File is not valid UTF-8 on {}.", resolved.hostname())
+                            })
+                        })
+                    })
+                    .await?;
+                    let new_content = super::edit::apply_replacements(&old_content, &replacements)?;
+                    Ok(vec![build_file_diff(
+                        resolved.reported_path(),
+                        "update",
+                        Some(old_content),
+                        Some(new_content),
+                    )])
+                }
+            }
         }
         FsStagePreviewRequest::ApplyPatch { patch } => {
             preview_patch_ssh(&project_root, roots, &patch, allow_sensitive).await
         }
         FsStagePreviewRequest::Delete { path } => {
-            let FsTarget::Ssh(resolved) = resolve_target(&project_root, roots, &path)? else {
-                return Err("Preview path is not on an SSH project".to_string());
-            };
-            gate_sensitive(&resolved.relative, allow_sensitive)?;
-            let old_content = with_sftp(&resolved.ssh, |client| {
-                let resolved = resolved.clone();
-                Box::pin(async move {
-                    let remote = jail_path(client, &resolved.ssh, &resolved.relative).await?;
-                    let bytes = client.read_all(&remote).await?;
-                    String::from_utf8(bytes)
-                        .map_err(|_| format!("File is not valid UTF-8 on {}.", resolved.hostname()))
-                })
-            })
-            .await?;
-            Ok(vec![build_file_diff(
-                resolved.reported_path(),
-                "delete",
-                Some(old_content),
-                None,
-            )])
+            match resolve_target(&project_root, roots, &path)? {
+                FsTarget::Local(resolved) => super::edit::stage_preview_local_member(
+                    resolved,
+                    FsStagePreviewRequest::Delete { path },
+                    allow_sensitive,
+                ),
+                FsTarget::Ssh(resolved) => {
+                    gate_sensitive(&resolved.relative, allow_sensitive)?;
+                    let old_content = with_sftp(&resolved.ssh, |client| {
+                        let resolved = resolved.clone();
+                        Box::pin(async move {
+                            let remote =
+                                jail_path(client, &resolved.ssh, &resolved.relative).await?;
+                            let bytes = client.read_all(&remote).await?;
+                            String::from_utf8(bytes).map_err(|_| {
+                                format!("File is not valid UTF-8 on {}.", resolved.hostname())
+                            })
+                        })
+                    })
+                    .await?;
+                    Ok(vec![build_file_diff(
+                        resolved.reported_path(),
+                        "delete",
+                        Some(old_content),
+                        None,
+                    )])
+                }
+            }
         }
     }
 }
@@ -1616,66 +1667,89 @@ async fn preview_patch_ssh(
     for operation in operations {
         match operation {
             super::edit::PatchOperation::Add { path, content } => {
-                let FsTarget::Ssh(resolved) = resolve_target(project_root, project_roots, &path)?
-                else {
-                    return Err("Preview path is not on an SSH project".to_string());
-                };
-                gate_sensitive(&resolved.relative, allow_sensitive)?;
-                diffs.push(build_file_diff(
-                    resolved.reported_path(),
-                    "create",
-                    None,
-                    Some(content),
-                ));
+                match resolve_target(project_root, project_roots, &path)? {
+                    FsTarget::Local(resolved) => {
+                        diffs.push(super::edit::preview_local_member(
+                            resolved,
+                            super::edit::PatchOperation::Add { path, content },
+                            allow_sensitive,
+                        )?);
+                    }
+                    FsTarget::Ssh(resolved) => {
+                        gate_sensitive(&resolved.relative, allow_sensitive)?;
+                        diffs.push(build_file_diff(
+                            resolved.reported_path(),
+                            "create",
+                            None,
+                            Some(content),
+                        ));
+                    }
+                }
             }
             super::edit::PatchOperation::Update { path, content } => {
-                let FsTarget::Ssh(resolved) = resolve_target(project_root, project_roots, &path)?
-                else {
-                    return Err("Preview path is not on an SSH project".to_string());
-                };
-                gate_sensitive(&resolved.relative, allow_sensitive)?;
-                let old_content = with_sftp(&resolved.ssh, |client| {
-                    let resolved = resolved.clone();
-                    Box::pin(async move {
-                        let remote = jail_path(client, &resolved.ssh, &resolved.relative).await?;
-                        let bytes = client.read_all(&remote).await?;
-                        String::from_utf8(bytes).map_err(|_| {
-                            format!("File is not valid UTF-8 on {}.", resolved.hostname())
+                match resolve_target(project_root, project_roots, &path)? {
+                    FsTarget::Local(resolved) => {
+                        diffs.push(super::edit::preview_local_member(
+                            resolved,
+                            super::edit::PatchOperation::Update { path, content },
+                            allow_sensitive,
+                        )?);
+                    }
+                    FsTarget::Ssh(resolved) => {
+                        gate_sensitive(&resolved.relative, allow_sensitive)?;
+                        let old_content = with_sftp(&resolved.ssh, |client| {
+                            let resolved = resolved.clone();
+                            Box::pin(async move {
+                                let remote =
+                                    jail_path(client, &resolved.ssh, &resolved.relative).await?;
+                                let bytes = client.read_all(&remote).await?;
+                                String::from_utf8(bytes).map_err(|_| {
+                                    format!("File is not valid UTF-8 on {}.", resolved.hostname())
+                                })
+                            })
                         })
-                    })
-                })
-                .await?;
-                let new_content = super::edit::apply_update_patch(&old_content, &content)?;
-                diffs.push(build_file_diff(
-                    resolved.reported_path(),
-                    "update",
-                    Some(old_content),
-                    Some(new_content),
-                ));
+                        .await?;
+                        let new_content = super::edit::apply_update_patch(&old_content, &content)?;
+                        diffs.push(build_file_diff(
+                            resolved.reported_path(),
+                            "update",
+                            Some(old_content),
+                            Some(new_content),
+                        ));
+                    }
+                }
             }
             super::edit::PatchOperation::Delete { path } => {
-                let FsTarget::Ssh(resolved) = resolve_target(project_root, project_roots, &path)?
-                else {
-                    return Err("Preview path is not on an SSH project".to_string());
-                };
-                gate_sensitive(&resolved.relative, allow_sensitive)?;
-                let old_content = with_sftp(&resolved.ssh, |client| {
-                    let resolved = resolved.clone();
-                    Box::pin(async move {
-                        let remote = jail_path(client, &resolved.ssh, &resolved.relative).await?;
-                        let bytes = client.read_all(&remote).await?;
-                        String::from_utf8(bytes).map_err(|_| {
-                            format!("File is not valid UTF-8 on {}.", resolved.hostname())
+                match resolve_target(project_root, project_roots, &path)? {
+                    FsTarget::Local(resolved) => {
+                        diffs.push(super::edit::preview_local_member(
+                            resolved,
+                            super::edit::PatchOperation::Delete { path },
+                            allow_sensitive,
+                        )?);
+                    }
+                    FsTarget::Ssh(resolved) => {
+                        gate_sensitive(&resolved.relative, allow_sensitive)?;
+                        let old_content = with_sftp(&resolved.ssh, |client| {
+                            let resolved = resolved.clone();
+                            Box::pin(async move {
+                                let remote =
+                                    jail_path(client, &resolved.ssh, &resolved.relative).await?;
+                                let bytes = client.read_all(&remote).await?;
+                                String::from_utf8(bytes).map_err(|_| {
+                                    format!("File is not valid UTF-8 on {}.", resolved.hostname())
+                                })
+                            })
                         })
-                    })
-                })
-                .await?;
-                diffs.push(build_file_diff(
-                    resolved.reported_path(),
-                    "delete",
-                    Some(old_content),
-                    None,
-                ));
+                        .await?;
+                        diffs.push(build_file_diff(
+                            resolved.reported_path(),
+                            "delete",
+                            Some(old_content),
+                            None,
+                        ));
+                    }
+                }
             }
         }
     }

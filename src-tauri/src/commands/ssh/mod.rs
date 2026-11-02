@@ -24,21 +24,20 @@ pub use askpass::{
 };
 pub use auth::{AuthAttempt, SecretDisposition, FIXTURE_SSH_PASSWORD};
 pub(crate) use channels::{
-    channel_exit_rx, close_channel, open_exec, open_sftp, recv_channel_exit,
-    take_channel_stdio, tty_argv_on_master, wait_channel_exit, ChannelStdio, SshExecResult,
+    channel_exit_rx, close_channel, open_exec, open_sftp, recv_channel_exit, take_channel_stdio,
+    tty_argv_on_master, wait_channel_exit, ChannelStdio, SshExecResult,
 };
 pub use channels::{read_channel_stderr, read_channel_stdout, write_channel_stdin};
-pub(crate) use remote_cmd::{
-    block_on, exec_on, indexer_cannot_run, inotify_enospc, inotifywait_missing,
-    is_ssh_root,
-    join_remote_argv, key_for, login_command, looks_like_enospc, looks_like_missing_program,
-    map_unreachable, missing_program, parse_root, posix_quote, probe_remote_program,
-    reject_git_hooks_write, ssh_uri_for, tty_login_command,
-};
 pub use errors::looks_like_host_key_changed;
 pub use known_hosts::{also_add_new_vixl_lines, remove_vixl_known_host_lines};
 pub use paths::{require_socket_path_len, SshPaths, MAX_UNIX_SOCKET_BYTES, SSH_BIN};
 pub use preview::SshPreview;
+pub(crate) use remote_cmd::{
+    block_on, exec_on, indexer_cannot_run, inotify_enospc, inotifywait_missing, is_ssh_root,
+    join_remote_argv, key_for, login_command, looks_like_enospc, looks_like_missing_program,
+    map_unreachable, missing_program, parse_root, posix_quote, probe_remote_program,
+    reject_git_hooks_write, ssh_uri_for, tty_login_command,
+};
 pub use session::{session_key, SessionKey, SshConnectRequest, SshSessionStatus};
 
 #[cfg(test)]
@@ -235,6 +234,6 @@ pub fn webview_rejects_ssh_vault_key(key: &str) -> Result<(), String> {
 }
 
 #[cfg(test)]
-mod sshd_tests;
-#[cfg(test)]
 mod remote_exec_tests;
+#[cfg(test)]
+mod sshd_tests;

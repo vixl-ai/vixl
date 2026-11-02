@@ -417,9 +417,7 @@ fn list_remote_nested_files(
         if !stat.exists {
             continue;
         }
-        if let Some(listed) =
-            remote_listed_entry(root, entry.name, &sentinel, frontmatter_only)?
-        {
+        if let Some(listed) = remote_listed_entry(root, entry.name, &sentinel, frontmatter_only)? {
             entries.push(listed);
         }
     }

@@ -60,7 +60,12 @@ pub fn map_unreachable(hostname: &str, err: String) -> String {
     }
 }
 
-pub fn looks_like_missing_program(program: &str, stdout: &str, stderr: &str, exit_code: i32) -> bool {
+pub fn looks_like_missing_program(
+    program: &str,
+    stdout: &str,
+    stderr: &str,
+    exit_code: i32,
+) -> bool {
     if exit_code == 127 {
         return true;
     }
@@ -111,7 +116,10 @@ pub fn ssh_uri_for(root: &SshProjectRoot, remote_path: &str) -> String {
     if root.port == 22 {
         format!("ssh://{}@{}{}", root.user, root.hostname, path)
     } else {
-        format!("ssh://{}@{}:{}{}", root.user, root.hostname, root.port, path)
+        format!(
+            "ssh://{}@{}:{}{}",
+            root.user, root.hostname, root.port, path
+        )
     }
 }
 
@@ -133,10 +141,7 @@ pub fn block_on<T>(fut: impl std::future::Future<Output = Result<T, String>>) ->
     }
 }
 
-pub async fn exec_on(
-    root: &SshProjectRoot,
-    command: String,
-) -> Result<SshExecResult, String> {
+pub async fn exec_on(root: &SshProjectRoot, command: String) -> Result<SshExecResult, String> {
     exec_wait(key_for(root), command)
         .await
         .map_err(|err| map_unreachable(&root.hostname, err))

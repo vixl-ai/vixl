@@ -84,14 +84,12 @@ pub async fn shell_spawn_pty(
     let mut cmd = CommandBuilder::new(resolve_pty_shell());
     cmd.args(pty_shell_args());
     let work_dir = match cwd {
-        Some(relative_cwd) => resolve_command_path(
-            &project_root,
-            project_roots.as_deref(),
-            &relative_cwd,
-        )?
-        .path
-        .to_string_lossy()
-        .to_string(),
+        Some(relative_cwd) => {
+            resolve_command_path(&project_root, project_roots.as_deref(), &relative_cwd)?
+                .path
+                .to_string_lossy()
+                .to_string()
+        }
         None => project_root,
     };
     cmd.cwd(work_dir);

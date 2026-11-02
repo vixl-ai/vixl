@@ -16,12 +16,12 @@ pub(crate) use path::{
     canonical_project_root, relative_path, resolve_command_path, resolve_workspace_path,
     workspace_roots_from_args,
 };
+pub use path::{is_sensitive_relative_path, WorkspaceRootArg};
+pub use read::{fs_list_dir, fs_list_dir_tree, fs_read_file, fs_stat};
 pub(crate) use remote::{
     parse_ssh_project_root, resolve_target, uses_ssh_transport, validate_relative, FsTarget,
     SshProjectRoot,
 };
-pub use path::{is_sensitive_relative_path, WorkspaceRootArg};
-pub use read::{fs_list_dir, fs_list_dir_tree, fs_read_file, fs_stat};
 pub use types::{
     DiffLine, FileDiff, FileDiffHunk, FsDirEntry, FsEditReplacement, FsReadFileResult,
     FsStagePreviewRequest, FsStatResult, FsTreeNode, WriteTempHandoffResult,

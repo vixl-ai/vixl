@@ -253,10 +253,7 @@ pub(crate) fn roots_match(left: &str, right: &str) -> bool {
 }
 
 fn ssh_roots_match(left: &str, right: &str) -> bool {
-    match (
-        parse_ssh_project_root(left),
-        parse_ssh_project_root(right),
-    ) {
+    match (parse_ssh_project_root(left), parse_ssh_project_root(right)) {
         (Ok(left_root), Ok(right_root)) => {
             left_root.user == right_root.user
                 && left_root.hostname == right_root.hostname

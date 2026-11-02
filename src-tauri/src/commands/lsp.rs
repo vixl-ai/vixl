@@ -1,8 +1,8 @@
 mod documents;
 mod ensure_running;
 mod helpers;
-mod instance;
 mod install_progress;
+mod instance;
 mod io;
 mod progress;
 mod resolve;
@@ -70,7 +70,7 @@ use helpers::{
     LspDiagnosticsEvent,
 };
 pub(crate) use install_progress::{finish_standalone_install, mark_server_installing};
-use instance::{lsp_logical_id};
+use instance::lsp_logical_id;
 use resolve::{active_project_root, load_effective_servers, server_binary_available};
 use rpc::{
     cancel_pending_requests, handle_process_exit, has_logical_server, json_rpc_request,

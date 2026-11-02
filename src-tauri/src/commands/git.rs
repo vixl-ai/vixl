@@ -494,7 +494,11 @@ pub async fn git_diff(
         return Err("Not a git repository".to_string());
     }
 
-    let args = git_diff_args(rel_path.as_deref(), staged.unwrap_or(false), base.as_deref())?;
+    let args = git_diff_args(
+        rel_path.as_deref(),
+        staged.unwrap_or(false),
+        base.as_deref(),
+    )?;
     let diff = run_git_async(&git_root, &args).await?;
     Ok(GitDiffResult { diff })
 }
