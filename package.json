@@ -48,12 +48,12 @@
     "@shikijs/monaco": "^4.4.2",
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/vue-table": "^8.21.3",
-    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.3",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-process": "^2.3.1",
-    "@tauri-apps/plugin-updater": "^2.10.1",
+    "@tauri-apps/plugin-updater": "^2.14.1",
     "@tiptap/core": "^3.31.0",
     "@tiptap/extension-document": "^3.31.0",
     "@tiptap/extension-hard-break": "^3.31.0",
@@ -108,7 +108,7 @@
     "zod": "^4.6.6"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4",
+    "@tauri-apps/cli": "^2.12.4",
     "@tsconfig/node26": "^26.0.0",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^26.2.0",
