@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -33,8 +33,16 @@ pub fn next_prompt_owner() -> u64 {
     NEXT_PROMPT_OWNER.fetch_add(1, Ordering::SeqCst)
 }
 
+struct PromptTable {
+    pending: HashMap<String, PendingPrompt>,
+    cancelled: HashSet<u64>,
+}
+
 lazy_static::lazy_static! {
-    static ref PENDING: Mutex<HashMap<String, PendingPrompt>> = Mutex::new(HashMap::new());
+    static ref PROMPTS: Mutex<PromptTable> = Mutex::new(PromptTable {
+        pending: HashMap::new(),
+        cancelled: HashSet::new(),
+    });
 }
 
 pub struct ConnectCtx {
@@ -56,7 +64,7 @@ pub async fn answer_confirm(
     trusted: bool,
     also_add: bool,
 ) -> Result<(), String> {
-    let pending = PENDING.lock().await.remove(&request_id);
+    let pending = PROMPTS.lock().await.pending.remove(&request_id);
     let Some(pending) = pending else {
         return Err("SSH confirm prompt is no longer open".to_string());
     };
@@ -67,7 +75,7 @@ pub async fn answer_confirm(
 }
 
 pub async fn answer_secret(request_id: String, value: String) -> Result<(), String> {
-    let pending = PENDING.lock().await.remove(&request_id);
+    let pending = PROMPTS.lock().await.pending.remove(&request_id);
     let Some(pending) = pending else {
         return Err("SSH secret prompt is no longer open".to_string());
     };
@@ -78,7 +86,7 @@ pub async fn answer_secret(request_id: String, value: String) -> Result<(), Stri
 }
 
 pub async fn cancel_prompt(request_id: String) -> Result<(), String> {
-    let pending = PENDING.lock().await.remove(&request_id);
+    let pending = PROMPTS.lock().await.pending.remove(&request_id);
     let Some(pending) = pending else {
         return Err("SSH prompt is no longer open".to_string());
     };
@@ -88,25 +96,35 @@ pub async fn cancel_prompt(request_id: String) -> Result<(), String> {
         .map_err(|_| "SSH prompt is no longer open".to_string())
 }
 
+pub async fn prompt_owner_cancelled(owner: u64) -> bool {
+    PROMPTS.lock().await.cancelled.contains(&owner)
+}
+
 pub async fn cancel_owned_prompts(owner: u64) {
-    let mut pending = PENDING.lock().await;
+    let mut prompts = PROMPTS.lock().await;
+    prompts.cancelled.insert(owner);
     let mut kept = HashMap::new();
-    for (id, waiter) in pending.drain() {
+    for (id, waiter) in prompts.pending.drain() {
         if waiter.owner == owner {
             let _ = waiter.tx.send(PromptAnswer::Abort);
         } else {
             kept.insert(id, waiter);
         }
     }
-    *pending = kept;
+    prompts.pending = kept;
 }
 
 async fn wait_for_user(request_id: String, owner: u64) -> PromptAnswer {
     let (tx, rx) = oneshot::channel();
-    PENDING
-        .lock()
-        .await
-        .insert(request_id, PendingPrompt { tx, owner });
+    {
+        let mut prompts = PROMPTS.lock().await;
+        if prompts.cancelled.contains(&owner) {
+            return PromptAnswer::Abort;
+        }
+        prompts
+            .pending
+            .insert(request_id, PendingPrompt { tx, owner });
+    }
     rx.await.unwrap_or(PromptAnswer::Abort)
 }
 
@@ -257,6 +275,8 @@ pub async fn serve_askpass_client(
         AskpassKind::Confirm => {
             if ctx.auth.lock().await.host_key_blocked() {
                 AskpassResponse::Cancel
+            } else if prompt_owner_cancelled(ctx.prompt_owner).await {
+                AskpassResponse::Cancel
             } else {
                 let meta = parse_confirm_metadata(&prompt, &stderr);
                 let request_id = Uuid::new_v4().to_string();
@@ -334,23 +354,27 @@ pub async fn serve_askpass_client(
                     AskpassResponse::Submit(value)
                 }
                 SecretDisposition::AskUser { saveable } => {
-                    let request_id = Uuid::new_v4().to_string();
-                    emit_secret(
-                        app.as_ref(),
-                        &SshSecretEvent {
-                            request_id: request_id.clone(),
-                            hostname: ctx.hostname.clone(),
-                            port: ctx.port,
-                            prompt: prompt.clone(),
-                            kind,
-                            saveable: saveable && secret_kind_is_saveable(kind),
-                        },
-                    );
-                    let answer = wait_for_user(request_id, ctx.prompt_owner).await;
-                    if matches!(answer, PromptAnswer::Cancel) {
-                        ctx.user_cancelled.store(true, Ordering::SeqCst);
+                    if prompt_owner_cancelled(ctx.prompt_owner).await {
+                        AskpassResponse::Cancel
+                    } else {
+                        let request_id = Uuid::new_v4().to_string();
+                        emit_secret(
+                            app.as_ref(),
+                            &SshSecretEvent {
+                                request_id: request_id.clone(),
+                                hostname: ctx.hostname.clone(),
+                                port: ctx.port,
+                                prompt: prompt.clone(),
+                                kind,
+                                saveable: saveable && secret_kind_is_saveable(kind),
+                            },
+                        );
+                        let answer = wait_for_user(request_id, ctx.prompt_owner).await;
+                        if matches!(answer, PromptAnswer::Cancel) {
+                            ctx.user_cancelled.store(true, Ordering::SeqCst);
+                        }
+                        askpass_from_prompt_answer(answer).0
                     }
-                    askpass_from_prompt_answer(answer).0
                 }
             }
         }
@@ -460,8 +484,8 @@ mod tests {
         let first = tokio::spawn(wait_for_user(first_id.clone(), first_owner));
         let second = tokio::spawn(wait_for_user(second_id.clone(), second_owner));
         for _ in 0..50 {
-            let pending = PENDING.lock().await;
-            if pending.contains_key(&first_id) && pending.contains_key(&second_id) {
+            let pending = PROMPTS.lock().await;
+            if pending.pending.contains_key(&first_id) && pending.pending.contains_key(&second_id) {
                 break;
             }
             drop(pending);
@@ -469,6 +493,10 @@ mod tests {
         }
         cancel_owned_prompts(first_owner).await;
         assert_eq!(first.await.expect("join"), PromptAnswer::Abort);
+        assert_eq!(
+            wait_for_user("appleseed-late".to_string(), first_owner).await,
+            PromptAnswer::Abort
+        );
         answer_secret(second_id, "orchard-answer".to_string())
             .await
             .expect("answer");
