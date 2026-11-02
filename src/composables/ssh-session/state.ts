@@ -220,6 +220,7 @@ export const resetConnectForm = (): void => {
   folderEntries.value = []
   folderSelected.value = []
   folderError.value = ''
+  folderListing.value = false
   connectPhase.value = 'form'
   resetSecretField()
   stopElapsed()

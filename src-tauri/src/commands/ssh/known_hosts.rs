@@ -83,6 +83,30 @@ pub fn line_matches_host(line: &str, hostname: &str, port: u16) -> bool {
     names.split(',').any(|name| name == token)
 }
 
+fn without_matching_host(line: &str, hostname: &str, port: u16) -> Option<String> {
+    if !line_matches_host(line, hostname, port) {
+        return Some(line.to_string());
+    }
+    let trimmed = line.trim();
+    let Some((names, rest)) = trimmed.split_once(char::is_whitespace) else {
+        return None;
+    };
+    let token = host_match_token(hostname, port);
+    let parts: Vec<&str> = names.split(',').filter(|name| !name.is_empty()).collect();
+    let kept: Vec<&str> = parts
+        .iter()
+        .copied()
+        .filter(|name| *name != token)
+        .collect();
+    if kept.len() == parts.len() {
+        return Some(line.to_string());
+    }
+    if kept.is_empty() {
+        return None;
+    }
+    Some(format!("{} {}", kept.join(","), rest.trim_start()))
+}
+
 pub fn remove_vixl_known_host_lines(
     vixl_known_hosts: &Path,
     hostname: &str,
@@ -101,11 +125,14 @@ pub fn remove_vixl_known_host_lines(
     let mut kept = Vec::new();
     let mut removed = 0usize;
     for line in text.lines() {
-        if line_matches_host(line, hostname, port) {
-            removed += 1;
-            continue;
+        match without_matching_host(line, hostname, port) {
+            None => removed += 1,
+            Some(next) if next != line => {
+                removed += 1;
+                kept.push(next);
+            }
+            Some(_) => kept.push(line.to_string()),
         }
-        kept.push(line);
     }
     let mut out = kept.join("\n");
     if !out.is_empty() {
@@ -260,5 +287,23 @@ mod tests {
         assert_eq!(removed_default, 1);
         let text = fs::read_to_string(&vixl).expect("read");
         assert!(!text.contains("IDefault"));
+    }
+
+    #[test]
+    fn remove_nonstandard_port_keeps_a_shared_line() {
+        let dir = tempdir().expect("tempdir");
+        let vixl = dir.path().join("known_hosts");
+        fs::write(
+            &vixl,
+            "appleseed.example,[appleseed.example]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIShared\n",
+        )
+        .expect("write");
+        let removed =
+            remove_vixl_known_host_lines(&vixl, "appleseed.example", 2222).expect("remove");
+        assert_eq!(removed, 1);
+        let text = fs::read_to_string(&vixl).expect("read");
+        assert!(text.contains("appleseed.example "));
+        assert!(!text.contains("[appleseed.example]:2222"));
+        assert!(text.contains("IShared"));
     }
 }

@@ -31,7 +31,7 @@ const listingUri = (absolute: string) => {
   })
 }
 
-export const listAt = async (absolute: string): Promise<void> => {
+export const listAt = async (absolute: string, attempt?: number): Promise<void> => {
   const current = state.activePreview.value
   if (!current) {
     return
@@ -49,14 +49,22 @@ export const listAt = async (absolute: string): Promise<void> => {
   state.folderError.value = ''
   try {
     const entries = await fsListDir(uri, '.')
+    if (attempt !== undefined && attempt !== state.connectAttempt.value) {
+      return
+    }
     state.folderCurrent.value = path
     state.folderRelative.value = '.'
     state.folderEntries.value = entries.filter((entry) => entry.kind === 'directory')
     state.folderSelected.value = []
   } catch (error) {
+    if (attempt !== undefined && attempt !== state.connectAttempt.value) {
+      return
+    }
     state.folderError.value = error instanceof Error ? error.message : String(error)
   } finally {
-    state.folderListing.value = false
+    if (attempt === undefined || attempt === state.connectAttempt.value) {
+      state.folderListing.value = false
+    }
   }
 }
 
@@ -133,6 +141,7 @@ export const createRemoteFolder = async (name: string): Promise<void> => {
 }
 
 export const startFolderPicker = async (status: SshSessionStatus): Promise<void> => {
+  const attempt = state.connectAttempt.value
   state.folderListing.value = true
   state.folderError.value = ''
   try {
@@ -142,6 +151,9 @@ export const startFolderPicker = async (status: SshSessionStatus): Promise<void>
       port: status.port,
       command: 'printf %s "$HOME"',
     })
+    if (attempt !== state.connectAttempt.value) {
+      return
+    }
     const home = result.stdout.trim()
     if (!home || home === '/') {
       throw new Error(`Opening / on ${status.hostname} is refused.`)
@@ -150,8 +162,11 @@ export const startFolderPicker = async (status: SshSessionStatus): Promise<void>
     state.folderCurrent.value = home
     state.folderRelative.value = '.'
     state.connectPhase.value = 'pick-folder'
-    await listAt(home)
+    await listAt(home, attempt)
   } catch (error) {
+    if (attempt !== state.connectAttempt.value) {
+      return
+    }
     const copy = parseSshConnectError(error)
     state.connectPhase.value = 'error'
     state.connectErrorTitle.value = copy.title.startsWith('Opening /')
@@ -161,7 +176,9 @@ export const startFolderPicker = async (status: SshSessionStatus): Promise<void>
       ? `Opening / on ${status.hostname} is refused.`
       : copy.body || copy.title
   } finally {
-    state.folderListing.value = false
+    if (attempt === state.connectAttempt.value) {
+      state.folderListing.value = false
+    }
   }
 }
 
