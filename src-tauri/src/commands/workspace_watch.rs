@@ -183,6 +183,21 @@ fn publish_remote_channel(
     true
 }
 
+fn fail_unpublished_remote(
+    map: &mut HashMap<String, RemoteWatch>,
+    key: &str,
+    stopped: &Arc<AtomicBool>,
+    err: String,
+) -> bool {
+    let still_ours = map
+        .get(key)
+        .is_some_and(|entry| Arc::ptr_eq(&entry.stopped, stopped));
+    if still_ours {
+        finish_remote_start(map, key, stopped, Err(err));
+    }
+    still_ours
+}
+
 pub struct WorkspaceWatchState {
     inner: Mutex<HashMap<String, RootEntry>>,
     remote: Mutex<HashMap<String, RemoteWatch>>,
@@ -851,8 +866,15 @@ async fn watch_workspace_ssh(app: AppHandle, project_root: String) -> Result<Str
         publish_remote_channel(&mut map, &key, &stopped, channel_id.clone())
     };
     if !published {
+        let owned = {
+            let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+            fail_unpublished_remote(&mut map, &key, &stopped, inotify_enospc(&ssh.hostname))
+        };
         stopped.store(true, Ordering::SeqCst);
         let _ = close_channel(channel_id).await;
+        if owned {
+            return Err(inotify_enospc(&ssh.hostname));
+        }
         return Ok(key);
     }
     let remote_path = ssh.remote_path.clone();
@@ -1019,6 +1041,35 @@ mod tests {
             claim_remote(&mut map, key.into()),
             RemoteClaim::Started(_)
         ));
+    }
+
+    #[test]
+    fn stopped_watch_publish_wakes_the_joiner() {
+        let mut map = HashMap::new();
+        let key = "ssh://johnny@appleseed.example/home/johnny";
+        let stopped = match claim_remote(&mut map, key.into()) {
+            RemoteClaim::Started(stopped) => stopped,
+            RemoteClaim::Joined(_) => panic!("first claim should start"),
+        };
+        let joined = match claim_remote(&mut map, key.into()) {
+            RemoteClaim::Joined(joined) => joined,
+            RemoteClaim::Started(_) => panic!("second claim should join"),
+        };
+        stopped.store(true, Ordering::SeqCst);
+        assert!(!publish_remote_channel(
+            &mut map,
+            key,
+            &stopped,
+            "channel".into(),
+        ));
+        assert!(fail_unpublished_remote(
+            &mut map,
+            key,
+            &stopped,
+            "inotify limit".into(),
+        ));
+        assert_eq!(joined.borrow().clone(), Some(Err("inotify limit".into())));
+        assert!(map.is_empty());
     }
 
     #[test]
