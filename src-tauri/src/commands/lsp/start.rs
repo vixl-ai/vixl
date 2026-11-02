@@ -28,7 +28,7 @@ use super::typescript::{build_initialization_options, inject_vue_tsdk_arg};
 use super::workspace_diagnostics::parse_diagnostic_provider;
 use crate::commands::fs::parse_ssh_project_root;
 use crate::commands::ssh::{
-    is_ssh_root, key_for, login_command, map_unreachable, open_exec, posix_quote,
+    channel_exit_rx, is_ssh_root, key_for, login_command, map_unreachable, open_exec, posix_quote,
     probe_remote_program, take_channel_stdio,
 };
 
@@ -327,6 +327,9 @@ async fn start_remote_server(
     let info = open_exec(key_for(&ssh), login_command(&ssh.remote_path, &remote_cmd))
         .await
         .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let exit_rx = channel_exit_rx(&info.channel_id)
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
     let mut stdio = take_channel_stdio(&info.channel_id)
         .await
         .map_err(|err| map_unreachable(&ssh.hostname, err))?;
@@ -338,6 +341,7 @@ async fn start_remote_server(
         child: LspChild::Remote {
             channel_id: info.channel_id.clone(),
             stdout: Some(stdio.stdout),
+            exit_rx,
         },
         stdin: stdio.stdin,
         workspace_root: workspace_root.clone(),

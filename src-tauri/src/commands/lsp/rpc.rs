@@ -68,7 +68,25 @@ pub(crate) enum LspChild {
     Remote {
         channel_id: String,
         stdout: Option<ChildStdout>,
+        exit_rx: tokio::sync::watch::Receiver<Option<i32>>,
     },
+}
+
+fn exit_status_from_code(code: i32) -> std::process::ExitStatus {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if code < 0 {
+            return std::process::ExitStatus::from_raw(0);
+        }
+        std::process::ExitStatus::from_raw(code << 8)
+    }
+    #[cfg(not(unix))]
+    {
+        use std::os::windows::process::ExitStatusExt;
+        let raw = if code < 0 { 1 } else { code as u32 };
+        std::process::ExitStatus::from_raw(raw)
+    }
 }
 
 impl LspChild {
@@ -82,7 +100,10 @@ impl LspChild {
     pub(crate) fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
         match self {
             Self::Local(child) => child.try_wait(),
-            Self::Remote { .. } => Ok(None),
+            Self::Remote { exit_rx, .. } => match *exit_rx.borrow() {
+                Some(code) => Ok(Some(exit_status_from_code(code))),
+                None => Ok(None),
+            },
         }
     }
 
@@ -474,6 +495,19 @@ async fn wait_child_status(process: &Mutex<LspProcess>) -> Option<std::process::
     guard.child.try_wait().ok().flatten()
 }
 
+async fn close_remote_lsp(process: &Mutex<LspProcess>) {
+    let channel_id = {
+        let guard = process.lock().await;
+        match &guard.child {
+            LspChild::Remote { channel_id, .. } => Some(channel_id.clone()),
+            LspChild::Local(_) => None,
+        }
+    };
+    if let Some(channel_id) = channel_id {
+        let _ = close_channel(channel_id).await;
+    }
+}
+
 pub(crate) async fn handle_process_exit(
     app: &AppHandle,
     server_id: &str,
@@ -489,6 +523,8 @@ pub(crate) async fn handle_process_exit(
     if exit_handled.load(Ordering::SeqCst) {
         return;
     }
+
+    close_remote_lsp(process).await;
 
     let status = match known_status {
         Some(status) => status_from_std(status),
@@ -534,5 +570,24 @@ pub(crate) async fn handle_process_exit(
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LspChild;
+
+    #[test]
+    fn remote_try_wait_stays_pending_until_the_channel_exits() {
+        let (tx, exit_rx) = tokio::sync::watch::channel(None);
+        let mut child = LspChild::Remote {
+            channel_id: "channel".to_string(),
+            stdout: None,
+            exit_rx,
+        };
+        assert!(child.try_wait().expect("wait").is_none());
+        tx.send(Some(1)).expect("exit");
+        let status = child.try_wait().expect("wait").expect("exited");
+        assert_eq!(status.code(), Some(1));
     }
 }
