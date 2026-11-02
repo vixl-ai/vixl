@@ -12,6 +12,7 @@ import {
   parseSshConnectError,
   validateSshDestination,
   validateSshPort,
+  validateSshUser,
 } from '@/utils/ssh-destination'
 import { tryParseSshProjectRoot } from '@/utils/ssh-project-root'
 import { loadAliases } from './events'
@@ -85,6 +86,13 @@ export const submitConnectForm = async (): Promise<void> => {
     state.connectPhase.value = 'error'
     state.connectErrorTitle.value = portError.title
     state.connectErrorBody.value = portError.body
+    return
+  }
+  const userError = validateSshUser(destinationFromForm(), state.connectUser.value)
+  if (userError) {
+    state.connectPhase.value = 'error'
+    state.connectErrorTitle.value = userError.title
+    state.connectErrorBody.value = userError.body
     return
   }
   state.connectPhase.value = 'connecting'

@@ -33,7 +33,7 @@ static FORCE_WRITE_SIZE_MISMATCH: AtomicBool = AtomicBool::new(false);
 static SFTP_CLOSE_TICKS: AtomicU64 = AtomicU64::new(0);
 
 struct SftpPoolSlot {
-    epoch: AtomicU64,
+    opened_for: AtomicU64,
     client: Mutex<Option<SftpClient>>,
 }
 
@@ -433,7 +433,7 @@ pub(crate) async fn insert_silent_sftp_for_test(
     SFTP_POOL.lock().await.insert(
         key,
         Arc::new(SftpPoolSlot {
-            epoch: AtomicU64::new(1),
+            opened_for: AtomicU64::new(1),
             client: Mutex::new(Some(client)),
         }),
     );
@@ -486,16 +486,49 @@ pub(crate) async fn pooled_client_open(key: &SessionKey) -> bool {
 }
 
 #[cfg(test)]
-pub(crate) async fn bump_pooled_epoch_for_test(key: &SessionKey) {
+pub(crate) async fn retarget_pooled_client_for_test(key: &SessionKey, generation: u64) {
     let pool = SFTP_POOL.lock().await;
     if let Some(slot) = pool.get(key) {
-        slot.epoch.fetch_add(1, Ordering::SeqCst);
+        slot.opened_for.store(generation, Ordering::SeqCst);
     }
+}
+
+fn pooled_client_needs_reopen(opened_for: u64, generation: u64, present: bool) -> bool {
+    !present || opened_for != generation
+}
+
+fn prepare_pooled_client(
+    slot: &SftpPoolSlot,
+    guard: &mut Option<SftpClient>,
+    generation: u64,
+) -> bool {
+    if pooled_client_needs_reopen(
+        slot.opened_for.load(Ordering::SeqCst),
+        generation,
+        guard.is_some(),
+    ) {
+        *guard = None;
+        return true;
+    }
+    false
+}
+
+#[cfg(test)]
+pub(crate) async fn forget_stale_pooled_client(key: &SessionKey, generation: u64) -> bool {
+    let slot = {
+        let pool = SFTP_POOL.lock().await;
+        pool.get(key).cloned()
+    };
+    let Some(slot) = slot else {
+        return false;
+    };
+    let mut guard = slot.client.lock().await;
+    prepare_pooled_client(&slot, &mut guard, generation)
 }
 
 fn drop_client(slot: &SftpPoolSlot, guard: &mut Option<SftpClient>) {
     *guard = None;
-    slot.epoch.fetch_add(1, Ordering::SeqCst);
+    slot.opened_for.store(0, Ordering::SeqCst);
 }
 
 pub(crate) async fn close_pooled_sftp(key: &SessionKey) {
@@ -512,11 +545,13 @@ pub(crate) async fn close_pooled_sftp(key: &SessionKey) {
         }
         return;
     }
-    let epoch = slot.epoch.load(Ordering::SeqCst);
+    let opened_for = slot.opened_for.load(Ordering::SeqCst);
     let key = key.clone();
     tokio::spawn(async move {
         let mut guard = slot.client.lock().await;
-        if slot.epoch.load(Ordering::SeqCst) == epoch && require_live_master(&key).await.is_err() {
+        if slot.opened_for.load(Ordering::SeqCst) == opened_for
+            && require_live_master(&key).await.is_err()
+        {
             drop_client(&slot, &mut guard);
         }
         #[cfg(test)]
@@ -529,23 +564,26 @@ where
     F: for<'a> FnOnce(&'a mut SftpClient) -> BoxFuture<'a, Result<T, String>>,
 {
     let key = session_key(&ssh.user, &ssh.hostname, ssh.port);
-    if let Err(err) = require_live_master(&key).await {
-        close_pooled_sftp(&key).await;
-        return Err(map_transport(&ssh.hostname, err));
-    }
+    let generation = match require_live_master(&key).await {
+        Ok(live) => live.generation,
+        Err(err) => {
+            close_pooled_sftp(&key).await;
+            return Err(map_transport(&ssh.hostname, err));
+        }
+    };
     let slot = {
         let mut pool = SFTP_POOL.lock().await;
         pool.entry(key.clone())
             .or_insert_with(|| {
                 Arc::new(SftpPoolSlot {
-                    epoch: AtomicU64::new(0),
+                    opened_for: AtomicU64::new(0),
                     client: Mutex::new(None),
                 })
             })
             .clone()
     };
     let mut guard = slot.client.lock().await;
-    if guard.is_none() {
+    if prepare_pooled_client(&slot, &mut guard, generation) {
         let info = open_sftp(key.clone())
             .await
             .map_err(|err| map_transport(&ssh.hostname, err))?;
@@ -554,7 +592,7 @@ where
             .map_err(|err| map_transport(&ssh.hostname, err))?;
         let client = SftpClient::connect(stdio, ssh.hostname.clone()).await?;
         *guard = Some(client);
-        slot.epoch.fetch_add(1, Ordering::SeqCst);
+        slot.opened_for.store(generation, Ordering::SeqCst);
     }
     let client = guard.as_mut().expect("sftp client");
     match f(client).await {

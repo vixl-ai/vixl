@@ -22,9 +22,8 @@ pub fn acquire_control_lock(path: &Path) -> Result<ControlLock, String> {
         .map_err(|err| format!("Could not open SSH lock {}: {err}", path.display()))?;
     let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
     if rc != 0 {
-        return Err(format!(
-            "Could not attach to the SSH socket. Process still has Vixl's lock at {}.",
-            path.display()
+        return Err(super::errors::control_lock_busy(
+            &path.display().to_string(),
         ));
     }
     Ok(ControlLock { _file: file })

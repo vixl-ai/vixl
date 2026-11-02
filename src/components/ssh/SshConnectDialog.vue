@@ -11,8 +11,10 @@ import {
 import { Input } from '@/components/shadcn/ui/input'
 import { Label } from '@/components/shadcn/ui/label'
 import useSshSession from '@/composables/use-ssh-session'
+import { sshIdentityExample } from '@/utils/ssh-destination'
 
 const ssh = useSshSession()
+const identityExample = sshIdentityExample()
 
 const handleOpenChange = (open: boolean): void => {
   if (!open) {
@@ -80,13 +82,15 @@ const onFolderChecked = (name: string, checked: boolean | 'indeterminate'): void
 <template>
   <Dialog :open="ssh.connectOpen.value" @update:open="handleOpenChange">
     <DialogContent
-      class="max-w-md"
+      class="max-w-md min-w-0 overflow-x-hidden"
       :show-close-button="ssh.connectPhase.value !== 'connecting'"
       @pointer-down-outside="preventOutside"
       @interact-outside="preventOutside"
     >
-      <DialogHeader v-if="dialogTitle">
-        <DialogTitle>{{ dialogTitle }}</DialogTitle>
+      <DialogHeader v-if="dialogTitle" class="min-w-0 pr-8 text-left">
+        <DialogTitle class="text-left leading-snug break-words [overflow-wrap:anywhere]">
+          {{ dialogTitle }}
+        </DialogTitle>
       </DialogHeader>
       <DialogTitle v-else class="sr-only">
         {{ ssh.connectPhase.value === 'pick-folder' ? 'Choose a folder' : 'SSH connection' }}
@@ -124,13 +128,13 @@ const onFolderChecked = (name: string, checked: boolean | 'indeterminate'): void
           <Input
             id="ssh-connect-host"
             v-model="ssh.connectHost.value"
-            placeholder="eva or aidanhibbard@eva.local"
+            placeholder="johnny@appleseed.example"
           />
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-1.5">
             <Label for="ssh-connect-user">User</Label>
-            <Input id="ssh-connect-user" v-model="ssh.connectUser.value" />
+            <Input id="ssh-connect-user" v-model="ssh.connectUser.value" placeholder="johnny" />
           </div>
           <div class="space-y-1.5">
             <Label for="ssh-connect-port">Port</Label>
@@ -142,7 +146,7 @@ const onFolderChecked = (name: string, checked: boolean | 'indeterminate'): void
           <Input
             id="ssh-connect-identity"
             v-model="ssh.connectIdentity.value"
-            placeholder="Optional"
+            :placeholder="identityExample"
           />
         </div>
         <div class="flex items-center gap-2">
@@ -163,9 +167,11 @@ const onFolderChecked = (name: string, checked: boolean | 'indeterminate'): void
 
       <div
         v-else-if="ssh.connectPhase.value === 'error'"
-        class="space-y-2 text-sm text-muted-foreground"
+        class="min-w-0 space-y-2 text-sm text-muted-foreground"
       >
-        <p class="whitespace-pre-wrap">{{ ssh.connectErrorBody.value }}</p>
+        <p class="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
+          {{ ssh.connectErrorBody.value }}
+        </p>
         <p
           v-if="ssh.changedKey.value && ssh.changedKey.value.body.includes('.ssh/known_hosts') && !ssh.changedKey.value.canRemove"
         >

@@ -23,7 +23,23 @@ impl SshErrorCopy {
 pub fn blank_host() -> String {
     SshErrorCopy::new(
         "Enter a host.",
-        "Type an alias such as eva, or a user and host such as aidanhibbard@eva.local.",
+        "Type an alias such as appleseed, or a user and host such as johnny@appleseed.example.",
+    )
+    .into_message()
+}
+
+pub fn blank_user() -> String {
+    SshErrorCopy::new(
+        "Enter a user.",
+        "Type the account on that host, such as johnny. Vixl does not use the account on this computer.",
+    )
+    .into_message()
+}
+
+pub fn control_lock_busy(path: &str) -> String {
+    SshErrorCopy::new(
+        "Could not attach to the SSH socket.",
+        format!("Another Vixl process still holds the connection lock at {path}."),
     )
     .into_message()
 }
@@ -31,7 +47,7 @@ pub fn blank_host() -> String {
 pub fn password_in_host() -> String {
     SshErrorCopy::new(
         "Remove the password from the host field.",
-        "Vixl will not connect with a password in the host. Type eva, or aidanhibbard@eva.local, and enter the password when asked.",
+        "Vixl will not connect with a password in the host. Type appleseed, or johnny@appleseed.example, and enter the password when asked.",
     )
     .into_message()
 }
@@ -39,7 +55,7 @@ pub fn password_in_host() -> String {
 pub fn ssh_command_as_host() -> String {
     SshErrorCopy::new(
         "That is an ssh command, not a host.",
-        "Vixl connects to a host such as eva. Flags in this field are not applied. Set the port and the identity file in the fields below. The next screen shows the settings OpenSSH will use.",
+        "Vixl connects to a host such as appleseed.example. Flags in this field are not applied. Set the port and the identity file in the fields below. The next screen shows the settings OpenSSH will use.",
     )
     .into_message()
 }

@@ -49,7 +49,7 @@ lazy_static::lazy_static! {
 }
 
 async fn fail_if_dead(key: &SessionKey) -> Result<super::session::SessionSnapshot, String> {
-    let snapshot = require_live_master(key).await?;
+    let snapshot = require_live_master(key).await?.snapshot;
     if !control_check(&snapshot) {
         mark_master_dead(key).await;
         return Err(errors::dead_master_channel(&key.hostname));

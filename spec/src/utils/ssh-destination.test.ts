@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildSshConnectRequest,
+  sshIdentityExample,
   validateSshDestination,
+  validateSshUser,
 } from '@/utils/ssh-destination'
 
 describe('validateSshDestination', () => {
   it('refuses a blank host without starting ssh', () => {
     expect(validateSshDestination('')).toEqual({
       title: 'Enter a host.',
-      body: 'Type an alias such as eva, or a user and host such as aidanhibbard@eva.local.',
+      body: 'Type an alias such as appleseed, or a user and host such as johnny@appleseed.example.',
     })
   })
 
@@ -20,6 +22,25 @@ describe('validateSshDestination', () => {
   it('refuses a password in the host field', () => {
     const error = validateSshDestination('aidanhibbard:secret@eva.local')
     expect(error?.title).toBe('Remove the password from the host field.')
+  })
+})
+
+describe('validateSshUser', () => {
+  it('asks for an account instead of using this computer', () => {
+    expect(validateSshUser('appleseed.example', '')).toEqual({
+      title: 'Enter a user.',
+      body: 'Type the account on that host, such as johnny. Vixl does not use the account on this computer.',
+    })
+    expect(validateSshUser('appleseed.example', 'johnny')).toBeNull()
+    expect(validateSshUser('johnny@appleseed.example', '')).toBeNull()
+  })
+})
+
+describe('sshIdentityExample', () => {
+  it('uses a johnny path for the current system', () => {
+    expect(sshIdentityExample('MacIntel')).toBe('/Users/johnny/.ssh/id_ed25519')
+    expect(sshIdentityExample('Linux x86_64')).toBe('/home/johnny/.ssh/id_ed25519')
+    expect(sshIdentityExample('Win32')).toBe('C:\\Users\\johnny\\.ssh\\id_ed25519')
   })
 })
 

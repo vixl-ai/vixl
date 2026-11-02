@@ -428,7 +428,7 @@ async fn deferred_close_keeps_a_client_replaced_while_the_slot_was_busy() {
     .await;
     let ticks = super::remote::sftp_close_ticks();
     super::remote::close_pooled_sftp(&key).await;
-    super::remote::bump_pooled_epoch_for_test(&key).await;
+    super::remote::retarget_pooled_client_for_test(&key, 99).await;
     let _ = release.send(());
     wait_for_deferred_close(ticks).await;
     assert!(
@@ -479,6 +479,36 @@ async fn deferred_close_drops_a_client_the_dead_master_still_owns() {
     let _ = child.kill().await;
     let _ = child.wait().await;
     clear_sessions_for_tests().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn stale_master_generation_drops_the_cached_client() {
+    let _lock = SESSION_TEST_LOCK.lock().await;
+    clear_sessions_for_tests().await;
+    let key = session_key("aidanhibbard", "vixl-generation-sftp.example", 2222);
+    let mut child = super::remote::insert_silent_sftp_for_test(
+        key.clone(),
+        "vixl-generation-sftp.example".into(),
+    )
+    .await;
+    assert!(super::remote::forget_stale_pooled_client(&key, 99).await);
+    assert!(!super::remote::pooled_client_open(&key).await);
+    let _ = child.kill().await;
+    let _ = child.wait().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn current_master_generation_keeps_the_cached_client() {
+    let _lock = SESSION_TEST_LOCK.lock().await;
+    clear_sessions_for_tests().await;
+    let key = session_key("aidanhibbard", "vixl-current-sftp.example", 2222);
+    let mut child =
+        super::remote::insert_silent_sftp_for_test(key.clone(), "vixl-current-sftp.example".into())
+            .await;
+    assert!(!super::remote::forget_stale_pooled_client(&key, 1).await);
+    assert!(super::remote::pooled_client_open(&key).await);
+    let _ = child.kill().await;
+    let _ = child.wait().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

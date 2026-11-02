@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -24,7 +24,9 @@ use super::paths::{
 };
 use super::preview::{preview_destination, SshPreview};
 use super::prompt::{cancel_all_prompts, run_askpass_listener, ConnectCtx};
-use super::validate::{validate_destination, validate_port};
+use super::validate::{
+    destination_with_user, resolve_connect_user, validate_destination, validate_port,
+};
 use super::vault::{read_passphrase, read_password};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -60,6 +62,13 @@ struct SessionRecord {
     lock: Option<ControlLock>,
     master_alive: bool,
     user_cancelled: Arc<AtomicBool>,
+    master_generation: u64,
+}
+
+static NEXT_MASTER_GENERATION: AtomicU64 = AtomicU64::new(1);
+
+fn next_master_generation() -> u64 {
+    NEXT_MASTER_GENERATION.fetch_add(1, Ordering::SeqCst)
 }
 
 lazy_static::lazy_static! {
@@ -131,7 +140,12 @@ pub fn session_key(user: &str, hostname: &str, port: u16) -> SessionKey {
     }
 }
 
-pub async fn require_live_master(key: &SessionKey) -> Result<SessionSnapshot, String> {
+pub struct LiveMaster {
+    pub snapshot: SessionSnapshot,
+    pub generation: u64,
+}
+
+pub async fn require_live_master(key: &SessionKey) -> Result<LiveMaster, String> {
     let sessions = SESSIONS.lock().await;
     let Some(record) = sessions.get(key) else {
         return Err(errors::dead_master_channel(&key.hostname));
@@ -139,12 +153,46 @@ pub async fn require_live_master(key: &SessionKey) -> Result<SessionSnapshot, St
     if !record.master_alive || record.state != "connected" {
         return Err(errors::dead_master_channel(&key.hostname));
     }
-    Ok(SessionSnapshot {
-        key: record.key.clone(),
-        destination: record.destination.clone(),
-        control_path: record.control_path.clone(),
-        paths: record.paths.clone(),
+    Ok(LiveMaster {
+        generation: record.master_generation,
+        snapshot: SessionSnapshot {
+            key: record.key.clone(),
+            destination: record.destination.clone(),
+            control_path: record.control_path.clone(),
+            paths: record.paths.clone(),
+        },
     })
+}
+
+fn apply_master_exit(
+    record: &mut SessionRecord,
+    generation: u64,
+    hostname: &str,
+    stderr_text: &str,
+    exit_success: bool,
+) -> Option<SshErrorCopy> {
+    if record.master_generation != generation {
+        return None;
+    }
+    let user_disconnected = record.state == "disconnected";
+    match errors::master_exit_report(hostname, stderr_text, exit_success, user_disconnected) {
+        errors::MasterExitReport::UserDisconnect => {
+            record.master_alive = false;
+            record.state = "disconnected".to_string();
+            record.line = format!("Disconnected from {hostname}.");
+            record.last_error = None;
+            None
+        }
+        errors::MasterExitReport::Failure(copy) => {
+            record.master_alive = false;
+            record.line = copy.title.clone();
+            record.last_error = Some(copy.clone());
+            if record.state != "disconnected" {
+                record.state = "disconnected".to_string();
+            }
+            Some(copy)
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -217,6 +265,8 @@ pub async fn connect(
 ) -> Result<SshSessionStatus, String> {
     let destination = validate_destination(&request.destination)?;
     let port = validate_port(request.port)?;
+    let user = resolve_connect_user(request.user.as_deref(), &destination)?;
+    let ssh_destination = destination_with_user(&destination, &user);
     let paths = match (request.vixl_ssh_dir.as_ref(), request.user_ssh_dir.as_ref()) {
         (Some(vixl), Some(user)) => SshPaths::from_roots(PathBuf::from(vixl), PathBuf::from(user)),
         _ => SshPaths::production()?,
@@ -224,18 +274,14 @@ pub async fn connect(
     ensure_dir_mode_0700(&paths.vixl_ssh_dir)?;
     ensure_dir_mode_0700(&paths.control_dir())?;
 
-    let preview = preview_destination(
+    let mut preview = preview_destination(
         &paths,
-        &destination,
+        &ssh_destination,
         port,
         request.identity_file.as_deref(),
         request.config_file.as_deref(),
     )?;
-    let user = request
-        .user
-        .clone()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| preview.user.clone());
+    preview.user = user.clone();
     let key = session_key(&user, &preview.hostname, preview.port);
 
     {
@@ -315,7 +361,7 @@ pub async fn connect(
     });
 
     let argv = build_ssh_argv(ArgvRequest {
-        destination: &destination,
+        destination: &ssh_destination,
         control_path: Some(&control_path.to_string_lossy()),
         control_master: ControlMasterMode::Yes,
         tty: TtyMode::No,
@@ -407,11 +453,13 @@ pub async fn connect(
     }
 
     let (kill_tx, mut kill_rx) = tokio::sync::mpsc::channel::<()>(1);
+    let master_generation = next_master_generation();
     let wait_ctx = ctx.clone();
     let wait_key = key.clone();
     let wait_app = app.clone();
     let wait_host = preview.hostname.clone();
     let wait_port = preview.port;
+    let wait_generation = master_generation;
     tokio::spawn(async move {
         let status = tokio::select! {
             status = child.wait() => status,
@@ -430,39 +478,27 @@ pub async fn connect(
         };
         let stderr_text = wait_ctx.stderr.lock().await.clone();
         let exit_success = matches!(status, Ok(code) if code.success());
-        let user_disconnected = SESSIONS
-            .lock()
-            .await
-            .get(&wait_key)
-            .map(|record| record.state == "disconnected")
-            .unwrap_or(false);
-        match errors::master_exit_report(&wait_host, &stderr_text, exit_success, user_disconnected)
-        {
-            errors::MasterExitReport::UserDisconnect => {
-                if let Some(record) = SESSIONS.lock().await.get_mut(&wait_key) {
-                    record.master_alive = false;
-                    record.state = "disconnected".to_string();
-                    record.line = format!("Disconnected from {wait_host}.");
-                    record.last_error = None;
-                }
-            }
-            errors::MasterExitReport::Failure(copy) => {
-                emit_error(
-                    wait_app.as_ref(),
-                    &wait_key.user,
-                    &wait_host,
-                    wait_port,
-                    &copy,
-                );
-                if let Some(record) = SESSIONS.lock().await.get_mut(&wait_key) {
-                    record.master_alive = false;
-                    record.line = copy.title.clone();
-                    record.last_error = Some(copy);
-                    if record.state != "disconnected" {
-                        record.state = "disconnected".to_string();
-                    }
-                }
-            }
+        let copy = {
+            let mut sessions = SESSIONS.lock().await;
+            let Some(record) = sessions.get_mut(&wait_key) else {
+                return;
+            };
+            apply_master_exit(
+                record,
+                wait_generation,
+                &wait_host,
+                &stderr_text,
+                exit_success,
+            )
+        };
+        if let Some(copy) = copy {
+            emit_error(
+                wait_app.as_ref(),
+                &wait_key.user,
+                &wait_host,
+                wait_port,
+                &copy,
+            );
         }
     });
 
@@ -473,7 +509,7 @@ pub async fn connect(
             SessionRecord {
                 key: key.clone(),
                 paths: paths.clone(),
-                destination: destination.clone(),
+                destination: ssh_destination.clone(),
                 control_path: control_path.clone(),
                 state: "connecting".to_string(),
                 line: format!("Connecting to {} port {}.", preview.hostname, preview.port),
@@ -482,13 +518,14 @@ pub async fn connect(
                 lock: Some(lock),
                 master_alive: false,
                 user_cancelled: user_cancelled.clone(),
+                master_generation,
             },
         );
     }
 
     let snapshot = SessionSnapshot {
         key: key.clone(),
-        destination: destination.clone(),
+        destination: ssh_destination.clone(),
         control_path: control_path.clone(),
         paths: paths.clone(),
     };
@@ -708,6 +745,7 @@ pub async fn insert_test_session(status: SshSessionStatus, paths: SshPaths, cont
             lock: None,
             master_alive: status.master_alive,
             user_cancelled: Arc::new(AtomicBool::new(false)),
+            master_generation: next_master_generation(),
         },
     );
 }
@@ -798,5 +836,52 @@ mod tests {
         assert_eq!(request.password_only, Some(true));
         assert_eq!(request.port, Some(22));
         assert!(request.config_file.is_none());
+    }
+
+    #[tokio::test]
+    async fn stale_master_exit_does_not_clobber_a_newer_connect() {
+        let _lock = SESSION_TEST_LOCK.lock().await;
+        clear_sessions_for_tests().await;
+        let hostname = "vixl-stale-master.example";
+        let dir = tempdir().expect("tempdir");
+        let paths = SshPaths::from_roots(dir.path().join("vixl"), dir.path().join("user"));
+        insert_test_session(
+            SshSessionStatus {
+                user: "aidanhibbard".to_string(),
+                hostname: hostname.to_string(),
+                port: 22,
+                destination: hostname.to_string(),
+                state: "connecting".to_string(),
+                line: format!("Connecting to {hostname} port 22."),
+                last_error: None,
+                master_alive: false,
+            },
+            paths,
+            dir.path().join("cm-missing"),
+        )
+        .await;
+        let key = session_key("aidanhibbard", hostname, 22);
+        let stale = {
+            let mut sessions = SESSIONS.lock().await;
+            let record = sessions.get_mut(&key).expect("session");
+            let stale = record.master_generation;
+            record.master_generation = next_master_generation();
+            record.state = "connecting".to_string();
+            stale
+        };
+        let copy = {
+            let mut sessions = SESSIONS.lock().await;
+            let record = sessions.get_mut(&key).expect("session");
+            apply_master_exit(record, stale, hostname, "Connection closed", false)
+        };
+        assert!(copy.is_none());
+        let (state, last_error) = {
+            let sessions = SESSIONS.lock().await;
+            let record = sessions.get(&key).expect("session");
+            (record.state.clone(), record.last_error.clone())
+        };
+        assert_eq!(state, "connecting");
+        assert!(last_error.is_none());
+        clear_sessions_for_tests().await;
     }
 }

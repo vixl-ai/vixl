@@ -27,22 +27,52 @@ export const validateSshDestination = (raw: string): SshDestinationError | null 
   if (!trimmed) {
     return {
       title: 'Enter a host.',
-      body: 'Type an alias such as eva, or a user and host such as aidanhibbard@eva.local.',
+      body: 'Type an alias such as appleseed, or a user and host such as johnny@appleseed.example.',
     }
   }
   if (looksLikeSshCommand(trimmed)) {
     return {
       title: 'That is an ssh command, not a host.',
-      body: 'Vixl connects to a host such as eva. Flags in this field are not applied. Set the port and the identity file in the fields below. The next screen shows the settings OpenSSH will use.',
+      body: 'Vixl connects to a host such as appleseed.example. Flags in this field are not applied. Set the port and the identity file in the fields below. The next screen shows the settings OpenSSH will use.',
     }
   }
   if (looksLikePasswordInHost(trimmed)) {
     return {
       title: 'Remove the password from the host field.',
-      body: 'Vixl will not connect with a password in the host. Type eva, or aidanhibbard@eva.local, and enter the password when asked.',
+      body: 'Vixl will not connect with a password in the host. Type appleseed, or johnny@appleseed.example, and enter the password when asked.',
     }
   }
   return null
+}
+
+export const hostIncludesUser = (raw: string): boolean => {
+  const trimmed = raw.trim().replace(/^ssh:\/\//i, '')
+  const at = trimmed.lastIndexOf('@')
+  if (at <= 0) {
+    return false
+  }
+  const user = trimmed.slice(0, at)
+  return user.length > 0 && !user.includes(' ') && !user.includes(':')
+}
+
+export const validateSshUser = (host: string, user: string): SshDestinationError | null => {
+  if (user.trim() || hostIncludesUser(host)) {
+    return null
+  }
+  return {
+    title: 'Enter a user.',
+    body: 'Type the account on that host, such as johnny. Vixl does not use the account on this computer.',
+  }
+}
+
+export const sshIdentityExample = (platform: string = navigator.platform): string => {
+  if (/win/i.test(platform)) {
+    return 'C:\\Users\\johnny\\.ssh\\id_ed25519'
+  }
+  if (/linux/i.test(platform)) {
+    return '/home/johnny/.ssh/id_ed25519'
+  }
+  return '/Users/johnny/.ssh/id_ed25519'
 }
 
 export const validateSshPort = (raw: string): SshDestinationError | null => {
