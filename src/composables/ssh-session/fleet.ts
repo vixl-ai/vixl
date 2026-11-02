@@ -38,10 +38,22 @@ export const requestDisconnect = (project: FleetProject): void => {
 }
 
 const runDisconnect = async (user: string, hostname: string, port: number): Promise<void> => {
+  state.expectUserDisconnect(user, hostname, port)
   try {
     const status = await sshDisconnect(user, hostname, port)
-    state.upsertSession(status)
+    state.upsertSession({
+      ...status,
+      user,
+      hostname,
+      port,
+      state: 'disconnected',
+      masterAlive: false,
+      lastError: null,
+      line: `Disconnected from ${hostname}.`,
+    })
+    toast.success(`${hostname} disconnected.`)
   } catch (error) {
+    state.clearUserDisconnect(user, hostname, port)
     toast.error(`The connection to ${hostname} did not exit.`, {
       description:
         error instanceof Error ? error.message : 'Vixl signaled only its own SSH process.',

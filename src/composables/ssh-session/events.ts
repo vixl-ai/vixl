@@ -71,11 +71,33 @@ const handleBanner = (event: SshBannerEvent): void => {
   state.banner.value = event
 }
 
-const handleError = (event: SshErrorEvent): void => {
+export const handleSshError = (event: SshErrorEvent): void => {
   const previewUser = state.activePreview.value?.user || state.connectUser.value.trim()
-  const key = state.sessionKeyOf(previewUser || 'user', event.hostname, event.port)
   const existing = state.sessions.value.find(
     (item) => item.hostname === event.hostname && item.port === event.port,
+  )
+  const acknowledgedUser = state.takeUserDisconnect(
+    existing?.user || previewUser || '',
+    event.hostname,
+    event.port,
+  )
+  if (acknowledgedUser) {
+    state.upsertSession({
+      user: existing?.user || acknowledgedUser,
+      hostname: event.hostname,
+      port: event.port,
+      destination: existing?.destination ?? '',
+      state: 'disconnected',
+      line: `Disconnected from ${event.hostname}.`,
+      lastError: null,
+      masterAlive: false,
+    })
+    return
+  }
+  const key = state.sessionKeyOf(
+    existing?.user || previewUser || 'user',
+    event.hostname,
+    event.port,
   )
   state.upsertSession({
     user: existing?.user ?? previewUser ?? '',
@@ -126,7 +148,7 @@ export const bindListeners = async (): Promise<void> => {
       listen<SshConfirmEvent>('ssh://confirm', (event) => handleConfirm(event.payload)),
       listen<SshSecretEvent>('ssh://secret', (event) => handleSecret(event.payload)),
       listen<SshBannerEvent>('ssh://banner', (event) => handleBanner(event.payload)),
-      listen<SshErrorEvent>('ssh://error', (event) => handleError(event.payload)),
+      listen<SshErrorEvent>('ssh://error', (event) => handleSshError(event.payload)),
     ]),
   )
   await refreshSessions()

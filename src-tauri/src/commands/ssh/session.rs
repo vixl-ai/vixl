@@ -416,23 +416,33 @@ pub async fn connect(
             }
         };
         let stderr_text = wait_ctx.stderr.lock().await.clone();
-        let copy = if errors::looks_like_host_key_changed(&stderr_text) {
-            errors::classify_master_failure(&wait_host, &stderr_text)
-        } else if matches!(status, Ok(s) if s.success()) {
-            SshErrorCopy::new(
-                format!("Disconnected from {wait_host}."),
-                "The SSH master exited.",
-            )
-        } else {
-            errors::classify_master_failure(&wait_host, &stderr_text)
-        };
-        emit_error(wait_app.as_ref(), &wait_host, wait_port, &copy);
-        if let Some(record) = SESSIONS.lock().await.get_mut(&wait_key) {
-            record.master_alive = false;
-            record.line = copy.title.clone();
-            record.last_error = Some(copy.clone());
-            if record.state != "disconnected" {
-                record.state = "disconnected".to_string();
+        let exit_success = matches!(status, Ok(code) if code.success());
+        let user_disconnected = SESSIONS
+            .lock()
+            .await
+            .get(&wait_key)
+            .map(|record| record.state == "disconnected")
+            .unwrap_or(false);
+        match errors::master_exit_report(&wait_host, &stderr_text, exit_success, user_disconnected)
+        {
+            errors::MasterExitReport::UserDisconnect => {
+                if let Some(record) = SESSIONS.lock().await.get_mut(&wait_key) {
+                    record.master_alive = false;
+                    record.state = "disconnected".to_string();
+                    record.line = format!("Disconnected from {wait_host}.");
+                    record.last_error = None;
+                }
+            }
+            errors::MasterExitReport::Failure(copy) => {
+                emit_error(wait_app.as_ref(), &wait_host, wait_port, &copy);
+                if let Some(record) = SESSIONS.lock().await.get_mut(&wait_key) {
+                    record.master_alive = false;
+                    record.line = copy.title.clone();
+                    record.last_error = Some(copy);
+                    if record.state != "disconnected" {
+                        record.state = "disconnected".to_string();
+                    }
+                }
             }
         }
     });
@@ -573,6 +583,7 @@ pub async fn disconnect(user: &str, hostname: &str, port: u16) -> Result<SshSess
         record.master_alive = false;
         record.state = "disconnected".to_string();
         record.line = format!("Disconnected from {hostname}.");
+        record.last_error = None;
         (
             record.kill_tx.clone(),
             record.destination.clone(),

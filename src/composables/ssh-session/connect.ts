@@ -126,6 +126,11 @@ export const confirmPreviewConnect = async (): Promise<void> => {
     identityFile: state.connectIdentity.value.trim() || undefined,
     passwordOnly: state.connectPasswordOnly.value,
   })
+  state.clearUserDisconnect(
+    state.connectUser.value.trim() || current.user,
+    current.hostname,
+    port,
+  )
   state.activePreview.value = current
   state.connectPhase.value = 'connecting'
   state.connectStatus.value = `Looking up ${current.hostname}.`

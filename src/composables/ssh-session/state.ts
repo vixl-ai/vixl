@@ -86,6 +86,40 @@ export const folderBasename = (rootPath: string): string => {
 export const sessionKeyOf = (user: string, hostname: string, port: number): string =>
   sshSessionKey(user, hostname, port)
 
+const userDisconnects = new Set<string>()
+
+const userDisconnectSuffix = (hostname: string, port: number): string => `@${hostname}:${port}`
+
+export const expectUserDisconnect = (user: string, hostname: string, port: number): void => {
+  userDisconnects.add(sessionKeyOf(user, hostname, port))
+}
+
+export const takeUserDisconnect = (user: string, hostname: string, port: number): string | null => {
+  const exact = sessionKeyOf(user, hostname, port)
+  if (user && userDisconnects.has(exact)) {
+    userDisconnects.delete(exact)
+    return user
+  }
+  const suffix = userDisconnectSuffix(hostname, port)
+  for (const pending of userDisconnects) {
+    if (pending.endsWith(suffix)) {
+      userDisconnects.delete(pending)
+      return pending.slice(0, pending.length - suffix.length)
+    }
+  }
+  return null
+}
+
+export const clearUserDisconnect = (user: string, hostname: string, port: number): void => {
+  userDisconnects.delete(sessionKeyOf(user, hostname, port))
+  const suffix = userDisconnectSuffix(hostname, port)
+  for (const pending of userDisconnects) {
+    if (pending.endsWith(suffix)) {
+      userDisconnects.delete(pending)
+    }
+  }
+}
+
 export const upsertSession = (next: SshSessionStatus): void => {
   const key = sessionKeyOf(next.user, next.hostname, next.port)
   const remaining = sessions.value.filter(

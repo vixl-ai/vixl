@@ -96,6 +96,33 @@ pub fn connect_failure_copy(hostname: &str, stderr: &str, user_cancelled: bool) 
     classify_master_failure(hostname, stderr)
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum MasterExitReport {
+    UserDisconnect,
+    Failure(SshErrorCopy),
+}
+
+pub fn master_exit_report(
+    hostname: &str,
+    stderr: &str,
+    exit_success: bool,
+    user_disconnected: bool,
+) -> MasterExitReport {
+    if user_disconnected {
+        return MasterExitReport::UserDisconnect;
+    }
+    if looks_like_host_key_changed(stderr) {
+        return MasterExitReport::Failure(classify_master_failure(hostname, stderr));
+    }
+    if exit_success {
+        return MasterExitReport::Failure(SshErrorCopy::new(
+            format!("Disconnected from {hostname}."),
+            "The SSH master exited.",
+        ));
+    }
+    MasterExitReport::Failure(classify_master_failure(hostname, stderr))
+}
+
 pub fn not_connected(hostname: &str) -> String {
     format!("{hostname} is not connected")
 }
@@ -213,5 +240,37 @@ mod tests {
         );
         let cancelled = connect_failure_copy("eva.local", stderr, true);
         assert_eq!(cancelled.title, "Connection to eva.local cancelled.");
+    }
+
+    #[test]
+    fn user_disconnect_is_not_a_connect_failure() {
+        let signalled = master_exit_report("eva.local", "", false, true);
+        assert_eq!(signalled, MasterExitReport::UserDisconnect);
+        let clean = master_exit_report("eva.local", "", true, true);
+        assert_eq!(clean, MasterExitReport::UserDisconnect);
+        let with_stderr = master_exit_report(
+            "eva.local",
+            "ssh: connect to host eva.local port 22: Connection refused",
+            false,
+            true,
+        );
+        assert_eq!(with_stderr, MasterExitReport::UserDisconnect);
+    }
+
+    #[test]
+    fn unexpected_master_exit_stays_a_failure() {
+        let signalled = master_exit_report("eva.local", "", false, false);
+        assert_eq!(
+            signalled,
+            MasterExitReport::Failure(SshErrorCopy::new("Could not connect to eva.local.", "",))
+        );
+        let clean = master_exit_report("eva.local", "", true, false);
+        assert_eq!(
+            clean,
+            MasterExitReport::Failure(SshErrorCopy::new(
+                "Disconnected from eva.local.",
+                "The SSH master exited.",
+            ))
+        );
     }
 }
