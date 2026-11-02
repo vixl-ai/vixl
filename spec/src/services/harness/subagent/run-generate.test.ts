@@ -96,6 +96,12 @@ const prepareCompactStep = vi.hoisted(() =>
 const resolveModelVision = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<boolean>>(async () => false),
 )
+const queueSubagentResumeSnapshot = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => void>(),
+)
+const flushSubagentResumePersist = vi.hoisted(() =>
+  vi.fn<(subagentId?: string) => Promise<void>>(async () => undefined),
+)
 
 vi.mock('ai', () => ({
   streamText: (...args: unknown[]) => streamText(...args),
@@ -125,6 +131,19 @@ vi.mock('@/services/harness/subagent/prepare-compact-step', () => ({
 vi.mock('@/services/harness/resolve-model-vision', () => ({
   default: (...args: unknown[]) => resolveModelVision(...args),
 }))
+
+vi.mock('@/services/harness/subagent/persist-resume', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('@/services/harness/subagent/persist-resume')
+  >()
+  return {
+    ...actual,
+    queueSubagentResumeSnapshot: (...args: unknown[]) =>
+      queueSubagentResumeSnapshot(...args),
+    flushSubagentResumePersist: (subagentId?: string) =>
+      flushSubagentResumePersist(subagentId),
+  }
+})
 
 import runSubagentGenerate from '@/services/harness/subagent/run-generate'
 import { DEFAULT_MAX_OUTPUT_TOKENS } from '@/services/models/resolve-model-call-options'
@@ -966,6 +985,28 @@ describe('runSubagentGenerate per-step snapshot', () => {
         }),
       ]),
     )
+    expect(queueSubagentResumeSnapshot).toHaveBeenCalled()
+    const ids = queueSubagentResumeSnapshot.mock.calls.map(
+      (call) => (call[0] as { subagentId: string }).subagentId,
+    )
+    expect(ids.every((id) => id === 'sub-1')).toBe(true)
+    expect(queueSubagentResumeSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subagentId: 'sub-1',
+        toolCallId: 'call-1',
+        agentName: 'explore',
+        projectSlug: 'project',
+        chatId: 'chat-1',
+        model: 'local::qwen',
+        capabilities: 'read-only',
+        messages: snapshot,
+      }),
+    )
+    expect(flushSubagentResumePersist).toHaveBeenCalledWith('sub-1')
+    const queueOrder = queueSubagentResumeSnapshot.mock.invocationCallOrder[0] ?? 0
+    const flushOrders = flushSubagentResumePersist.mock.invocationCallOrder
+    expect(flushOrders.length).toBeGreaterThanOrEqual(2)
+    expect(flushOrders[0]).toBeGreaterThan(queueOrder)
   })
 })
 
@@ -1478,6 +1519,7 @@ describe('runSubagentGenerate nested step stream', () => {
       }),
     ).rejects.toThrow('Subagent aborted')
     expect(captureBillableUsage).not.toHaveBeenCalled()
+    expect(flushSubagentResumePersist).toHaveBeenCalledWith('sub-1')
 
     const nested = nestedFrom(events)
     const starts = nested.filter((event) => event.type === 'step-start')

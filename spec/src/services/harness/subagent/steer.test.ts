@@ -6,7 +6,7 @@ const resumeSubagent = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{
     subagentId: string
     name: string
-    status: 'running'
+    accepted: true
     note: string
   }>>(),
 )
@@ -16,7 +16,6 @@ vi.mock('@/services/harness/subagent/resume', () => ({
 }))
 
 import steerSubagent from '@/services/harness/subagent/steer'
-import { noPoll, visibleStatus } from '@/services/harness/guidance'
 import {
   drainSteers,
   resetInboxForTests,
@@ -27,9 +26,18 @@ import {
   register,
   resetSubagentRegistryForTests,
   resolve,
+  restoreSubagent,
 } from '@/services/harness/subagent/registry'
 
-const resumeNote = `Resume started in the background. ${noPoll} ${visibleStatus('steered')}`
+const resumeNote =
+  'Resume accepted. This return is not output and not progress. Do not tell the user a status or a result from it. End the turn and wait. The harness wake brings the subagent result.'
+
+const acceptedReturn = {
+  subagentId: 'sub-1',
+  name: 'explorer',
+  accepted: true as const,
+  note: resumeNote,
+}
 
 const baseCtx = (): HarnessToolContext => ({
   projectRoot: '/tmp/project',
@@ -65,12 +73,7 @@ describe('steer_subagent routing', () => {
     vi.clearAllMocks()
     resetSubagentRegistryForTests()
     resetInboxForTests()
-    resumeSubagent.mockResolvedValue({
-      subagentId: 'sub-1',
-      name: 'explorer',
-      status: 'running',
-      note: resumeNote,
-    })
+    resumeSubagent.mockResolvedValue(acceptedReturn)
   })
 
   it('queues a steer when the subagent is running', async () => {
@@ -100,12 +103,9 @@ describe('steer_subagent routing', () => {
       summary: 'first pass',
     })
 
-    await expect(execute(baseCtx(), 'sub-1', 'keep going')).resolves.toEqual({
-      subagentId: 'sub-1',
-      name: 'explorer',
-      status: 'running',
-      note: resumeNote,
-    })
+    await expect(execute(baseCtx(), 'sub-1', 'keep going')).resolves.toEqual(
+      acceptedReturn,
+    )
     expect(resumeSubagent).toHaveBeenCalledWith(
       expect.objectContaining({ chatId: 'chat-1' }),
       'sub-1',
@@ -121,12 +121,9 @@ describe('steer_subagent routing', () => {
     })
     fail('sub-1', 'boom')
 
-    await expect(execute(baseCtx(), 'sub-1', 'try again')).resolves.toEqual({
-      subagentId: 'sub-1',
-      name: 'explorer',
-      status: 'running',
-      note: resumeNote,
-    })
+    await expect(execute(baseCtx(), 'sub-1', 'try again')).resolves.toEqual(
+      acceptedReturn,
+    )
     expect(resumeSubagent).toHaveBeenCalled()
   })
 
@@ -175,6 +172,27 @@ describe('steer_subagent routing', () => {
       'Unknown subagentId: missing. Known subagent ids for this chat: sub-known (explorer, running)',
     )
     expect(resumeSubagent).not.toHaveBeenCalled()
+  })
+
+  it('resumes an interrupted subagent', async () => {
+    restoreSubagent({
+      subagentId: 'sub-1',
+      chatId: 'chat-1',
+      toolCallId: 'tc-1',
+      agentName: 'explorer',
+      status: 'interrupted',
+      startedAt: '2020-01-01T00:00:00.000Z',
+      model: 'local::qwen',
+    })
+
+    await expect(execute(baseCtx(), 'sub-1', 'keep going')).resolves.toEqual(
+      acceptedReturn,
+    )
+    expect(resumeSubagent).toHaveBeenCalledWith(
+      expect.objectContaining({ chatId: 'chat-1' }),
+      'sub-1',
+      'keep going',
+    )
   })
 
   it('throws when the subagent cannot be steered', async () => {

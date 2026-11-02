@@ -43,6 +43,7 @@ const TOOL_LABELS_DONE: Record<string, string> = {
   diagnostics: 'Read diagnostics',
   web_fetch: 'Fetched',
   resolve_models: 'Looked up models',
+  get_subagents: 'Listed subagents',
 }
 
 const TOOL_LABELS_RUNNING: Record<string, string> = {
@@ -81,6 +82,7 @@ const TOOL_LABELS_RUNNING: Record<string, string> = {
   diagnostics: 'Reading diagnostics',
   web_fetch: 'Fetching',
   resolve_models: 'Looking up models',
+  get_subagents: 'Listing subagents',
 }
 
 const formatPathHint = (path: string, toolName: string): string =>
@@ -153,6 +155,22 @@ const formatSpawnSubagentLabel = (run: ToolRun): string => {
   return name
 }
 
+const formatGetSubagentLabel = (run: ToolRun): string => {
+  const args = asRecord(run.args)
+  const result = asRecord(run.result)
+  const resultName = typeof result?.agentName === 'string' ? result.agentName.trim() : ''
+  const subagentId = typeof args?.subagentId === 'string' ? args.subagentId : ''
+  const registryName = subagentId ? (getSubagent(subagentId)?.agentName.trim() ?? '') : ''
+  const name = resultName || registryName || 'Sub-agent'
+  if (run.status === 'running') {
+    return `Reading ${name}`
+  }
+  if (run.status === 'rejected') {
+    return `Read ${name} (rejected)`
+  }
+  return `Read ${name}`
+}
+
 const formatSteerSubagentLabel = (run: ToolRun): string => {
   const args = asRecord(run.args)
   const result = asRecord(run.result)
@@ -213,6 +231,10 @@ export default (run: ToolRun, options?: { omitPathHint?: boolean }): string => {
 
   if (run.name === 'steer_subagent') {
     return formatSteerSubagentLabel(run)
+  }
+
+  if (run.name === 'get_subagent') {
+    return formatGetSubagentLabel(run)
   }
 
   if (run.name === 'call_mcp_tool') {

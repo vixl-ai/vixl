@@ -8,11 +8,26 @@ import type {
 } from '@/types/harness/subagent-record'
 import {
   forgetBackgroundResultTracking,
-  isBackgroundResultDelivered,
   resetBackgroundResultSetsForTests,
 } from '@/services/harness/subagent/background-result-sets'
+import {
+  classifySubagentOrigin,
+  forgetBlockingOriginSubagent,
+  listDeliverableResults,
+  markBlockingOriginReopened,
+  resetBlockingOriginSetsForTests,
+} from '@/services/harness/subagent/blocking-origin-sets'
 import { clearSteers, resetInboxForTests } from '@/services/harness/subagent/inbox'
 import forgetResumeOverlayDelivery from '@/services/harness/orchestrator/forget-resume-overlay-delivery'
+import {
+  resetCompletionWaitersForTests,
+  resolveCompletionWaiters,
+  waitForSubagent,
+} from '@/services/harness/subagent/registry-completion'
+import {
+  pruneChatSubagentIds,
+  restoreSubagentRecord,
+} from '@/services/harness/subagent/registry-restore'
 
 export {
   isBackgroundResultFinalized,
@@ -20,16 +35,24 @@ export {
   markBackgroundResultsFinalized,
 } from '@/services/harness/subagent/background-result-sets'
 
-type CompletionWaiter = (result: SubagentResult) => void
-
 const subagents = new Map<string, SubagentRecord>()
 const chatSubagents = new Map<string, Set<string>>()
 const controllers = new Map<string, AbortController>()
-const completionWaiters = new Map<string, CompletionWaiter[]>()
 const turnResponseMessages = new Map<string, ModelMessage[]>()
 const pendingBackgroundResume = new Set<string>()
 const blockingSubagents = new Set<string>()
 const backgroundSubagents = new Set<string>()
+const restoredBackgroundSubagents = new Set<string>()
+
+const registryMaps = {
+  subagents,
+  chatSubagents,
+  controllers,
+  blockingSubagents,
+  backgroundSubagents,
+  restoredBackgroundSubagents,
+  pendingBackgroundResume,
+}
 
 export const subagentRegistryRevision = ref(0)
 
@@ -52,14 +75,6 @@ const trackSubagentForChat = (chatId: string, subagentId: string): void => {
   const existing = chatSubagents.get(chatId) ?? new Set<string>()
   existing.add(subagentId)
   chatSubagents.set(chatId, existing)
-}
-
-const resolveCompletionWaiters = (subagentId: string, result: SubagentResult): void => {
-  const waiters = completionWaiters.get(subagentId) ?? []
-  completionWaiters.delete(subagentId)
-  for (const resolve of waiters) {
-    resolve(result)
-  }
 }
 
 export const register = (
@@ -99,6 +114,7 @@ export const register = (
   } else {
     blockingSubagents.add(subagentId)
   }
+  classifySubagentOrigin(subagentId, options?.pendingResume === false)
   bumpRevision()
   return record
 }
@@ -122,11 +138,7 @@ export const fail = (subagentId: string, summary: string): void => {
     return
   }
 
-  const result: SubagentResult = {
-    subagentId,
-    name: record.agentName,
-    summary,
-  }
+  const result: SubagentResult = { subagentId, name: record.agentName, summary }
   setSubagentStatus(record, 'failed', result)
   controllers.delete(subagentId)
   blockingSubagents.delete(subagentId)
@@ -134,38 +146,18 @@ export const fail = (subagentId: string, summary: string): void => {
   bumpRevision()
 }
 
-export const waitFor = (chatId: string, subagentId: string): Promise<SubagentResult> => {
-  const record = subagents.get(subagentId)
-  if (!record || record.chatId !== chatId) {
-    return Promise.reject(new Error(`Subagent not found: ${subagentId}`))
-  }
-
-  if (record.status !== 'running' && record.result) {
-    return Promise.resolve(record.result)
-  }
-
-  return new Promise((resolvePromise) => {
-    const waiters = completionWaiters.get(subagentId) ?? []
-    waiters.push(resolvePromise)
-    completionWaiters.set(subagentId, waiters)
-  })
-}
+export const waitFor = (chatId: string, subagentId: string): Promise<SubagentResult> =>
+  waitForSubagent(subagents.get(subagentId) ?? null, chatId, subagentId)
 
 export const getSubagent = (subagentId: string): SubagentRecord | null =>
   subagents.get(subagentId) ?? null
 
 export const hasSubagent = (subagentId: string): boolean => subagents.has(subagentId)
 
-export const listSubagentsForChat = (chatId: string): SubagentRecord[] => {
-  const ids = chatSubagents.get(chatId)
-  if (!ids) {
-    return []
-  }
-
-  return [...ids]
+export const listSubagentsForChat = (chatId: string): SubagentRecord[] =>
+  [...(chatSubagents.get(chatId) ?? [])]
     .map((subagentId) => subagents.get(subagentId))
     .filter((record): record is SubagentRecord => record !== undefined)
-}
 
 export const listSubagents = (): SubagentRecord[] => [...subagents.values()]
 
@@ -197,19 +189,8 @@ export const clearPendingBackgroundResume = (chatId: string): void => {
 
 export const listDeliverableBackgroundResults = (
   chatId: string,
-): Array<{ toolCallId: string; result: SubagentResult }> => {
-  return listSubagentsForChat(chatId).flatMap((record) => {
-    if (
-      !isBackgroundSubagent(record.subagentId) ||
-      (record.status !== 'completed' && record.status !== 'failed') ||
-      !record.result ||
-      isBackgroundResultDelivered(chatId, record.toolCallId)
-    ) {
-      return []
-    }
-    return [{ toolCallId: record.toolCallId, result: record.result }]
-  })
-}
+): Array<{ toolCallId: string; result: SubagentResult }> =>
+  listDeliverableResults(chatId, listSubagentsForChat(chatId), isBackgroundSubagent)
 
 export const setTurnResponseMessages = (chatId: string, messages: ModelMessage[]): void => {
   turnResponseMessages.set(chatId, messages)
@@ -230,10 +211,7 @@ export const setMessages = (subagentId: string, messages: ModelMessage[]): void 
   record.messages = messages
 }
 
-export const appendMessages = (
-  subagentId: string,
-  extra: ModelMessage[],
-): void => {
+export const appendMessages = (subagentId: string, extra: ModelMessage[]): void => {
   const record = subagents.get(subagentId)
   if (!record || extra.length === 0) {
     return
@@ -241,12 +219,29 @@ export const appendMessages = (
   record.messages = [...(record.messages ?? []), ...extra]
 }
 
+export const restoreSubagent = (
+  record: SubagentRecord,
+  options?: { background?: boolean },
+): SubagentRecord | null =>
+  restoreSubagentRecord(registryMaps, record, options, {
+    trackSubagentForChat,
+    bumpRevision,
+  })
+
+export const pruneSubagentsForChat = (
+  chatId: string,
+  keptSubagentIds: ReadonlySet<string>,
+): void => pruneChatSubagentIds(registryMaps, chatId, keptSubagentIds, bumpRevision)
+
+const canReopen = (status: SubagentStatus): boolean =>
+  status === 'completed' || status === 'failed' || status === 'interrupted'
+
 export const reopen = (
   subagentId: string,
   controller: AbortController,
 ): SubagentRecord | null => {
   const record = subagents.get(subagentId)
-  if (!record || (record.status !== 'completed' && record.status !== 'failed')) {
+  if (!record || !canReopen(record.status)) {
     return null
   }
 
@@ -256,6 +251,13 @@ export const reopen = (
     toolCallId: record.toolCallId,
   })
   pendingBackgroundResume.add(record.chatId)
+  if (
+    backgroundSubagents.has(subagentId) ||
+    restoredBackgroundSubagents.has(subagentId)
+  ) {
+    backgroundSubagents.add(subagentId)
+  }
+  markBlockingOriginReopened(subagentId)
   record.status = 'running'
   record.result = undefined
   controllers.set(subagentId, controller)
@@ -274,11 +276,8 @@ const abortRunning = (subagentId: string, summary: string): boolean => {
   controllers.get(subagentId)?.abort()
   controllers.delete(subagentId)
   blockingSubagents.delete(subagentId)
-  const result: SubagentResult = {
-    subagentId,
-    name: record.agentName,
-    summary,
-  }
+  forgetBlockingOriginSubagent(subagentId)
+  const result: SubagentResult = { subagentId, name: record.agentName, summary }
   setSubagentStatus(record, 'aborted', result)
   resolveCompletionWaiters(subagentId, result)
   return true
@@ -319,6 +318,8 @@ export const abort = (chatId: string): void => {
   for (const subagentId of ids) {
     abortRunning(subagentId, 'Subagent aborted')
     backgroundSubagents.delete(subagentId)
+    restoredBackgroundSubagents.delete(subagentId)
+    forgetBlockingOriginSubagent(subagentId)
   }
 
   chatSubagents.delete(chatId)
@@ -332,12 +333,14 @@ export const resetSubagentRegistryForTests = (): void => {
   subagents.clear()
   chatSubagents.clear()
   controllers.clear()
-  completionWaiters.clear()
+  resetCompletionWaitersForTests()
   turnResponseMessages.clear()
   pendingBackgroundResume.clear()
   resetBackgroundResultSetsForTests()
   blockingSubagents.clear()
   backgroundSubagents.clear()
+  restoredBackgroundSubagents.clear()
+  resetBlockingOriginSetsForTests()
   resetInboxForTests()
   bumpRevision()
 }

@@ -660,6 +660,92 @@ describe('resumeOrchestrator background waves', () => {
     )
   })
 
+  it('wakes a steered blocking spawn without rewriting the inline spawn tool result', async () => {
+    register(
+      'chat-1',
+      'sub-1',
+      new AbortController(),
+      { toolCallId: 'tc-1', agentName: 'blocking' },
+      { pendingResume: false },
+    )
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'blocking',
+      summary: 'inline done',
+    })
+    setTurnResponseMessages('chat-1', [
+      {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: 'tc-1',
+            toolName: 'spawn_subagent',
+            output: {
+              type: 'json',
+              value: {
+                subagentId: 'sub-1',
+                name: 'blocking',
+                summary: 'inline done',
+              },
+            },
+          },
+        ],
+      },
+    ])
+
+    expect(reopen('sub-1', new AbortController())?.status).toBe('running')
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'blocking',
+      summary: 'steered extra',
+    })
+
+    await resumeOrchestrator(
+      buildInput(listDeliverableBackgroundResults('chat-1')),
+    )
+
+    const streamInput = runHarnessStream.mock.calls[0]?.[0]
+    const modelMessages = streamInput?.modelMessages as Array<{
+      role: string
+      content:
+        | string
+        | Array<{
+            type: string
+            toolCallId?: string
+            output?: { type: string; value: unknown }
+          }>
+    }>
+    const spawnTool = modelMessages.find((message) => message.role === 'tool')
+    expect(spawnTool).toEqual({
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: 'tc-1',
+          toolName: 'spawn_subagent',
+          output: {
+            type: 'json',
+            value: {
+              subagentId: 'sub-1',
+              name: 'blocking',
+              summary: 'inline done',
+            },
+          },
+        },
+      ],
+    })
+    const wakeNudge = modelMessages[modelMessages.length - 1]
+    expect(wakeNudge?.role).toBe('user')
+    expect(typeof wakeNudge?.content).toBe('string')
+    expect(wakeNudge?.content).toContain('[harness: background subagent results]')
+    expect(wakeNudge?.content).toContain('- blocking (sub-1, completed): steered extra')
+    expect(wakeNudge?.content).toContain('Summaries are below.')
+    expect(wakeNudge?.content).not.toContain(
+      'Summaries are in the spawn_subagent tool results above.',
+    )
+  })
+
   it('falls back to an inline wake-nudge turn when the snapshot was flushed', async () => {
     register('chat-1', 'sub-1', new AbortController(), {
       toolCallId: 'tc-1',

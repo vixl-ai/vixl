@@ -35,7 +35,6 @@ vi.mock('@/services/harness/subagent/helpers', async (importOriginal) => {
 })
 
 import resumeSubagent from '@/services/harness/subagent/resume'
-import { noPoll, visibleStatus } from '@/services/harness/guidance'
 import {
   getSubagent,
   listDeliverableBackgroundResults,
@@ -46,12 +45,13 @@ import {
   setMessages,
 } from '@/services/harness/subagent/registry'
 
-const resumeNote = `Resume started in the background. ${noPoll} ${visibleStatus('steered')}`
+const resumeNote =
+  'Resume accepted. This return is not output and not progress. Do not tell the user a status or a result from it. End the turn and wait. The harness wake brings the subagent result.'
 
-const runningReturn = {
+const acceptedReturn = {
   subagentId: 'sub-1',
   name: 'explorer',
-  status: 'running' as const,
+  accepted: true as const,
   note: resumeNote,
 }
 
@@ -98,7 +98,7 @@ describe('resumeSubagent', () => {
     })
   })
 
-  it('returns running immediately, then completes generate in the background', async () => {
+  it('returns acceptance immediately, then completes generate in the background', async () => {
     const history: ModelMessage[] = [
       { role: 'user', content: 'first task' },
       { role: 'assistant', content: 'first summary' },
@@ -124,7 +124,7 @@ describe('resumeSubagent', () => {
     }
 
     await expect(resumeSubagent(ctx, 'sub-1', 'keep going')).resolves.toEqual(
-      runningReturn,
+      acceptedReturn,
     )
 
     expect(getSubagent('sub-1')?.status).toBe('running')
@@ -246,7 +246,7 @@ describe('resumeSubagent', () => {
 
     const ctx = baseCtx()
     await expect(resumeSubagent(ctx, 'sub-1', 'keep going')).resolves.toEqual(
-      runningReturn,
+      acceptedReturn,
     )
     expect(finishSubagentWithError).not.toHaveBeenCalled()
 

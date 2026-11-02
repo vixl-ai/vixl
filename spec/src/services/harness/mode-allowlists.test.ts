@@ -81,6 +81,26 @@ describe('mode allowlists steer_subagent', () => {
   })
 })
 
+describe('mode allowlists get_subagents and get_subagent', () => {
+  const names = ['get_subagents', 'get_subagent'] as const
+
+  it('includes get_subagents and get_subagent in ask, plan, agent, and orchestrator', () => {
+    for (const name of names) {
+      expect(MODE_TOOL_ALLOWLIST.ask).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.plan).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.agent).toContain(name)
+      expect(MODE_TOOL_ALLOWLIST.orchestrator).toContain(name)
+    }
+  })
+
+  it('does not include get_subagents or get_subagent in subagent tool sets', () => {
+    for (const name of names) {
+      expect(SUBAGENT_READ_ONLY_TOOLS).not.toContain(name)
+      expect(SUBAGENT_WRITE_TOOLS).not.toContain(name)
+    }
+  })
+})
+
 describe('mode allowlists mcp tools', () => {
   const mcpTools = [
     'call_mcp_tool',

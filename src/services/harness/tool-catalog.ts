@@ -42,6 +42,8 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   update_todos: 'Create, update, complete, or cancel in-chat todos (merge by id)',
   spawn_subagent: 'Spawn sub-agent (background: end turn, harness resumes)',
   steer_subagent: 'Send a follow-up to a spawned sub-agent',
+  get_subagents: 'Page spawned sub-agents in this chat',
+  get_subagent: 'Fetch one spawned sub-agent in this chat',
   resolve_models:
     'Look up allowed model refs by query (capped)',
   web_fetch:

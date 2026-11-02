@@ -1,5 +1,4 @@
 import type { ModelMessage } from 'ai'
-import { noPoll, visibleStatus } from '@/services/harness/guidance'
 import {
   emitSubagentResult,
   finishSubagentWithError,
@@ -21,7 +20,7 @@ const resumeSubagent = async (
 ): Promise<{
   subagentId: string
   name: string
-  status: 'running'
+  accepted: true
   note: string
 }> => {
   const record = getSubagent(subagentId)
@@ -55,6 +54,7 @@ const resumeSubagent = async (
     prompt: record.prompt,
     model,
     capabilities: record.capabilities ?? 'read-only',
+    ...(record.workspace ? { workspace: record.workspace } : {}),
   })
   ctx.onHarnessEvent?.({
     type: 'subagent-event',
@@ -112,8 +112,8 @@ const resumeSubagent = async (
   return {
     subagentId,
     name: record.agentName,
-    status: 'running',
-    note: `Resume started in the background. ${noPoll} ${visibleStatus('steered')}`,
+    accepted: true,
+    note: 'Resume accepted. This return is not output and not progress. Do not tell the user a status or a result from it. End the turn and wait. The harness wake brings the subagent result.',
   }
 }
 

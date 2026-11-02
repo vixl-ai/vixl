@@ -16,6 +16,53 @@ pub fn next_seq(conn: &Connection, chat_id: &str) -> Result<i64, String> {
     Ok(max.unwrap_or(-1) + 1)
 }
 
+pub fn upsert_message_value(conn: &Connection, chat_id: &str, line: &Value) -> Result<(), String> {
+    let parsed = ParsedMessage::from_value(line)?;
+    let keep_seq: Option<i64> = conn
+        .query_row(
+            "SELECT MIN(seq) FROM chat_messages WHERE chat_id = ?1 AND id = ?2",
+            params![chat_id, parsed.id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    if let Some(seq) = keep_seq {
+        conn.execute(
+            "UPDATE chat_messages SET
+                role = ?1,
+                parts_json = ?2,
+                created_at = ?3,
+                model = ?4,
+                mention_highlights_json = ?5,
+                harness_event_json = ?6,
+                extras_json = ?7
+             WHERE chat_id = ?8 AND id = ?9 AND seq = ?10",
+            params![
+                parsed.role,
+                parsed.parts_json,
+                parsed.created_at,
+                parsed.model,
+                parsed.mention_highlights_json,
+                parsed.harness_event_json,
+                parsed.extras_json,
+                chat_id,
+                parsed.id,
+                seq,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        conn.execute(
+            "DELETE FROM chat_messages WHERE chat_id = ?1 AND id = ?2 AND seq != ?3",
+            params![chat_id, parsed.id, seq],
+        )
+        .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let seq = next_seq(conn, chat_id)?;
+    insert_parsed(conn, chat_id, seq, &parsed)
+}
+
 pub fn insert_message_value(
     conn: &Connection,
     chat_id: &str,
@@ -23,6 +70,15 @@ pub fn insert_message_value(
     line: &Value,
 ) -> Result<(), String> {
     let parsed = ParsedMessage::from_value(line)?;
+    insert_parsed(conn, chat_id, seq, &parsed)
+}
+
+fn insert_parsed(
+    conn: &Connection,
+    chat_id: &str,
+    seq: i64,
+    parsed: &ParsedMessage,
+) -> Result<(), String> {
     conn.execute(
         "INSERT INTO chat_messages (
             id, chat_id, seq, role, parts_json, created_at, model,

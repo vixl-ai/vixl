@@ -1,6 +1,11 @@
 import type { ModelMessage } from 'ai'
 
-export type SubagentStatus = 'running' | 'completed' | 'failed' | 'aborted'
+export type SubagentStatus =
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'aborted'
+  | 'interrupted'
 
 export type SubagentResult = {
   subagentId: string

@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
+import { pruneSubagentsForChat } from '@/services/harness/subagent/registry'
 import { clearActiveTurnState } from './helpers'
 import { rebuildMessagesFromTimeline } from './message-parsing'
 import type { ChatSession } from './types'
@@ -115,6 +116,14 @@ export const applyHarnessWakeTimelineTruncate = (
     item?.type === 'user' ? item.message.id : undefined
   const previousMessages = session.messages.value
   session.timeline.value = nextTimeline
+  pruneSubagentsForChat(
+    session.chatId,
+    new Set(
+      nextTimeline.flatMap((entry) =>
+        entry.type === 'subagent' ? [entry.subagentId] : [],
+      ),
+    ),
+  )
   session.messages.value = mergeHarnessWakeMessages(
     rebuildMessagesFromTimeline(nextTimeline),
     previousMessages,

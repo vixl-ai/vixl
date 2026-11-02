@@ -236,6 +236,72 @@ describe('formatToolRunLabel steer_subagent', () => {
   })
 })
 
+describe('formatToolRunLabel get_subagents', () => {
+  it('labels listing while running, done, and rejected', () => {
+    expect(
+      formatToolRunLabel(toolRun({ name: 'get_subagents', status: 'running' })),
+    ).toBe('Listing subagents')
+    expect(formatToolRunLabel(toolRun({ name: 'get_subagents' }))).toBe('Listed subagents')
+    expect(
+      formatToolRunLabel(toolRun({ name: 'get_subagents', status: 'rejected' })),
+    ).toBe('Listed subagents (rejected)')
+  })
+})
+
+describe('formatToolRunLabel get_subagent', () => {
+  afterEach(() => {
+    resetSubagentRegistryForTests()
+  })
+
+  it('labels a running read from the registered agent name', () => {
+    register('chat-1', 'sub-1', new AbortController(), {
+      toolCallId: 'tc-1',
+      agentName: 'generalPurpose',
+    })
+
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'get_subagent',
+          status: 'running',
+          args: { subagentId: 'sub-1' },
+        }),
+      ),
+    ).toBe('Reading generalPurpose')
+  })
+
+  it('labels a done read from result.agentName', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'get_subagent',
+          result: { subagentId: 'sub-1', agentName: 'generalPurpose', status: 'completed' },
+        }),
+      ),
+    ).toBe('Read generalPurpose')
+  })
+
+  it('falls back to Sub-agent when the id and result name are unknown', () => {
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'get_subagent',
+          status: 'running',
+          args: { subagentId: 'missing-sub' },
+        }),
+      ),
+    ).toBe('Reading Sub-agent')
+    expect(
+      formatToolRunLabel(
+        toolRun({
+          name: 'get_subagent',
+          args: { subagentId: 'missing-sub' },
+        }),
+      ),
+    ).toBe('Read Sub-agent')
+  })
+})
+
 describe('formatToolRunLabel terminal', () => {
   it('labels a running run_terminal with the description alone', () => {
     expect(

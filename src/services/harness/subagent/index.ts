@@ -1,5 +1,7 @@
 export { default as spawnSubagent } from './spawn'
 export { default as steerSubagent } from './steer'
+export { default as getSubagents } from './get-subagents'
+export { default as getSubagent } from './get-subagent'
 export { default as deliverSteer } from './deliver-steer'
 export { default as flushPendingBackgroundResume } from './flush-pending-resume'
 export { default as resumeSubagent } from './resume'

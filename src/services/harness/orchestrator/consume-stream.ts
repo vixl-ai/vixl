@@ -1,5 +1,6 @@
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import { clearStagedImages } from '@/services/harness/image-stage'
+import { flushSubagentResumePersist } from '@/services/harness/subagent/persist-resume'
 import type { AgentStop } from '@/types/chat/agent-stop'
 import {
   countImageFileParts,
@@ -72,11 +73,25 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
 
   const emitTurnEnded = async (stop: AgentStop): Promise<void> => {
     await flushSubagentPersistence()
+    let publishedStop = stop
+    try {
+      await flushSubagentResumePersist(undefined, chatId)
+    } catch (error) {
+      if (stop.reason === 'completed' || stop.reason === 'content-filter') {
+        publishedStop = {
+          reason: 'error',
+          detail:
+            error instanceof Error
+              ? error.message
+              : 'Failed to save subagent resume snapshot',
+        }
+      }
+    }
     await publishTurnEnded({
       projectSlug: workspace.projectSlug,
       chatId,
       turnId: assistantId,
-      stop,
+      stop: publishedStop,
       onEvent,
     })
   }

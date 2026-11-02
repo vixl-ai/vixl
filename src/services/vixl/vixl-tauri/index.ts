@@ -160,6 +160,7 @@ export {
   readChatMeta,
   readChatMessages,
   appendChatLine,
+  upsertChatLine,
   truncateChatLog,
   updateChatMeta,
   deleteChat,

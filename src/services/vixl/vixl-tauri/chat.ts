@@ -30,6 +30,12 @@ export const appendChatLine = (
   line: Record<string, unknown>,
 ): Promise<void> => call('append_chat_line', { projectSlug, chatId, line })
 
+export const upsertChatLine = (
+  projectSlug: string,
+  chatId: string,
+  line: Record<string, unknown>,
+): Promise<void> => call('upsert_chat_line', { projectSlug, chatId, line })
+
 export const truncateChatLog = (args: {
   projectSlug: string
   chatId: string

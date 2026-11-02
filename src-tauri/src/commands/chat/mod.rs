@@ -15,6 +15,7 @@ mod rewrite_checkpoints;
 mod store;
 mod truncate;
 mod update;
+mod upsert;
 mod usage;
 
 pub use append::append_chat_line;
@@ -31,6 +32,7 @@ pub use pin::{list_pinned_chats, pin_chat};
 pub use read::{read_chat_messages, read_chat_meta};
 pub use truncate::truncate_chat_log;
 pub use update::update_chat_meta;
+pub use upsert::upsert_chat_line;
 pub use usage::{read_chat_usage, write_chat_usage};
 
 #[cfg(test)]

@@ -122,6 +122,9 @@ export const completeSubagentTimelineItem = (
   ]
 }
 
+export const SUBAGENT_INTERRUPTED_SUMMARY =
+  'Interrupted when the app closed. Steer this subagent to resume.'
+
 export const finalizeHydratedSubagents = (
   items: ChatTimelineItem[],
 ): ChatTimelineItem[] =>
@@ -132,6 +135,7 @@ export const finalizeHydratedSubagents = (
     return {
       ...item,
       status: 'error',
+      summary: SUBAGENT_INTERRUPTED_SUMMARY,
       compacting: false,
       tools: closeIncompleteSubagentTools(item.tools),
       steps: closeIncompleteSubagentSteps(item.steps ?? []),

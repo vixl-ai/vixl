@@ -117,6 +117,30 @@ describe('persistSubagentHarnessEvent nested live events', () => {
       }),
     )
   })
+
+  it('uses nested subagent-history capturedAt as the line createdAt', async () => {
+    await nested({
+      type: 'subagent-history',
+      messages: [{ role: 'user', content: 'task' }],
+      capturedAt: '2026-01-01T00:00:02.000Z',
+    })
+
+    expect(appendChatLine).toHaveBeenCalledTimes(1)
+    expect(appendChatLine.mock.calls[0]?.[2]?.createdAt).toBe(
+      '2026-01-01T00:00:02.000Z',
+    )
+  })
+
+  it('stamps a non-empty write-time createdAt when the nested event has no capturedAt', async () => {
+    await nested({
+      type: 'subagent-history',
+      messages: [{ role: 'user', content: 'task' }],
+    })
+
+    const createdAt = appendChatLine.mock.calls[0]?.[2]?.createdAt
+    expect(typeof createdAt).toBe('string')
+    expect(createdAt).not.toBe('')
+  })
 })
 
 describe('persistSubagentHarnessEvent stop', () => {

@@ -123,11 +123,20 @@ export const persistSubagentHarnessEvent = async (
       : event.type === 'subagent-result'
         ? `${event.subagentId}-result`
         : `${event.subagentId}-event-${crypto.randomUUID()}`
+  const nestedHistoryCapturedAt =
+    event.type === 'subagent-event' && event.event.type === 'subagent-history'
+      ? event.event.capturedAt
+      : undefined
+  const createdAt =
+    typeof nestedHistoryCapturedAt === 'string' &&
+    nestedHistoryCapturedAt.length > 0
+      ? nestedHistoryCapturedAt
+      : nowIso()
   await persistLine(projectSlug, chatId, {
     id: lineId,
     role: 'assistant',
     parts: [],
-    createdAt: nowIso(),
+    createdAt,
     harnessEvent: event,
   })
 }

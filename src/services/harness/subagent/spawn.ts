@@ -167,6 +167,7 @@ const spawnSubagent = (ctx: HarnessToolContext) =>
         prompt,
         model,
         capabilities: resolvedCapabilities,
+        ...(workspace ? { workspace } : {}),
       })
 
       if (!blocking) {

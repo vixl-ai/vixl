@@ -141,6 +141,58 @@ fn duplicate_message_ids_are_allowed() {
     assert_eq!(messages[0]["createdAt"], "2026-01-01T00:00:00Z");
 }
 
+fn resume_line(subagent_id: &str, prompt: &str) -> serde_json::Value {
+    serde_json::json!({
+        "id": format!("subagent-resume:{subagent_id}"),
+        "role": "assistant",
+        "parts": [],
+        "createdAt": "2026-01-01T00:00:00Z",
+        "harnessEvent": {
+            "type": "subagent-resume",
+            "subagentId": subagent_id,
+            "toolCallId": "call-1",
+            "agentName": "explore",
+            "blocking": true,
+            "prompt": prompt,
+            "model": "local::qwen",
+            "capabilities": "read-only",
+            "messages": [{ "role": "user", "content": prompt }]
+        }
+    })
+}
+
+#[test]
+fn upsert_inserts_once_and_replaces_harness_event_json() {
+    let (_dir, conn) = open_migrated();
+    let meta = sample_meta("c1", "slug", "Chat", "2026-01-01T00:00:00Z");
+    store::insert_chat(&conn, &meta, "pid").expect("insert");
+    store::upsert_message_value(&conn, "c1", &resume_line("sub-1", "first")).expect("insert");
+    store::upsert_message_value(&conn, "c1", &resume_line("sub-1", "second")).expect("replace");
+    let messages = store::list_messages(&conn, "c1").expect("list");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["id"], "subagent-resume:sub-1");
+    assert_eq!(messages[0]["harnessEvent"]["type"], "subagent-resume");
+    assert_eq!(messages[0]["harnessEvent"]["prompt"], "second");
+    assert_eq!(
+        messages[0]["harnessEvent"]["messages"][0]["content"],
+        "second"
+    );
+}
+
+#[test]
+fn upsert_collapses_duplicate_ids_to_one_row() {
+    let (_dir, conn) = open_migrated();
+    let meta = sample_meta("c1", "slug", "Chat", "2026-01-01T00:00:00Z");
+    store::insert_chat(&conn, &meta, "pid").expect("insert");
+    store::insert_message_value(&conn, "c1", 0, &resume_line("sub-1", "old-a")).expect("first");
+    store::insert_message_value(&conn, "c1", 1, &resume_line("sub-1", "old-b")).expect("second");
+    store::upsert_message_value(&conn, "c1", &resume_line("sub-1", "latest")).expect("collapse");
+    let messages = store::list_messages(&conn, "c1").expect("list");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["id"], "subagent-resume:sub-1");
+    assert_eq!(messages[0]["harnessEvent"]["prompt"], "latest");
+}
+
 #[test]
 fn fork_keeps_source_permission_level() {
     let mut source = sample_meta("src", "slug", "Chat", "2026-01-01T00:00:00Z");

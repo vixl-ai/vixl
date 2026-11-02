@@ -4,10 +4,15 @@ import deriveToolArtifact from '@/services/harness/derive-tool-artifact'
 import enrichToolError from '@/services/harness/enrich-tool-error'
 import {
   deriveToolDiffs,
+  nowIso,
   resolveToolErrorMessage,
 } from '@/services/harness/orchestrator/helpers'
 import { withTerminalOutputDescription } from '@/services/harness/shell/with-terminal-output-description'
 import { getSubagent, setMessages } from '@/services/harness/subagent/registry'
+import {
+  queueSubagentResumeSnapshot,
+  type SubagentResumeSnapshot,
+} from '@/services/harness/subagent/persist-resume'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
@@ -102,11 +107,16 @@ export const readLastStepResponseMessages = (
 
 export const persistSubagentHistory = (
   emitNestedEvent: (event: HarnessEvent) => void,
-  subagentId: string,
-  messages: ModelMessage[],
+  snapshot: SubagentResumeSnapshot,
 ): void => {
-  setMessages(subagentId, messages)
-  emitNestedEvent({ type: 'subagent-history', messages })
+  const capturedAt = nowIso()
+  setMessages(snapshot.subagentId, snapshot.messages)
+  emitNestedEvent({
+    type: 'subagent-history',
+    messages: snapshot.messages,
+    capturedAt,
+  })
+  queueSubagentResumeSnapshot(snapshot, capturedAt)
 }
 
 export const historyAfterGenerate = (

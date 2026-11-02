@@ -3,6 +3,7 @@ import type { AgentStep } from '@/types/chat/agent-step'
 import type { AgentStop } from '@/types/chat/agent-stop'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { TodoItem } from '@/types/harness/harness-event'
+import type { SubagentWorkspace } from '@/types/harness/subagent-record'
 import type { ToolRun } from '@/types/harness/tool-run'
 
 export type SubagentSteer = { message: string; toolBoundary: number }
@@ -17,6 +18,9 @@ export type SubagentTimelineItem = {
   summary?: string
   prompt?: string
   model?: string
+  capabilities?: 'read-only' | 'write'
+  workspace?: SubagentWorkspace
+  startedAt?: string
   tools: ToolRun[]
   steps?: AgentStep[]
   compacting?: boolean

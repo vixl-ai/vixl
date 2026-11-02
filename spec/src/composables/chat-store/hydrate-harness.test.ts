@@ -12,6 +12,162 @@ const emptyAcc = (): HydrateAccumulator => hydrateTimelineBuilder.createAccumula
 
 const noopFlush = (): void => {}
 
+describe('hydrate-harness subagent-resume', () => {
+  it('consumes the line without restoring timeline or flushing a parent turn', () => {
+    const acc = emptyAcc()
+    acc.pendingTurn = {
+      id: 'turn-1',
+      steps: [{ id: 's1', text: 'hello', reasoning: '', tools: [] }],
+      text: '',
+      createdAt: '2026-01-01T00:00:00Z',
+    }
+    const consumed = applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-resume',
+        subagentId: 'sub-1',
+        toolCallId: 'call-1',
+        agentName: 'explore',
+        blocking: true,
+        prompt: 'task',
+        model: 'local::qwen',
+        capabilities: 'read-only',
+        messages: [{ role: 'user', content: 'task' }],
+      },
+      noopFlush,
+      '2026-01-01T00:00:01.000Z',
+    )
+    expect(consumed).toBe(true)
+    expect(acc.pendingTurn?.id).toBe('turn-1')
+    expect(acc.nextTimeline).toEqual([])
+    expect(acc.subagentResumes.get('sub-1')).toEqual({
+      messages: [{ role: 'user', content: 'task' }],
+      model: 'local::qwen',
+      capabilities: 'read-only',
+      createdAt: '2026-01-01T00:00:01.000Z',
+      blocking: true,
+    })
+  })
+
+  it('omits resume blocking when the field is not a boolean', () => {
+    const acc = emptyAcc()
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-resume',
+        subagentId: 'sub-1',
+        toolCallId: 'call-1',
+        agentName: 'explore',
+        prompt: 'task',
+        model: 'local::qwen',
+        capabilities: 'read-only',
+        messages: [{ role: 'user', content: 'task' }],
+      },
+      noopFlush,
+      '2026-01-01T00:00:01.000Z',
+    )
+    expect(acc.subagentResumes.get('sub-1')).toEqual({
+      messages: [{ role: 'user', content: 'task' }],
+      model: 'local::qwen',
+      capabilities: 'read-only',
+      createdAt: '2026-01-01T00:00:01.000Z',
+    })
+  })
+
+  it('records createdAt for the latest nested subagent-history', () => {
+    const acc = emptyAcc()
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-start',
+        subagentId: 'sub-1',
+        name: 'explore',
+        blocking: false,
+      },
+      noopFlush,
+    )
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-event',
+        subagentId: 'sub-1',
+        event: {
+          type: 'subagent-history',
+          messages: [{ role: 'user', content: 'first' }],
+        },
+      },
+      noopFlush,
+      '2026-01-01T00:00:01.000Z',
+    )
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-event',
+        subagentId: 'sub-1',
+        event: {
+          type: 'subagent-history',
+          messages: [{ role: 'user', content: 'second' }],
+        },
+      },
+      noopFlush,
+      '2026-01-01T00:00:02.000Z',
+    )
+    expect(acc.subagentHistories.get('sub-1')).toEqual({
+      createdAt: '2026-01-01T00:00:02.000Z',
+      messages: [{ role: 'user', content: 'second' }],
+    })
+  })
+
+  it('does not clear a stored history timestamp when a later history line has no createdAt', () => {
+    const acc = emptyAcc()
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-start',
+        subagentId: 'sub-1',
+        name: 'explore',
+        blocking: false,
+      },
+      noopFlush,
+    )
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-event',
+        subagentId: 'sub-1',
+        event: {
+          type: 'subagent-history',
+          messages: [{ role: 'user', content: 'first' }],
+        },
+      },
+      noopFlush,
+      '2026-01-01T00:00:01.000Z',
+    )
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-event',
+        subagentId: 'sub-1',
+        event: {
+          type: 'subagent-history',
+          messages: [{ role: 'user', content: 'untimestamped' }],
+        },
+      },
+      noopFlush,
+    )
+    expect(acc.subagentHistories.get('sub-1')).toEqual({
+      createdAt: '2026-01-01T00:00:01.000Z',
+      messages: [{ role: 'user', content: 'first' }],
+    })
+    const item = acc.nextTimeline[0]
+    expect(item?.type).toBe('subagent')
+    if (item?.type !== 'subagent') {
+      return
+    }
+    expect(item.messages).toEqual([{ role: 'user', content: 'untimestamped' }])
+  })
+})
+
 describe('hydrate-harness subagent-start', () => {
   it('ignores a persisted description and keeps agentName', () => {
     const acc = emptyAcc()
@@ -56,6 +212,97 @@ describe('hydrate-harness subagent-start', () => {
     }
     expect(item.name).toBe('generalPurpose')
     expect('description' in item).toBe(false)
+  })
+
+  it('does not let a later start flip blocking true to false', () => {
+    const acc = emptyAcc()
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-start',
+        subagentId: 'sub-1',
+        name: 'explorer',
+        blocking: true,
+      },
+      noopFlush,
+    )
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-start',
+        subagentId: 'sub-1',
+        name: 'explorer',
+        blocking: false,
+      },
+      noopFlush,
+    )
+    const item = acc.nextTimeline[0]
+    expect(item?.type).toBe('subagent')
+    if (item?.type !== 'subagent') {
+      return
+    }
+    expect(item.blocking).toBe(true)
+  })
+
+  it('lets a later start set blocking true when the existing item is false', () => {
+    const acc = emptyAcc()
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-start',
+        subagentId: 'sub-1',
+        name: 'explorer',
+        blocking: false,
+      },
+      noopFlush,
+    )
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-start',
+        subagentId: 'sub-1',
+        name: 'explorer',
+        blocking: true,
+      },
+      noopFlush,
+    )
+    const item = acc.nextTimeline[0]
+    expect(item?.type).toBe('subagent')
+    if (item?.type !== 'subagent') {
+      return
+    }
+    expect(item.blocking).toBe(true)
+  })
+
+  it('copies capabilities, workspace, and startedAt from the start line', () => {
+    const acc = emptyAcc()
+    applyHydrateHarnessEvent(
+      acc,
+      {
+        type: 'subagent-start',
+        subagentId: 'sub-1',
+        toolCallId: 'call-1',
+        name: 'explorer',
+        blocking: false,
+        prompt: 'look around',
+        model: 'local::qwen',
+        capabilities: 'write',
+        workspace: { projectRoot: '/tmp/wt', projectSlug: 'feature' },
+      },
+      noopFlush,
+      '2020-01-01T00:00:00.000Z',
+    )
+    const item = acc.nextTimeline[0]
+    expect(item?.type).toBe('subagent')
+    if (item?.type !== 'subagent') {
+      return
+    }
+    expect(item.capabilities).toBe('write')
+    expect(item.workspace).toEqual({
+      projectRoot: '/tmp/wt',
+      projectSlug: 'feature',
+    })
+    expect(item.startedAt).toBe('2020-01-01T00:00:00.000Z')
   })
 })
 

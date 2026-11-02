@@ -9,6 +9,7 @@ import {
   listDeliverableShellResults,
   markShellResultsDelivered,
 } from '@/services/harness/shell/registry'
+import { isBlockingOriginSubagent } from '@/services/harness/subagent/blocking-origin-sets'
 import {
   clearPendingBackgroundResume,
   clearTurnResponseMessages,
@@ -78,9 +79,12 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
         )
 
   const overlay = loadResumeOverlay(chatId)
+  const spawnPatchResults = finalizedResults.filter(
+    (item) => !isBlockingOriginSubagent(item.result.subagentId),
+  )
   const patchedTurnMessages = turnMessages
-    ? patchSubagentToolResults(turnMessages, finalizedResults)
-    : patchSubagentToolResults(overlay.spawnMessages, finalizedResults)
+    ? patchSubagentToolResults(turnMessages, spawnPatchResults)
+    : patchSubagentToolResults(overlay.spawnMessages, spawnPatchResults)
 
   if (turnMessages && patchedTurnMessages.length > 0) {
     await persistResumeOverlay({
@@ -119,7 +123,11 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
           runningAgents,
           chatSubagents,
           {
-            summariesInline: !turnMessages,
+            summariesInline:
+              !turnMessages ||
+              wakeResults.some((item) =>
+                isBlockingOriginSubagent(item.result.subagentId),
+              ),
           },
         )
       : null
@@ -229,7 +237,7 @@ export default async (input: ResumeOrchestratorInput): Promise<void> => {
   } else {
     const persisted = loadResumeOverlay(chatId)
     modelMessages.push(
-      ...patchSubagentToolResults(persisted.spawnMessages, finalizedResults),
+      ...patchSubagentToolResults(persisted.spawnMessages, spawnPatchResults),
     )
     for (const wake of persisted.wakes) {
       pushWakeIfNew(wake.content)

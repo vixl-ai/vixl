@@ -110,6 +110,15 @@ vi.mock('vue-sonner', () => ({
   toast: { error: vi.fn<() => void>(), success: vi.fn<() => void>() },
 }))
 
+const flushSubagentResumePersist = vi.hoisted(() =>
+  vi.fn<(subagentId?: string, chatId?: string) => Promise<void>>(async () => undefined),
+)
+
+vi.mock('@/services/harness/subagent/persist-resume', () => ({
+  flushSubagentResumePersist: (...args: unknown[]) =>
+    flushSubagentResumePersist(...(args as [string?, string?])),
+}))
+
 import { toast } from 'vue-sonner'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import consumeStream from '@/services/harness/orchestrator/consume-stream'
@@ -1065,10 +1074,32 @@ describe('consumeStream terminal stop', () => {
     expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', stop)
     const flush = prepared.flushSubagentPersistence as ReturnType<typeof vi.fn>
     expect(flush).toHaveBeenCalled()
+    expect(flushSubagentResumePersist).toHaveBeenCalledTimes(1)
+    expect(flushSubagentResumePersist.mock.calls[0]).toEqual([undefined, 'chat-1'])
     const flushOrder = flush.mock.invocationCallOrder[0] ?? 0
+    const resumeFlushOrder = flushSubagentResumePersist.mock.invocationCallOrder[0] ?? 0
     const stopOrder = persistTurnEnded.mock.invocationCallOrder[0] ?? 0
     expect(flushOrder).toBeGreaterThan(0)
-    expect(flushOrder).toBeLessThan(stopOrder)
+    expect(flushOrder).toBeLessThan(resumeFlushOrder)
+    expect(resumeFlushOrder).toBeLessThan(stopOrder)
+  })
+
+  it('does not emit completed when resume persist flush rejects', async () => {
+    const resumeError = new Error('disk full')
+    flushSubagentResumePersist.mockRejectedValueOnce(resumeError)
+    mockPartsStream([
+      { type: 'finish-step', finishReason: 'stop', usage: { outputTokens: 8 } },
+    ])
+    const prepared = makePrepared()
+
+    await expect(consumeStream(prepared)).resolves.toBeUndefined()
+    const stop = { reason: 'error', detail: 'disk full' }
+    expect(persistTurnEnded).toHaveBeenCalledTimes(1)
+    expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', stop)
+    expect(turnEndedEvents(prepared.onEvent)).toEqual([
+      { type: 'turn-ended', turnId: 'turn-1', stop },
+    ])
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
   it('emits completed with plan detail when this turn created a plan', async () => {
@@ -1159,6 +1190,40 @@ describe('consumeStream terminal stop', () => {
       partialSteps: 2,
       assistantId: 'turn-1',
     })
+  })
+
+  it('emits user-stop on abort even when resume persist flush rejects', async () => {
+    const resumeError = new Error('disk full')
+    flushSubagentResumePersist.mockRejectedValueOnce(resumeError)
+    const controller = new AbortController()
+    streamText.mockImplementation((config) => ({
+      fullStream: (async function* () {
+        yield { type: 'start-step' }
+        controller.abort()
+        await (config as { onAbort?: () => Promise<void> }).onAbort?.()
+      })(),
+      text: Promise.resolve(''),
+      responseMessages: Promise.resolve([]),
+      usage: Promise.resolve(undefined),
+    }))
+    const prepared = makePrepared()
+    ;(prepared as { signal: AbortSignal }).signal = controller.signal
+    ;(prepared.steps as { stepCount: number }).stepCount = 2
+
+    await expect(consumeStream(prepared)).resolves.toBeUndefined()
+
+    const stop = { reason: 'user-stop' }
+    expect(turnEndedEvents(prepared.onEvent)).toEqual([
+      { type: 'turn-ended', turnId: 'turn-1', stop },
+    ])
+    expect(persistTurnEnded).toHaveBeenCalledWith('demo', 'chat-1', 'turn-1', stop)
+    expect(prepared.onEvent).toHaveBeenCalledWith({
+      type: 'turn-aborted',
+      reason: 'user-stop',
+      partialSteps: 2,
+      assistantId: 'turn-1',
+    })
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
   it('still finishes the stream when saving the turn end fails', async () => {

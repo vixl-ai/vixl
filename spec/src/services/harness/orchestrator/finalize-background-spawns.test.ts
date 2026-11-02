@@ -254,4 +254,48 @@ describe('finalizeBackgroundSpawnResults', () => {
     expect(persistToolRun).toHaveBeenCalledTimes(1)
     expect(isBackgroundResultFinalized('chat-1', 'tc-1')).toBe(true)
   })
+
+  it('returns a steered blocking result without persisting or emitting the spawn tool', async () => {
+    register(
+      'chat-1',
+      'sub-1',
+      new AbortController(),
+      { toolCallId: 'tc-1', agentName: 'blocking' },
+      { pendingResume: false },
+    )
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'blocking',
+      summary: 'inline done',
+    })
+    expect(reopen('sub-1', new AbortController())?.status).toBe('running')
+    resolve('sub-1', {
+      subagentId: 'sub-1',
+      name: 'blocking',
+      summary: 'steered extra',
+    })
+    const completed = listDeliverableBackgroundResults('chat-1')
+    const onEvent = vi.fn<(...args: unknown[]) => void>()
+
+    const first = await finalizeBackgroundSpawnResults(
+      'proj',
+      'chat-1',
+      completed,
+      onEvent,
+      null,
+    )
+    const second = await finalizeBackgroundSpawnResults(
+      'proj',
+      'chat-1',
+      completed,
+      onEvent,
+      null,
+    )
+
+    expect(first).toEqual(completed)
+    expect(second).toEqual(completed)
+    expect(onEvent).not.toHaveBeenCalled()
+    expect(persistToolRun).not.toHaveBeenCalled()
+    expect(listDeliverableBackgroundResults('chat-1')).toEqual(completed)
+  })
 })

@@ -219,7 +219,13 @@ describe('spawn_subagent workspaceSlug', () => {
   })
 
   it('accepts a worktree child and passes the nested workspace', async () => {
-    await expect(execute(baseCtx(), 'feature')).resolves.toMatchObject({
+    const events: unknown[] = []
+    const ctx = baseCtx({
+      onHarnessEvent: (event) => {
+        events.push(event)
+      },
+    })
+    await expect(execute(ctx, 'feature')).resolves.toMatchObject({
       summary: 'ok summary',
     })
     expect(runSubagentGenerate).toHaveBeenCalledWith(
@@ -230,6 +236,18 @@ describe('spawn_subagent workspaceSlug', () => {
         },
       }),
     )
+    expect(events.find((event) =>
+      typeof event === 'object'
+      && event !== null
+      && 'type' in event
+      && event.type === 'subagent-start',
+    )).toMatchObject({
+      type: 'subagent-start',
+      workspace: {
+        projectRoot: '/tmp/worktrees/demo/feature',
+        projectSlug: 'feature',
+      },
+    })
   })
 
   it('resolves the agent definition from the worktree root when workspaceSlug is set', async () => {

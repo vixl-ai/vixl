@@ -473,6 +473,75 @@ describe('truncate merges harnessWake messages', () => {
     expect(session.messages.value.map((message) => message.id)).toEqual(['u1'])
   })
 
+  it('drops cut subagents from the registry when truncating', async () => {
+    const { createSession } = await import('@/composables/chat-store/helpers')
+    const { createSessionMutations } = await import(
+      '@/composables/chat-store/session-mutations'
+    )
+    const {
+      listSubagentsForChat,
+      resetSubagentRegistryForTests,
+      restoreSubagent,
+    } = await import('@/services/harness/subagent/registry')
+    resetSubagentRegistryForTests()
+    const session = createSession('proj', 'chat-trunc-subagents')
+    const first = userMessage('u1', 'first', '2026-01-01T00:00:00.000Z')
+    const second = userMessage('u2', 'second', '2026-01-01T00:00:03.000Z')
+    const kept = {
+      type: 'subagent' as const,
+      subagentId: 'sub-keep',
+      toolCallId: 'tc-keep',
+      name: 'keeper',
+      blocking: false,
+      status: 'done' as const,
+      tools: [],
+      compactions: [],
+    }
+    const dropped = {
+      type: 'subagent' as const,
+      subagentId: 'sub-drop',
+      toolCallId: 'tc-drop',
+      name: 'dropped',
+      blocking: false,
+      status: 'done' as const,
+      tools: [],
+      compactions: [],
+    }
+    restoreSubagent({
+      subagentId: 'sub-keep',
+      chatId: 'chat-trunc-subagents',
+      toolCallId: 'tc-keep',
+      agentName: 'keeper',
+      status: 'completed',
+      startedAt: '2020-01-01T00:00:00.000Z',
+    })
+    restoreSubagent({
+      subagentId: 'sub-drop',
+      chatId: 'chat-trunc-subagents',
+      toolCallId: 'tc-drop',
+      agentName: 'dropped',
+      status: 'completed',
+      startedAt: '2020-01-01T00:00:00.000Z',
+    })
+    session.timeline.value = [
+      { type: 'user', message: first },
+      kept,
+      { type: 'user', message: second },
+      dropped,
+    ]
+    session.messages.value = [first, second]
+    const api = createSessionMutations(session)
+    await api.truncateBeforeMessage('proj', 'chat-trunc-subagents', 'u2')
+
+    expect(session.timeline.value.map((item) => item.type)).toEqual([
+      'user',
+      'subagent',
+    ])
+    expect(
+      listSubagentsForChat('chat-trunc-subagents').map((record) => record.subagentId),
+    ).toEqual(['sub-keep'])
+  })
+
   it('leaves rebuilt messages when the boundary user has no createdAt', async () => {
     const { mergeHarnessWakeMessages } = await import(
       '@/composables/chat-store/merge-harness-wake-messages'

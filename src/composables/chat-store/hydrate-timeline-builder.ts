@@ -1,4 +1,4 @@
-import type { UIMessage } from 'ai'
+import type { ModelMessage, UIMessage } from 'ai'
 import type { AgentStop } from '@/types/chat/agent-stop'
 import type { AgentTurn } from '@/types/chat/agent-turn'
 import type {
@@ -6,6 +6,7 @@ import type {
   SubagentTimelineItem,
 } from '@/types/chat/chat-timeline-item'
 import type { TodoItem, HarnessEvent } from '@/types/harness/harness-event'
+import type { SubagentWorkspace } from '@/types/harness/subagent-record'
 import type { ToolRun } from '@/types/harness/tool-run'
 import closeIncompleteSubagentTools, {
   closeIncompleteSubagentSteps,
@@ -17,6 +18,20 @@ import {
   upsertToolInStep,
 } from './message-parsing'
 
+export type HydratedSubagentResume = {
+  messages: ModelMessage[]
+  model?: string
+  capabilities?: 'read-only' | 'write'
+  workspace?: SubagentWorkspace
+  createdAt?: string
+  blocking?: boolean
+}
+
+export type HydratedSubagentHistory = {
+  createdAt?: string
+  messages?: unknown[]
+}
+
 export type HydrateAccumulator = {
   nextMessages: UIMessage[]
   nextTimeline: ChatTimelineItem[]
@@ -27,6 +42,8 @@ export type HydrateAccumulator = {
   timelineSubagentIndex: Map<string, number>
   pendingSubagentIndex: Map<string, number>
   committedTools: Map<string, { itemIndex: number; stepId: string }>
+  subagentResumes: Map<string, HydratedSubagentResume>
+  subagentHistories: Map<string, HydratedSubagentHistory>
 }
 
 type SubagentStartInput = Omit<
@@ -53,6 +70,8 @@ const createAccumulator = (): HydrateAccumulator => ({
   timelineSubagentIndex: new Map(),
   pendingSubagentIndex: new Map(),
   committedTools: new Map(),
+  subagentResumes: new Map(),
+  subagentHistories: new Map(),
 })
 
 const startTarget = (acc: HydrateAccumulator): SubagentList =>
@@ -92,9 +111,12 @@ const upsertSubagentStart = (
         ...existing,
         toolCallId: subagent.toolCallId ?? existing.toolCallId,
         name: subagent.name,
-        blocking: subagent.blocking,
+        blocking: existing.blocking || subagent.blocking,
         prompt: subagent.prompt ?? existing.prompt,
         model: subagent.model ?? existing.model,
+        capabilities: subagent.capabilities ?? existing.capabilities,
+        workspace: subagent.workspace ?? existing.workspace,
+        startedAt: subagent.startedAt ?? existing.startedAt,
         status: 'running',
         tools: subagent.tools ?? existing.tools,
         steps: subagent.steps ?? existing.steps ?? [],
@@ -113,6 +135,9 @@ const upsertSubagentStart = (
     blocking: subagent.blocking,
     prompt: subagent.prompt,
     model: subagent.model,
+    capabilities: subagent.capabilities,
+    workspace: subagent.workspace,
+    startedAt: subagent.startedAt,
     status: 'running',
     tools: subagent.tools ?? [],
     steps: subagent.steps ?? [],

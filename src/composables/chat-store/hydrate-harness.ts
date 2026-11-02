@@ -1,7 +1,13 @@
+import type { ModelMessage } from 'ai'
 import type { AgentStep } from '@/types/chat/agent-step'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import mapSubagentResultStatus from '@/utils/map-subagent-result-status'
+import {
+  parseCapabilities,
+  parseOptionalBoolean,
+  parseWorkspace,
+} from './hydrate-subagent-fields'
 import attachTurnEnded, { parseAgentStop } from './attach-turn-ended'
 import { parseChatArtifact, parseChatDiffs, parseTodoItems } from './helpers'
 import hydrateTimelineBuilder, {
@@ -77,6 +83,12 @@ const applyHydrateHarnessEvent = (
       typeof harnessEvent.model === 'string' && harnessEvent.model.length > 0
         ? harnessEvent.model
         : undefined
+    const capabilities = parseCapabilities(harnessEvent.capabilities)
+    const workspace = parseWorkspace(harnessEvent.workspace)
+    const startedAt =
+      typeof createdAt === 'string' && createdAt.length > 0
+        ? createdAt
+        : undefined
     if (subagentId) {
       hydrateTimelineBuilder.startSubagent(acc, {
         subagentId,
@@ -85,6 +97,9 @@ const applyHydrateHarnessEvent = (
         blocking,
         prompt,
         model,
+        capabilities,
+        workspace,
+        startedAt,
       })
     }
     return true
@@ -115,10 +130,26 @@ const applyHydrateHarnessEvent = (
       typeof nested === 'object' &&
       'type' in (nested as Record<string, unknown>)
     ) {
+      const nestedEvent = nested as HarnessEvent
+      if (nestedEvent.type === 'subagent-history') {
+        const historyCreatedAt =
+          typeof createdAt === 'string' && createdAt.length > 0
+            ? createdAt
+            : undefined
+        if (historyCreatedAt) {
+          const existingAt = acc.subagentHistories.get(subagentId)?.createdAt
+          if (!existingAt || historyCreatedAt >= existingAt) {
+            acc.subagentHistories.set(subagentId, {
+              createdAt: historyCreatedAt,
+              messages: nestedEvent.messages,
+            })
+          }
+        }
+      }
       hydrateTimelineBuilder.appendSubagentEvent(
         acc,
         subagentId,
-        nested as HarnessEvent,
+        nestedEvent,
       )
     }
     return true
@@ -134,6 +165,35 @@ const applyHydrateHarnessEvent = (
   }
 
   if (type === 'compaction-started' || type === 'compaction-ended') {
+    return true
+  }
+
+  if (type === 'subagent-resume') {
+    const subagentId = String(harnessEvent.subagentId ?? '')
+    if (subagentId) {
+      const model =
+        typeof harnessEvent.model === 'string' && harnessEvent.model.length > 0
+          ? harnessEvent.model
+          : undefined
+      const capabilities = parseCapabilities(harnessEvent.capabilities)
+      const workspace = parseWorkspace(harnessEvent.workspace)
+      const messages = Array.isArray(harnessEvent.messages)
+        ? (harnessEvent.messages as ModelMessage[])
+        : []
+      const resumeCreatedAt =
+        typeof createdAt === 'string' && createdAt.length > 0
+          ? createdAt
+          : undefined
+      const blocking = parseOptionalBoolean(harnessEvent.blocking)
+      acc.subagentResumes.set(subagentId, {
+        messages,
+        ...(model ? { model } : {}),
+        ...(capabilities ? { capabilities } : {}),
+        ...(workspace ? { workspace } : {}),
+        ...(resumeCreatedAt ? { createdAt: resumeCreatedAt } : {}),
+        ...(blocking !== undefined ? { blocking } : {}),
+      })
+    }
     return true
   }
 

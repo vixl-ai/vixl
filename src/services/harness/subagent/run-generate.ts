@@ -27,6 +27,11 @@ import prepareCompactStep from '@/services/harness/subagent/prepare-compact-step
 import { drainSteers } from '@/services/harness/subagent/inbox'
 import { setMessages } from '@/services/harness/subagent/registry'
 import {
+  buildResumeSnapshot,
+  flushSubagentResumePersist,
+  queueSubagentResumeSnapshot,
+} from '@/services/harness/subagent/persist-resume'
+import {
   billSubagentUsage,
   createSubagentToolExecutionHooks,
   historyAfterGenerate,
@@ -205,6 +210,8 @@ const runSubagentGenerate = async (args: {
     const snapshot = compacted?.messages ?? messages
     // Registry only per step; subagent-history consumers replace the full UI list.
     setMessages(subagentId, snapshot)
+    queueSubagentResumeSnapshot(buildResumeSnapshot(args, snapshot))
+    await flushSubagentResumePersist(subagentId)
     steps.noteModelRequested()
     if (compacted?.messages) {
       return compacted
@@ -284,6 +291,7 @@ const runSubagentGenerate = async (args: {
     // Terminal throw only. Retries stay unsealed so step-drop-unsealed still works.
     // Abort already sealed in consume; finishStep is a no-op when stepOpen is false.
     steps.finishStep()
+    await flushSubagentResumePersist(subagentId).catch(() => null)
     throw error
   }
 
@@ -299,9 +307,9 @@ const runSubagentGenerate = async (args: {
 
   persistSubagentHistory(
     emitNestedEvent,
-    subagentId,
-    historyAfterGenerate(subagentId, inputMessages, result),
+    buildResumeSnapshot(args, historyAfterGenerate(subagentId, inputMessages, result)),
   )
+  await flushSubagentResumePersist(subagentId)
 
   const finishReason = result.finishReason
   const withFinish = (text: string): SubagentGenerateResult =>
@@ -311,9 +319,7 @@ const runSubagentGenerate = async (args: {
     return withFinish(result.text)
   }
 
-  const notice = `[${describeOutputLimitTruncation({
-    maxOutputTokens: callOptions.maxOutputTokens,
-  })}]`
+  const notice = `[${describeOutputLimitTruncation({ maxOutputTokens: callOptions.maxOutputTokens })}]`
   if (!result.text.trim()) {
     return withFinish(notice)
   }

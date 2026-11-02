@@ -1,6 +1,7 @@
 import type { ModelMessage } from 'ai'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import type { SubagentResult } from '@/types/harness/subagent-record'
+import { isBlockingOriginSubagent } from '@/services/harness/subagent/blocking-origin-sets'
 import {
   getSubagent,
   isBackgroundResultFinalized,
@@ -80,6 +81,10 @@ export const finalizeBackgroundSpawnResults = async (
     // new object on the same toolCallId. Skip a snapshotted outcome that is
     // no longer live so a steered finish stays wakeable.
     if (!isLiveRegistryResult(item)) {
+      continue
+    }
+    if (isBlockingOriginSubagent(item.result.subagentId)) {
+      finalized.push(item)
       continue
     }
     onEvent({

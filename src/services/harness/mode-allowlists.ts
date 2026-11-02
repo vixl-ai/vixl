@@ -33,6 +33,8 @@ const ASK_TOOLS = [
   ...MCP_TOOLS,
   'spawn_subagent',
   'steer_subagent',
+  'get_subagents',
+  'get_subagent',
   'resolve_models',
 ] as const
 
@@ -76,6 +78,8 @@ const ORCHESTRATOR_TOOLS = [
   'update_todos',
   'spawn_subagent',
   'steer_subagent',
+  'get_subagents',
+  'get_subagent',
   'resolve_models',
   'move_workspace',
   'worktree_create',
@@ -128,6 +132,8 @@ export const MODE_TOOL_ALLOWLIST: Record<VixlChatMode, string[]> = {
     'update_todos',
     'spawn_subagent',
     'steer_subagent',
+    'get_subagents',
+    'get_subagent',
     'resolve_models',
   ],
   orchestrator: [...ORCHESTRATOR_TOOLS],

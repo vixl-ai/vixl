@@ -1,9 +1,11 @@
+import type { ModelMessage } from 'ai'
 import type { AgentStop } from '@/types/chat/agent-stop'
 import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import type { ContextBucket } from '@/types/harness/context-bucket'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type { ApprovalKind, PermissionScope } from '@/types/harness/permission'
 import type { SideTaskKind } from '@/types/harness/side-task-kind'
+import type { SubagentWorkspace } from '@/types/harness/subagent-record'
 import type { ChatMeta } from '@/types/chat/chat-meta'
 import type { BillableUsageRecord } from '@/types/billing/billable-usage-record'
 import type { TurnUsageAggregate } from '@/types/billing/turn-usage-aggregate'
@@ -65,6 +67,7 @@ export type HarnessEvent =
       prompt?: string
       model?: string
       capabilities?: 'read-only' | 'write'
+      workspace?: SubagentWorkspace
     }
   | {
       type: 'subagent-event'
@@ -129,4 +132,16 @@ export type HarnessEvent =
   | { type: 'compaction-ended' }
   | { type: 'compaction'; summary: string; focus: string | null }
   | { type: 'subagent-steer'; message: string }
-  | { type: 'subagent-history'; messages: unknown[] }
+  | { type: 'subagent-history'; messages: unknown[]; capturedAt?: string }
+  | {
+      type: 'subagent-resume'
+      subagentId: string
+      toolCallId: string
+      agentName: string
+      blocking: boolean
+      prompt: string
+      model: string
+      capabilities: 'read-only' | 'write'
+      workspace?: SubagentWorkspace
+      messages: ModelMessage[]
+    }

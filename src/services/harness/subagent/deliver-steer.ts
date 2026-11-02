@@ -24,12 +24,20 @@ const deliverSteer = async (
   subagentId: string,
   message: string,
   agentName: string,
-): Promise<{
-  subagentId: string
-  name: string
-  status: 'running'
-  note: string
-}> => {
+): Promise<
+  | {
+      subagentId: string
+      name: string
+      status: 'running'
+      note: string
+    }
+  | {
+      subagentId: string
+      name: string
+      accepted: true
+      note: string
+    }
+> => {
   if (ctx.signal?.aborted) {
     throw new Error('Subagent aborted')
   }
@@ -57,7 +65,11 @@ const deliverSteer = async (
     }
   }
 
-  if (record.status === 'completed' || record.status === 'failed') {
+  if (
+    record.status === 'completed' ||
+    record.status === 'failed' ||
+    record.status === 'interrupted'
+  ) {
     return resumeSubagent(ctx, subagentId, message)
   }
 

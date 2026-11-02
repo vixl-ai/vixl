@@ -6,6 +6,7 @@ import {
   clearQueuedSubagentSteers,
   completeSubagentTimelineItem,
   finalizeHydratedSubagents,
+  SUBAGENT_INTERRUPTED_SUMMARY,
   queueSubagentSteer,
   rollbackQueuedSubagentSteer,
   upsertSubagentStart,
@@ -439,8 +440,10 @@ describe('finalizeHydratedSubagents stop', () => {
       return
     }
     expect(incomplete.status).toBe('error')
+    expect(incomplete.summary).toBe(SUBAGENT_INTERRUPTED_SUMMARY)
     expect(incomplete.stop).toEqual({ reason: 'incomplete' })
     expect(kept.status).toBe('error')
+    expect(kept.summary).toBe(SUBAGENT_INTERRUPTED_SUMMARY)
     expect(kept.stop).toEqual({ reason: 'completed', finish: 'stop' })
     expect(untouched.status).toBe('done')
     expect(untouched.stop).toBeUndefined()
