@@ -1165,9 +1165,9 @@ async fn build_tree(
     })
 }
 
-pub(crate) fn ensure_ssh_project_directory(project_root: &str) -> Result<(), String> {
+pub(crate) async fn ensure_ssh_project_directory_await(project_root: &str) -> Result<(), String> {
     let ssh = parse_ssh_project_root(project_root)?;
-    run(ensure_ssh_project_directory_async(ssh))
+    ensure_ssh_project_directory_async(ssh).await
 }
 
 async fn ensure_ssh_project_directory_async(ssh: SshProjectRoot) -> Result<(), String> {
@@ -1260,12 +1260,28 @@ pub(crate) fn write_file(
     content: String,
     allow_sensitive: Option<bool>,
 ) -> Result<FileDiff, String> {
-    match resolve_target(project_root, project_roots, path)? {
+    run(write_file_await(
+        project_root.to_string(),
+        project_roots.map(|roots| roots.to_vec()),
+        path.to_string(),
+        content,
+        allow_sensitive,
+    ))
+}
+
+pub(crate) async fn write_file_await(
+    project_root: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    path: String,
+    content: String,
+    allow_sensitive: Option<bool>,
+) -> Result<FileDiff, String> {
+    match resolve_target(&project_root, project_roots.as_deref(), &path)? {
         FsTarget::Local(_) => Err("internal: local root routed to ssh write".to_string()),
         FsTarget::Ssh(resolved) => {
             gate_sensitive(&resolved.relative, allow_sensitive)?;
             reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
-            run(write_file_ssh(resolved, content))
+            write_file_ssh(resolved, content).await
         }
     }
 }
@@ -1329,12 +1345,26 @@ pub(crate) fn mkdir(
     path: &str,
     allow_sensitive: Option<bool>,
 ) -> Result<(), String> {
-    match resolve_target(project_root, project_roots, path)? {
+    run(mkdir_await(
+        project_root.to_string(),
+        project_roots.map(|roots| roots.to_vec()),
+        path.to_string(),
+        allow_sensitive,
+    ))
+}
+
+pub(crate) async fn mkdir_await(
+    project_root: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    path: String,
+    allow_sensitive: Option<bool>,
+) -> Result<(), String> {
+    match resolve_target(&project_root, project_roots.as_deref(), &path)? {
         FsTarget::Local(_) => Err("internal: local root routed to ssh mkdir".to_string()),
         FsTarget::Ssh(resolved) => {
             gate_sensitive(&resolved.relative, allow_sensitive)?;
             reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
-            run(mkdir_ssh(resolved))
+            mkdir_ssh(resolved).await
         }
     }
 }
@@ -1357,12 +1387,28 @@ pub(crate) fn delete(
     recursive: Option<bool>,
     allow_sensitive: Option<bool>,
 ) -> Result<(), String> {
-    match resolve_target(project_root, project_roots, path)? {
+    run(delete_await(
+        project_root.to_string(),
+        project_roots.map(|roots| roots.to_vec()),
+        path.to_string(),
+        recursive,
+        allow_sensitive,
+    ))
+}
+
+pub(crate) async fn delete_await(
+    project_root: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    path: String,
+    recursive: Option<bool>,
+    allow_sensitive: Option<bool>,
+) -> Result<(), String> {
+    match resolve_target(&project_root, project_roots.as_deref(), &path)? {
         FsTarget::Local(_) => Err("internal: local root routed to ssh delete".to_string()),
         FsTarget::Ssh(resolved) => {
             gate_sensitive(&resolved.relative, allow_sensitive)?;
             reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
-            run(delete_ssh(resolved, recursive.unwrap_or(false)))
+            delete_ssh(resolved, recursive.unwrap_or(false)).await
         }
     }
 }
@@ -1411,8 +1457,24 @@ pub(crate) fn rename(
     to: &str,
     allow_sensitive: Option<bool>,
 ) -> Result<(), String> {
-    let from_target = resolve_target(project_root, project_roots, from)?;
-    let to_target = resolve_target(project_root, project_roots, to)?;
+    run(rename_await(
+        project_root.to_string(),
+        project_roots.map(|roots| roots.to_vec()),
+        from.to_string(),
+        to.to_string(),
+        allow_sensitive,
+    ))
+}
+
+pub(crate) async fn rename_await(
+    project_root: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    from: String,
+    to: String,
+    allow_sensitive: Option<bool>,
+) -> Result<(), String> {
+    let from_target = resolve_target(&project_root, project_roots.as_deref(), &from)?;
+    let to_target = resolve_target(&project_root, project_roots.as_deref(), &to)?;
     match (from_target, to_target) {
         (FsTarget::Ssh(from), FsTarget::Ssh(to)) => {
             gate_sensitive(&from.relative, allow_sensitive)?;
@@ -1425,7 +1487,7 @@ pub(crate) fn rename(
             {
                 return Err("Move paths must belong to a single project member".to_string());
             }
-            run(rename_ssh(from, to))
+            rename_ssh(from, to).await
         }
         _ => Err("Rename paths must belong to a single SSH project".to_string()),
     }
@@ -1467,15 +1529,31 @@ pub(crate) fn copy(
     to: &str,
     allow_sensitive: Option<bool>,
 ) -> Result<(), String> {
-    let from_target = resolve_target(project_root, project_roots, from)?;
-    let to_target = resolve_target(project_root, project_roots, to)?;
+    run(copy_await(
+        project_root.to_string(),
+        project_roots.map(|roots| roots.to_vec()),
+        from.to_string(),
+        to.to_string(),
+        allow_sensitive,
+    ))
+}
+
+pub(crate) async fn copy_await(
+    project_root: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    from: String,
+    to: String,
+    allow_sensitive: Option<bool>,
+) -> Result<(), String> {
+    let from_target = resolve_target(&project_root, project_roots.as_deref(), &from)?;
+    let to_target = resolve_target(&project_root, project_roots.as_deref(), &to)?;
     match (from_target, to_target) {
         (FsTarget::Ssh(from), FsTarget::Ssh(to)) => {
             gate_sensitive(&from.relative, allow_sensitive)?;
             gate_sensitive(&to.relative, allow_sensitive)?;
             reject_git_hooks_write(&from.relative, from.hostname())?;
             reject_git_hooks_write(&to.relative, to.hostname())?;
-            run(copy_ssh(from, to, allow_sensitive))
+            copy_ssh(from, to, allow_sensitive).await
         }
         _ => Err("Copy paths must belong to a single SSH project".to_string()),
     }
@@ -1567,8 +1645,24 @@ pub(crate) fn move_path(
     to: &str,
     allow_sensitive: Option<bool>,
 ) -> Result<(), String> {
-    let from_target = resolve_target(project_root, project_roots, from)?;
-    let to_target = resolve_target(project_root, project_roots, to)?;
+    run(move_path_await(
+        project_root.to_string(),
+        project_roots.map(|roots| roots.to_vec()),
+        from.to_string(),
+        to.to_string(),
+        allow_sensitive,
+    ))
+}
+
+pub(crate) async fn move_path_await(
+    project_root: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    from: String,
+    to: String,
+    allow_sensitive: Option<bool>,
+) -> Result<(), String> {
+    let from_target = resolve_target(&project_root, project_roots.as_deref(), &from)?;
+    let to_target = resolve_target(&project_root, project_roots.as_deref(), &to)?;
     match (from_target, to_target) {
         (FsTarget::Ssh(from), FsTarget::Ssh(to)) => {
             if let (Some(a), Some(b)) = (&from.slug, &to.slug) {
@@ -1580,7 +1674,7 @@ pub(crate) fn move_path(
             gate_sensitive(&to.relative, allow_sensitive)?;
             reject_git_hooks_write(&from.relative, from.hostname())?;
             reject_git_hooks_write(&to.relative, to.hostname())?;
-            run(move_ssh(from, to, allow_sensitive))
+            move_ssh(from, to, allow_sensitive).await
         }
         _ => Err("Move paths must belong to a single SSH project".to_string()),
     }
@@ -1641,12 +1735,28 @@ pub(crate) fn edit_file(
     replacements: Vec<FsEditReplacement>,
     allow_sensitive: Option<bool>,
 ) -> Result<FileDiff, String> {
-    match resolve_target(project_root, project_roots, path)? {
+    run(edit_file_await(
+        project_root.to_string(),
+        project_roots.map(|roots| roots.to_vec()),
+        path.to_string(),
+        replacements,
+        allow_sensitive,
+    ))
+}
+
+pub(crate) async fn edit_file_await(
+    project_root: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    path: String,
+    replacements: Vec<FsEditReplacement>,
+    allow_sensitive: Option<bool>,
+) -> Result<FileDiff, String> {
+    match resolve_target(&project_root, project_roots.as_deref(), &path)? {
         FsTarget::Local(_) => Err("internal: local root routed to ssh edit".to_string()),
         FsTarget::Ssh(resolved) => {
             gate_sensitive(&resolved.relative, allow_sensitive)?;
             reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
-            run(edit_file_ssh(resolved, replacements))
+            edit_file_ssh(resolved, replacements).await
         }
     }
 }
@@ -1685,12 +1795,21 @@ pub(crate) fn apply_patch(
     patch: &str,
     allow_sensitive: Option<bool>,
 ) -> Result<Vec<FileDiff>, String> {
-    run(apply_patch_ssh(
+    run(apply_patch_await(
         project_root.to_string(),
         project_roots.map(|roots| roots.to_vec()),
         patch.to_string(),
         allow_sensitive,
     ))
+}
+
+pub(crate) async fn apply_patch_await(
+    project_root: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    patch: String,
+    allow_sensitive: Option<bool>,
+) -> Result<Vec<FileDiff>, String> {
+    apply_patch_ssh(project_root, project_roots, patch, allow_sensitive).await
 }
 
 async fn apply_patch_ssh(
@@ -1820,12 +1939,21 @@ pub(crate) fn stage_preview(
     request: FsStagePreviewRequest,
     allow_sensitive: Option<bool>,
 ) -> Result<Vec<FileDiff>, String> {
-    run(stage_preview_ssh(
+    run(stage_preview_await(
         project_root.to_string(),
         project_roots.map(|roots| roots.to_vec()),
         request,
         allow_sensitive,
     ))
+}
+
+pub(crate) async fn stage_preview_await(
+    project_root: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    request: FsStagePreviewRequest,
+    allow_sensitive: Option<bool>,
+) -> Result<Vec<FileDiff>, String> {
+    stage_preview_ssh(project_root, project_roots, request, allow_sensitive).await
 }
 
 async fn stage_preview_ssh(

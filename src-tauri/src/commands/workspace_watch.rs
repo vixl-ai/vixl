@@ -14,9 +14,9 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use super::fs::{canonical_project_root, parse_ssh_project_root, resolve_workspace_path};
 use super::skip_dirs::skip_directory;
 use super::ssh::{
-    block_on, close_channel, inotify_enospc, inotifywait_missing, is_ssh_root, key_for,
-    login_command, looks_like_enospc, map_unreachable, open_exec, posix_quote,
-    probe_remote_program, take_channel_stdio,
+    close_channel, inotify_enospc, inotifywait_missing, is_ssh_root, key_for, login_command,
+    looks_like_enospc, map_unreachable, open_exec, posix_quote, probe_remote_program,
+    take_channel_stdio,
 };
 
 const DEBOUNCE_MS: u64 = 150;
@@ -551,13 +551,13 @@ fn start_session(app: AppHandle, root: PathBuf, shallow: bool) -> Result<Arc<Sha
 }
 
 #[tauri::command]
-pub fn watch_workspace(
+pub async fn watch_workspace(
     app: AppHandle,
     project_root: String,
     mode: Option<WorkspaceWatchMode>,
 ) -> Result<String, String> {
     if is_ssh_root(&project_root) {
-        return block_on(watch_workspace_ssh(app, project_root));
+        return watch_workspace_ssh(app, project_root).await;
     }
     let root = canonical_project_root(&project_root)?;
     let key = root.to_string_lossy().to_string();
@@ -621,20 +621,26 @@ fn unwatch_session_key(project_root: &str, contains_key: impl Fn(&str) -> bool) 
 }
 
 #[tauri::command]
-pub fn unwatch_workspace(app: AppHandle, project_root: String) -> Result<(), String> {
+pub async fn unwatch_workspace(app: AppHandle, project_root: String) -> Result<(), String> {
     let state = app.state::<WorkspaceWatchState>();
     if is_ssh_root(&project_root) {
         let key = project_root.trim().to_string();
-        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
-        let Some(entry) = map.get_mut(&key) else {
-            return Ok(());
-        };
-        entry.refcount = entry.refcount.saturating_sub(1);
-        if entry.refcount == 0 {
-            if let Some(entry) = map.remove(&key) {
-                entry.stopped.store(true, Ordering::SeqCst);
-                let _ = block_on(close_channel(entry.channel_id));
+        let channel_id = {
+            let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+            let Some(entry) = map.get_mut(&key) else {
+                return Ok(());
+            };
+            entry.refcount = entry.refcount.saturating_sub(1);
+            if entry.refcount > 0 {
+                return Ok(());
             }
+            map.remove(&key).map(|entry| {
+                entry.stopped.store(true, Ordering::SeqCst);
+                entry.channel_id
+            })
+        };
+        if let Some(channel_id) = channel_id {
+            let _ = close_channel(channel_id).await;
         }
         return Ok(());
     }

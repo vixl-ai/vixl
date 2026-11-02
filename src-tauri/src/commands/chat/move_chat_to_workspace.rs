@@ -9,7 +9,7 @@ use super::meta::{now_iso, ChatMeta};
 use super::paths::chat_dir_path;
 use super::rewrite_checkpoints::rewrite_file_checkpoints_for_root;
 use super::store;
-use crate::commands::fs::{canonical_project_root, ensure_ssh_project_directory};
+use crate::commands::fs::{canonical_project_root, ensure_ssh_project_directory_await};
 use crate::commands::registry::{
     add_or_update_project, registry_set_active_project, roots_match, FleetProject,
 };
@@ -49,11 +49,26 @@ pub(crate) fn resolve_destination_root(
     root_path: &str,
     current_root: &str,
 ) -> Result<String, String> {
+    resolve_local_destination(root_path, current_root)
+}
+
+async fn resolve_destination_root_command(
+    root_path: &str,
+    current_root: &str,
+) -> Result<String, String> {
     if is_ssh_root(root_path) {
         let uri = prepare_ssh_destination(root_path, current_root)?;
-        ensure_ssh_project_directory(&uri)?;
+        ensure_ssh_project_directory_await(&uri).await?;
         return Ok(uri);
     }
+    let root_path = root_path.to_string();
+    let current_root = current_root.to_string();
+    tokio::task::spawn_blocking(move || resolve_local_destination(&root_path, &current_root))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+fn resolve_local_destination(root_path: &str, current_root: &str) -> Result<String, String> {
     let canonical = canonical_project_root(root_path)?;
     if same_project_root(current_root, &canonical) {
         return Err("Destination is the chat's current project root".to_string());
@@ -143,9 +158,9 @@ fn rollback_chat_directory(
 }
 
 #[tauri::command]
-pub fn move_chat_to_workspace(
+pub async fn move_chat_to_workspace(
     app: AppHandle,
-    db: State<AppDb>,
+    db: State<'_, AppDb>,
     from_project_slug: String,
     chat_id: String,
     root_path: String,
@@ -155,7 +170,7 @@ pub fn move_chat_to_workspace(
         store::get_chat(&conn, &from_project_slug, &chat_id)?
     };
     let old_root = record.meta.project_root.clone();
-    let dest_root_str = resolve_destination_root(&root_path, &old_root)?;
+    let dest_root_str = resolve_destination_root_command(&root_path, &old_root).await?;
     let project =
         add_or_update_project(&app, folder_name(Path::new(&dest_root_str)), dest_root_str)?;
     registry_set_active_project(app.clone(), Some(project.id.clone()))?;

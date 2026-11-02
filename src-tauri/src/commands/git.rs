@@ -86,8 +86,8 @@ fn is_fatal_git_transport(err: &str) -> bool {
     err.contains("is not installed on") || err.contains("is unreachable.")
 }
 
-fn git_inside_work_tree(root_path: &str) -> Result<bool, String> {
-    match run_git(root_path, &["rev-parse", "--is-inside-work-tree"]) {
+async fn git_inside_work_tree(root_path: &str) -> Result<bool, String> {
+    match run_git_async(root_path, &["rev-parse", "--is-inside-work-tree"]).await {
         Ok(value) => Ok(value == "true"),
         Err(err) if is_fatal_git_transport(&err) => Err(err),
         Err(_) => Ok(false),
@@ -141,19 +141,20 @@ fn git_repo_cwd_ssh(
 }
 
 #[tauri::command]
-pub fn git_repo_info(
+pub async fn git_repo_info(
     root_path: String,
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<GitRepoInfo, String> {
     let _ = project_roots;
-    if !git_inside_work_tree(&root_path)? {
+    if !git_inside_work_tree(&root_path).await? {
         return Ok(GitRepoInfo {
             is_repo: false,
             current_branch: None,
         });
     }
 
-    let current_branch = run_git(&root_path, &["branch", "--show-current"])
+    let current_branch = run_git_async(&root_path, &["branch", "--show-current"])
+        .await
         .ok()
         .filter(|branch| !branch.is_empty());
 
@@ -164,16 +165,16 @@ pub fn git_repo_info(
 }
 
 #[tauri::command]
-pub fn git_list_branches(
+pub async fn git_list_branches(
     root_path: String,
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<Vec<String>, String> {
     let _ = project_roots;
-    if !git_inside_work_tree(&root_path)? {
+    if !git_inside_work_tree(&root_path).await? {
         return Ok(vec![]);
     }
 
-    let output = run_git(&root_path, &["branch", "--format=%(refname:short)"])?;
+    let output = run_git_async(&root_path, &["branch", "--format=%(refname:short)"]).await?;
 
     let mut branches: Vec<String> = output
         .lines()
@@ -189,7 +190,7 @@ pub fn git_list_branches(
 }
 
 #[tauri::command]
-pub fn git_checkout_branch(
+pub async fn git_checkout_branch(
     root_path: String,
     branch: String,
     project_roots: Option<Vec<WorkspaceRootArg>>,
@@ -199,16 +200,16 @@ pub fn git_checkout_branch(
         return Err("Branch name is required".to_string());
     }
 
-    if !git_inside_work_tree(&root_path)? {
+    if !git_inside_work_tree(&root_path).await? {
         return Err("Not a git repository".to_string());
     }
 
-    run_git(&root_path, &["checkout", branch.trim()])?;
+    run_git_async(&root_path, &["checkout", branch.trim()]).await?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn git_branch_create(
+pub async fn git_branch_create(
     project_root: String,
     name: String,
     checkout: Option<bool>,
@@ -220,14 +221,14 @@ pub fn git_branch_create(
         return Err("Branch name is required".to_string());
     }
 
-    if !git_inside_work_tree(&project_root)? {
+    if !git_inside_work_tree(&project_root).await? {
         return Err("Not a git repository".to_string());
     }
 
     if checkout.unwrap_or(true) {
-        run_git(&project_root, &["checkout", "-b", branch])?;
+        run_git_async(&project_root, &["checkout", "-b", branch]).await?;
     } else {
-        run_git(&project_root, &["branch", branch])?;
+        run_git_async(&project_root, &["branch", branch]).await?;
     }
 
     Ok(())
@@ -278,7 +279,7 @@ pub async fn git_commit(
     }
 
     let git_root = repo.unwrap_or(project_root);
-    if !git_inside_work_tree(&git_root)? {
+    if !git_inside_work_tree(&git_root).await? {
         return Err("Not a git repository".to_string());
     }
 
@@ -437,7 +438,7 @@ pub async fn git_status(
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<GitStatusResult, String> {
     let _ = project_roots;
-    if !git_inside_work_tree(&project_root)? {
+    if !git_inside_work_tree(&project_root).await? {
         return Err("Not a git repository".to_string());
     }
 
@@ -495,7 +496,7 @@ pub async fn git_diff(
 ) -> Result<GitDiffResult, String> {
     let (git_root, rel_path) =
         git_repo_cwd(&project_root, project_roots.as_deref(), path.as_deref())?;
-    if !git_inside_work_tree(&git_root)? {
+    if !git_inside_work_tree(&git_root).await? {
         return Err("Not a git repository".to_string());
     }
 
@@ -516,7 +517,7 @@ pub async fn git_show_file(
 ) -> Result<GitShowFileResult, String> {
     let (git_root, rel_path) =
         git_repo_cwd(&project_root, project_roots.as_deref(), Some(path.trim()))?;
-    if !git_inside_work_tree(&git_root)? {
+    if !git_inside_work_tree(&git_root).await? {
         return Err("Not a git repository".to_string());
     }
 
@@ -603,7 +604,7 @@ pub async fn git_log(
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<GitLogResult, String> {
     let _ = project_roots;
-    if !git_inside_work_tree(&project_root)? {
+    if !git_inside_work_tree(&project_root).await? {
         return Err("Not a git repository".to_string());
     }
 

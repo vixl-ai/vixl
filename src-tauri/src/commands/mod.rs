@@ -42,10 +42,12 @@ pub use config::{
 };
 pub use file_checkpoint::{file_checkpoint_capture, file_checkpoint_load, file_checkpoint_restore};
 pub use fs::{
-    append_temp_log, fs_apply_patch, fs_copy, fs_delete, fs_edit_file, fs_list_dir,
-    fs_list_dir_command, fs_list_dir_tree, fs_list_dir_tree_command, fs_mkdir, fs_move,
-    fs_read_file, fs_read_file_command, fs_rename, fs_stage_preview, fs_stat, fs_stat_command,
-    fs_write_file, write_temp_bytes, write_temp_handoff, write_text_file,
+    append_temp_log, fs_apply_patch, fs_apply_patch_command, fs_copy, fs_copy_command, fs_delete,
+    fs_delete_command, fs_edit_file, fs_edit_file_command, fs_list_dir, fs_list_dir_command,
+    fs_list_dir_tree, fs_list_dir_tree_command, fs_mkdir, fs_mkdir_command, fs_move,
+    fs_move_command, fs_read_file, fs_read_file_command, fs_rename, fs_rename_command,
+    fs_stage_preview, fs_stage_preview_command, fs_stat, fs_stat_command, fs_write_file,
+    fs_write_file_command, write_temp_bytes, write_temp_handoff, write_text_file,
 };
 pub use git::{
     git_branch_create, git_checkout_branch, git_commit, git_diff, git_list_branches, git_log,

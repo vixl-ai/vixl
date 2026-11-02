@@ -417,7 +417,6 @@ fn apply_one(
     }
 }
 
-#[tauri::command]
 pub fn fs_edit_file(
     project_root: String,
     path: String,
@@ -465,7 +464,6 @@ pub fn fs_edit_file(
     ))
 }
 
-#[tauri::command]
 pub fn fs_apply_patch(
     project_root: String,
     patch: String,
@@ -487,7 +485,6 @@ pub fn fs_apply_patch(
         allow_sensitive,
     )
 }
-#[tauri::command]
 pub fn fs_stage_preview(
     project_root: String,
     request: FsStagePreviewRequest,
@@ -508,6 +505,75 @@ pub fn fs_stage_preview(
         project_roots.as_deref(),
         allow_sensitive,
     )
+}
+
+#[tauri::command(rename = "fs_edit_file")]
+pub async fn fs_edit_file_command(
+    project_root: String,
+    path: String,
+    replacements: Vec<FsEditReplacement>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<FileDiff, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref())
+        && matches!(
+            remote::resolve_target(&project_root, project_roots.as_deref(), &path)?,
+            remote::FsTarget::Ssh(_)
+        )
+    {
+        return remote::edit_file_await(
+            project_root,
+            project_roots,
+            path,
+            replacements,
+            allow_sensitive,
+        )
+        .await;
+    }
+    super::read::off_the_webview(move || {
+        fs_edit_file(
+            project_root,
+            path,
+            replacements,
+            project_roots,
+            allow_sensitive,
+        )
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_apply_patch")]
+pub async fn fs_apply_patch_command(
+    project_root: String,
+    patch: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<Vec<FileDiff>, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        return remote::apply_patch_await(project_root, project_roots, patch, allow_sensitive)
+            .await;
+    }
+    super::read::off_the_webview(move || {
+        fs_apply_patch(project_root, patch, project_roots, allow_sensitive)
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_stage_preview")]
+pub async fn fs_stage_preview_command(
+    project_root: String,
+    request: FsStagePreviewRequest,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<Vec<FileDiff>, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        return remote::stage_preview_await(project_root, project_roots, request, allow_sensitive)
+            .await;
+    }
+    super::read::off_the_webview(move || {
+        fs_stage_preview(project_root, request, project_roots, allow_sensitive)
+    })
+    .await
 }
 
 fn stage_preview_local(

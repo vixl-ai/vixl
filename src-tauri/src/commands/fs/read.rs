@@ -364,7 +364,7 @@ fn routes_to_ssh(
     ))
 }
 
-async fn off_the_webview<T, F>(work: F) -> Result<T, String>
+pub(crate) async fn off_the_webview<T, F>(work: F) -> Result<T, String>
 where
     T: Send + 'static,
     F: FnOnce() -> Result<T, String> + Send + 'static,
