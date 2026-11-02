@@ -245,7 +245,6 @@ async fn has_remote_project_vixl(root: &str) -> Result<bool, String> {
     }
 }
 
-#[tauri::command]
 pub fn list_vixl_files(
     app: AppHandle,
     scope: String,
@@ -275,7 +274,6 @@ fn list_vixl_files_at(
     list_files_for_kind(&base, kind)
 }
 
-#[tauri::command]
 pub fn list_project_files(
     root_path: String,
     kind: String,
@@ -291,43 +289,46 @@ pub fn list_project_files(
 }
 
 fn list_remote_vixl_files(root: &str, kind: &str) -> Result<Vec<ProjectFileEntry>, String> {
+    let root = root.to_string();
+    let kind = kind.to_string();
+    crate::commands::ssh::block_on(async move { list_remote_vixl_files_async(&root, &kind).await })
+}
+
+async fn list_remote_vixl_files_async(
+    root: &str,
+    kind: &str,
+) -> Result<Vec<ProjectFileEntry>, String> {
     match kind {
-        "agents" | "rules" => list_remote_flat_markdown(root, kind),
-        "agents-md" => list_remote_agents_md(root),
-        "skills" => list_remote_nested_files(root, "skills", "SKILL.md", true),
-        "plans" => list_remote_nested_files(root, "plans", "PLAN.md", false),
+        "agents" | "rules" => list_remote_flat_markdown(root, kind).await,
+        "agents-md" => list_remote_agents_md(root).await,
+        "skills" => list_remote_nested_files(root, "skills", "SKILL.md", true).await,
+        "plans" => list_remote_nested_files(root, "plans", "PLAN.md", false).await,
         _ => Err(format!("unknown kind: {kind}")),
     }
 }
 
-fn list_remote_dir(
+async fn list_remote_dir(
     root: &str,
     relative: &str,
 ) -> Result<Vec<crate::commands::fs::FsDirEntry>, String> {
-    crate::commands::fs::fs_list_dir(root.to_string(), relative.to_string(), None, None)
+    crate::commands::fs::list_dir_await(root, None, relative, None).await
 }
 
-fn list_remote_dir_or_empty(
+async fn list_remote_dir_or_empty(
     root: &str,
     relative: &str,
 ) -> Result<Vec<crate::commands::fs::FsDirEntry>, String> {
-    match list_remote_dir(root, relative) {
+    match list_remote_dir(root, relative).await {
         Ok(entries) => Ok(entries),
         Err(err) if err.contains("No such file on ") => Ok(vec![]),
         Err(err) => Err(err),
     }
 }
 
-fn remote_read_text(root: &str, relative: &str) -> Result<Option<String>, String> {
-    match crate::commands::fs::fs_read_file(
-        root.to_string(),
-        relative.to_string(),
-        None,
-        None,
-        Some(false),
-        None,
-        None,
-    ) {
+async fn remote_read_text(root: &str, relative: &str) -> Result<Option<String>, String> {
+    match crate::commands::fs::read_file_await(root, None, relative, None, None, Some(false), None)
+        .await
+    {
         Ok(file) => Ok(Some(file.content)),
         Err(err) if err.contains("No such file on ") => Ok(None),
         Err(err) => Err(err),
@@ -348,13 +349,13 @@ fn description_from_content(content: &str) -> Option<String> {
     None
 }
 
-fn remote_listed_entry(
+async fn remote_listed_entry(
     root: &str,
     name: String,
     relative: &str,
     frontmatter_only: bool,
 ) -> Result<Option<ProjectFileEntry>, String> {
-    let Some(content) = remote_read_text(root, relative)? else {
+    let Some(content) = remote_read_text(root, relative).await? else {
         return Ok(None);
     };
     let description = if frontmatter_only {
@@ -377,17 +378,20 @@ fn is_markdown_name(name: &str) -> bool {
     name.ends_with(".md") || name.ends_with(".mdc")
 }
 
-fn list_remote_flat_markdown(root: &str, kind: &str) -> Result<Vec<ProjectFileEntry>, String> {
+async fn list_remote_flat_markdown(
+    root: &str,
+    kind: &str,
+) -> Result<Vec<ProjectFileEntry>, String> {
     let relative = format!(".vixl/{kind}");
     let mut entries = Vec::new();
-    for entry in list_remote_dir_or_empty(root, &relative)? {
+    for entry in list_remote_dir_or_empty(root, &relative).await? {
         if !is_markdown_name(&entry.name) {
             continue;
         }
         if entry.kind != "file" && entry.kind != "symlink" {
             continue;
         }
-        if let Some(listed) = remote_listed_entry(root, entry.name, &entry.path, false)? {
+        if let Some(listed) = remote_listed_entry(root, entry.name, &entry.path, false).await? {
             entries.push(listed);
         }
     }
@@ -395,10 +399,10 @@ fn list_remote_flat_markdown(root: &str, kind: &str) -> Result<Vec<ProjectFileEn
     Ok(entries)
 }
 
-fn list_remote_agents_md(root: &str) -> Result<Vec<ProjectFileEntry>, String> {
+async fn list_remote_agents_md(root: &str) -> Result<Vec<ProjectFileEntry>, String> {
     let mut found_upper = None;
     let mut found_lower = None;
-    for entry in list_remote_dir_or_empty(root, ".vixl")? {
+    for entry in list_remote_dir_or_empty(root, ".vixl").await? {
         if entry.kind != "file" && entry.kind != "symlink" {
             continue;
         }
@@ -411,12 +415,13 @@ fn list_remote_agents_md(root: &str) -> Result<Vec<ProjectFileEntry>, String> {
     let Some(entry) = found_upper.or(found_lower) else {
         return Ok(vec![]);
     };
-    Ok(remote_listed_entry(root, entry.name, &entry.path, false)?
+    Ok(remote_listed_entry(root, entry.name, &entry.path, false)
+        .await?
         .into_iter()
         .collect())
 }
 
-fn list_remote_nested_files(
+async fn list_remote_nested_files(
     root: &str,
     kind: &str,
     file_name: &str,
@@ -424,21 +429,60 @@ fn list_remote_nested_files(
 ) -> Result<Vec<ProjectFileEntry>, String> {
     let relative = format!(".vixl/{kind}");
     let mut entries = Vec::new();
-    for entry in list_remote_dir_or_empty(root, &relative)? {
+    for entry in list_remote_dir_or_empty(root, &relative).await? {
         if entry.kind != "directory" {
             continue;
         }
         let sentinel = format!("{}/{file_name}", entry.path);
-        let stat = crate::commands::fs::fs_stat(root.to_string(), sentinel.clone(), None, None)?;
+        let stat = crate::commands::fs::stat_await(root, None, &sentinel, None).await?;
         if !stat.exists {
             continue;
         }
-        if let Some(listed) = remote_listed_entry(root, entry.name, &sentinel, frontmatter_only)? {
+        if let Some(listed) =
+            remote_listed_entry(root, entry.name, &sentinel, frontmatter_only).await?
+        {
             entries.push(listed);
         }
     }
     entries.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(entries)
+}
+
+#[tauri::command(rename = "list_vixl_files")]
+pub async fn list_vixl_files_command(
+    app: AppHandle,
+    scope: String,
+    kind: String,
+    root_path: Option<String>,
+) -> Result<Vec<ProjectFileEntry>, String> {
+    if scope == "project" {
+        if let Some(root) = root_path.as_deref() {
+            if crate::commands::ssh::is_ssh_root(root) {
+                return list_remote_vixl_files_async(root, &kind).await;
+            }
+        }
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        list_vixl_files_at(&scope, &kind, root_path.as_deref(), || user_vixl_dir(&app))
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
+
+#[tauri::command(rename = "list_project_files")]
+pub async fn list_project_files_command(
+    root_path: String,
+    kind: String,
+) -> Result<Vec<ProjectFileEntry>, String> {
+    if root_is_home(&root_path) {
+        return Ok(vec![]);
+    }
+    if crate::commands::ssh::is_ssh_root(&root_path) {
+        return list_remote_vixl_files_async(&root_path, &kind).await;
+    }
+    tauri::async_runtime::spawn_blocking(move || list_project_files(root_path, kind))
+        .await
+        .map_err(|err| err.to_string())?
 }
 
 fn vixl_base_dir(

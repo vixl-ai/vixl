@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use crate::commands::fs::{fs_list_dir, fs_read_file, fs_stat, fs_write_file, WorkspaceRootArg};
+use crate::commands::fs::{
+    fs_list_dir, fs_read_file, fs_read_file_command, fs_stat, fs_write_file, WorkspaceRootArg,
+};
 use crate::commands::ssh::{
     clear_sessions_for_tests, connect, disconnect, insert_test_session, SshConnectRequest,
     SshPaths, SshSessionStatus, SESSION_TEST_LOCK,
@@ -161,6 +163,25 @@ fn local_root_still_uses_std_fs() {
     );
     let listed = fs_list_dir(root, ".".into(), None, None).expect("list");
     assert!(listed.iter().any(|entry| entry.name == "local.txt"));
+}
+
+#[tokio::test]
+async fn read_command_fails_fast_when_the_master_is_dead() {
+    let err = fs_read_file_command(
+        "ssh://aidanhibbard@vixl-read-decoy.example/tmp/proj".into(),
+        "AGENTS.md".into(),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect_err("dead master");
+    assert!(
+        err.contains("vixl-read-decoy.example is not connected."),
+        "got {err}"
+    );
 }
 
 #[test]

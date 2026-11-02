@@ -12,11 +12,23 @@ pub struct AuthAttempt {
     host_key_rejected: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum SecretDisposition {
     Submit(String),
     AskUser { saveable: bool },
     Cancel,
+}
+
+impl std::fmt::Debug for SecretDisposition {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Submit(_) => formatter.write_str("Submit([redacted])"),
+            Self::AskUser { saveable } => {
+                write!(formatter, "AskUser {{ saveable: {saveable} }}")
+            }
+            Self::Cancel => formatter.write_str("Cancel"),
+        }
+    }
 }
 
 impl AuthAttempt {
@@ -116,12 +128,14 @@ mod tests {
     fn saved_secret_is_attempted_once() {
         let mut attempt = AuthAttempt::new(Some(FIXTURE_SSH_PASSWORD.to_string()), None);
         match attempt.take_secret(SecretKind::Password) {
-            SecretDisposition::Submit(value) => assert_eq!(value, FIXTURE_SSH_PASSWORD),
-            other => panic!("expected submit, got {other:?}"),
+            SecretDisposition::Submit(value) => assert!(value == FIXTURE_SSH_PASSWORD),
+            SecretDisposition::Cancel => panic!("expected submit, got cancel"),
+            SecretDisposition::AskUser { .. } => panic!("expected submit, got ask user"),
         }
         match attempt.take_secret(SecretKind::Password) {
             SecretDisposition::AskUser { saveable } => assert!(saveable),
-            other => panic!("expected ask user, got {other:?}"),
+            SecretDisposition::Cancel => panic!("expected ask user, got cancel"),
+            SecretDisposition::Submit(_) => panic!("expected ask user, got submit"),
         }
     }
 
@@ -129,18 +143,18 @@ mod tests {
     fn changed_host_key_does_not_open_password_submission() {
         let mut attempt = AuthAttempt::new(Some(FIXTURE_SSH_PASSWORD.to_string()), None);
         attempt.note_host_key_changed();
-        assert_eq!(
+        assert!(matches!(
             attempt.take_secret(SecretKind::Password),
             SecretDisposition::Cancel
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             attempt.take_secret(SecretKind::Passphrase),
             SecretDisposition::Cancel
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             attempt.take_secret(SecretKind::Otp),
             SecretDisposition::Cancel
-        );
+        ));
     }
 
     #[test]
@@ -148,7 +162,8 @@ mod tests {
         let mut attempt = AuthAttempt::new(Some(FIXTURE_SSH_PASSWORD.to_string()), None);
         match attempt.take_secret(SecretKind::Otp) {
             SecretDisposition::AskUser { saveable } => assert!(!saveable),
-            other => panic!("expected ask user, got {other:?}"),
+            SecretDisposition::Cancel => panic!("expected ask user, got cancel"),
+            SecretDisposition::Submit(_) => panic!("expected ask user, got submit"),
         }
     }
 }

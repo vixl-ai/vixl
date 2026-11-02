@@ -453,6 +453,7 @@ fn is_transport_err(err: &str, hostname: &str) -> bool {
         || lower.contains("not connected")
         || lower.contains("master is dead")
         || lower.contains("ssh channel")
+        || lower.contains("sftp channel timed out")
         || lower.contains("broken pipe")
         || lower.contains("connection reset")
         || lower.contains("connection lost")
@@ -666,7 +667,7 @@ fn gate_sensitive(relative: &str, allow_sensitive: Option<bool>) -> Result<(), S
     reject_sensitive_path_unless_allowed(relative, allow_sensitive)
 }
 
-pub(crate) fn read_file(
+pub(crate) async fn read_file_await(
     project_root: &str,
     project_roots: Option<&[WorkspaceRootArg]>,
     path: &str,
@@ -679,9 +680,35 @@ pub(crate) fn read_file(
         FsTarget::Local(_) => Err("internal: local root routed to ssh read".to_string()),
         FsTarget::Ssh(resolved) => {
             gate_sensitive(&resolved.relative, allow_sensitive)?;
-            run(read_file_ssh(resolved, offset, limit, include_base64))
+            read_file_ssh(resolved, offset, limit, include_base64).await
         }
     }
+}
+
+pub(crate) fn read_file(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+    path: &str,
+    offset: Option<u32>,
+    limit: Option<u32>,
+    include_base64: Option<bool>,
+    allow_sensitive: Option<bool>,
+) -> Result<FsReadFileResult, String> {
+    let project_root = project_root.to_string();
+    let project_roots = project_roots.map(|roots| roots.to_vec());
+    let path = path.to_string();
+    run(async move {
+        read_file_await(
+            &project_root,
+            project_roots.as_deref(),
+            &path,
+            offset,
+            limit,
+            include_base64,
+            allow_sensitive,
+        )
+        .await
+    })
 }
 
 async fn read_file_ssh(
@@ -835,7 +862,7 @@ async fn list_dir_ssh(resolved: SshResolved) -> Result<Vec<FsDirEntry>, String> 
     .await
 }
 
-pub(crate) fn list_dir_tree(
+pub(crate) async fn list_dir_tree_await(
     project_root: &str,
     project_roots: Option<&[WorkspaceRootArg]>,
     path: &str,
@@ -846,9 +873,31 @@ pub(crate) fn list_dir_tree(
         FsTarget::Local(_) => Err("internal: local root routed to ssh tree".to_string()),
         FsTarget::Ssh(resolved) => {
             gate_sensitive(&resolved.relative, allow_sensitive)?;
-            run(list_dir_tree_ssh(resolved, max_depth.unwrap_or(4)))
+            list_dir_tree_ssh(resolved, max_depth.unwrap_or(4)).await
         }
     }
+}
+
+pub(crate) fn list_dir_tree(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+    path: &str,
+    max_depth: Option<u32>,
+    allow_sensitive: Option<bool>,
+) -> Result<FsTreeNode, String> {
+    let project_root = project_root.to_string();
+    let project_roots = project_roots.map(|roots| roots.to_vec());
+    let path = path.to_string();
+    run(async move {
+        list_dir_tree_await(
+            &project_root,
+            project_roots.as_deref(),
+            &path,
+            max_depth,
+            allow_sensitive,
+        )
+        .await
+    })
 }
 
 async fn list_dir_tree_ssh(resolved: SshResolved, max_depth: u32) -> Result<FsTreeNode, String> {
@@ -959,7 +1008,7 @@ async fn ensure_ssh_project_directory_async(ssh: SshProjectRoot) -> Result<(), S
     .await
 }
 
-pub(crate) fn stat(
+pub(crate) async fn stat_await(
     project_root: &str,
     project_roots: Option<&[WorkspaceRootArg]>,
     path: &str,
@@ -969,9 +1018,29 @@ pub(crate) fn stat(
         FsTarget::Local(_) => Err("internal: local root routed to ssh stat".to_string()),
         FsTarget::Ssh(resolved) => {
             gate_sensitive(&resolved.relative, allow_sensitive)?;
-            run(stat_ssh(resolved))
+            stat_ssh(resolved).await
         }
     }
+}
+
+pub(crate) fn stat(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+    path: &str,
+    allow_sensitive: Option<bool>,
+) -> Result<FsStatResult, String> {
+    let project_root = project_root.to_string();
+    let project_roots = project_roots.map(|roots| roots.to_vec());
+    let path = path.to_string();
+    run(async move {
+        stat_await(
+            &project_root,
+            project_roots.as_deref(),
+            &path,
+            allow_sensitive,
+        )
+        .await
+    })
 }
 
 async fn stat_ssh(resolved: SshResolved) -> Result<FsStatResult, String> {
@@ -1807,6 +1876,12 @@ pub(crate) fn force_next_write_size_mismatch() {
 mod tests {
     use super::super::sftp::size_mismatch_err;
     use super::*;
+
+    #[test]
+    fn timed_out_sftp_channel_is_dropped() {
+        let err = "eva.local is unreachable. SFTP channel timed out.";
+        assert!(is_transport_err(err, "eva.local"));
+    }
 
     #[test]
     fn parse_uri_default_port() {

@@ -28,7 +28,6 @@ fn is_image_path(path: &Path) -> bool {
     image_mime_type(path).is_some()
 }
 
-#[tauri::command]
 pub fn fs_read_file(
     project_root: String,
     path: String,
@@ -161,7 +160,6 @@ fn read_resolved(
     })
 }
 
-#[tauri::command]
 pub fn fs_list_dir(
     project_root: String,
     path: String,
@@ -264,7 +262,6 @@ fn build_tree(
     })
 }
 
-#[tauri::command]
 pub fn fs_list_dir_tree(
     project_root: String,
     path: String,
@@ -303,7 +300,6 @@ pub fn fs_list_dir_tree(
     build_tree(&resolved, &absolute, 0, depth)
 }
 
-#[tauri::command]
 pub fn fs_stat(
     project_root: String,
     path: String,
@@ -352,4 +348,132 @@ pub fn fs_stat(
         size: meta.len(),
         modified_ms: modified_ms(&absolute),
     })
+}
+
+fn routes_to_ssh(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+    path: &str,
+) -> Result<bool, String> {
+    if !remote::uses_ssh_transport(project_root, project_roots) {
+        return Ok(false);
+    }
+    Ok(matches!(
+        remote::resolve_target(project_root, project_roots, path)?,
+        FsTarget::Ssh(_)
+    ))
+}
+
+async fn off_the_webview<T, F>(work: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|err| err.to_string())?
+}
+
+#[tauri::command(rename = "fs_read_file")]
+pub async fn fs_read_file_command(
+    project_root: String,
+    path: String,
+    offset: Option<u32>,
+    limit: Option<u32>,
+    include_base64: Option<bool>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<FsReadFileResult, String> {
+    if routes_to_ssh(&project_root, project_roots.as_deref(), &path)? {
+        return remote::read_file_await(
+            &project_root,
+            project_roots.as_deref(),
+            &path,
+            offset,
+            limit,
+            include_base64,
+            allow_sensitive,
+        )
+        .await;
+    }
+    off_the_webview(move || {
+        fs_read_file(
+            project_root,
+            path,
+            offset,
+            limit,
+            include_base64,
+            project_roots,
+            allow_sensitive,
+        )
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_list_dir")]
+pub async fn fs_list_dir_command(
+    project_root: String,
+    path: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<Vec<FsDirEntry>, String> {
+    if routes_to_ssh(&project_root, project_roots.as_deref(), &path)? {
+        return remote::list_dir_await(
+            &project_root,
+            project_roots.as_deref(),
+            &path,
+            allow_sensitive,
+        )
+        .await;
+    }
+    off_the_webview(move || fs_list_dir(project_root, path, project_roots, allow_sensitive)).await
+}
+
+#[tauri::command(rename = "fs_list_dir_tree")]
+pub async fn fs_list_dir_tree_command(
+    project_root: String,
+    path: String,
+    max_depth: Option<u32>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<FsTreeNode, String> {
+    if routes_to_ssh(&project_root, project_roots.as_deref(), &path)? {
+        return remote::list_dir_tree_await(
+            &project_root,
+            project_roots.as_deref(),
+            &path,
+            max_depth,
+            allow_sensitive,
+        )
+        .await;
+    }
+    off_the_webview(move || {
+        fs_list_dir_tree(
+            project_root,
+            path,
+            max_depth,
+            project_roots,
+            allow_sensitive,
+        )
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_stat")]
+pub async fn fs_stat_command(
+    project_root: String,
+    path: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<FsStatResult, String> {
+    if routes_to_ssh(&project_root, project_roots.as_deref(), &path)? {
+        return remote::stat_await(
+            &project_root,
+            project_roots.as_deref(),
+            &path,
+            allow_sensitive,
+        )
+        .await;
+    }
+    off_the_webview(move || fs_stat(project_root, path, project_roots, allow_sensitive)).await
 }

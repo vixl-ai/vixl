@@ -43,7 +43,8 @@ pub use config::{
 pub use file_checkpoint::{file_checkpoint_capture, file_checkpoint_load, file_checkpoint_restore};
 pub use fs::{
     append_temp_log, fs_apply_patch, fs_copy, fs_delete, fs_edit_file, fs_list_dir,
-    fs_list_dir_tree, fs_mkdir, fs_move, fs_read_file, fs_rename, fs_stage_preview, fs_stat,
+    fs_list_dir_command, fs_list_dir_tree, fs_list_dir_tree_command, fs_mkdir, fs_move,
+    fs_read_file, fs_read_file_command, fs_rename, fs_stage_preview, fs_stat, fs_stat_command,
     fs_write_file, write_temp_bytes, write_temp_handoff, write_text_file,
 };
 pub use git::{
@@ -67,7 +68,8 @@ pub use oauth::{
 };
 pub use paths::{
     get_default_workspace_root, get_user_vixl_dir, get_vixl_dir, has_project_vixl,
-    is_home_workspace_root, list_project_files, list_vixl_files,
+    is_home_workspace_root, list_project_files, list_project_files_command, list_vixl_files,
+    list_vixl_files_command,
 };
 pub use registry::{
     get_active_project, open_project_at_path, open_project_at_path_command, registry_add_group,

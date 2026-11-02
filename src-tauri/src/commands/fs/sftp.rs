@@ -63,6 +63,7 @@ const FXF_EXCL: u32 = 0x0000_0020;
 
 const MAX_PACKET: usize = 256 * 1024;
 const IO_CHUNK: u32 = 32 * 1024;
+const PACKET_TIMEOUT: Duration = Duration::from_secs(20);
 const SFTP_VERSION: u32 = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -495,10 +496,12 @@ impl SftpClient {
     }
 
     async fn read_reply(&mut self, id: u32) -> Result<(u8, Vec<u8>), String> {
-        let (typ, body) = self
-            .read_packet()
-            .await
-            .map_err(|err| self.transport_err(&err))?;
+        let packet = tokio::time::timeout(PACKET_TIMEOUT, self.read_packet()).await;
+        let (typ, body) = match packet {
+            Ok(Ok(packet)) => packet,
+            Ok(Err(err)) => return Err(self.transport_err(&err)),
+            Err(_) => return Err(self.transport_err("SFTP channel timed out.")),
+        };
         let mut cur = Cursor::new(body);
         let got_id = cur.u32()?;
         if got_id != id {
