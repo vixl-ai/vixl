@@ -754,21 +754,29 @@ async fn watch_workspace_ssh(app: AppHandle, project_root: String) -> Result<Str
         let _ = close_channel(channel_id).await;
         return Err(inotify_enospc(&ssh.hostname));
     }
-    let mut map = state.remote.lock().map_err(|error| error.to_string())?;
-    if let Some(entry) = map.get_mut(&key) {
-        entry.refcount = entry.refcount.saturating_add(1);
-        stopped.store(true, Ordering::SeqCst);
+    let channel_to_close = {
+        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+        if map.contains_key(&key) {
+            if let Some(entry) = map.get_mut(&key) {
+                entry.refcount = entry.refcount.saturating_add(1);
+            }
+            stopped.store(true, Ordering::SeqCst);
+            Some(channel_id)
+        } else {
+            map.insert(
+                key.clone(),
+                RemoteWatch {
+                    refcount: 1,
+                    channel_id,
+                    stopped,
+                },
+            );
+            None
+        }
+    };
+    if let Some(channel_id) = channel_to_close {
         let _ = close_channel(channel_id).await;
-        return Ok(key);
     }
-    map.insert(
-        key.clone(),
-        RemoteWatch {
-            refcount: 1,
-            channel_id,
-            stopped,
-        },
-    );
     Ok(key)
 }
 

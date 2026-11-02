@@ -21,7 +21,12 @@ pub struct GitRepoInfo {
 
 pub(crate) fn run_git(root_path: &str, args: &[&str]) -> Result<String, String> {
     if is_ssh_root(root_path) {
-        return block_on(run_git_ssh(root_path, args));
+        let root_path = root_path.to_string();
+        let args: Vec<String> = args.iter().map(|arg| (*arg).to_string()).collect();
+        return block_on(async move {
+            let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+            run_git_ssh(&root_path, &arg_refs).await
+        });
     }
     run_git_local(root_path, args)
 }
