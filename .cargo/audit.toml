@@ -1,3 +1,0 @@
-# Direct zip and tauri-plugin-updater both use zip 9.x (patched).
-[advisories]
-ignore = []
