@@ -73,6 +73,7 @@ const commandStatus = {
 }
 
 const connectFailure = {
+  user: 'aidanhibbard',
   hostname: 'eva.local',
   port: 22,
   title: 'Could not connect to eva.local.',
@@ -95,6 +96,8 @@ describe('ssh disconnect', () => {
     state.connectUser.value = ''
     state.toastedDeath.clear()
     state.clearUserDisconnect('aidanhibbard', 'eva.local', 22)
+    state.clearUserDisconnect('other', 'eva.local', 22)
+    vi.useRealTimers()
   })
 
   it('confirms a disconnect with a success toast', async () => {
@@ -163,5 +166,35 @@ describe('ssh disconnect', () => {
 
     expect(toast.success).toHaveBeenCalledWith('eva.local disconnected.')
     expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('still reports an error for another account on the same host', async () => {
+    sshDisconnect.mockResolvedValue(commandStatus)
+
+    requestDisconnect(project)
+    await flushPromises()
+
+    handleSshError({
+      ...connectFailure,
+      user: 'other',
+    })
+
+    expect(toast.error).toHaveBeenCalledWith('eva.local disconnected.', {
+      description: 'Could not connect to eva.local.',
+    })
+  })
+
+  it('reports the same account again after the disconnect echo window', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    sshDisconnect.mockResolvedValue(commandStatus)
+
+    requestDisconnect(project)
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(2000)
+    handleSshError(connectFailure)
+
+    expect(toast.error).toHaveBeenCalledWith('eva.local disconnected.', {
+      description: 'Could not connect to eva.local.',
+    })
   })
 })

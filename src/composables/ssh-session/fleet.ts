@@ -52,6 +52,7 @@ const runDisconnect = async (user: string, hostname: string, port: number): Prom
       line: `Disconnected from ${hostname}.`,
     })
     toast.success(`${hostname} disconnected.`)
+    state.releaseUserDisconnect(user, hostname, port)
   } catch (error) {
     state.clearUserDisconnect(user, hostname, port)
     toast.error(`The connection to ${hostname} did not exit.`, {

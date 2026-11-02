@@ -87,37 +87,50 @@ export const sessionKeyOf = (user: string, hostname: string, port: number): stri
   sshSessionKey(user, hostname, port)
 
 const userDisconnects = new Set<string>()
+const userDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-const userDisconnectSuffix = (hostname: string, port: number): string => `@${hostname}:${port}`
+const clearDisconnectTimer = (key: string): void => {
+  const timer = userDisconnectTimers.get(key)
+  if (timer === undefined) {
+    return
+  }
+  clearTimeout(timer)
+  userDisconnectTimers.delete(key)
+}
 
 export const expectUserDisconnect = (user: string, hostname: string, port: number): void => {
-  userDisconnects.add(sessionKeyOf(user, hostname, port))
+  const key = sessionKeyOf(user, hostname, port)
+  clearDisconnectTimer(key)
+  userDisconnects.add(key)
 }
 
 export const takeUserDisconnect = (user: string, hostname: string, port: number): string | null => {
+  if (!user) {
+    return null
+  }
   const exact = sessionKeyOf(user, hostname, port)
-  if (user && userDisconnects.has(exact)) {
-    userDisconnects.delete(exact)
-    return user
+  if (!userDisconnects.has(exact)) {
+    return null
   }
-  const suffix = userDisconnectSuffix(hostname, port)
-  for (const pending of userDisconnects) {
-    if (pending.endsWith(suffix)) {
-      userDisconnects.delete(pending)
-      return pending.slice(0, pending.length - suffix.length)
-    }
-  }
-  return null
+  userDisconnects.delete(exact)
+  clearDisconnectTimer(exact)
+  return user
 }
 
 export const clearUserDisconnect = (user: string, hostname: string, port: number): void => {
-  userDisconnects.delete(sessionKeyOf(user, hostname, port))
-  const suffix = userDisconnectSuffix(hostname, port)
-  for (const pending of userDisconnects) {
-    if (pending.endsWith(suffix)) {
-      userDisconnects.delete(pending)
-    }
-  }
+  const key = sessionKeyOf(user, hostname, port)
+  userDisconnects.delete(key)
+  clearDisconnectTimer(key)
+}
+
+export const releaseUserDisconnect = (user: string, hostname: string, port: number): void => {
+  const key = sessionKeyOf(user, hostname, port)
+  clearDisconnectTimer(key)
+  const timer = setTimeout(() => {
+    userDisconnectTimers.delete(key)
+    userDisconnects.delete(key)
+  }, 2000)
+  userDisconnectTimers.set(key, timer)
 }
 
 export const upsertSession = (next: SshSessionStatus): void => {

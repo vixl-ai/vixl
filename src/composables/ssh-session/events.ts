@@ -73,17 +73,16 @@ const handleBanner = (event: SshBannerEvent): void => {
 
 export const handleSshError = (event: SshErrorEvent): void => {
   const previewUser = state.activePreview.value?.user || state.connectUser.value.trim()
-  const existing = state.sessions.value.find(
-    (item) => item.hostname === event.hostname && item.port === event.port,
-  )
-  const acknowledgedUser = state.takeUserDisconnect(
-    existing?.user || previewUser || '',
-    event.hostname,
-    event.port,
-  )
+  const user = event.user || previewUser
+  const existing = user
+    ? state.sessionForKey(user, event.hostname, event.port)
+    : (state.sessions.value.find(
+        (item) => item.hostname === event.hostname && item.port === event.port,
+      ) ?? null)
+  const acknowledgedUser = state.takeUserDisconnect(event.user, event.hostname, event.port)
   if (acknowledgedUser) {
     state.upsertSession({
-      user: existing?.user || acknowledgedUser,
+      user: event.user || acknowledgedUser,
       hostname: event.hostname,
       port: event.port,
       destination: existing?.destination ?? '',
@@ -94,13 +93,9 @@ export const handleSshError = (event: SshErrorEvent): void => {
     })
     return
   }
-  const key = state.sessionKeyOf(
-    existing?.user || previewUser || 'user',
-    event.hostname,
-    event.port,
-  )
+  const key = state.sessionKeyOf(user || 'user', event.hostname, event.port)
   state.upsertSession({
-    user: existing?.user ?? previewUser ?? '',
+    user: event.user || existing?.user || previewUser,
     hostname: event.hostname,
     port: event.port,
     destination: existing?.destination ?? '',

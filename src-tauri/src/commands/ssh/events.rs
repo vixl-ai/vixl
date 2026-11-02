@@ -47,6 +47,7 @@ pub struct SshBannerEvent {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SshErrorEvent {
+    pub user: String,
     pub hostname: String,
     pub port: u16,
     pub title: String,
@@ -83,11 +84,18 @@ pub fn emit_banner(app: Option<&AppHandle>, event: &SshBannerEvent) {
     }
 }
 
-pub fn emit_error(app: Option<&AppHandle>, hostname: &str, port: u16, copy: &SshErrorCopy) {
+pub fn emit_error(
+    app: Option<&AppHandle>,
+    user: &str,
+    hostname: &str,
+    port: u16,
+    copy: &SshErrorCopy,
+) {
     if let Some(app) = app {
         let _ = app.emit(
             EVENT_ERROR,
             SshErrorEvent {
+                user: user.to_string(),
                 hostname: hostname.to_string(),
                 port,
                 title: copy.title.clone(),

@@ -70,6 +70,7 @@ export type SshStatusEvent = {
 }
 
 export type SshErrorEvent = {
+  user: string
   hostname: string
   port: number
   title: string

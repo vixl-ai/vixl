@@ -447,7 +447,13 @@ pub async fn connect(
                 }
             }
             errors::MasterExitReport::Failure(copy) => {
-                emit_error(wait_app.as_ref(), &wait_host, wait_port, &copy);
+                emit_error(
+                    wait_app.as_ref(),
+                    &wait_key.user,
+                    &wait_host,
+                    wait_port,
+                    &copy,
+                );
                 if let Some(record) = SESSIONS.lock().await.get_mut(&wait_key) {
                     record.master_alive = false;
                     record.line = copy.title.clone();
@@ -593,7 +599,7 @@ pub async fn connect(
         &stderr_text,
         user_cancelled.load(Ordering::SeqCst),
     );
-    emit_error(app.as_ref(), &preview.hostname, preview.port, &copy);
+    emit_error(app.as_ref(), &user, &preview.hostname, preview.port, &copy);
     let _ = kill_tx.send(()).await;
     let mut sessions = SESSIONS.lock().await;
     if let Some(record) = sessions.get_mut(&key) {
