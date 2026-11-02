@@ -18,13 +18,13 @@ export const sidebarVirtualRange = (args: {
   }
 
   const overscan = args.overscan ?? 6
-  const heights = new Array<number>(count)
-  const tops = new Array<number>(count)
+  const heights: number[] = []
+  const tops: number[] = []
   let total = 0
   for (let index = 0; index < count; index += 1) {
-    tops[index] = total
+    tops.push(total)
     const height = args.heightAt(index)
-    heights[index] = height
+    heights.push(height)
     total += height
   }
 

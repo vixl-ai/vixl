@@ -10,6 +10,7 @@ import type { ChatMeta } from '@/types/chat/chat-meta'
 import { isTauri, listPinnedChats } from '@/services/vixl/vixl-tauri'
 import type { FleetPinnedChat } from '@/types/fleet/fleet-pinned-chat'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
+import { revealedProjectSlug } from '@/composables/fleet-project-reveal'
 import { sidebarChatSortKey } from '@/utils/sidebar-chat-sort-key'
 
 export type FleetSidebarActivityItem =
@@ -105,7 +106,7 @@ export default () => {
             : project.name,
         kind: 'project',
         isActiveProject: isActive,
-        defaultExpanded: isActive,
+        defaultExpanded: isActive && Object.hasOwn(chatsBySlug.value, project.slug),
         chats: mapChats(project.slug),
         id: project.id,
         rootPath: project.rootPath,
@@ -189,7 +190,16 @@ export default () => {
       })
     }
 
-    return items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    return items.sort((left, right) => {
+      const leftRevealed =
+        left.kind === 'project' && left.project.slug === revealedProjectSlug.value
+      const rightRevealed =
+        right.kind === 'project' && right.project.slug === revealedProjectSlug.value
+      if (leftRevealed !== rightRevealed) {
+        return leftRevealed ? -1 : 1
+      }
+      return right.updatedAt.localeCompare(left.updatedAt)
+    })
   })
 
   const refreshSlug = async (projectSlug: string): Promise<void> => {
@@ -261,6 +271,15 @@ export default () => {
     refreshPinned,
     refreshAll,
   }
+}
+
+export const forgetSidebarChats = (slug: string): void => {
+  if (!Object.hasOwn(chatsBySlug.value, slug)) {
+    return
+  }
+  const next = { ...chatsBySlug.value }
+  delete next[slug]
+  chatsBySlug.value = next
 }
 
 const isHomeLabel = (slug: string): boolean => slug === HOME_CHAT_SLUG

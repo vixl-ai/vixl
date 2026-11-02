@@ -93,7 +93,11 @@ export const setFolderSelected = (absolute: string, selected: boolean): void => 
 
 const rejectedFolderName = (name: string, hostname: string): string | null => {
   const trimmed = name.trim()
-  if (!trimmed || trimmed === '.' || trimmed === '..' || /[\\/\0\n\r]/.test(trimmed)) {
+  const rejected = [...trimmed].some((char) => {
+    const code = char.charCodeAt(0)
+    return char === '/' || char === '\\' || code === 0 || code === 10 || code === 13
+  })
+  if (!trimmed || trimmed === '.' || trimmed === '..' || rejected) {
     return `Name rejected on ${hostname}.`
   }
   return null

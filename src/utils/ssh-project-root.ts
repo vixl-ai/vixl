@@ -56,6 +56,33 @@ export const formatSshUri = (root: SshProjectRoot): string => {
   return `ssh://${root.user}@${host}${port}${path}`
 }
 
+const normalizeRemotePath = (value: string): string => {
+  const parts: string[] = []
+  for (const part of value.split('/')) {
+    if (!part || part === '.') {
+      continue
+    }
+    if (part === '..') {
+      parts.pop()
+      continue
+    }
+    parts.push(part)
+  }
+  return `/${parts.join('/')}`
+}
+
+export const resolveSshMoveRoot = (projectRoot: string, rootPath: string): string => {
+  const trimmed = rootPath.trim()
+  if (isSshProjectRoot(trimmed)) {
+    return formatSshUri(parseSshProjectRoot(trimmed))
+  }
+  const current = parseSshProjectRoot(projectRoot)
+  const remotePath = trimmed.startsWith('/')
+    ? normalizeRemotePath(trimmed)
+    : normalizeRemotePath(`${current.remotePath}/${trimmed}`)
+  return formatSshUri(parseSshProjectRoot(formatSshUri({ ...current, remotePath })))
+}
+
 export const sshSidebarLabel = (root: SshProjectRoot): string =>
   `${root.user}@${root.hostname}:${root.remotePath}`
 

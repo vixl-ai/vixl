@@ -64,6 +64,10 @@ vi.mock('@/composables/use-chat-store', () => ({
 }))
 
 import useFleetSidebar from '@/composables/use-fleet-sidebar'
+import {
+  revealedProjectSlug,
+  revealFleetProject,
+} from '@/composables/fleet-project-reveal'
 
 const makeChat = (
   overrides: Pick<ChatMeta, 'id' | 'title' | 'projectSlug' | 'updatedAt'> &
@@ -98,6 +102,7 @@ describe('use-fleet-sidebar activityItems', () => {
     ]
     fleetGroups.value = []
     activeProjectId.value = null
+    revealedProjectSlug.value = null
   })
 
   it('emits exactly one home item when home chats exist', async () => {
@@ -198,6 +203,51 @@ describe('use-fleet-sidebar activityItems', () => {
         item.kind === 'home' ? 'home' : item.project.slug,
       ),
     ).toEqual(['beta', 'home', 'alpha'])
+  })
+
+  it('pins a revealed project above newer chats', async () => {
+    fleetProjects.value = [
+      { id: 'proj-1', slug: 'alpha', name: 'Alpha' },
+      { id: 'proj-2', slug: 'beta', name: 'Beta' },
+    ]
+
+    const sidebar = await seedSidebar({
+      alpha: [
+        makeChat({
+          id: 'a1',
+          title: 'Alpha chat',
+          projectSlug: 'alpha',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      beta: [
+        makeChat({
+          id: 'b1',
+          title: 'Beta chat',
+          projectSlug: 'beta',
+          updatedAt: '2026-01-04T00:00:00.000Z',
+        }),
+      ],
+    })
+
+    revealFleetProject('alpha')
+
+    expect(
+      sidebar.activityItems.value.map((item) =>
+        item.kind === 'home' ? 'home' : item.project.slug,
+      ),
+    ).toEqual(['alpha', 'beta'])
+  })
+
+  it('opens an active project only after its chats are loaded', async () => {
+    activeProjectId.value = 'proj-new'
+    fleetProjects.value = [
+      { id: 'proj-new', slug: 'not-loaded-yet', name: 'New' },
+    ]
+    const sidebar = useFleetSidebar()
+    expect(sidebar.sidebarProjects.value[0]?.defaultExpanded).toBe(false)
+    await sidebar.refreshChats()
+    expect(sidebar.sidebarProjects.value[0]?.defaultExpanded).toBe(true)
   })
 
   it('sets home item updatedAt to the max of its chats', async () => {

@@ -36,6 +36,7 @@ vi.mock('@/services/harness/plan-execution-session', () => ({
 
 import { toast } from 'vue-sonner'
 import createEvents from '@/composables/agent-harness/events'
+import { revealedProjectSlug } from '@/composables/fleet-project-reveal'
 import { closeRunningTools, createStep } from '@/composables/chat-store/message-parsing'
 
 const buildState = (): AgentHarnessState =>
@@ -380,6 +381,7 @@ describe('agent-harness events billable-usage last-step', () => {
 describe('agent-harness events workspace-moved', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    revealedProjectSlug.value = null
   })
 
   it('sets standalone false and activates the destination project', async () => {
@@ -387,9 +389,7 @@ describe('agent-harness events workspace-moved', () => {
     const setActiveProject = vi
       .fn<(id: string) => Promise<void>>()
       .mockResolvedValue(undefined)
-    const refreshSlug = vi
-      .fn<(slug: string) => Promise<void>>()
-      .mockResolvedValue(undefined)
+    const refreshAll = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
     const rekeySession = vi.fn<(...args: unknown[]) => void>()
     const loadedThreadKey = ref<string | null>('_home_:chat-1')
 
@@ -408,7 +408,7 @@ describe('agent-harness events workspace-moved', () => {
         setActiveProject,
       },
       fleetSidebar: {
-        refreshSlug,
+        refreshAll,
       },
       chatStore: {
         rekeySession,
@@ -444,18 +444,16 @@ describe('agent-harness events workspace-moved', () => {
     expect(setActiveProject).toHaveBeenCalledWith('proj-1')
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(routerReplace).toHaveBeenCalledWith('/project/dest/chat/chat-1')
-    expect(refreshSlug).toHaveBeenCalledWith('_home_')
-    expect(refreshSlug).toHaveBeenCalledWith('dest')
+    expect(refreshAll).toHaveBeenCalledTimes(1)
+    expect(revealedProjectSlug.value).toBe('dest')
   })
 
-  it('rekeys sync then toasts and rejects when fleet activation fails', async () => {
+  it('rekeys sync, toasts, and still opens the sidebar when activation fails', async () => {
     const refresh = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
     const setActiveProject = vi
       .fn<(id: string) => Promise<void>>()
       .mockRejectedValue(new Error('no graph'))
-    const refreshSlug = vi
-      .fn<(slug: string) => Promise<void>>()
-      .mockResolvedValue(undefined)
+    const refreshAll = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
     const rekeySession = vi.fn<(...args: unknown[]) => void>()
 
     const state = {
@@ -472,7 +470,7 @@ describe('agent-harness events workspace-moved', () => {
         setActiveProject,
       },
       fleetSidebar: {
-        refreshSlug,
+        refreshAll,
       },
       chatStore: {
         rekeySession,
@@ -481,21 +479,19 @@ describe('agent-harness events workspace-moved', () => {
 
     const { handleEvent } = createEvents(state, buildAttention(), deps)
 
-    await expect(
-      handleEvent({
-        type: 'workspace-moved',
-        fromProjectSlug: '_home_',
-        chatId: 'chat-1',
-        project: {
-          id: 'proj-1',
-          name: 'Dest',
-          slug: 'dest',
-          rootPath: '/tmp/dest',
-        },
-        projectSlug: 'dest',
-        projectRoot: '/tmp/dest',
-      }),
-    ).rejects.toThrow('no graph')
+    await handleEvent({
+      type: 'workspace-moved',
+      fromProjectSlug: '_home_',
+      chatId: 'chat-1',
+      project: {
+        id: 'proj-1',
+        name: 'Dest',
+        slug: 'dest',
+        rootPath: '/tmp/dest',
+      },
+      projectSlug: 'dest',
+      projectRoot: '/tmp/dest',
+    })
 
     expect(state.options.projectSlug).toBe('dest')
     expect(rekeySession).toHaveBeenCalled()
@@ -503,7 +499,9 @@ describe('agent-harness events workspace-moved', () => {
     expect(toast.error).toHaveBeenCalledWith('Failed to rebind workspace', {
       description: 'no graph',
     })
-    expect(refreshSlug).not.toHaveBeenCalled()
+    expect(refreshAll).toHaveBeenCalledTimes(1)
+    expect(revealedProjectSlug.value).toBe('dest')
+    expect(routerReplace).toHaveBeenCalledWith('/project/dest/chat/chat-1')
   })
 })
 

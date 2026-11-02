@@ -212,6 +212,30 @@ describe('move_workspace tool', () => {
     })
   })
 
+  it('resolves a remote folder against the ssh project root', async () => {
+    const ctx = baseCtx()
+    ctx.projectRoot = 'ssh://aidanhibbard@eva.local/home/aidanhibbard'
+    await execute({ rootPath: 'src/llama.cpp' }, ctx)
+
+    expect(moveChatToWorkspace).toHaveBeenCalledWith({
+      fromProjectSlug: 'project',
+      chatId: 'chat-1',
+      rootPath: 'ssh://aidanhibbard@eva.local/home/aidanhibbard/src/llama.cpp',
+    })
+  })
+
+  it('treats an absolute remote path as a folder on the current host', async () => {
+    const ctx = baseCtx()
+    ctx.projectRoot = 'ssh://aidanhibbard@eva.local/home/aidanhibbard'
+    await execute({ rootPath: '/home/aidanhibbard/src/llama.cpp' }, ctx)
+
+    expect(moveChatToWorkspace).toHaveBeenCalledWith({
+      fromProjectSlug: 'project',
+      chatId: 'chat-1',
+      rootPath: 'ssh://aidanhibbard@eva.local/home/aidanhibbard/src/llama.cpp',
+    })
+  })
+
   it('awaits onHarnessEvent before returning success', async () => {
     let resolved = false
     const ctx = baseCtx()

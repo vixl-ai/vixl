@@ -1,6 +1,7 @@
 import { ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { vixlFileChangeToken } from '@/composables/use-vixl-live-sync'
+import { isDisconnectedRoot } from '@/composables/ssh-session/fleet'
 import { listAgentIndex } from '@/services/agents/registry'
 import {
   looksLikeSessionDropped,
@@ -32,7 +33,6 @@ const toastLoadFailure = (
   title: string,
   error: unknown,
   root: string | null,
-  announceOffline: boolean,
 ): boolean => {
   if (!offlineSshLoadError(root, error)) {
     toast.error(title, {
@@ -40,11 +40,12 @@ const toastLoadFailure = (
     })
     return false
   }
-  if (!announceOffline || !root || announcedOfflineRoots.has(root)) {
+  if (!root || isDisconnectedRoot(root) || announcedOfflineRoots.has(root)) {
     return true
   }
   announcedOfflineRoots.add(root)
   toast.error(title, {
+    id: `slash-offline:${root}`,
     description: RECONNECT_HINT,
   })
   return true
@@ -52,9 +53,8 @@ const toastLoadFailure = (
 
 export default (projectRoot: () => string | null) => {
   const entries = ref<SlashIndexEntry[]>([])
-  let readyToAnnounce = false
 
-  const refresh = async (announceOffline = true): Promise<void> => {
+  const refresh = async (): Promise<void> => {
     const root = projectRoot()
     let skills: SlashIndexEntry[] = []
     let agents: SlashIndexEntry[] = []
@@ -67,12 +67,7 @@ export default (projectRoot: () => string | null) => {
         scope: skill.scope,
       }))
     } catch (error) {
-      offline = toastLoadFailure(
-        'Failed to load skills',
-        error,
-        root,
-        announceOffline,
-      ) || offline
+      offline = toastLoadFailure('Failed to load skills', error, root) || offline
     }
     try {
       agents = (await listAgentIndex(root))
@@ -87,12 +82,7 @@ export default (projectRoot: () => string | null) => {
           scope: agent.scope,
         }))
     } catch (error) {
-      offline = toastLoadFailure(
-        'Failed to load agents',
-        error,
-        root,
-        announceOffline,
-      ) || offline
+      offline = toastLoadFailure('Failed to load agents', error, root) || offline
     }
     if (root && !offline) {
       announcedOfflineRoots.delete(root)
@@ -103,19 +93,9 @@ export default (projectRoot: () => string | null) => {
   watch(
     [projectRoot, vixlFileChangeToken],
     () => {
-      const announceOffline = readyToAnnounce
-      refresh(announceOffline)
-        .catch((error) => {
-          toastLoadFailure(
-            'Failed to load slash commands',
-            error,
-            projectRoot(),
-            announceOffline,
-          )
-        })
-        .finally(() => {
-          readyToAnnounce = true
-        })
+      refresh().catch((error) => {
+        toastLoadFailure('Failed to load slash commands', error, projectRoot())
+      })
     },
     { immediate: true },
   )

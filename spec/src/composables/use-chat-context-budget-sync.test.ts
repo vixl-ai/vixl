@@ -133,6 +133,34 @@ describe('useChatContextBudgetSync', () => {
     effectiveSettings.value = defaultVixlSettings()
   })
 
+  it('does not recount when a keystroke leaves draft mentions unchanged', async () => {
+    const { default: useChatContextBudgetSync } = await import(
+      '@/composables/use-chat-context-budget-sync'
+    )
+    const sync = useChatContextBudgetSync()
+    await flushDeferredRefresh()
+    const refresh = refreshFns.current.at(-1)
+    expect(refresh).toBeDefined()
+    refresh?.mockClear()
+
+    sync.setDraftMentions([])
+    await flushDeferredRefresh()
+    expect(refresh).not.toHaveBeenCalled()
+
+    sync.setDraftMentions([{ type: 'file', path: 'src/main.ts' }])
+    await flushDeferredRefresh()
+    expect(refresh).toHaveBeenCalledTimes(1)
+    refresh?.mockClear()
+
+    sync.setDraftMentions([{ type: 'file', path: 'src/main.ts' }])
+    await flushDeferredRefresh()
+    expect(refresh).not.toHaveBeenCalled()
+
+    sync.setDraftMentions([{ type: 'file', path: 'src/main.ts', content: 'fn main' }])
+    await flushDeferredRefresh()
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
   it('skips refresh while chatStore.loading is true', async () => {
     loading.value = true
     const { default: useChatContextBudgetSync } = await import(

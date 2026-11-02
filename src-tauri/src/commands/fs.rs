@@ -19,8 +19,8 @@ pub(crate) use path::{
 pub use path::{is_sensitive_relative_path, WorkspaceRootArg};
 pub use read::{fs_list_dir, fs_list_dir_tree, fs_read_file, fs_stat};
 pub(crate) use remote::{
-    parse_ssh_project_root, resolve_target, uses_ssh_transport, validate_relative, FsTarget,
-    SshProjectRoot,
+    ensure_ssh_project_directory, parse_ssh_project_root, resolve_target, uses_ssh_transport,
+    validate_relative, FsTarget, SshProjectRoot,
 };
 pub use types::{
     DiffLine, FileDiff, FileDiffHunk, FsDirEntry, FsEditReplacement, FsReadFileResult,

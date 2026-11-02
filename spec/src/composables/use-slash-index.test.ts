@@ -13,6 +13,9 @@ const listSlashSkillIndex = vi.hoisted(() =>
 const listAgentIndex = vi.hoisted(() =>
   vi.fn<(root: string | null) => Promise<unknown[]>>(async () => []),
 )
+const isDisconnectedRoot = vi.hoisted(() =>
+  vi.fn<(root: string | null | undefined) => boolean>(() => true),
+)
 
 vi.mock('vue-sonner', () => ({
   toast: {
@@ -28,12 +31,17 @@ vi.mock('@/services/agents/registry', () => ({
   listAgentIndex: (root: string | null) => listAgentIndex(root),
 }))
 
+vi.mock('@/composables/ssh-session/fleet', () => ({
+  isDisconnectedRoot: (root: string | null | undefined) => isDisconnectedRoot(root),
+}))
+
 const sshRoot = 'ssh://aidanhibbard@eva.local/home/aidanhibbard/proj'
 const otherRoot = 'ssh://aidanhibbard@other.local/home/aidanhibbard/proj'
 const offline = new Error(
   'eva.local is unreachable. eva.local is not connected. The SSH master is dead. This channel was not opened.',
 )
 const reconnect = {
+  id: `slash-offline:${sshRoot}`,
   description: 'Right click the project and click reconnect',
 }
 
@@ -41,21 +49,24 @@ describe('useSlashIndex offline ssh', () => {
   beforeEach(() => {
     resetSlashIndexToastsForTests()
     vi.mocked(toast.error).mockClear()
+    isDisconnectedRoot.mockReset()
+    isDisconnectedRoot.mockReturnValue(true)
     listSlashSkillIndex.mockReset()
     listAgentIndex.mockReset()
     listSlashSkillIndex.mockRejectedValue(offline)
     listAgentIndex.mockRejectedValue(offline)
   })
 
-  it('stays quiet when chats load a disconnected project at startup', async () => {
+  it('stays quiet while a disconnected project loads chats', async () => {
     const first = effectScope()
     const second = effectScope()
-    first.run(() => {
-      useSlashIndex(() => sshRoot)
-    })
+    const firstApi = first.run(() => useSlashIndex(() => sshRoot))
     second.run(() => {
       useSlashIndex(() => sshRoot)
     })
+    await flushPromises()
+    await firstApi?.refresh()
+    vixlFileChangeToken.value += 1
     await flushPromises()
 
     expect(toast.error).not.toHaveBeenCalled()
@@ -63,19 +74,16 @@ describe('useSlashIndex offline ssh', () => {
     second.stop()
   })
 
-  it('announces a later failure once per project', async () => {
+  it('announces a connected project once when the load fails', async () => {
+    isDisconnectedRoot.mockReturnValue(false)
     const first = effectScope()
     const second = effectScope()
-    let refresh: (() => Promise<void>) | null = null
     first.run(() => {
-      refresh = useSlashIndex(() => sshRoot).refresh
+      useSlashIndex(() => sshRoot)
     })
     second.run(() => {
       useSlashIndex(() => sshRoot)
     })
-    await flushPromises()
-
-    await refresh?.()
     await flushPromises()
     vixlFileChangeToken.value += 1
     await flushPromises()
@@ -87,31 +95,32 @@ describe('useSlashIndex offline ssh', () => {
   })
 
   it('announces again after the project loads, and separately for another project', async () => {
+    isDisconnectedRoot.mockReturnValue(false)
     const scope = effectScope()
-    let refresh: (() => Promise<void>) | null = null
     let root = sshRoot
-    scope.run(() => {
-      refresh = useSlashIndex(() => root).refresh
-    })
+    const api = scope.run(() => useSlashIndex(() => root))
     await flushPromises()
 
-    await refresh?.()
+    await api?.refresh()
     listSlashSkillIndex.mockResolvedValue([])
     listAgentIndex.mockResolvedValue([])
-    await refresh?.()
+    await api?.refresh()
     listSlashSkillIndex.mockRejectedValue(offline)
     listAgentIndex.mockResolvedValue([])
-    await refresh?.()
+    await api?.refresh()
 
     root = otherRoot
     listSlashSkillIndex.mockResolvedValue([])
     listAgentIndex.mockRejectedValue(offline)
-    await refresh?.()
+    await api?.refresh()
 
     expect(toast.error).toHaveBeenCalledTimes(3)
     expect(toast.error).toHaveBeenNthCalledWith(1, 'Failed to load skills', reconnect)
     expect(toast.error).toHaveBeenNthCalledWith(2, 'Failed to load skills', reconnect)
-    expect(toast.error).toHaveBeenNthCalledWith(3, 'Failed to load agents', reconnect)
+    expect(toast.error).toHaveBeenNthCalledWith(3, 'Failed to load agents', {
+      id: `slash-offline:${otherRoot}`,
+      description: 'Right click the project and click reconnect',
+    })
     scope.stop()
   })
 

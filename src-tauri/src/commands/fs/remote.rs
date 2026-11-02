@@ -917,6 +917,26 @@ async fn build_tree(
     })
 }
 
+pub(crate) fn ensure_ssh_project_directory(project_root: &str) -> Result<(), String> {
+    let ssh = parse_ssh_project_root(project_root)?;
+    run(ensure_ssh_project_directory_async(ssh))
+}
+
+async fn ensure_ssh_project_directory_async(ssh: SshProjectRoot) -> Result<(), String> {
+    with_sftp(&ssh, |client| {
+        let ssh = ssh.clone();
+        Box::pin(async move {
+            let remote = real_root(client, &ssh).await?;
+            match client.stat(&remote).await {
+                Ok(attrs) if attrs.is_dir() => Ok(()),
+                Ok(_) => Err(not_directory_err(&ssh.hostname)),
+                Err(err) => Err(err),
+            }
+        })
+    })
+    .await
+}
+
 pub(crate) fn stat(
     project_root: &str,
     project_roots: Option<&[WorkspaceRootArg]>,

@@ -25,6 +25,14 @@ let rowObserver: ResizeObserver | null = null
 
 const heightAt = (index: number): number => measured.value[index] ?? props.estimate
 
+const readViewport = (node: HTMLElement): number => {
+  const height = node.clientHeight
+  if (!height) {
+    return SIDEBAR_LIST_VIEWPORT
+  }
+  return Math.min(height, SIDEBAR_LIST_VIEWPORT)
+}
+
 const layout = computed(() =>
   sidebarVirtualRange({
     count: props.count,
@@ -89,9 +97,9 @@ onMounted(() => {
   if (!node || typeof ResizeObserver === 'undefined') {
     return
   }
-  viewport.value = node.clientHeight || SIDEBAR_LIST_VIEWPORT
+  viewport.value = readViewport(node)
   scrollerObserver = new ResizeObserver(() => {
-    viewport.value = node.clientHeight || SIDEBAR_LIST_VIEWPORT
+    viewport.value = readViewport(node)
   })
   scrollerObserver.observe(node)
   rowObserver = new ResizeObserver((entries) => {
@@ -122,9 +130,10 @@ onBeforeUnmount(() => {
     ref="scroller"
     data-sidebar-virtual-list
     :class="cn(
-      'min-w-0 max-h-42 scroll-fade-b scrollbar-none overflow-x-hidden overflow-y-auto',
+      'min-w-0 max-h-42 min-h-0 scroll-fade-b scrollbar-none overflow-x-hidden overflow-y-auto',
       props.class,
     )"
+    :style="{ maxHeight: `${SIDEBAR_LIST_VIEWPORT}px`, minHeight: '0' }"
     @scroll="onScroll"
   >
     <ul

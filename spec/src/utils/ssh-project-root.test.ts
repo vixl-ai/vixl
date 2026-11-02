@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   parseSshProjectRoot,
   parseSshRunsAsLine,
+  resolveSshMoveRoot,
   sshCopyRemotePath,
   sshRunsAsLine,
   sshSidebarLabel,
@@ -46,5 +47,37 @@ describe('ssh labels', () => {
       hostname: 'eva.local',
     })
     expect(parseSshRunsAsLine('Runs on this Mac')).toBeNull()
+  })
+})
+
+describe('resolveSshMoveRoot', () => {
+  const current = 'ssh://aidanhibbard@eva.local/home/aidanhibbard'
+
+  it('joins a workspace-relative folder onto the remote root', () => {
+    expect(resolveSshMoveRoot(current, 'src/llama.cpp')).toBe(
+      'ssh://aidanhibbard@eva.local/home/aidanhibbard/src/llama.cpp',
+    )
+  })
+
+  it('treats an absolute path as a path on the current host', () => {
+    expect(resolveSshMoveRoot(current, '/home/aidanhibbard/src/llama.cpp')).toBe(
+      'ssh://aidanhibbard@eva.local/home/aidanhibbard/src/llama.cpp',
+    )
+  })
+
+  it('keeps an explicit ssh uri, including a non-default port', () => {
+    expect(
+      resolveSshMoveRoot(
+        current,
+        'ssh://aidanhibbard@eva.local:2222/home/aidanhibbard/src/llama.cpp',
+      ),
+    ).toBe('ssh://aidanhibbard@eva.local:2222/home/aidanhibbard/src/llama.cpp')
+  })
+
+  it('refuses a destination of /', () => {
+    expect(() => resolveSshMoveRoot(current, '/')).toThrow('Opening / on eva.local is refused.')
+    expect(() => resolveSshMoveRoot(`${current}/proj`, '../../..')).toThrow(
+      'Opening / on eva.local is refused.',
+    )
   })
 })

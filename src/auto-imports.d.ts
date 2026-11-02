@@ -24,6 +24,7 @@ declare global {
   const chatProjectSlugForId: typeof import('./composables/use-fleet-sidebar').chatProjectSlugForId
   const chatTitleForId: typeof import('./composables/use-fleet-sidebar').chatTitleForId
   const chatTurnOpenKeys: typeof import('./composables/use-chat-turn-open-state').chatTurnOpenKeys
+  const clearRevealedFleetProject: typeof import('./composables/fleet-project-reveal').clearRevealedFleetProject
   const collectChatTurnOpenLiveIds: typeof import('./composables/use-chat-turn-open-state').collectChatTurnOpenLiveIds
   const computed: typeof import('vue').computed
   const computedAsync: typeof import('@vueuse/core').computedAsync
@@ -55,6 +56,7 @@ declare global {
   const effectScope: typeof import('vue').effectScope
   const ensureFleetLoaded: typeof import('./composables/use-fleet-registry').ensureFleetLoaded
   const extendRef: typeof import('@vueuse/core').extendRef
+  const forgetSidebarChats: typeof import('./composables/use-fleet-sidebar').forgetSidebarChats
   const getActiveFleetProjectId: typeof import('./composables/use-fleet-registry').getActiveFleetProjectId
   const getCachedAgentHarness: typeof import('./composables/use-agent-harness').getCachedAgentHarness
   const getCurrentInstance: typeof import('vue').getCurrentInstance
@@ -127,6 +129,9 @@ declare global {
   const resetSlashIndexToastsForTests: typeof import('./composables/use-slash-index').resetSlashIndexToastsForTests
   const resolveComponent: typeof import('vue').resolveComponent
   const resolveProjectRowWorkspace: typeof import('./composables/resolve-project-row-workspace').default
+  const revealFleetProject: typeof import('./composables/fleet-project-reveal').revealFleetProject
+  const revealedProjectNonce: typeof import('./composables/fleet-project-reveal').revealedProjectNonce
+  const revealedProjectSlug: typeof import('./composables/fleet-project-reveal').revealedProjectSlug
   const runAtomicFlip: typeof import('./composables/use-theme-flip').runAtomicFlip
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
@@ -455,6 +460,7 @@ declare module 'vue' {
     readonly chatProjectSlugForId: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['chatProjectSlugForId']>
     readonly chatTitleForId: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['chatTitleForId']>
     readonly chatTurnOpenKeys: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['chatTurnOpenKeys']>
+    readonly clearRevealedFleetProject: UnwrapRef<typeof import('./composables/fleet-project-reveal')['clearRevealedFleetProject']>
     readonly collectChatTurnOpenLiveIds: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['collectChatTurnOpenLiveIds']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('@vueuse/core')['computedAsync']>
@@ -486,6 +492,7 @@ declare module 'vue' {
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly ensureFleetLoaded: UnwrapRef<typeof import('./composables/use-fleet-registry')['ensureFleetLoaded']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
+    readonly forgetSidebarChats: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['forgetSidebarChats']>
     readonly getActiveFleetProjectId: UnwrapRef<typeof import('./composables/use-fleet-registry')['getActiveFleetProjectId']>
     readonly getCachedAgentHarness: UnwrapRef<typeof import('./composables/use-agent-harness')['getCachedAgentHarness']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
@@ -558,6 +565,9 @@ declare module 'vue' {
     readonly resetSlashIndexToastsForTests: UnwrapRef<typeof import('./composables/use-slash-index')['resetSlashIndexToastsForTests']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly resolveProjectRowWorkspace: UnwrapRef<typeof import('./composables/resolve-project-row-workspace')['default']>
+    readonly revealFleetProject: UnwrapRef<typeof import('./composables/fleet-project-reveal')['revealFleetProject']>
+    readonly revealedProjectNonce: UnwrapRef<typeof import('./composables/fleet-project-reveal')['revealedProjectNonce']>
+    readonly revealedProjectSlug: UnwrapRef<typeof import('./composables/fleet-project-reveal')['revealedProjectSlug']>
     readonly runAtomicFlip: UnwrapRef<typeof import('./composables/use-theme-flip')['runAtomicFlip']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
