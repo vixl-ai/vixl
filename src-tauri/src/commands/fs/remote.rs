@@ -429,15 +429,57 @@ pub(crate) async fn insert_silent_sftp_for_test(
     child
 }
 
+#[cfg(test)]
+pub(crate) async fn hold_pooled_sftp_for_test(
+    key: &SessionKey,
+) -> tokio::sync::oneshot::Sender<()> {
+    let slot = {
+        let pool = SFTP_POOL.lock().await;
+        pool.get(key).cloned().expect("pooled sftp")
+    };
+    let probe = slot.clone();
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    tokio::spawn(async move {
+        let guard = slot.lock().await;
+        let _ = rx.await;
+        drop(guard);
+    });
+    let started = std::time::Instant::now();
+    loop {
+        tokio::task::yield_now().await;
+        if probe.try_lock().is_err() {
+            break;
+        }
+        if started.elapsed() > std::time::Duration::from_secs(2) {
+            panic!("pooled sftp lock was not taken");
+        }
+    }
+    tx
+}
+
 pub(crate) async fn close_pooled_sftp(key: &SessionKey) {
     let slot = {
         let pool = SFTP_POOL.lock().await;
         pool.get(key).cloned()
     };
-    if let Some(slot) = slot {
-        let mut guard = slot.lock().await;
+    let Some(slot) = slot else {
+        return;
+    };
+    if let Ok(mut guard) = slot.try_lock() {
         *guard = None;
+        return;
     }
+    let key = key.clone();
+    tokio::spawn(async move {
+        let slot = {
+            let pool = SFTP_POOL.lock().await;
+            pool.get(&key).cloned()
+        };
+        if let Some(slot) = slot {
+            let mut guard = slot.lock().await;
+            *guard = None;
+        }
+    });
 }
 
 async fn with_sftp<T, F>(ssh: &SshProjectRoot, f: F) -> Result<T, String>

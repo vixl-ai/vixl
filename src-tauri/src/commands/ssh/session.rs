@@ -184,10 +184,7 @@ pub async fn mark_master_dead(key: &SessionKey) {
         record.state = "disconnected".to_string();
         record.line = errors::not_connected(&key.hostname);
     }
-    let key = key.clone();
-    tokio::spawn(async move {
-        crate::commands::fs::close_pooled_sftp(&key).await;
-    });
+    crate::commands::fs::close_pooled_sftp(key).await;
 }
 
 fn connect_poll_succeeded(state: &str, control_ok: bool, user_cancelled: bool) -> bool {
