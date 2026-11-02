@@ -73,6 +73,7 @@ fn next_master_generation() -> u64 {
 
 lazy_static::lazy_static! {
     static ref SESSIONS: Mutex<HashMap<SessionKey, SessionRecord>> = Mutex::new(HashMap::new());
+    static ref CONTROL_SOCKET_GATE: Mutex<()> = Mutex::new(());
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -174,7 +175,8 @@ fn apply_master_exit(
     if record.master_generation != generation {
         return None;
     }
-    let user_disconnected = record.state == "disconnected";
+    let user_disconnected =
+        record.state == "disconnected" || record.user_cancelled.load(Ordering::SeqCst);
     match errors::master_exit_report(hostname, stderr_text, exit_success, user_disconnected) {
         errors::MasterExitReport::UserDisconnect => {
             record.master_alive = false;
@@ -313,6 +315,7 @@ pub async fn connect(
 
     let lock = acquire_control_lock(&paths.lock_path(&control_id))?;
     let _ = reap_orphans_for_control_path(&control_path.to_string_lossy());
+    let _control_gate = CONTROL_SOCKET_GATE.lock().await;
     let _ = std::fs::remove_file(&control_path);
 
     emit_line(
@@ -522,6 +525,7 @@ pub async fn connect(
             },
         );
     }
+    drop(_control_gate);
 
     let snapshot = SessionSnapshot {
         key: key.clone(),
@@ -648,36 +652,56 @@ pub async fn connect(
     Err(copy.into_message())
 }
 
+async fn disconnect_still_owns(key: &SessionKey, generation: u64) -> bool {
+    SESSIONS
+        .lock()
+        .await
+        .get(key)
+        .is_some_and(|record| record.master_generation == generation)
+}
+
+async fn remove_control_socket_if_owned(key: &SessionKey, generation: u64, path: &PathBuf) {
+    if disconnect_still_owns(key, generation).await {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
 pub async fn disconnect(user: &str, hostname: &str, port: u16) -> Result<SshSessionStatus, String> {
     let key = session_key(user, hostname, port);
     let open = {
         let mut sessions = SESSIONS.lock().await;
-        sessions.get_mut(&key).map(|record| {
-            record.master_alive = false;
-            record.state = "disconnected".to_string();
-            record.line = format!("Disconnected from {hostname}.");
-            record.last_error = None;
-            (
-                record.kill_tx.clone(),
-                record.destination.clone(),
-                record.control_path.clone(),
-                record.paths.clone(),
-            )
-        })
+        let Some(record) = sessions.get_mut(&key) else {
+            return Ok(SshSessionStatus {
+                user: user.to_string(),
+                hostname: hostname.to_string(),
+                port,
+                destination: String::new(),
+                state: "disconnected".to_string(),
+                line: format!("Disconnected from {hostname}."),
+                last_error: None,
+                master_alive: false,
+            });
+        };
+        record.master_alive = false;
+        record.state = "disconnected".to_string();
+        record.line = format!("Disconnected from {hostname}.");
+        record.last_error = None;
+        let generation = record.master_generation;
+        let kill_tx = record.kill_tx.clone();
+        let destination = record.destination.clone();
+        let control_path = record.control_path.clone();
+        let paths = record.paths.clone();
+        drop(record.lock.take());
+        Some((generation, kill_tx, destination, control_path, paths))
+    };
+    let Some((generation, kill_tx, destination, control_path, paths)) = open else {
+        return Ok(session_status(user, hostname, port).await);
     };
     crate::commands::fs::close_pooled_sftp(&key).await;
-    let Some((kill_tx, destination, control_path, paths)) = open else {
-        return Ok(SshSessionStatus {
-            user: user.to_string(),
-            hostname: hostname.to_string(),
-            port,
-            destination: String::new(),
-            state: "disconnected".to_string(),
-            line: format!("Disconnected from {hostname}."),
-            last_error: None,
-            master_alive: false,
-        });
-    };
+    let _gate = CONTROL_SOCKET_GATE.lock().await;
+    if !disconnect_still_owns(&key, generation).await {
+        return Ok(session_status(user, hostname, port).await);
+    }
     let snapshot = SessionSnapshot {
         key: key.clone(),
         destination,
@@ -702,11 +726,14 @@ pub async fn disconnect(user: &str, hostname: &str, port: u16) -> Result<SshSess
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status();
-    if let Some(kill_tx) = kill_tx {
-        let _ = kill_tx.send(()).await;
+    if disconnect_still_owns(&key, generation).await {
+        if let Some(kill_tx) = kill_tx {
+            let _ = kill_tx.send(()).await;
+        }
     }
     tokio::time::sleep(Duration::from_millis(50)).await;
-    let _ = std::fs::remove_file(&control_path);
+    remove_control_socket_if_owned(&key, generation, &control_path).await;
+    drop(_gate);
     Ok(session_status(user, hostname, port).await)
 }
 
@@ -882,6 +909,96 @@ mod tests {
         };
         assert_eq!(state, "connecting");
         assert!(last_error.is_none());
+        clear_sessions_for_tests().await;
+    }
+
+    #[tokio::test]
+    async fn cancelled_master_exit_is_not_a_connection_failure() {
+        let _lock = SESSION_TEST_LOCK.lock().await;
+        clear_sessions_for_tests().await;
+        let hostname = "appleseed.example";
+        let dir = tempdir().expect("tempdir");
+        let paths = SshPaths::from_roots(dir.path().join("vixl"), dir.path().join("user"));
+        insert_test_session(
+            SshSessionStatus {
+                user: "johnny".to_string(),
+                hostname: hostname.to_string(),
+                port: 22,
+                destination: hostname.to_string(),
+                state: "connecting".to_string(),
+                line: format!("Connecting to {hostname} port 22."),
+                last_error: None,
+                master_alive: false,
+            },
+            paths,
+            dir.path().join("cm-cancel"),
+        )
+        .await;
+        let key = session_key("johnny", hostname, 22);
+        let generation = {
+            let mut sessions = SESSIONS.lock().await;
+            let record = sessions.get_mut(&key).expect("session");
+            record.user_cancelled.store(true, Ordering::SeqCst);
+            record.master_generation
+        };
+        let copy = {
+            let mut sessions = SESSIONS.lock().await;
+            let record = sessions.get_mut(&key).expect("session");
+            apply_master_exit(record, generation, hostname, "Connection closed", false)
+        };
+        assert!(copy.is_none());
+        let (state, last_error) = {
+            let sessions = SESSIONS.lock().await;
+            let record = sessions.get(&key).expect("session");
+            (record.state.clone(), record.last_error.clone())
+        };
+        assert_eq!(state, "disconnected");
+        assert!(last_error.is_none());
+        clear_sessions_for_tests().await;
+    }
+
+    #[tokio::test]
+    async fn newer_connect_keeps_its_control_socket() {
+        let _lock = SESSION_TEST_LOCK.lock().await;
+        clear_sessions_for_tests().await;
+        let hostname = "appleseed.example";
+        let dir = tempdir().expect("tempdir");
+        let socket = dir.path().join("cm-live");
+        std::fs::write(&socket, b"live").expect("socket");
+        let paths = SshPaths::from_roots(dir.path().join("vixl"), dir.path().join("user"));
+        insert_test_session(
+            SshSessionStatus {
+                user: "johnny".to_string(),
+                hostname: hostname.to_string(),
+                port: 22,
+                destination: hostname.to_string(),
+                state: "connected".to_string(),
+                line: format!("Connected as johnny@{hostname}."),
+                last_error: None,
+                master_alive: true,
+            },
+            paths,
+            socket.clone(),
+        )
+        .await;
+        let key = session_key("johnny", hostname, 22);
+        let stale = {
+            let mut sessions = SESSIONS.lock().await;
+            let record = sessions.get_mut(&key).expect("session");
+            let stale = record.master_generation;
+            record.master_generation = next_master_generation();
+            stale
+        };
+        remove_control_socket_if_owned(&key, stale, &socket).await;
+        assert!(socket.is_file(), "stale disconnect removed the new socket");
+        let current = SESSIONS
+            .lock()
+            .await
+            .get(&key)
+            .expect("session")
+            .master_generation;
+        remove_control_socket_if_owned(&key, current, &socket).await;
+        assert!(!socket.exists());
         clear_sessions_for_tests().await;
     }
 }
