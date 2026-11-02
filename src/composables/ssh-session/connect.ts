@@ -54,7 +54,11 @@ export const openReconnect = async (project: FleetProject): Promise<void> => {
 
 export const closeConnect = async (): Promise<void> => {
   const current = state.activePreview.value
-  if (state.connectPhase.value === 'connecting' && current) {
+  const connecting = state.connectPhase.value === 'connecting'
+  if (connecting) {
+    state.connectAttempt.value += 1
+  }
+  if (connecting && current) {
     try {
       await sshCancelConnect(current.user, current.hostname, current.port)
     } catch {
@@ -80,6 +84,7 @@ export const closeConnect = async (): Promise<void> => {
 }
 
 export const submitConnectForm = async (): Promise<void> => {
+  const attempt = (state.connectAttempt.value += 1)
   const destinationError = validateSshDestination(destinationFromForm())
   if (destinationError) {
     state.connectPhase.value = 'error'
@@ -119,16 +124,22 @@ export const submitConnectForm = async (): Promise<void> => {
     state.connectErrorTitle.value = ''
     state.connectErrorBody.value = ''
   } catch (error) {
+    if (attempt !== state.connectAttempt.value) {
+      return
+    }
     const copy = parseSshConnectError(error)
     state.connectPhase.value = 'error'
     state.connectErrorTitle.value = copy.title
     state.connectErrorBody.value = copy.body
     return
   }
-  await confirmPreviewConnect()
+  if (attempt !== state.connectAttempt.value) {
+    return
+  }
+  await confirmPreviewConnect(attempt)
 }
 
-export const confirmPreviewConnect = async (): Promise<void> => {
+export const confirmPreviewConnect = async (attempt: number): Promise<void> => {
   const current = state.preview.value
   if (!current) {
     return
@@ -157,6 +168,9 @@ export const confirmPreviewConnect = async (): Promise<void> => {
     const status = await sshConnect(request)
     state.stopElapsed()
     state.upsertSession(status)
+    if (attempt !== state.connectAttempt.value) {
+      return
+    }
     state.toastedDeath.delete(state.sessionKeyOf(status.user, status.hostname, status.port))
     state.connectStatus.value = status.line
     if (status.state !== 'connected' && !status.masterAlive) {
@@ -177,6 +191,9 @@ export const confirmPreviewConnect = async (): Promise<void> => {
     await refreshFleetSidebar()
   } catch (error) {
     state.stopElapsed()
+    if (attempt !== state.connectAttempt.value) {
+      return
+    }
     const copy = parseSshConnectError(error)
     state.applyConnectError(copy.title, copy.body, current.hostname, current.port)
   }
@@ -191,6 +208,7 @@ export const closeConnectError = (): void => {
 
 export const cancelConnecting = async (): Promise<void> => {
   const current = state.activePreview.value
+  state.connectAttempt.value += 1
   if (current) {
     try {
       await sshCancelConnect(current.user, current.hostname, current.port)
