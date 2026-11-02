@@ -77,7 +77,7 @@ fn exit_status_from_code(code: i32) -> std::process::ExitStatus {
     {
         use std::os::unix::process::ExitStatusExt;
         if code < 0 {
-            return std::process::ExitStatus::from_raw(0);
+            return std::process::ExitStatus::from_raw(9);
         }
         std::process::ExitStatus::from_raw(code << 8)
     }
@@ -589,5 +589,17 @@ mod tests {
         tx.send(Some(1)).expect("exit");
         let status = child.try_wait().expect("wait").expect("exited");
         assert_eq!(status.code(), Some(1));
+        tx.send(Some(-1)).expect("signal");
+        let status = child.try_wait().expect("wait").expect("signaled");
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            assert!(status.code().is_none());
+            assert_eq!(status.signal(), Some(9));
+        }
+        #[cfg(not(unix))]
+        {
+            assert_eq!(status.code(), Some(1));
+        }
     }
 }

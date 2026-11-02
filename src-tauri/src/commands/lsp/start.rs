@@ -475,6 +475,16 @@ async fn start_remote_server(
         process.clone(),
     );
 
+    let still_alive = {
+        let mut guard = process.lock().await;
+        matches!(guard.child.try_wait(), Ok(None))
+    };
+    if !still_alive {
+        return Err(format!(
+            "Language server exited during startup ({server_id})"
+        ));
+    }
+
     let activity = current_running_activity(&process).await;
     let mut patch = LspStatePatch::running("path".to_string(), workspace_root, None);
     patch.activity = Some(activity.clone());
