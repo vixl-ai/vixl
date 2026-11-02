@@ -21,9 +21,14 @@ vi.mock('vue-sonner', () => ({
 }))
 
 const rekeyAgentHarness = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
+const forgetSidebarChats = vi.hoisted(() => vi.fn<(slug: string) => void>())
 
 vi.mock('@/composables/agent-harness/cache', () => ({
   rekeyAgentHarness: (...args: unknown[]) => rekeyAgentHarness(...args),
+}))
+
+vi.mock('@/composables/use-fleet-sidebar', () => ({
+  forgetSidebarChats: (slug: string) => forgetSidebarChats(slug),
 }))
 
 import rebindWorkspace from '@/composables/agent-harness/rebind-workspace'
@@ -167,6 +172,8 @@ describe('rebind-workspace plan tab', () => {
     await rebindWorkspace(state, workspaceMoved)
 
     expect(loadedThreadKey.value).toBe('dest:chat-1')
+    expect(forgetSidebarChats).toHaveBeenCalledWith('_home_')
+    expect(forgetSidebarChats).not.toHaveBeenCalledWith('dest')
     expect(state.fleetSidebar.refreshAll).toHaveBeenCalledTimes(1)
     expect(revealedProjectSlug.value).toBe('dest')
   })

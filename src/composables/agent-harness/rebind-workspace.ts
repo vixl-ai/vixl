@@ -68,7 +68,7 @@ export default async (
     root_path: event.project.rootPath,
     last_opened: new Date().toISOString(),
   })
-  forgetSidebarChats(event.projectSlug)
+  forgetSidebarChats(fromProjectSlug)
 
   const report = (error: unknown): void => {
     toast.error('Failed to rebind workspace', {

@@ -113,6 +113,33 @@ async fn glob_with_ssh(request: WorkspaceGlobRequest) -> Result<WorkspaceGlobRes
                         .await?;
                 files.extend(partial.files);
                 truncated = truncated || partial.truncated;
+            } else if !arg.path.trim().is_empty() {
+                let root = canonical_project_root(&arg.path)?;
+                let pattern = request.pattern.clone();
+                let prefix = arg.slug.trim().to_string();
+                let partial = tokio::task::spawn_blocking(move || {
+                    collect_glob_files(&root, &pattern, remaining)
+                })
+                .await
+                .map_err(|error| format!("Glob search failed: {error}"))??;
+                for mut entry in partial.files {
+                    if !prefix.is_empty() {
+                        entry.path = if entry.path.is_empty() {
+                            prefix.clone()
+                        } else {
+                            format!("{prefix}/{}", entry.path)
+                        };
+                    }
+                    files.push(entry);
+                    if files.len() >= limit {
+                        truncated = true;
+                        break;
+                    }
+                }
+                truncated = truncated || partial.truncated;
+            }
+            if truncated {
+                break;
             }
         }
         files.sort_by(|left, right| left.path.cmp(&right.path));
@@ -217,4 +244,40 @@ fn collect_glob_files(
     files.sort_by(|left, right| left.path.cmp(&right.path));
 
     Ok(WorkspaceGlobResult { files, truncated })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn mixed_workspace_glob_includes_the_local_root() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("hello.txt"), "hi").expect("write");
+        let result = workspace_glob(WorkspaceGlobRequest {
+            project_root: "ssh://johnny@vixl-glob.example/tmp/remote".into(),
+            pattern: "hello.txt".into(),
+            limit: Some(1),
+            project_roots: Some(vec![
+                WorkspaceRootArg {
+                    slug: "local".into(),
+                    path: dir.path().to_string_lossy().to_string(),
+                },
+                WorkspaceRootArg {
+                    slug: "remote".into(),
+                    path: "ssh://johnny@vixl-glob.example/tmp/remote".into(),
+                },
+            ]),
+        })
+        .await
+        .expect("glob");
+        assert!(
+            result
+                .files
+                .iter()
+                .any(|file| file.path == "local/hello.txt"),
+            "local root missing: {:?}",
+            result.files
+        );
+    }
 }
