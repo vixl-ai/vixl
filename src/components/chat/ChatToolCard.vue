@@ -3,7 +3,6 @@ import type { ApprovalResolution } from '@/services/harness/permission/approval-
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import { ref } from 'vue'
 import ChatApprovalActions from '@/components/chat/ChatApprovalActions.vue'
-import ChatRunsAtMark from '@/components/chat/ChatRunsAtMark.vue'
 import ChatInlineFileDiff from '@/components/chat/InlineFileDiff.vue'
 import { isNetworkSandboxApproval } from '@/components/chat/chat-tool-card'
 import McpServerIcon from '@/components/mcp/ServerIcon.vue'
@@ -74,7 +73,6 @@ const open = ref(false)
         >
           {{ subagentLabel }}
         </span>
-        <ChatRunsAtMark v-if="approval.runsAt" :runs-at="approval.runsAt" />
       </CollapsibleTrigger>
       <ChatApprovalActions
         :approval="approval"

@@ -92,7 +92,6 @@ declare module 'vue' {
     ChatQuestionCard: typeof import('./components/chat/ChatQuestionCard.vue')['default']
     ChatQueueHandlers: typeof import('./components/chat/ChatQueueHandlers.vue')['default']
     ChatRunningDots: typeof import('./components/navigation/aside/left/ChatRunningDots.vue')['default']
-    ChatRunsAtMark: typeof import('./components/chat/ChatRunsAtMark.vue')['default']
     ChatSkillSuggestionList: typeof import('./components/chat/prompt-editor/ChatSkillSuggestionList.vue')['default']
     ChatsSection: typeof import('./components/project/sections/ChatsSection.vue')['default']
     ChatStackPillBar: typeof import('./components/chat/ChatStackPillBar.vue')['default']
