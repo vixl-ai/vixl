@@ -385,6 +385,102 @@ async fn busy_cached_channel_does_not_stall_the_next_read() {
     clear_sessions_for_tests().await;
 }
 
+async fn wait_for_deferred_close(before: u64) {
+    let started = std::time::Instant::now();
+    loop {
+        if super::remote::sftp_close_ticks() > before {
+            return;
+        }
+        tokio::task::yield_now().await;
+        if started.elapsed() > Duration::from_secs(2) {
+            panic!("deferred sftp close did not finish");
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn deferred_close_keeps_a_client_replaced_while_the_slot_was_busy() {
+    let _lock = SESSION_TEST_LOCK.lock().await;
+    clear_sessions_for_tests().await;
+    let user = "aidanhibbard";
+    let hostname = "vixl-epoch-sftp.example";
+    let port = 2222u16;
+    let key = session_key(user, hostname, port);
+    let mut child =
+        super::remote::insert_silent_sftp_for_test(key.clone(), hostname.to_string()).await;
+    let release = super::remote::hold_pooled_sftp_for_test(&key).await;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let paths = SshPaths::from_roots(dir.path().join("vixl"), dir.path().join("user"));
+    insert_test_session(
+        SshSessionStatus {
+            user: user.to_string(),
+            hostname: hostname.to_string(),
+            port,
+            destination: hostname.to_string(),
+            state: "disconnected".to_string(),
+            line: format!("{hostname} is not connected."),
+            last_error: None,
+            master_alive: false,
+        },
+        paths,
+        dir.path().join("cm-missing"),
+    )
+    .await;
+    let ticks = super::remote::sftp_close_ticks();
+    super::remote::close_pooled_sftp(&key).await;
+    super::remote::bump_pooled_epoch_for_test(&key).await;
+    let _ = release.send(());
+    wait_for_deferred_close(ticks).await;
+    assert!(
+        super::remote::pooled_client_open(&key).await,
+        "deferred close dropped the replacement client"
+    );
+    let _ = child.kill().await;
+    let _ = child.wait().await;
+    clear_sessions_for_tests().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn deferred_close_drops_a_client_the_dead_master_still_owns() {
+    let _lock = SESSION_TEST_LOCK.lock().await;
+    clear_sessions_for_tests().await;
+    let user = "aidanhibbard";
+    let hostname = "vixl-epoch-drop.example";
+    let port = 2222u16;
+    let key = session_key(user, hostname, port);
+    let mut child =
+        super::remote::insert_silent_sftp_for_test(key.clone(), hostname.to_string()).await;
+    let release = super::remote::hold_pooled_sftp_for_test(&key).await;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let paths = SshPaths::from_roots(dir.path().join("vixl"), dir.path().join("user"));
+    insert_test_session(
+        SshSessionStatus {
+            user: user.to_string(),
+            hostname: hostname.to_string(),
+            port,
+            destination: hostname.to_string(),
+            state: "disconnected".to_string(),
+            line: format!("{hostname} is not connected."),
+            last_error: None,
+            master_alive: false,
+        },
+        paths,
+        dir.path().join("cm-missing"),
+    )
+    .await;
+    let ticks = super::remote::sftp_close_ticks();
+    super::remote::close_pooled_sftp(&key).await;
+    let _ = release.send(());
+    wait_for_deferred_close(ticks).await;
+    assert!(
+        !super::remote::pooled_client_open(&key).await,
+        "dead master left the cached client"
+    );
+    let _ = child.kill().await;
+    let _ = child.wait().await;
+    clear_sessions_for_tests().await;
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn dead_master_fails_and_names_the_host() {
     let _lock = SESSION_TEST_LOCK.lock().await;
