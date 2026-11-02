@@ -134,7 +134,25 @@ pub fn tty_login_command(remote_cwd: &str) -> String {
     )
 }
 
-pub fn block_on<T>(fut: impl std::future::Future<Output = Result<T, String>>) -> Result<T, String> {
+fn on_main_thread() -> bool {
+    std::thread::current().name() == Some("main")
+}
+
+pub fn block_on<T>(
+    fut: impl std::future::Future<Output = Result<T, String>> + Send + 'static,
+) -> Result<T, String>
+where
+    T: Send + 'static,
+{
+    if on_main_thread() {
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        tauri::async_runtime::spawn(async move {
+            let _ = tx.send(fut.await);
+        });
+        return rx
+            .recv()
+            .unwrap_or_else(|_| Err("SSH task ended before it replied".to_string()));
+    }
     match tokio::runtime::Handle::try_current() {
         Ok(handle) => tokio::task::block_in_place(|| handle.block_on(fut)),
         Err(_) => tauri::async_runtime::block_on(fut),

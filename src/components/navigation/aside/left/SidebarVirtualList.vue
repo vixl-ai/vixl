@@ -42,6 +42,13 @@ const layout = computed(() =>
   }),
 )
 
+const frameHeight = computed(() => {
+  if (props.count <= 0) {
+    return 0
+  }
+  return Math.min(layout.value.total, SIDEBAR_LIST_VIEWPORT)
+})
+
 const rows = computed(() => {
   const next: { index: number; key: string; top: number }[] = []
   let top = layout.value.offset
@@ -133,7 +140,11 @@ onBeforeUnmount(() => {
       'min-w-0 max-h-42 min-h-0 scroll-fade-b scrollbar-none overflow-x-hidden overflow-y-auto',
       props.class,
     )"
-    :style="{ maxHeight: `${SIDEBAR_LIST_VIEWPORT}px`, minHeight: '0' }"
+    :style="{
+      height: `${frameHeight}px`,
+      maxHeight: `${SIDEBAR_LIST_VIEWPORT}px`,
+      minHeight: '0',
+    }"
     @scroll="onScroll"
   >
     <ul

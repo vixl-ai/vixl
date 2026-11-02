@@ -386,11 +386,13 @@ fn resolve_absolute_local_members(members: &[Member], user_path: &str) -> Result
     Err("Absolute path is outside all project roots".to_string())
 }
 
-fn run<T>(fut: impl std::future::Future<Output = Result<T, String>>) -> Result<T, String> {
-    match tokio::runtime::Handle::try_current() {
-        Ok(handle) => tokio::task::block_in_place(|| handle.block_on(fut)),
-        Err(_) => tauri::async_runtime::block_on(fut),
-    }
+fn run<T>(
+    fut: impl std::future::Future<Output = Result<T, String>> + Send + 'static,
+) -> Result<T, String>
+where
+    T: Send + 'static,
+{
+    crate::commands::ssh::block_on(fut)
 }
 
 async fn with_sftp<T, F>(ssh: &SshProjectRoot, f: F) -> Result<T, String>
@@ -758,7 +760,7 @@ async fn read_file_ssh(
     .await
 }
 
-pub(crate) fn list_dir(
+pub(crate) async fn list_dir_await(
     project_root: &str,
     project_roots: Option<&[WorkspaceRootArg]>,
     path: &str,
@@ -768,9 +770,29 @@ pub(crate) fn list_dir(
         FsTarget::Local(_) => Err("internal: local root routed to ssh list".to_string()),
         FsTarget::Ssh(resolved) => {
             gate_sensitive(&resolved.relative, allow_sensitive)?;
-            run(list_dir_ssh(resolved))
+            list_dir_ssh(resolved).await
         }
     }
+}
+
+pub(crate) fn list_dir(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+    path: &str,
+    allow_sensitive: Option<bool>,
+) -> Result<Vec<FsDirEntry>, String> {
+    let project_root = project_root.to_string();
+    let project_roots = project_roots.map(|roots| roots.to_vec());
+    let path = path.to_string();
+    run(async move {
+        list_dir_await(
+            &project_root,
+            project_roots.as_deref(),
+            &path,
+            allow_sensitive,
+        )
+        .await
+    })
 }
 
 async fn list_dir_ssh(resolved: SshResolved) -> Result<Vec<FsDirEntry>, String> {

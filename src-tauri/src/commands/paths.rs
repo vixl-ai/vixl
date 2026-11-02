@@ -166,16 +166,23 @@ pub fn get_user_vixl_dir(app: AppHandle) -> Result<String, String> {
     user_vixl_dir(&app).map(|p| p.to_string_lossy().to_string())
 }
 
+fn project_has_vixl(root_path: &str) -> Result<bool, String> {
+    if root_is_home(root_path) {
+        return Ok(false);
+    }
+    let vixl_dir = resolve_project_vixl_dir(root_path);
+    Ok(vixl_dir.is_dir() && vixl_dir_has_config(&vixl_dir))
+}
+
 #[tauri::command]
-pub fn has_project_vixl(root_path: String) -> Result<bool, String> {
+pub async fn has_project_vixl(root_path: String) -> Result<bool, String> {
     if root_is_home(&root_path) {
         return Ok(false);
     }
     if crate::commands::ssh::is_ssh_root(&root_path) {
-        return has_remote_project_vixl(&root_path);
+        return has_remote_project_vixl(&root_path).await;
     }
-    let vixl_dir = resolve_project_vixl_dir(&root_path);
-    Ok(vixl_dir.is_dir() && vixl_dir_has_config(&vixl_dir))
+    project_has_vixl(&root_path)
 }
 
 #[tauri::command]
@@ -221,8 +228,8 @@ fn get_vixl_dir_at(
     vixl_base_dir(scope, root_path, personal_dir).map(|path| path.to_string_lossy().into_owned())
 }
 
-fn has_remote_project_vixl(root: &str) -> Result<bool, String> {
-    match list_remote_dir(root, VIXL_DIR) {
+async fn has_remote_project_vixl(root: &str) -> Result<bool, String> {
+    match crate::commands::fs::list_dir_await(root, None, VIXL_DIR, None).await {
         Ok(_) => Ok(true),
         Err(err) if err.contains("No such file on ") => Ok(false),
         Err(err) => Err(err),
@@ -1229,7 +1236,7 @@ mod tests {
         let _home_env = HomeEnvGuard::set_home(&home);
         let home_str = path_str(&home);
 
-        assert!(!has_project_vixl(home_str.to_string()).unwrap());
+        assert!(!project_has_vixl(home_str).unwrap());
         assert!(
             list_project_files(home_str.to_string(), "agents".to_string())
                 .unwrap()
@@ -1358,7 +1365,7 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err, HOME_PROJECT_SCOPE_ERROR);
-        assert!(!has_project_vixl(dotted).unwrap());
+        assert!(!project_has_vixl(&dotted).unwrap());
         assert!(!home.join(".vixl").exists());
     }
 
@@ -1378,7 +1385,7 @@ mod tests {
         let _home_env = HomeEnvGuard::set_home(&home);
         let project_str = path_str(&project);
 
-        assert!(has_project_vixl(project_str.to_string()).unwrap());
+        assert!(project_has_vixl(project_str).unwrap());
         let settings = read_scoped_json(
             "project",
             Some(project_str),
@@ -1430,7 +1437,7 @@ mod tests {
         std::os::unix::fs::symlink(&home, &link).expect("symlink home");
 
         let _home_env = HomeEnvGuard::set_home(&home);
-        assert!(!has_project_vixl(path_str(&link).to_string()).unwrap());
+        assert!(!project_has_vixl(path_str(&link)).unwrap());
         let err = write_scoped_json(
             "project",
             Some(path_str(&link)),
@@ -1533,7 +1540,7 @@ mod tests {
             "vixl-list-decoy.example",
         );
 
-        match has_project_vixl(uri.to_string()) {
+        match tauri::async_runtime::block_on(has_project_vixl(uri.to_string())) {
             Ok(true) => panic!("URI-named local directory must not count as project .vixl"),
             Ok(false) => panic!("expected unreachable, got false"),
             Err(err) => assert!(
