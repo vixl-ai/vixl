@@ -17,6 +17,7 @@ import {
 import { tryParseSshProjectRoot } from '@/utils/ssh-project-root'
 import { loadAliases } from './events'
 import { startFolderPicker } from './folder'
+import { rememberedSshIdentity, rememberSshIdentity } from './identity-memory'
 import * as state from './state'
 
 const destinationFromForm = (): string => state.connectHost.value.trim()
@@ -29,6 +30,11 @@ export const fillFromProject = (project: FleetProject): void => {
   state.connectUser.value = root.user
   state.connectHost.value = root.hostname
   state.connectPort.value = String(root.port)
+  state.connectIdentity.value = rememberedSshIdentity(root.user, root.hostname, root.port)
+}
+
+const rememberFormIdentity = (user: string, hostname: string, port: number): void => {
+  rememberSshIdentity(user, hostname, port, state.connectIdentity.value.trim())
 }
 
 export const openAddSsh = async (): Promise<void> => {
@@ -100,14 +106,16 @@ export const submitConnectForm = async (): Promise<void> => {
   try {
     const portRaw = state.connectPort.value.trim()
     const port = portRaw ? Number(portRaw) : undefined
-    state.preview.value = await sshPreview({
+    const preview = await sshPreview({
       destination: destinationFromForm(),
       port,
       identityFile: state.connectIdentity.value.trim() || undefined,
     })
-    if (state.connectUser.value.trim()) {
-      state.preview.value = { ...state.preview.value, user: state.connectUser.value.trim() }
-    }
+    const typedUser = state.connectUser.value.trim()
+    const shown = typedUser ? { ...preview, user: typedUser } : preview
+    state.preview.value = shown
+    const previewPort = portRaw ? Number(portRaw) : shown.port
+    rememberFormIdentity(shown.user, shown.hostname, previewPort)
     state.connectErrorTitle.value = ''
     state.connectErrorBody.value = ''
   } catch (error) {
