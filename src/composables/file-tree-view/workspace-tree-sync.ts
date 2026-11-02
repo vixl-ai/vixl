@@ -45,6 +45,7 @@ export const bindFileTreeWorkspaceSync = (
   let watchedShallow: boolean | null = null
   let pendingRelist = false
   let watchCancelled = false
+  let watchTicket = 0
   let treeListenCancelled = false
   let unlistenTree: UnlistenFn | null = null
   let mergeGeneration = 0
@@ -170,6 +171,7 @@ export const bindFileTreeWorkspaceSync = (
     if (!isTauri()) {
       return
     }
+    const ticket = ++watchTicket
     if (state.watchError) {
       state.watchError.value = null
     }
@@ -177,7 +179,7 @@ export const bindFileTreeWorkspaceSync = (
     const canonicalRoot = await watchWorkspace(
       shallow ? { projectRoot: root, mode: 'shallow' } : { projectRoot: root },
     )
-    if (watchCancelled) {
+    if (watchCancelled || ticket !== watchTicket) {
       await unwatchWorkspace({ projectRoot: canonicalRoot || root }).catch(recoverTreeSyncError)
       return
     }
@@ -220,9 +222,10 @@ export const bindFileTreeWorkspaceSync = (
     if (previousRoot === nextRoot && previousShallow === nextShallow) {
       return
     }
+    watchTicket += 1
     mergeGeneration += 1
     pendingRelist = false
-    if (previousRoot) {
+    if (previousRoot && watchedRoot) {
       await stopWorkspaceWatch(previousRoot)
     }
     if (!nextRoot) {
@@ -285,8 +288,10 @@ export const bindFileTreeWorkspaceSync = (
       clearTimeout(focusRelistTimer)
       focusRelistTimer = null
     }
-    const root = watchedRoot ?? state.projectRoot.value
-    stopWorkspaceWatch(root).catch(recoverTreeSyncError)
+    const root = watchedRoot
+    if (root) {
+      stopWorkspaceWatch(root).catch(recoverTreeSyncError)
+    }
   })
 
   watch(
