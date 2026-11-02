@@ -749,38 +749,35 @@ async fn watch_workspace_ssh(app: AppHandle, project_root: String) -> Result<Str
     let key = project_root.trim().to_string();
     let ssh = parse_ssh_project_root(&key)?;
     let state = app.state::<WorkspaceWatchState>();
-    {
+    let stopped = {
         let mut map = state.remote.lock().map_err(|error| error.to_string())?;
-        if let Some(entry) = map.get_mut(&key) {
-            entry.refcount = entry.refcount.saturating_add(1);
-            return Ok(key);
+        match claim_remote(&mut map, key.clone()) {
+            RemoteClaim::Joined => return Ok(key),
+            RemoteClaim::Started(stopped) => stopped,
         }
+    };
+    if let Err(err) = open_remote_inotify(&ssh).await {
+        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+        drop_remote_start(&mut map, &key, &stopped);
+        return Err(err);
     }
-    probe_remote_program(&ssh, "inotifywait")
-        .await
-        .map_err(|err| {
-            if err.contains("is not installed") {
-                inotifywait_missing(&ssh.hostname)
-            } else {
-                err
-            }
-        })?;
-    let command = format!(
-        "inotifywait -m -r -e create,delete,move,modify --format '%w%f|%e' {}",
-        posix_quote(&ssh.remote_path)
-    );
-    let info = open_exec(key_for(&ssh), login_command(&ssh.remote_path, &command))
-        .await
-        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
-    let mut stdio = take_channel_stdio(&info.channel_id)
-        .await
-        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let mut stdio = match take_remote_inotify_stdio(&ssh).await {
+        Ok(stdio) => stdio,
+        Err(err) => {
+            let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+            drop_remote_start(&mut map, &key, &stopped);
+            return Err(err);
+        }
+    };
     drop(stdio.stdin);
-    let stopped = Arc::new(AtomicBool::new(false));
+    let channel_id = stdio.channel_id.clone();
+    if stopped.load(Ordering::SeqCst) {
+        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+        drop_remote_start(&mut map, &key, &stopped);
+        let _ = close_channel(channel_id).await;
+        return Ok(key);
+    }
     let hostname = ssh.hostname.clone();
-    let remote_path = ssh.remote_path.clone();
-    let root_path = key.clone();
-    let channel_id = info.channel_id.clone();
     let stderr_stopped = stopped.clone();
     let stderr_channel = channel_id.clone();
     if let Some(stderr) = stdio.stderr.take() {
@@ -796,6 +793,24 @@ async fn watch_workspace_ssh(app: AppHandle, project_root: String) -> Result<Str
             }
         });
     }
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    if stopped.load(Ordering::SeqCst) {
+        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+        drop_remote_start(&mut map, &key, &stopped);
+        let _ = close_channel(channel_id).await;
+        return Err(inotify_enospc(&ssh.hostname));
+    }
+    let published = {
+        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
+        publish_remote_channel(&mut map, &key, &stopped, channel_id.clone())
+    };
+    if !published {
+        stopped.store(true, Ordering::SeqCst);
+        let _ = close_channel(channel_id).await;
+        return Ok(key);
+    }
+    let remote_path = ssh.remote_path.clone();
+    let root_path = key.clone();
     let stdout_stopped = stopped.clone();
     let app_watch = app.clone();
     tokio::spawn(async move {
@@ -809,35 +824,35 @@ async fn watch_workspace_ssh(app: AppHandle, project_root: String) -> Result<Str
             }
         }
     });
-    tokio::time::sleep(Duration::from_millis(200)).await;
-    if stopped.load(Ordering::SeqCst) {
-        let _ = close_channel(channel_id).await;
-        return Err(inotify_enospc(&ssh.hostname));
-    }
-    let channel_to_close = {
-        let mut map = state.remote.lock().map_err(|error| error.to_string())?;
-        if map.contains_key(&key) {
-            if let Some(entry) = map.get_mut(&key) {
-                entry.refcount = entry.refcount.saturating_add(1);
-            }
-            stopped.store(true, Ordering::SeqCst);
-            Some(channel_id)
-        } else {
-            map.insert(
-                key.clone(),
-                RemoteWatch {
-                    refcount: 1,
-                    channel_id,
-                    stopped,
-                },
-            );
-            None
-        }
-    };
-    if let Some(channel_id) = channel_to_close {
-        let _ = close_channel(channel_id).await;
-    }
     Ok(key)
+}
+
+async fn open_remote_inotify(ssh: &crate::commands::fs::SshProjectRoot) -> Result<(), String> {
+    probe_remote_program(ssh, "inotifywait")
+        .await
+        .map_err(|err| {
+            if err.contains("is not installed") {
+                inotifywait_missing(&ssh.hostname)
+            } else {
+                err
+            }
+        })?;
+    Ok(())
+}
+
+async fn take_remote_inotify_stdio(
+    ssh: &crate::commands::fs::SshProjectRoot,
+) -> Result<crate::commands::ssh::ChannelStdio, String> {
+    let command = format!(
+        "inotifywait -m -r -e create,delete,move,modify --format '%w%f|%e' {}",
+        posix_quote(&ssh.remote_path)
+    );
+    let info = open_exec(key_for(ssh), login_command(&ssh.remote_path, &command))
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    take_channel_stdio(&info.channel_id)
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))
 }
 
 fn remote_watch_payload(
