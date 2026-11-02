@@ -55,6 +55,19 @@ fn copies_plan_dir_to_new_root() {
 }
 
 #[test]
+fn ssh_destination_does_not_create_a_local_directory() {
+    let old_root = tempfile::tempdir().expect("old root");
+    write_plan(old_root.path(), "ship-it", "PLAN.md", "source plan\n");
+    let err = copy_active_plan_to_root(
+        &old_root.path().to_string_lossy(),
+        "ssh://johnny@appleseed.example/home/johnny/garden",
+        ".vixl/plans/ship-it/PLAN.md",
+    )
+    .expect_err("ssh copy");
+    assert_eq!(err, "SSH workspace plan copy uses the async copier.");
+}
+
+#[test]
 fn missing_source_plan_is_noop_success() {
     let old_root = tempfile::tempdir().expect("old root");
     let new_root = tempfile::tempdir().expect("new root");

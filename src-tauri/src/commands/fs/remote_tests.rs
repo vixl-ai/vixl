@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
+use crate::commands::chat::copy_active_plan_for_move;
 use crate::commands::fs::{
     fs_list_dir, fs_read_file, fs_read_file_command, fs_stat, fs_write_file, WorkspaceRootArg,
 };
@@ -581,6 +582,7 @@ async fn disposable_sshd_remote_fs() {
             match connect(None, request).await {
                 Ok(status) => {
                     assert!(status.master_alive, "master should be alive");
+                    copy_local_plan_onto_remote(&user, port, &short_root).await;
                     run_live_sftp_cases(&user, port, &short_root);
                     let _ = disconnect(&user, "127.0.0.1", port).await;
                 }
@@ -593,6 +595,32 @@ async fn disposable_sshd_remote_fs() {
     }
     drop(dir_guard);
     clear_sessions_for_tests().await;
+}
+
+async fn copy_local_plan_onto_remote(user: &str, port: u16, short_root: &Path) {
+    let local = tempfile::tempdir().expect("local plan");
+    let plan = local.path().join(".vixl").join("plans").join("ship-it");
+    fs::create_dir_all(&plan).expect("plan dir");
+    fs::write(plan.join("PLAN.md"), "ship it\n").expect("plan");
+    fs::write(plan.join("notes.md"), "notes\n").expect("notes");
+    let remote = short_root.join("plan-dest");
+    fs::create_dir_all(&remote).expect("plan dest");
+    copy_active_plan_for_move(
+        &local.path().to_string_lossy(),
+        &ssh_root(user, port, &remote),
+        ".vixl/plans/ship-it/PLAN.md",
+    )
+    .await
+    .expect("copy plan over ssh");
+    let copied = remote.join(".vixl").join("plans").join("ship-it");
+    assert_eq!(
+        fs::read_to_string(copied.join("PLAN.md")).expect("remote plan"),
+        "ship it\n"
+    );
+    assert_eq!(
+        fs::read_to_string(copied.join("notes.md")).expect("remote notes"),
+        "notes\n"
+    );
 }
 
 fn run_live_sftp_cases(user: &str, port: u16, short_root: &Path) {

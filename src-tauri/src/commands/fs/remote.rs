@@ -11,8 +11,8 @@ use tokio::sync::Mutex;
 use url::Url;
 
 use crate::commands::ssh::{
-    open_sftp, reject_git_hooks_write, require_live_master, session_key, take_channel_stdio,
-    SessionKey,
+    is_ssh_root, open_sftp, reject_git_hooks_write, require_live_master, session_key,
+    take_channel_stdio, SessionKey,
 };
 
 use super::diff::build_file_diff;
@@ -1251,6 +1251,194 @@ async fn stat_ssh(resolved: SshResolved) -> Result<FsStatResult, String> {
         })
     })
     .await
+}
+
+pub(crate) async fn entry_kind_await(
+    project_root: &str,
+    path: &str,
+) -> Result<Option<String>, String> {
+    if is_ssh_root(project_root) {
+        let stat = stat_await(project_root, None, path, Some(true)).await?;
+        if !stat.exists {
+            return Ok(None);
+        }
+        return Ok(Some(stat.kind));
+    }
+    let root = project_root.to_string();
+    let path = path.to_string();
+    tauri::async_runtime::spawn_blocking(move || local_entry_kind(&root, &path))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+fn local_entry_kind(root: &str, path: &str) -> Result<Option<String>, String> {
+    match std::fs::metadata(Path::new(root).join(path)) {
+        Ok(meta) if meta.is_dir() => Ok(Some("directory".to_string())),
+        Ok(meta) if meta.is_file() => Ok(Some("file".to_string())),
+        Ok(_) => Ok(Some("other".to_string())),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+pub(crate) async fn modified_ms_await(
+    project_root: &str,
+    path: &str,
+) -> Result<Option<u64>, String> {
+    if is_ssh_root(project_root) {
+        let stat = stat_await(project_root, None, path, Some(true)).await?;
+        return Ok(stat.modified_ms);
+    }
+    let root = project_root.to_string();
+    let path = path.to_string();
+    tauri::async_runtime::spawn_blocking(move || local_modified_ms(&root, &path))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+fn local_modified_ms(root: &str, path: &str) -> Result<Option<u64>, String> {
+    match std::fs::metadata(Path::new(root).join(path)) {
+        Ok(meta) => Ok(meta.modified().ok().and_then(system_time_millis)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn system_time_millis(time: std::time::SystemTime) -> Option<u64> {
+    time.duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .map(|duration| duration.as_millis() as u64)
+}
+
+pub(crate) async fn list_children_await(
+    project_root: &str,
+    path: &str,
+) -> Result<Vec<FsDirEntry>, String> {
+    if is_ssh_root(project_root) {
+        return list_dir_await(project_root, None, path, Some(true)).await;
+    }
+    let root = project_root.to_string();
+    let path = path.to_string();
+    tauri::async_runtime::spawn_blocking(move || local_list_children(&root, &path))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+fn local_list_children(root: &str, path: &str) -> Result<Vec<FsDirEntry>, String> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(Path::new(root).join(path)).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.contains('\0') || name.contains('\n') || name.contains('\r') {
+            continue;
+        }
+        let file_type = entry.file_type().map_err(|error| error.to_string())?;
+        let kind = if file_type.is_dir() {
+            "directory"
+        } else if file_type.is_file() {
+            "file"
+        } else {
+            "other"
+        };
+        let child = if path.is_empty() || path == "." {
+            name.clone()
+        } else {
+            format!("{path}/{name}")
+        };
+        out.push(FsDirEntry {
+            name,
+            path: child,
+            kind: kind.to_string(),
+        });
+    }
+    out.sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
+    Ok(out)
+}
+
+pub(crate) async fn read_bytes_await(project_root: &str, path: &str) -> Result<Vec<u8>, String> {
+    if is_ssh_root(project_root) {
+        match resolve_target(project_root, None, path)? {
+            FsTarget::Ssh(resolved) => {
+                gate_sensitive(&resolved.relative, Some(true))?;
+                return read_bytes_ssh(resolved).await;
+            }
+            FsTarget::Local(_) => {}
+        }
+    }
+    let root = project_root.to_string();
+    let path = path.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        std::fs::read(Path::new(&root).join(path)).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+async fn read_bytes_ssh(resolved: SshResolved) -> Result<Vec<u8>, String> {
+    with_sftp(&resolved.ssh, |client| {
+        let resolved = resolved.clone();
+        Box::pin(async move {
+            let remote = jail_path(client, &resolved.ssh, &resolved.relative).await?;
+            let attrs = classify_open(client, &resolved.ssh, &remote).await?;
+            if attrs.is_dir() || !attrs.is_regular_file() {
+                return Err(not_regular_err(resolved.hostname()));
+            }
+            client.read_all(&remote).await
+        })
+    })
+    .await
+}
+
+pub(crate) async fn write_bytes_await(
+    project_root: &str,
+    path: &str,
+    bytes: Vec<u8>,
+) -> Result<(), String> {
+    if is_ssh_root(project_root) {
+        match resolve_target(project_root, None, path)? {
+            FsTarget::Ssh(resolved) => {
+                gate_sensitive(&resolved.relative, Some(true))?;
+                reject_git_hooks_write(&resolved.relative, resolved.hostname())?;
+                return write_bytes_ssh(resolved, bytes).await;
+            }
+            FsTarget::Local(_) => {}
+        }
+    }
+    let root = project_root.to_string();
+    let path = path.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        let absolute = Path::new(&root).join(&path);
+        if let Some(parent) = absolute.parent() {
+            std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        std::fs::write(absolute, bytes).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+async fn write_bytes_ssh(resolved: SshResolved, bytes: Vec<u8>) -> Result<(), String> {
+    with_sftp(&resolved.ssh, |client| {
+        let resolved = resolved.clone();
+        Box::pin(async move {
+            let remote = jail_path(client, &resolved.ssh, &resolved.relative).await?;
+            sftp_atomic_write(client, &remote, &bytes).await
+        })
+    })
+    .await
+}
+
+pub(crate) async fn ensure_dir_await(project_root: &str, path: &str) -> Result<(), String> {
+    if is_ssh_root(project_root) {
+        return mkdir_await(project_root.to_string(), None, path.to_string(), Some(true)).await;
+    }
+    let root = project_root.to_string();
+    let path = path.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        std::fs::create_dir_all(Path::new(&root).join(path)).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 pub(crate) fn write_file(
