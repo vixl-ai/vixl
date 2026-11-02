@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -24,6 +24,13 @@ pub enum PromptAnswer {
 
 struct PendingPrompt {
     tx: oneshot::Sender<PromptAnswer>,
+    owner: u64,
+}
+
+static NEXT_PROMPT_OWNER: AtomicU64 = AtomicU64::new(1);
+
+pub fn next_prompt_owner() -> u64 {
+    NEXT_PROMPT_OWNER.fetch_add(1, Ordering::SeqCst)
 }
 
 lazy_static::lazy_static! {
@@ -41,6 +48,7 @@ pub struct ConnectCtx {
     pub hostname: String,
     pub port: u16,
     pub identity_basename: Option<String>,
+    pub prompt_owner: u64,
 }
 
 pub async fn answer_confirm(
@@ -80,19 +88,25 @@ pub async fn cancel_prompt(request_id: String) -> Result<(), String> {
         .map_err(|_| "SSH prompt is no longer open".to_string())
 }
 
-pub async fn cancel_all_prompts() {
+pub async fn cancel_owned_prompts(owner: u64) {
     let mut pending = PENDING.lock().await;
-    for (_, waiter) in pending.drain() {
-        let _ = waiter.tx.send(PromptAnswer::Abort);
+    let mut kept = HashMap::new();
+    for (id, waiter) in pending.drain() {
+        if waiter.owner == owner {
+            let _ = waiter.tx.send(PromptAnswer::Abort);
+        } else {
+            kept.insert(id, waiter);
+        }
     }
+    *pending = kept;
 }
 
-async fn wait_for_user(request_id: String) -> PromptAnswer {
+async fn wait_for_user(request_id: String, owner: u64) -> PromptAnswer {
     let (tx, rx) = oneshot::channel();
     PENDING
         .lock()
         .await
-        .insert(request_id, PendingPrompt { tx });
+        .insert(request_id, PendingPrompt { tx, owner });
     rx.await.unwrap_or(PromptAnswer::Abort)
 }
 
@@ -258,7 +272,7 @@ pub async fn serve_askpass_client(
                         address: meta.address,
                     },
                 );
-                let answer = wait_for_user(request_id).await;
+                let answer = wait_for_user(request_id, ctx.prompt_owner).await;
                 if matches!(answer, PromptAnswer::Cancel) {
                     ctx.user_cancelled.store(true, Ordering::SeqCst);
                 }
@@ -332,7 +346,7 @@ pub async fn serve_askpass_client(
                             saveable: saveable && secret_kind_is_saveable(kind),
                         },
                     );
-                    let answer = wait_for_user(request_id).await;
+                    let answer = wait_for_user(request_id, ctx.prompt_owner).await;
                     if matches!(answer, PromptAnswer::Cancel) {
                         ctx.user_cancelled.store(true, Ordering::SeqCst);
                     }
@@ -422,7 +436,7 @@ mod tests {
     #[tokio::test]
     async fn answer_confirm_passes_also_add_flag() {
         let request_id = "confirm-also-add".to_string();
-        let waiter = tokio::spawn(wait_for_user(request_id.clone()));
+        let waiter = tokio::spawn(wait_for_user(request_id.clone(), next_prompt_owner()));
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         answer_confirm(request_id, true, true)
             .await
@@ -434,6 +448,33 @@ mod tests {
                 trusted: true,
                 also_add: true
             }
+        );
+    }
+
+    #[tokio::test]
+    async fn cancelling_one_connect_leaves_the_other_prompt() {
+        let first_owner = next_prompt_owner();
+        let second_owner = next_prompt_owner();
+        let first_id = "appleseed-confirm".to_string();
+        let second_id = "orchard-secret".to_string();
+        let first = tokio::spawn(wait_for_user(first_id.clone(), first_owner));
+        let second = tokio::spawn(wait_for_user(second_id.clone(), second_owner));
+        for _ in 0..50 {
+            let pending = PENDING.lock().await;
+            if pending.contains_key(&first_id) && pending.contains_key(&second_id) {
+                break;
+            }
+            drop(pending);
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        cancel_owned_prompts(first_owner).await;
+        assert_eq!(first.await.expect("join"), PromptAnswer::Abort);
+        answer_secret(second_id, "orchard-answer".to_string())
+            .await
+            .expect("answer");
+        assert_eq!(
+            second.await.expect("join"),
+            PromptAnswer::Secret("orchard-answer".to_string())
         );
     }
 }

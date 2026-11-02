@@ -23,7 +23,7 @@ use super::paths::{
     set_mode_0600, SshPaths, SSH_BIN,
 };
 use super::preview::{preview_destination, SshPreview};
-use super::prompt::{cancel_all_prompts, run_askpass_listener, ConnectCtx};
+use super::prompt::{cancel_owned_prompts, next_prompt_owner, run_askpass_listener, ConnectCtx};
 use super::validate::{
     destination_with_user, resolve_connect_user, validate_destination, validate_port,
 };
@@ -75,6 +75,7 @@ lazy_static::lazy_static! {
     static ref SESSIONS: Mutex<HashMap<SessionKey, SessionRecord>> = Mutex::new(HashMap::new());
     static ref CONTROL_SOCKET_GATE: Mutex<()> = Mutex::new(());
     static ref CONNECT_CANCEL: Mutex<HashMap<SessionKey, Arc<AtomicBool>>> = Mutex::new(HashMap::new());
+    static ref PROMPT_OWNERS: Mutex<HashMap<SessionKey, u64>> = Mutex::new(HashMap::new());
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -317,13 +318,27 @@ async fn attach_connect_kill(
     true
 }
 
+async fn remember_prompt_owner(key: &SessionKey, owner: u64) {
+    PROMPT_OWNERS.lock().await.insert(key.clone(), owner);
+}
+
+async fn clear_prompt_owner(key: &SessionKey, owner: u64) {
+    let mut owners = PROMPT_OWNERS.lock().await;
+    if owners.get(key).copied() == Some(owner) {
+        owners.remove(key);
+    }
+}
+
 async fn stop_askpass(
+    key: &SessionKey,
+    owner: u64,
     listener_stop_tx: tokio::sync::watch::Sender<bool>,
     listener: tokio::task::JoinHandle<()>,
 ) {
     let _ = listener_stop_tx.send(true);
     let _ = listener.await;
-    cancel_all_prompts().await;
+    cancel_owned_prompts(owner).await;
+    clear_prompt_owner(key, owner).await;
 }
 
 async fn session_record_state(key: &SessionKey) -> Option<String> {
@@ -479,6 +494,7 @@ pub async fn connect(
             .map(|name| name.to_string())
     });
 
+    let prompt_owner = next_prompt_owner();
     let ctx = Arc::new(ConnectCtx {
         auth: Mutex::new(AuthAttempt::new(saved_password, saved_passphrase)),
         paths: paths.clone(),
@@ -490,6 +506,7 @@ pub async fn connect(
         hostname: preview.hostname.clone(),
         port: preview.port,
         identity_basename,
+        prompt_owner,
     });
 
     if user_cancelled.load(Ordering::SeqCst)
@@ -501,6 +518,7 @@ pub async fn connect(
         return Ok(session_status(&user, &preview.hostname, preview.port).await);
     }
 
+    remember_prompt_owner(&key, prompt_owner).await;
     let (listener_stop_tx, listener_stop_rx) = tokio::sync::watch::channel(false);
     let listener_app = app.clone();
     let listener_ctx = ctx.clone();
@@ -547,7 +565,7 @@ pub async fn connect(
 
     if user_cancelled.load(Ordering::SeqCst) {
         drop(_control_gate);
-        stop_askpass(listener_stop_tx, listener).await;
+        stop_askpass(&key, prompt_owner, listener_stop_tx, listener).await;
         mark_cancelled_connect(&key, master_generation).await;
         clear_connect_cancel(&key, &user_cancelled).await;
         return Ok(session_status(&user, &preview.hostname, preview.port).await);
@@ -557,7 +575,7 @@ pub async fn connect(
         Ok(child) => child,
         Err(err) => {
             drop(_control_gate);
-            stop_askpass(listener_stop_tx, listener).await;
+            stop_askpass(&key, prompt_owner, listener_stop_tx, listener).await;
             if user_cancelled.load(Ordering::SeqCst) {
                 mark_cancelled_connect(&key, master_generation).await;
                 clear_connect_cancel(&key, &user_cancelled).await;
@@ -681,7 +699,7 @@ pub async fn connect(
     if !attach_connect_kill(&key, master_generation, kill_tx.clone()).await {
         let _ = kill_tx.send(()).await;
         drop(_control_gate);
-        stop_askpass(listener_stop_tx, listener).await;
+        stop_askpass(&key, prompt_owner, listener_stop_tx, listener).await;
         mark_cancelled_connect(&key, master_generation).await;
         clear_connect_cancel(&key, &user_cancelled).await;
         return Ok(session_status(&user, &preview.hostname, preview.port).await);
@@ -765,7 +783,7 @@ pub async fn connect(
         }
     };
 
-    stop_askpass(listener_stop_tx, listener).await;
+    stop_askpass(&key, prompt_owner, listener_stop_tx, listener).await;
 
     if connected {
         let line = format!("Connected as {user}@{host}.", host = preview.hostname);
@@ -929,7 +947,9 @@ pub async fn cancel_connect(user: &str, hostname: &str, port: u16) -> Result<(),
     if let Some(flag) = CONNECT_CANCEL.lock().await.get(&key) {
         flag.store(true, Ordering::SeqCst);
     }
-    cancel_all_prompts().await;
+    if let Some(owner) = PROMPT_OWNERS.lock().await.get(&key).copied() {
+        cancel_owned_prompts(owner).await;
+    }
     let _ = disconnect(user, hostname, port).await;
     Ok(())
 }
@@ -965,6 +985,7 @@ pub async fn insert_test_session(status: SshSessionStatus, paths: SshPaths, cont
 pub async fn clear_sessions_for_tests() {
     SESSIONS.lock().await.clear();
     CONNECT_CANCEL.lock().await.clear();
+    PROMPT_OWNERS.lock().await.clear();
 }
 
 #[cfg(test)]
