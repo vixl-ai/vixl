@@ -11,6 +11,11 @@ use tokio::task::JoinHandle;
 use std::os::unix::process::ExitStatusExt;
 
 use super::builders::spawn_child;
+use crate::commands::fs::parse_ssh_project_root;
+use crate::commands::ssh::{
+    channel_exit_rx, close_channel, is_ssh_root, key_for, login_command, map_unreachable,
+    open_exec, recv_channel_exit, take_channel_stdio,
+};
 
 /// Live tracked shell: wait task owns the Child and listens on `kill_rx`.
 /// Kill looks up this entry (so it stays registered until exit) and signals via `kill_tx`.
@@ -143,6 +148,11 @@ pub async fn shell_spawn_tracked(
     project_writable: Option<bool>,
     project_roots: Option<Vec<crate::commands::fs::WorkspaceRootArg>>,
 ) -> Result<(), String> {
+    if is_ssh_root(&project_root) {
+        let _ = (sandboxed, allow_network, project_writable, project_roots);
+        return spawn_tracked_remote(app, shell_id, project_root, command).await;
+    }
+
     let mut child = spawn_child(
         &project_root,
         &command,
@@ -220,6 +230,94 @@ pub async fn shell_spawn_tracked(
         let _ = exit_tx.send(Some(exit.clone()));
         TRACKED_SHELLS.lock().unwrap().remove(&shell_wait);
 
+        let _ = app_wait.emit(
+            &format!("shell-exit-{shell_wait}"),
+            serde_json::json!({
+              "shellId": shell_wait,
+              "exitCode": exit.exit_code,
+              "signal": exit.signal,
+            }),
+        );
+    });
+
+    Ok(())
+}
+
+pub(crate) async fn reap_remote_shell(
+    channel_id: String,
+    exit_watch: tokio::sync::watch::Receiver<Option<i32>>,
+    mut kill_rx: tokio::sync::mpsc::Receiver<()>,
+) -> i32 {
+    tokio::select! {
+        code = recv_channel_exit(exit_watch.clone()) => {
+            let code = code.unwrap_or(-1);
+            let _ = close_channel(channel_id).await;
+            code
+        }
+        kill = kill_rx.recv() => {
+            if kill.is_some() {
+                let _ = close_channel(channel_id).await;
+            }
+            recv_channel_exit(exit_watch).await.unwrap_or(-1)
+        }
+    }
+}
+
+async fn spawn_tracked_remote(
+    app: AppHandle,
+    shell_id: String,
+    project_root: String,
+    command: String,
+) -> Result<(), String> {
+    let ssh = parse_ssh_project_root(&project_root)?;
+    let info = open_exec(key_for(&ssh), login_command(&ssh.remote_path, &command))
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let stdio = take_channel_stdio(&info.channel_id)
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let stdout = stdio.stdout;
+    let stderr = stdio
+        .stderr
+        .ok_or_else(|| "stderr unavailable".to_string())?;
+    drop(stdio.stdin);
+
+    let (kill_tx, kill_rx) = tokio::sync::mpsc::channel::<()>(1);
+    let (exit_tx, exit_rx) = tokio::sync::watch::channel::<Option<ShellExitResult>>(None);
+
+    TRACKED_SHELLS.lock().unwrap().insert(
+        shell_id.clone(),
+        TrackedShell {
+            kill_tx,
+            exit_rx: exit_rx.clone(),
+        },
+    );
+
+    let app_stdout = app.clone();
+    let shell_stdout = shell_id.clone();
+    let stdout_task = tokio::spawn(async move {
+        pump_shell_stream(app_stdout, shell_stdout, "stdout", stdout).await;
+    });
+
+    let app_stderr = app.clone();
+    let shell_stderr = shell_id.clone();
+    let stderr_task = tokio::spawn(async move {
+        pump_shell_stream(app_stderr, shell_stderr, "stderr", stderr).await;
+    });
+
+    let app_wait = app.clone();
+    let shell_wait = shell_id.clone();
+    let channel_id = info.channel_id.clone();
+    let exit_watch = channel_exit_rx(&channel_id).await?;
+    tokio::spawn(async move {
+        let exit_code = reap_remote_shell(channel_id, exit_watch, kill_rx).await;
+        join_output_pumps(stdout_task, stderr_task).await;
+        let exit = ShellExitResult {
+            exit_code,
+            signal: None,
+        };
+        let _ = exit_tx.send(Some(exit.clone()));
+        TRACKED_SHELLS.lock().unwrap().remove(&shell_wait);
         let _ = app_wait.emit(
             &format!("shell-exit-{shell_wait}"),
             serde_json::json!({

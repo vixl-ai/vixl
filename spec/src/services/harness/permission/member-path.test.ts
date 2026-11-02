@@ -140,6 +140,7 @@ describe('permission keys are prefixed per member', () => {
       projectRoot: '/tmp/api',
       path: 'api/src/.env',
       content: 'SECRET=1',
+      allowSensitive: true,
       projectRoots: roots,
     })
   })
@@ -161,6 +162,7 @@ describe('permission keys are prefixed per member', () => {
       projectRoot: '/tmp/project',
       path: 'src/a.ts',
       content: 'ok',
+      allowSensitive: true,
     })
     expect(fsWriteFile.mock.calls[0]?.[0]).not.toHaveProperty('projectRoots')
   })

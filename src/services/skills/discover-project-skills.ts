@@ -5,7 +5,7 @@ import parseSkillFrontmatter from '@/services/skills/strip-skill-frontmatter'
 export const discoverProjectSkillIndex = async (
   projectRoot: string,
 ): Promise<SkillIndexEntry[]> => {
-  const files = await listVixlFiles('project', 'skills', projectRoot).catch(() => [])
+  const files = await listVixlFiles('project', 'skills', projectRoot)
   return files.map((file) => ({
     name: file.name,
     description: file.description ?? '',
@@ -17,7 +17,7 @@ export const loadProjectSkill = async (
   projectRoot: string,
   name: string,
 ): Promise<{ skillDirectory: string; content: string; description: string } | null> => {
-  const files = await listVixlFiles('project', 'skills', projectRoot).catch(() => [])
+  const files = await listVixlFiles('project', 'skills', projectRoot)
   const match = files.find((file) => file.name.toLowerCase() === name.toLowerCase())
   if (!match) {
     return null

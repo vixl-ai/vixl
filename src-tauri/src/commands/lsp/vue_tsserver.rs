@@ -8,9 +8,7 @@ use super::documents::{close_document, ensure_document_open, sync_document_chang
 use super::ensure_running::ensure_running_server;
 use super::helpers::path_to_uri;
 use super::instance::lsp_instance_key;
-use super::rpc::{
-    json_rpc_request, lookup_managed, send_notification, LspProcess, LSP_SERVERS,
-};
+use super::rpc::{json_rpc_request, lookup_managed, send_notification, LspProcess, LSP_SERVERS};
 use super::stop_server_internal;
 
 pub fn tsserver_request_body(result: serde_json::Value) -> serde_json::Value {
@@ -104,7 +102,9 @@ pub(crate) async fn forward_vue_tsserver_request_inner(
         guard.uses_classic_typescript
     };
     if !uses_classic {
-        stop_server_internal(app, &lsp_instance_key("typescript", &workspace_root)).await.ok();
+        stop_server_internal(app, &lsp_instance_key("typescript", &workspace_root))
+            .await
+            .ok();
         let _ = ensure_running_server(app, "ts", Some(workspace_root.clone())).await?;
         let ts_managed = {
             let servers = LSP_SERVERS.lock().await;
@@ -132,7 +132,9 @@ pub(crate) async fn forward_vue_tsserver_request_inner(
             }
 
             // Old typescript-language-server builds lack typescript.tsserverRequest.
-            stop_server_internal(app, &lsp_instance_key("typescript", &workspace_root)).await.ok();
+            stop_server_internal(app, &lsp_instance_key("typescript", &workspace_root))
+                .await
+                .ok();
             let _ = ensure_running_server(app, "ts", Some(workspace_root.clone())).await?;
             let ts_managed = {
                 let servers = LSP_SERVERS.lock().await;

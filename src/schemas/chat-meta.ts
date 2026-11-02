@@ -31,7 +31,14 @@ export const activeContextSchema = z.object({
 })
 
 export const chatAttentionSchema = z
-  .enum(['needs_approval', 'needs_input', 'needs_mcp_auth', 'completed', 'error'])
+  .enum([
+    'needs_approval',
+    'needs_input',
+    'needs_mcp_auth',
+    'disconnected',
+    'completed',
+    'error',
+  ])
   .nullable()
 
 const awaitingPlanGoSchema = z

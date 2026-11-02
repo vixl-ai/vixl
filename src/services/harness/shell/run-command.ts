@@ -21,8 +21,11 @@ import {
   wrapWithSandboxingFooter,
 } from '@/services/harness/shell/sandbox-result'
 import { hasSubagent } from '@/services/harness/subagent/registry'
+import { sessionDroppedError, sshHostFromRoot } from '@/services/harness/ssh/model-errors'
+import { sshMasterIsDead } from '@/services/harness/ssh/session-alive'
 import { ipcProjectRoots } from '@/services/harness/tool-roots'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import { isSshProjectRoot } from '@/utils/ssh-project-root'
 
 export const runTerminalCommand = async (
   ctx: HarnessToolContext,
@@ -100,6 +103,12 @@ export const runTerminalCommand = async (
       throw new Error(`Command timed out after ${timeoutMs}ms: ${args.command}`)
     }
 
+    if (isSshProjectRoot(projectRoot) && !stdout.trim() && !stderr.trim()) {
+      if (await sshMasterIsDead(projectRoot)) {
+        throw new Error(sessionDroppedError(sshHostFromRoot(projectRoot)))
+      }
+    }
+
     if (waitResult.exitCode !== 0) {
       const reason = formatShellExitReason(waitResult)
       const detail = stderr.trim() || stdout.trim() || reason
@@ -132,6 +141,9 @@ export const runTerminalCommand = async (
       meta,
     )
   } catch (error) {
+    if (isSshProjectRoot(projectRoot)) {
+      throw error instanceof Error ? error : new Error(String(error))
+    }
     throw wrapWithSandboxingFooter(error, meta)
   }
 }

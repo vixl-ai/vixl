@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 use uuid::Uuid;
 
+use super::fs::{parse_ssh_project_root, uses_ssh_transport};
 use super::paths::user_vixl_dir;
 use super::worktree::WorktreeParentMatch;
 
@@ -239,6 +240,9 @@ pub(crate) fn roots_match(left: &str, right: &str) -> bool {
     if left == right {
         return true;
     }
+    if uses_ssh_transport(left, None) || uses_ssh_transport(right, None) {
+        return ssh_roots_match(left, right);
+    }
     match (
         dunce::canonicalize(Path::new(left)),
         dunce::canonicalize(Path::new(right)),
@@ -248,10 +252,33 @@ pub(crate) fn roots_match(left: &str, right: &str) -> bool {
     }
 }
 
+fn ssh_roots_match(left: &str, right: &str) -> bool {
+    match (parse_ssh_project_root(left), parse_ssh_project_root(right)) {
+        (Ok(left_root), Ok(right_root)) => {
+            left_root.user == right_root.user
+                && left_root.hostname == right_root.hostname
+                && left_root.port == right_root.port
+                && left_root.remote_path == right_root.remote_path
+        }
+        _ => false,
+    }
+}
+
 fn normalize_root_path(root_path: String) -> String {
+    if uses_ssh_transport(&root_path, None) {
+        return root_path;
+    }
     dunce::canonicalize(&root_path)
         .map(|path| path.to_string_lossy().to_string())
         .unwrap_or(root_path)
+}
+
+pub(crate) fn validate_registry_root(root_path: &str) -> Result<(), String> {
+    if uses_ssh_transport(root_path, None) {
+        parse_ssh_project_root(root_path).map(|_| ())
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -342,6 +369,7 @@ pub(crate) fn add_or_update_project(
     name: String,
     root_path: String,
 ) -> Result<FleetProject, String> {
+    validate_registry_root(&root_path)?;
     let mut registry = read_registry(app)?;
     let groups = read_groups_registry(app).unwrap_or(GroupsRegistry {
         version: 1,

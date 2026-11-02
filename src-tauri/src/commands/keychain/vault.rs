@@ -2,6 +2,23 @@ use std::collections::HashMap;
 
 const KEY_PREFIX: &str = "vixl:";
 pub const VAULT_ACCOUNT: &str = "vixl:vault";
+pub const SSH_PASSWORD_PREFIX: &str = "vixl:ssh-password:";
+pub const SSH_PASSPHRASE_PREFIX: &str = "vixl:ssh-passphrase:";
+
+pub fn deny_ssh_vault_from_webview(key: &str) -> Result<(), String> {
+    if key.starts_with(SSH_PASSWORD_PREFIX) || key.starts_with(SSH_PASSPHRASE_PREFIX) {
+        return Err(
+            "SSH secrets cannot be read or written through the generic secret commands".to_string(),
+        );
+    }
+    Ok(())
+}
+
+pub fn webview_secret_command_prepare(key: &str) -> Result<(), String> {
+    deny_ssh_vault_from_webview(key)?;
+    require_vixl_key(key)?;
+    Ok(())
+}
 
 pub type VaultMap = HashMap<String, String>;
 

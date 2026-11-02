@@ -1,8 +1,8 @@
 mod documents;
 mod ensure_running;
 mod helpers;
-mod instance;
 mod install_progress;
+mod instance;
 mod io;
 mod progress;
 mod resolve;
@@ -70,7 +70,7 @@ use helpers::{
     LspDiagnosticsEvent,
 };
 pub(crate) use install_progress::{finish_standalone_install, mark_server_installing};
-use instance::{lsp_logical_id};
+use instance::lsp_logical_id;
 use resolve::{active_project_root, load_effective_servers, server_binary_available};
 use rpc::{
     cancel_pending_requests, handle_process_exit, has_logical_server, json_rpc_request,
@@ -112,7 +112,7 @@ pub(crate) fn spawn_reader(
     tokio::spawn(async move {
         let stdout = {
             let mut guard = process.lock().await;
-            guard.child.stdout.take()
+            guard.child.take_stdout()
         };
 
         let Some(stdout) = stdout else {
@@ -772,7 +772,7 @@ mod retire_tests {
         let stdin = child.stdin.take().expect("sleep stdin");
         let generation = 4;
         let process = Arc::new(Mutex::new(LspProcess {
-            child,
+            child: super::rpc::LspChild::Local(child),
             stdin,
             workspace_root: "/tmp/app".to_string(),
             open_documents: HashMap::new(),

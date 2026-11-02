@@ -12,6 +12,7 @@ import useContextUsage from '@/composables/use-context-usage'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useVixlConfig from '@/composables/use-vixl-config'
 import useMcpServers from '@/composables/use-mcp-servers'
+import contextMentionFromNode from '@/utils/context-mention-from-node'
 
 const draftModelRef = ref('')
 const draftMode = ref<VixlChatMode>('agent')
@@ -139,6 +140,9 @@ export default () => {
   }
 
   const setDraftMentions = (mentions: ContextMention[]): void => {
+    if (contextMentionFromNode.mentionsEqual(draftMentions.value, mentions)) {
+      return
+    }
     draftMentions.value = mentions
   }
 

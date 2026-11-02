@@ -30,7 +30,7 @@ export const assertServerTrusted = (
   if (!settings) {
     throw new Error('MCP trust check requires settings')
   }
-  const fingerprint = mcpServerFingerprint(config)
+  const fingerprint = mcpServerFingerprint(config, options?.scopeKey)
   if (!isMcpTrusted(settings, serverId, fingerprint, sessionTrusts, options?.scopeKey)) {
     throw new Error(
       `MCP server "${serverId}" is not trusted for the current configuration`,

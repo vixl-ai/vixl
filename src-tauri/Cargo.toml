@@ -120,6 +120,10 @@ name = "commands_keychain"
 path = "../spec/src-tauri/commands/keychain.rs"
 
 [[test]]
+name = "commands_ssh"
+path = "../spec/src-tauri/commands/ssh.rs"
+
+[[test]]
 name = "commands_lsp"
 path = "../spec/src-tauri/commands/lsp.rs"
 

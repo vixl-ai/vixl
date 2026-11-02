@@ -1,7 +1,9 @@
 use super::diff::build_file_diff;
 use super::path::{
-    reject_resolved_sensitive_path, resolve_command_path, WorkspaceRootArg,
+    reject_resolved_sensitive_path_unless_allowed, resolve_command_path, ResolvedWorkspacePath,
+    WorkspaceRootArg,
 };
+use super::remote::{self, FsTarget};
 use super::types::{FileDiff, FsEditReplacement, FsStagePreviewRequest};
 use std::fs;
 
@@ -36,13 +38,13 @@ pub(crate) fn apply_replacements(
 }
 
 #[derive(Debug)]
-enum PatchOperation {
+pub(crate) enum PatchOperation {
     Add { path: String, content: String },
     Update { path: String, content: String },
     Delete { path: String },
 }
 
-fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, String> {
+pub(crate) fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, String> {
     let trimmed = patch.trim();
     if trimmed.is_empty() {
         return Err("Patch is empty".to_string());
@@ -149,7 +151,10 @@ fn seek_matching_line<'a>(
     Ok(())
 }
 
-fn apply_update_patch<'a>(existing: &'a str, patched: &'a str) -> Result<String, String> {
+pub(crate) fn apply_update_patch<'a>(
+    existing: &'a str,
+    patched: &'a str,
+) -> Result<String, String> {
     let mut result: Vec<&'a str> = Vec::new();
     let mut old_index = 0usize;
     let old_lines: Vec<&str> = existing.lines().collect();
@@ -195,126 +200,259 @@ fn apply_update_patch<'a>(existing: &'a str, patched: &'a str) -> Result<String,
     Ok(output)
 }
 
+fn member_rel(resolved: &ResolvedWorkspacePath) -> String {
+    let rel = resolved.member_relative_path();
+    if rel.is_empty() {
+        ".".to_string()
+    } else {
+        rel
+    }
+}
+
+fn retarget(operation: PatchOperation, path: String) -> PatchOperation {
+    match operation {
+        PatchOperation::Add { content, .. } => PatchOperation::Add { path, content },
+        PatchOperation::Update { content, .. } => PatchOperation::Update { path, content },
+        PatchOperation::Delete { .. } => PatchOperation::Delete { path },
+    }
+}
+
+fn with_member_slug(resolved: &ResolvedWorkspacePath, mut diff: FileDiff) -> FileDiff {
+    let Some(slug) = resolved.slug.clone() else {
+        return diff;
+    };
+    if diff.path == slug || diff.path.starts_with(&format!("{slug}/")) {
+        return diff;
+    }
+    diff.path = if diff.path.is_empty() || diff.path == "." {
+        slug
+    } else {
+        format!("{slug}/{}", diff.path)
+    };
+    diff
+}
+
+pub(crate) fn apply_local_member(
+    resolved: ResolvedWorkspacePath,
+    operation: PatchOperation,
+    allow_sensitive: Option<bool>,
+) -> Result<FileDiff, String> {
+    let root = resolved.root.to_string_lossy().into_owned();
+    let operation = retarget(operation, member_rel(&resolved));
+    Ok(with_member_slug(
+        &resolved,
+        apply_one(&root, None, operation, allow_sensitive)?,
+    ))
+}
+
+pub(crate) fn preview_local_member(
+    resolved: ResolvedWorkspacePath,
+    operation: PatchOperation,
+    allow_sensitive: Option<bool>,
+) -> Result<FileDiff, String> {
+    let root = resolved.root.to_string_lossy().into_owned();
+    let operation = retarget(operation, member_rel(&resolved));
+    Ok(with_member_slug(
+        &resolved,
+        preview_one(&root, None, operation, allow_sensitive)?,
+    ))
+}
+
+pub(crate) fn stage_preview_local_member(
+    resolved: ResolvedWorkspacePath,
+    request: FsStagePreviewRequest,
+    allow_sensitive: Option<bool>,
+) -> Result<Vec<FileDiff>, String> {
+    let root = resolved.root.to_string_lossy().into_owned();
+    let rel = member_rel(&resolved);
+    let request = match request {
+        FsStagePreviewRequest::Write { content, .. } => {
+            FsStagePreviewRequest::Write { path: rel, content }
+        }
+        FsStagePreviewRequest::Edit { replacements, .. } => FsStagePreviewRequest::Edit {
+            path: rel,
+            replacements,
+        },
+        FsStagePreviewRequest::Delete { .. } => FsStagePreviewRequest::Delete { path: rel },
+        FsStagePreviewRequest::ApplyPatch { patch } => FsStagePreviewRequest::ApplyPatch { patch },
+    };
+    let diffs = stage_preview_local(&root, request, None, allow_sensitive)?;
+    Ok(diffs
+        .into_iter()
+        .map(|diff| with_member_slug(&resolved, diff))
+        .collect())
+}
+
 pub(crate) fn preview_patch(
     project_root: &str,
     project_roots: Option<&[WorkspaceRootArg]>,
     patch: &str,
+    allow_sensitive: Option<bool>,
 ) -> Result<Vec<FileDiff>, String> {
     let operations = parse_patch(patch)?;
     let mut diffs = Vec::new();
-
     for operation in operations {
-        match operation {
-            PatchOperation::Add { path, content } => {
-                let resolved = resolve_command_path(project_root, project_roots, &path)?;
-                reject_resolved_sensitive_path(&resolved)?;
-                diffs.push(build_file_diff(
-                    resolved.reported_path(),
-                    "create",
-                    None,
-                    Some(content),
-                ));
-            }
-            PatchOperation::Update { path, content } => {
-                let resolved = resolve_command_path(project_root, project_roots, &path)?;
-                reject_resolved_sensitive_path(&resolved)?;
-                let old_content =
-                    fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
-                let new_content = apply_update_patch(&old_content, &content)?;
-                diffs.push(build_file_diff(
-                    resolved.reported_path(),
-                    "update",
-                    Some(old_content),
-                    Some(new_content),
-                ));
-            }
-            PatchOperation::Delete { path } => {
-                let resolved = resolve_command_path(project_root, project_roots, &path)?;
-                reject_resolved_sensitive_path(&resolved)?;
-                let old_content =
-                    fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
-                diffs.push(build_file_diff(
-                    resolved.reported_path(),
-                    "delete",
-                    Some(old_content),
-                    None,
-                ));
-            }
+        diffs.push(preview_one(
+            project_root,
+            project_roots,
+            operation,
+            allow_sensitive,
+        )?);
+    }
+    Ok(diffs)
+}
+
+fn preview_one(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+    operation: PatchOperation,
+    allow_sensitive: Option<bool>,
+) -> Result<FileDiff, String> {
+    match operation {
+        PatchOperation::Add { path, content } => {
+            let resolved = resolve_command_path(project_root, project_roots, &path)?;
+            reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
+            Ok(build_file_diff(
+                resolved.reported_path(),
+                "create",
+                None,
+                Some(content),
+            ))
+        }
+        PatchOperation::Update { path, content } => {
+            let resolved = resolve_command_path(project_root, project_roots, &path)?;
+            reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
+            let old_content =
+                fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
+            let new_content = apply_update_patch(&old_content, &content)?;
+            Ok(build_file_diff(
+                resolved.reported_path(),
+                "update",
+                Some(old_content),
+                Some(new_content),
+            ))
+        }
+        PatchOperation::Delete { path } => {
+            let resolved = resolve_command_path(project_root, project_roots, &path)?;
+            reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
+            let old_content =
+                fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
+            Ok(build_file_diff(
+                resolved.reported_path(),
+                "delete",
+                Some(old_content),
+                None,
+            ))
         }
     }
-
-    Ok(diffs)
 }
 
 pub(crate) fn apply_patch_operations(
     project_root: &str,
     project_roots: Option<&[WorkspaceRootArg]>,
     patch: &str,
+    allow_sensitive: Option<bool>,
 ) -> Result<Vec<FileDiff>, String> {
     let operations = parse_patch(patch)?;
     let mut diffs = Vec::new();
-
     for operation in operations {
-        match operation {
-            PatchOperation::Add { path, content } => {
-                let resolved = resolve_command_path(project_root, project_roots, &path)?;
-                reject_resolved_sensitive_path(&resolved)?;
-                if let Some(parent) = resolved.path.parent() {
-                    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-                }
-                fs::write(&resolved.path, &content).map_err(|error| error.to_string())?;
-                diffs.push(build_file_diff(
-                    resolved.reported_path(),
-                    "create",
-                    None,
-                    Some(content),
-                ));
-            }
-            PatchOperation::Update { path, content } => {
-                let resolved = resolve_command_path(project_root, project_roots, &path)?;
-                reject_resolved_sensitive_path(&resolved)?;
-                let old_content =
-                    fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
-                let new_content = apply_update_patch(&old_content, &content)?;
-                fs::write(&resolved.path, &new_content).map_err(|error| error.to_string())?;
-                diffs.push(build_file_diff(
-                    resolved.reported_path(),
-                    "update",
-                    Some(old_content),
-                    Some(new_content),
-                ));
-            }
-            PatchOperation::Delete { path } => {
-                let resolved = resolve_command_path(project_root, project_roots, &path)?;
-                reject_resolved_sensitive_path(&resolved)?;
-                let old_content =
-                    fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
-                fs::remove_file(&resolved.path).map_err(|error| error.to_string())?;
-                diffs.push(build_file_diff(
-                    resolved.reported_path(),
-                    "delete",
-                    Some(old_content),
-                    None,
-                ));
-            }
-        }
+        diffs.push(apply_one(
+            project_root,
+            project_roots,
+            operation,
+            allow_sensitive,
+        )?);
     }
-
     Ok(diffs)
 }
 
-#[tauri::command]
+fn apply_one(
+    project_root: &str,
+    project_roots: Option<&[WorkspaceRootArg]>,
+    operation: PatchOperation,
+    allow_sensitive: Option<bool>,
+) -> Result<FileDiff, String> {
+    match operation {
+        PatchOperation::Add { path, content } => {
+            let resolved = resolve_command_path(project_root, project_roots, &path)?;
+            reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
+            if let Some(parent) = resolved.path.parent() {
+                fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+            }
+            fs::write(&resolved.path, &content).map_err(|error| error.to_string())?;
+            Ok(build_file_diff(
+                resolved.reported_path(),
+                "create",
+                None,
+                Some(content),
+            ))
+        }
+        PatchOperation::Update { path, content } => {
+            let resolved = resolve_command_path(project_root, project_roots, &path)?;
+            reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
+            let old_content =
+                fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
+            let new_content = apply_update_patch(&old_content, &content)?;
+            fs::write(&resolved.path, &new_content).map_err(|error| error.to_string())?;
+            Ok(build_file_diff(
+                resolved.reported_path(),
+                "update",
+                Some(old_content),
+                Some(new_content),
+            ))
+        }
+        PatchOperation::Delete { path } => {
+            let resolved = resolve_command_path(project_root, project_roots, &path)?;
+            reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
+            let old_content =
+                fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
+            fs::remove_file(&resolved.path).map_err(|error| error.to_string())?;
+            Ok(build_file_diff(
+                resolved.reported_path(),
+                "delete",
+                Some(old_content),
+                None,
+            ))
+        }
+    }
+}
+
 pub fn fs_edit_file(
     project_root: String,
     path: String,
     replacements: Vec<FsEditReplacement>,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<FileDiff, String> {
     if replacements.is_empty() {
         return Err("At least one replacement is required".to_string());
     }
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        match remote::resolve_target(&project_root, project_roots.as_deref(), &path)? {
+            FsTarget::Ssh(_) => {
+                return remote::edit_file(
+                    &project_root,
+                    project_roots.as_deref(),
+                    &path,
+                    replacements,
+                    allow_sensitive,
+                );
+            }
+            FsTarget::Local(resolved) => {
+                let rel = resolved.member_relative_path();
+                let rel = if rel.is_empty() { ".".to_string() } else { rel };
+                return fs_edit_file(
+                    resolved.root.to_string_lossy().into_owned(),
+                    rel,
+                    replacements,
+                    None,
+                    allow_sensitive,
+                );
+            }
+        }
+    }
     let resolved = resolve_command_path(&project_root, project_roots.as_deref(), &path)?;
-    reject_resolved_sensitive_path(&resolved)?;
+    reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
     let old_content = fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
     let new_content = apply_replacements(&old_content, &replacements)?;
     fs::write(&resolved.path, &new_content).map_err(|error| error.to_string())?;
@@ -326,25 +464,128 @@ pub fn fs_edit_file(
     ))
 }
 
-#[tauri::command]
 pub fn fs_apply_patch(
     project_root: String,
     patch: String,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<Vec<FileDiff>, String> {
-    apply_patch_operations(&project_root, project_roots.as_deref(), &patch)
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        return remote::apply_patch(
+            &project_root,
+            project_roots.as_deref(),
+            &patch,
+            allow_sensitive,
+        );
+    }
+    apply_patch_operations(
+        &project_root,
+        project_roots.as_deref(),
+        &patch,
+        allow_sensitive,
+    )
 }
-#[tauri::command]
 pub fn fs_stage_preview(
     project_root: String,
     request: FsStagePreviewRequest,
     project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
 ) -> Result<Vec<FileDiff>, String> {
-    let roots = project_roots.as_deref();
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        return remote::stage_preview(
+            &project_root,
+            project_roots.as_deref(),
+            request,
+            allow_sensitive,
+        );
+    }
+    stage_preview_local(
+        &project_root,
+        request,
+        project_roots.as_deref(),
+        allow_sensitive,
+    )
+}
+
+#[tauri::command(rename = "fs_edit_file")]
+pub async fn fs_edit_file_command(
+    project_root: String,
+    path: String,
+    replacements: Vec<FsEditReplacement>,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<FileDiff, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref())
+        && matches!(
+            remote::resolve_target(&project_root, project_roots.as_deref(), &path)?,
+            remote::FsTarget::Ssh(_)
+        )
+    {
+        return remote::edit_file_await(
+            project_root,
+            project_roots,
+            path,
+            replacements,
+            allow_sensitive,
+        )
+        .await;
+    }
+    super::read::off_the_webview(move || {
+        fs_edit_file(
+            project_root,
+            path,
+            replacements,
+            project_roots,
+            allow_sensitive,
+        )
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_apply_patch")]
+pub async fn fs_apply_patch_command(
+    project_root: String,
+    patch: String,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<Vec<FileDiff>, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        return remote::apply_patch_await(project_root, project_roots, patch, allow_sensitive)
+            .await;
+    }
+    super::read::off_the_webview(move || {
+        fs_apply_patch(project_root, patch, project_roots, allow_sensitive)
+    })
+    .await
+}
+
+#[tauri::command(rename = "fs_stage_preview")]
+pub async fn fs_stage_preview_command(
+    project_root: String,
+    request: FsStagePreviewRequest,
+    project_roots: Option<Vec<WorkspaceRootArg>>,
+    allow_sensitive: Option<bool>,
+) -> Result<Vec<FileDiff>, String> {
+    if remote::uses_ssh_transport(&project_root, project_roots.as_deref()) {
+        return remote::stage_preview_await(project_root, project_roots, request, allow_sensitive)
+            .await;
+    }
+    super::read::off_the_webview(move || {
+        fs_stage_preview(project_root, request, project_roots, allow_sensitive)
+    })
+    .await
+}
+
+fn stage_preview_local(
+    project_root: &str,
+    request: FsStagePreviewRequest,
+    roots: Option<&[WorkspaceRootArg]>,
+    allow_sensitive: Option<bool>,
+) -> Result<Vec<FileDiff>, String> {
     match request {
         FsStagePreviewRequest::Write { path, content } => {
-            let resolved = resolve_command_path(&project_root, roots, &path)?;
-            reject_resolved_sensitive_path(&resolved)?;
+            let resolved = resolve_command_path(project_root, roots, &path)?;
+            reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
             let old_content = if resolved.path.exists() {
                 Some(fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?)
             } else {
@@ -366,8 +607,8 @@ pub fn fs_stage_preview(
             if replacements.is_empty() {
                 return Err("At least one replacement is required".to_string());
             }
-            let resolved = resolve_command_path(&project_root, roots, &path)?;
-            reject_resolved_sensitive_path(&resolved)?;
+            let resolved = resolve_command_path(project_root, roots, &path)?;
+            reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
             let old_content =
                 fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
             let new_content = apply_replacements(&old_content, &replacements)?;
@@ -378,10 +619,12 @@ pub fn fs_stage_preview(
                 Some(new_content),
             )])
         }
-        FsStagePreviewRequest::ApplyPatch { patch } => preview_patch(&project_root, roots, &patch),
+        FsStagePreviewRequest::ApplyPatch { patch } => {
+            preview_patch(project_root, roots, &patch, allow_sensitive)
+        }
         FsStagePreviewRequest::Delete { path } => {
-            let resolved = resolve_command_path(&project_root, roots, &path)?;
-            reject_resolved_sensitive_path(&resolved)?;
+            let resolved = resolve_command_path(project_root, roots, &path)?;
+            reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
             let old_content =
                 fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
             Ok(vec![build_file_diff(
@@ -396,7 +639,12 @@ pub fn fs_stage_preview(
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_update_patch, build_file_diff, parse_patch, PatchOperation};
+    use super::{
+        apply_update_patch, build_file_diff, fs_apply_patch, fs_edit_file, fs_stage_preview,
+        parse_patch, PatchOperation,
+    };
+    use crate::commands::fs::path::WorkspaceRootArg;
+    use crate::commands::fs::types::{FsEditReplacement, FsStagePreviewRequest};
 
     #[test]
     fn mid_file_hunk_preserves_prefix_and_suffix() {
@@ -492,5 +740,103 @@ mod tests {
                 assert_ne!(line.content.as_str(), "gamma");
             }
         }
+    }
+
+    fn replacement(old_string: &str, new_string: &str) -> FsEditReplacement {
+        FsEditReplacement {
+            old_string: old_string.to_string(),
+            new_string: new_string.to_string(),
+            replace_all: false,
+        }
+    }
+
+    #[test]
+    fn edit_honors_allow_sensitive() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let env_path = dir.path().join(".env");
+        std::fs::write(&env_path, "A=1\n").expect("write env");
+        let root = dir.path().to_string_lossy().into_owned();
+        let blocked = fs_edit_file(
+            root.clone(),
+            ".env".to_string(),
+            vec![replacement("A=1", "A=2")],
+            None,
+            None,
+        );
+        assert_eq!(blocked.expect_err("blocked"), "Sensitive path blocked");
+        fs_edit_file(
+            root,
+            ".env".to_string(),
+            vec![replacement("A=1", "A=2")],
+            None,
+            Some(true),
+        )
+        .expect("allowed");
+        assert_eq!(std::fs::read_to_string(env_path).expect("read"), "A=2\n");
+    }
+
+    #[test]
+    fn ssh_workspace_previews_and_patches_a_local_member() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("note.txt"), "hello\n").expect("write note");
+        std::fs::write(dir.path().join(".env"), "TOKEN=1\n").expect("write env");
+        let roots = vec![
+            WorkspaceRootArg {
+                slug: "local".to_string(),
+                path: dir.path().to_string_lossy().into_owned(),
+            },
+            WorkspaceRootArg {
+                slug: "remote".to_string(),
+                path: "ssh://aidanhibbard@eva.local/home/aidanhibbard/proj".to_string(),
+            },
+        ];
+        let root = dir.path().to_string_lossy().into_owned();
+        let preview = fs_stage_preview(
+            root.clone(),
+            FsStagePreviewRequest::Write {
+                path: "local/note.txt".to_string(),
+                content: "next\n".to_string(),
+            },
+            Some(roots.clone()),
+            None,
+        )
+        .expect("local preview");
+        assert_eq!(preview[0].path, "local/note.txt");
+        assert_eq!(preview[0].new_content.as_deref(), Some("next\n"));
+
+        let blocked = fs_edit_file(
+            root.clone(),
+            "local/.env".to_string(),
+            vec![replacement("TOKEN=1", "TOKEN=2")],
+            Some(roots.clone()),
+            None,
+        );
+        assert_eq!(blocked.expect_err("blocked"), "Sensitive path blocked");
+        fs_edit_file(
+            root.clone(),
+            "local/.env".to_string(),
+            vec![replacement("TOKEN=1", "TOKEN=2")],
+            Some(roots.clone()),
+            Some(true),
+        )
+        .expect("local edit keeps allow_sensitive");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(".env")).expect("read env"),
+            "TOKEN=2\n"
+        );
+
+        let patched = fs_apply_patch(
+            root,
+            "*** Begin Patch\n*** Update File: local/note.txt\n@@\n-hello\n+next\n*** End Patch\n"
+                .to_string(),
+            Some(roots),
+            None,
+        )
+        .expect("local patch");
+        assert_eq!(patched[0].path, "local/note.txt");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("note.txt")).expect("read note"),
+            "next\n"
+        );
     }
 }

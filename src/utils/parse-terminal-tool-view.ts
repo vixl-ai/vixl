@@ -18,6 +18,8 @@ export type TerminalToolView = {
   command: string
   label: string
   shellId?: string
+  remote?: boolean
+  runsAt?: string
   phases: TerminalToolPhaseView[]
 }
 
@@ -86,11 +88,17 @@ const combinePhaseOutput = (record: Record<string, unknown> | null): string => {
   return clipTerminalOutput([stdout, stderr, error].filter((part) => part.length > 0).join('\n'))
 }
 
-const parsePhase = (record: Record<string, unknown> | null): TerminalToolPhaseView | null => {
+const isRemoteResult = (record: Record<string, unknown> | null): boolean =>
+  record?.remote === true
+
+const parsePhase = (
+  record: Record<string, unknown> | null,
+  remote?: boolean,
+): TerminalToolPhaseView | null => {
   if (!record) {
     return null
   }
-  const sandboxed = asSandboxed(record)
+  const sandboxed = remote ? undefined : asSandboxed(record)
   const exitCode = asExitCode(record.exitCode)
   const output = combinePhaseOutput(record)
   if (sandboxed === undefined && exitCode === undefined && output.length === 0) {
@@ -125,12 +133,14 @@ export const parseTerminalToolView = (run: ToolRun): TerminalToolView | null => 
     asOptionalString(result?.description) ?? asOptionalString(args?.description) ?? '',
   )
   const shellId = asOptionalString(result?.shellId) ?? asOptionalString(args?.shell_id)
+  const remote = isRemoteResult(result)
+  const runsAt = asOptionalString(result?.runsAt)
   const phases: TerminalToolPhaseView[] = []
-  const prior = parsePhase(asRecord(result?.priorPhase))
+  const prior = parsePhase(asRecord(result?.priorPhase), remote)
   if (prior) {
     phases.push(prior)
   }
-  const current = parsePhase(result)
+  const current = parsePhase(result, remote)
   if (current) {
     phases.push(current)
   } else if (phases.length === 0 && run.status === 'running') {
@@ -149,6 +159,8 @@ export const parseTerminalToolView = (run: ToolRun): TerminalToolView | null => 
     command,
     label,
     shellId,
+    ...(remote ? { remote: true } : {}),
+    ...(runsAt ? { runsAt } : {}),
     phases,
   }
 }

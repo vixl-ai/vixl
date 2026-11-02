@@ -82,6 +82,8 @@ const {
   handleRefresh,
   handleSelect,
   handleExpandedChange,
+  watchError,
+  retryWatch,
 } = useFileTreeView(props, emit)
 
 defineExpose({
@@ -109,7 +111,7 @@ defineExpose({
       v-if="!hideChrome"
       class="flex items-center justify-between px-2 py-1"
     >
-      <span class="truncate text-[13px] font-medium text-foreground">
+      <span class="min-w-0 truncate text-[13px] font-medium text-foreground">
         {{ projectLabel }}
       </span>
       <div class="flex shrink-0 items-center gap-0.5">
@@ -160,6 +162,22 @@ defineExpose({
           <TooltipContent class="z-60">Refresh</TooltipContent>
         </Tooltip>
       </div>
+    </div>
+    <div
+      v-if="watchError"
+      class="flex items-center justify-between gap-2 px-2 pb-1"
+    >
+      <p class="min-w-0 truncate text-[11px] text-destructive">
+        {{ watchError }}
+      </p>
+      <Button
+        variant="ghost"
+        size="sm"
+        class="h-6 shrink-0 px-2 text-[11px]"
+        @click="retryWatch"
+      >
+        Retry watch
+      </Button>
     </div>
     <ContextMenu>
       <ContextMenuTrigger as-child>

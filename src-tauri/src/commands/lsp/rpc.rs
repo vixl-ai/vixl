@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use tauri::AppHandle;
 use tokio::io::AsyncWriteExt;
-use tokio::process::{Child, ChildStdin};
+use tokio::process::{Child, ChildStdin, ChildStdout};
+
+use crate::commands::ssh::close_channel;
 use tokio::sync::{oneshot, Mutex};
 use tokio::time::{sleep, Duration};
 
@@ -61,8 +63,76 @@ pub struct LspDiagnosticProvider {
     pub identifier: Option<String>,
 }
 
+pub(crate) enum LspChild {
+    Local(Child),
+    Remote {
+        channel_id: String,
+        stdout: Option<ChildStdout>,
+        exit_rx: tokio::sync::watch::Receiver<Option<i32>>,
+    },
+}
+
+fn exit_status_from_code(code: i32) -> std::process::ExitStatus {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if code < 0 {
+            return std::process::ExitStatus::from_raw(9);
+        }
+        std::process::ExitStatus::from_raw(code << 8)
+    }
+    #[cfg(not(unix))]
+    {
+        use std::os::windows::process::ExitStatusExt;
+        let raw = if code < 0 { 1 } else { code as u32 };
+        std::process::ExitStatus::from_raw(raw)
+    }
+}
+
+impl LspChild {
+    pub(crate) fn take_stdout(&mut self) -> Option<ChildStdout> {
+        match self {
+            Self::Local(child) => child.stdout.take(),
+            Self::Remote { stdout, .. } => stdout.take(),
+        }
+    }
+
+    pub(crate) fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
+        match self {
+            Self::Local(child) => child.try_wait(),
+            Self::Remote { exit_rx, .. } => match *exit_rx.borrow() {
+                Some(code) => Ok(Some(exit_status_from_code(code))),
+                None => Ok(None),
+            },
+        }
+    }
+
+    pub(crate) fn start_kill(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Local(child) => child.start_kill(),
+            Self::Remote { channel_id, .. } => {
+                let id = channel_id.clone();
+                tokio::spawn(async move {
+                    let _ = close_channel(id).await;
+                });
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) async fn kill(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Local(child) => child.kill().await,
+            Self::Remote { channel_id, .. } => {
+                let _ = close_channel(channel_id.clone()).await;
+                Ok(())
+            }
+        }
+    }
+}
+
 pub(crate) struct LspProcess {
-    pub(crate) child: Child,
+    pub(crate) child: LspChild,
     pub(crate) stdin: ChildStdin,
     pub(crate) workspace_root: String,
     pub(crate) open_documents: HashMap<String, i32>,
@@ -425,6 +495,19 @@ async fn wait_child_status(process: &Mutex<LspProcess>) -> Option<std::process::
     guard.child.try_wait().ok().flatten()
 }
 
+async fn close_remote_lsp(process: &Mutex<LspProcess>) {
+    let channel_id = {
+        let guard = process.lock().await;
+        match &guard.child {
+            LspChild::Remote { channel_id, .. } => Some(channel_id.clone()),
+            LspChild::Local(_) => None,
+        }
+    };
+    if let Some(channel_id) = channel_id {
+        let _ = close_channel(channel_id).await;
+    }
+}
+
 pub(crate) async fn handle_process_exit(
     app: &AppHandle,
     server_id: &str,
@@ -440,6 +523,8 @@ pub(crate) async fn handle_process_exit(
     if exit_handled.load(Ordering::SeqCst) {
         return;
     }
+
+    close_remote_lsp(process).await;
 
     let status = match known_status {
         Some(status) => status_from_std(status),
@@ -484,6 +569,37 @@ pub(crate) async fn handle_process_exit(
                 );
             }
             _ => {}
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LspChild;
+
+    #[test]
+    fn remote_try_wait_stays_pending_until_the_channel_exits() {
+        let (tx, exit_rx) = tokio::sync::watch::channel(None);
+        let mut child = LspChild::Remote {
+            channel_id: "channel".to_string(),
+            stdout: None,
+            exit_rx,
+        };
+        assert!(child.try_wait().expect("wait").is_none());
+        tx.send(Some(1)).expect("exit");
+        let status = child.try_wait().expect("wait").expect("exited");
+        assert_eq!(status.code(), Some(1));
+        tx.send(Some(-1)).expect("signal");
+        let status = child.try_wait().expect("wait").expect("signaled");
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::ExitStatusExt;
+            assert!(status.code().is_none());
+            assert_eq!(status.signal(), Some(9));
+        }
+        #[cfg(not(unix))]
+        {
+            assert_eq!(status.code(), Some(1));
         }
     }
 }

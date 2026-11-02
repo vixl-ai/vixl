@@ -29,6 +29,49 @@ const asType = (value: unknown): ContextMention['type'] | null => {
   return null
 }
 
+const mentionPayload = (mention: ContextMention): string => {
+  switch (mention.type) {
+    case 'file':
+      return `file\0${mention.path}\0${mention.content ?? ''}`
+    case 'folder':
+      return `folder\0${mention.path}\0${mention.listing ?? ''}`
+    case 'rule':
+      return `rule\0${mention.name}`
+    case 'skill':
+      return `skill\0${mention.name}`
+    case 'agent':
+      return `agent\0${mention.name}`
+    case 'symbol':
+      return [
+        'symbol',
+        mention.path,
+        mention.name,
+        mention.startLine ?? '',
+        mention.endLine ?? '',
+        mention.content ?? '',
+      ].join('\0')
+    case 'codebase':
+      return `codebase\0${mention.query}\0${mention.content ?? ''}`
+  }
+}
+
+const mentionsEqual = (
+  left: ContextMention[],
+  right: ContextMention[],
+): boolean => {
+  if (left.length !== right.length) {
+    return false
+  }
+  for (let index = 0; index < left.length; index += 1) {
+    const current = left[index]
+    const next = right[index]
+    if (!current || !next || mentionPayload(current) !== mentionPayload(next)) {
+      return false
+    }
+  }
+  return true
+}
+
 const mentionKey = (mention: ContextMention): string => {
   if (mention.type === 'file' || mention.type === 'folder') {
     return `${mention.type}:${mention.path}`
@@ -216,6 +259,7 @@ const mergePreservingContent = (
 export default {
   mentionKey,
   mentionLabel,
+  mentionsEqual,
   toAttrs,
   fromAttrs,
   collectFromEditor,

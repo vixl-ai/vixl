@@ -15,3 +15,6 @@ pub(crate) use resolve_cmd::{apply_resolved_path_env, merged_shell_path};
 pub use spawn::{mcp_start, mcp_stop};
 pub use status::{mcp_call_tool, mcp_list_statuses, mcp_logout, mcp_refresh, mcp_status};
 pub use types::{McpIcon, McpServerState, McpToolInfo};
+
+#[cfg(test)]
+pub(crate) use rpc::{clear_mcp_connection, watch_remote_mcp_exit};

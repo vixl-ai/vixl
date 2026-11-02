@@ -5,6 +5,7 @@ import {
   type ProjectFileEntry,
 } from '@/services/vixl/vixl-tauri'
 import parseAgentMarkdown from '@/services/agents/parse-agent-markdown'
+import { isUnreachableHostError } from '@/services/harness/ssh/map-error'
 import type { AgentIndexEntry, AgentScope, ResolvedAgentDefinition } from '@/types/agents'
 import slugifyName from '@/utils/slugify-name'
 
@@ -29,7 +30,7 @@ const listPersonalAgentIndex = async (): Promise<AgentIndexEntry[]> => {
 }
 
 const listProjectAgentIndex = async (projectRoot: string): Promise<AgentIndexEntry[]> => {
-  const files = await listVixlFiles('project', 'agents', projectRoot).catch(() => [])
+  const files = await listVixlFiles('project', 'agents', projectRoot)
   return files.map((file) => toIndexEntry(file, 'project'))
 }
 
@@ -85,7 +86,10 @@ const loadAgentDefinition = async (
   try {
     const result = await fsReadFile({ projectRoot: readRoot, path: relativePath })
     content = result.content
-  } catch {
+  } catch (error) {
+    if (entry.scope === 'project' && isUnreachableHostError(error)) {
+      throw error
+    }
     return null
   }
 

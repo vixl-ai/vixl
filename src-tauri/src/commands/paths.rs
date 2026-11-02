@@ -166,13 +166,23 @@ pub fn get_user_vixl_dir(app: AppHandle) -> Result<String, String> {
     user_vixl_dir(&app).map(|p| p.to_string_lossy().to_string())
 }
 
+fn project_has_vixl(root_path: &str) -> Result<bool, String> {
+    if root_is_home(root_path) {
+        return Ok(false);
+    }
+    let vixl_dir = resolve_project_vixl_dir(root_path);
+    Ok(vixl_dir.is_dir() && vixl_dir_has_config(&vixl_dir))
+}
+
 #[tauri::command]
-pub fn has_project_vixl(root_path: String) -> Result<bool, String> {
+pub async fn has_project_vixl(root_path: String) -> Result<bool, String> {
     if root_is_home(&root_path) {
         return Ok(false);
     }
-    let vixl_dir = resolve_project_vixl_dir(&root_path);
-    Ok(vixl_dir.is_dir() && vixl_dir_has_config(&vixl_dir))
+    if crate::commands::ssh::is_ssh_root(&root_path) {
+        return has_remote_project_vixl(&root_path).await;
+    }
+    project_has_vixl(&root_path)
 }
 
 #[tauri::command]
@@ -196,11 +206,45 @@ pub fn get_vixl_dir(
     scope: String,
     root_path: Option<String>,
 ) -> Result<String, String> {
-    vixl_base_dir(&scope, root_path.as_deref(), || user_vixl_dir(&app))
-        .map(|path| path.to_string_lossy().to_string())
+    get_vixl_dir_at(&scope, root_path.as_deref(), || user_vixl_dir(&app))
 }
 
-#[tauri::command]
+fn remote_project_vixl_uri(root: &str) -> String {
+    format!("{}/.vixl", root.trim_end_matches('/'))
+}
+
+fn get_vixl_dir_at(
+    scope: &str,
+    root_path: Option<&str>,
+    personal_dir: impl FnOnce() -> Result<PathBuf, String>,
+) -> Result<String, String> {
+    if scope == "project" {
+        if let Some(root) = root_path {
+            if crate::commands::ssh::is_ssh_root(root) {
+                return Ok(remote_project_vixl_uri(root));
+            }
+        }
+    }
+    vixl_base_dir(scope, root_path, personal_dir).map(|path| path.to_string_lossy().into_owned())
+}
+
+fn remote_vixl_names_have_config(names: impl IntoIterator<Item = impl AsRef<str>>) -> bool {
+    names.into_iter().any(|name| {
+        let name = name.as_ref();
+        name == "mcp.json" || name == "settings.json"
+    })
+}
+
+async fn has_remote_project_vixl(root: &str) -> Result<bool, String> {
+    match crate::commands::fs::list_dir_await(root, None, VIXL_DIR, None).await {
+        Ok(entries) => Ok(remote_vixl_names_have_config(
+            entries.iter().map(|entry| entry.name.as_str()),
+        )),
+        Err(err) if err.contains("No such file on ") => Ok(false),
+        Err(err) => Err(err),
+    }
+}
+
 pub fn list_vixl_files(
     app: AppHandle,
     scope: String,
@@ -219,11 +263,17 @@ fn list_vixl_files_at(
     if project_scope_targets_home(scope, root_path) {
         return Ok(vec![]);
     }
+    if scope == "project" {
+        if let Some(root) = root_path {
+            if crate::commands::ssh::is_ssh_root(root) {
+                return list_remote_vixl_files(root, kind);
+            }
+        }
+    }
     let base = vixl_base_dir(scope, root_path, personal_dir)?;
     list_files_for_kind(&base, kind)
 }
 
-#[tauri::command]
 pub fn list_project_files(
     root_path: String,
     kind: String,
@@ -231,8 +281,208 @@ pub fn list_project_files(
     if root_is_home(&root_path) {
         return Ok(vec![]);
     }
+    if crate::commands::ssh::is_ssh_root(&root_path) {
+        return list_remote_vixl_files(&root_path, &kind);
+    }
     let base = resolve_project_vixl_dir(&root_path);
     list_files_for_kind(&base, &kind)
+}
+
+fn list_remote_vixl_files(root: &str, kind: &str) -> Result<Vec<ProjectFileEntry>, String> {
+    let root = root.to_string();
+    let kind = kind.to_string();
+    crate::commands::ssh::block_on(async move { list_remote_vixl_files_async(&root, &kind).await })
+}
+
+async fn list_remote_vixl_files_async(
+    root: &str,
+    kind: &str,
+) -> Result<Vec<ProjectFileEntry>, String> {
+    match kind {
+        "agents" | "rules" => list_remote_flat_markdown(root, kind).await,
+        "agents-md" => list_remote_agents_md(root).await,
+        "skills" => list_remote_nested_files(root, "skills", "SKILL.md", true).await,
+        "plans" => list_remote_nested_files(root, "plans", "PLAN.md", false).await,
+        _ => Err(format!("unknown kind: {kind}")),
+    }
+}
+
+async fn list_remote_dir(
+    root: &str,
+    relative: &str,
+) -> Result<Vec<crate::commands::fs::FsDirEntry>, String> {
+    crate::commands::fs::list_dir_await(root, None, relative, None).await
+}
+
+async fn list_remote_dir_or_empty(
+    root: &str,
+    relative: &str,
+) -> Result<Vec<crate::commands::fs::FsDirEntry>, String> {
+    match list_remote_dir(root, relative).await {
+        Ok(entries) => Ok(entries),
+        Err(err) if err.contains("No such file on ") => Ok(vec![]),
+        Err(err) => Err(err),
+    }
+}
+
+async fn remote_read_text(root: &str, relative: &str) -> Result<Option<String>, String> {
+    match crate::commands::fs::read_file_await(root, None, relative, None, None, Some(false), None)
+        .await
+    {
+        Ok(file) => Ok(Some(file.content)),
+        Err(err) if err.contains("No such file on ") => Ok(None),
+        Err(err) => Err(err),
+    }
+}
+
+fn description_from_content(content: &str) -> Option<String> {
+    if let Some(description) = read_frontmatter_field(content, "description") {
+        return Some(description);
+    }
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with("---") {
+            continue;
+        }
+        return Some(trimmed.chars().take(120).collect());
+    }
+    None
+}
+
+async fn remote_listed_entry(
+    root: &str,
+    name: String,
+    relative: &str,
+    frontmatter_only: bool,
+) -> Result<Option<ProjectFileEntry>, String> {
+    let Some(content) = remote_read_text(root, relative).await? else {
+        return Ok(None);
+    };
+    let description = if frontmatter_only {
+        read_frontmatter_field(&content, "description")
+    } else {
+        description_from_content(&content)
+    };
+    Ok(Some(ProjectFileEntry {
+        name,
+        path: remote_listed_path(root, relative),
+        description,
+    }))
+}
+
+fn remote_listed_path(root: &str, relative: &str) -> String {
+    format!("{}/{relative}", root.trim_end_matches('/'))
+}
+
+fn is_markdown_name(name: &str) -> bool {
+    name.ends_with(".md") || name.ends_with(".mdc")
+}
+
+async fn list_remote_flat_markdown(
+    root: &str,
+    kind: &str,
+) -> Result<Vec<ProjectFileEntry>, String> {
+    let relative = format!(".vixl/{kind}");
+    let mut entries = Vec::new();
+    for entry in list_remote_dir_or_empty(root, &relative).await? {
+        if !is_markdown_name(&entry.name) {
+            continue;
+        }
+        if entry.kind != "file" && entry.kind != "symlink" {
+            continue;
+        }
+        if let Some(listed) = remote_listed_entry(root, entry.name, &entry.path, false).await? {
+            entries.push(listed);
+        }
+    }
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(entries)
+}
+
+async fn list_remote_agents_md(root: &str) -> Result<Vec<ProjectFileEntry>, String> {
+    let mut found_upper = None;
+    let mut found_lower = None;
+    for entry in list_remote_dir_or_empty(root, ".vixl").await? {
+        if entry.kind != "file" && entry.kind != "symlink" {
+            continue;
+        }
+        if entry.name == "AGENTS.md" {
+            found_upper = Some(entry);
+        } else if entry.name == "agents.md" {
+            found_lower = Some(entry);
+        }
+    }
+    let Some(entry) = found_upper.or(found_lower) else {
+        return Ok(vec![]);
+    };
+    Ok(remote_listed_entry(root, entry.name, &entry.path, false)
+        .await?
+        .into_iter()
+        .collect())
+}
+
+async fn list_remote_nested_files(
+    root: &str,
+    kind: &str,
+    file_name: &str,
+    frontmatter_only: bool,
+) -> Result<Vec<ProjectFileEntry>, String> {
+    let relative = format!(".vixl/{kind}");
+    let mut entries = Vec::new();
+    for entry in list_remote_dir_or_empty(root, &relative).await? {
+        if entry.kind != "directory" {
+            continue;
+        }
+        let sentinel = format!("{}/{file_name}", entry.path);
+        let stat = crate::commands::fs::stat_await(root, None, &sentinel, None).await?;
+        if !stat.exists {
+            continue;
+        }
+        if let Some(listed) =
+            remote_listed_entry(root, entry.name, &sentinel, frontmatter_only).await?
+        {
+            entries.push(listed);
+        }
+    }
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(entries)
+}
+
+#[tauri::command(rename = "list_vixl_files")]
+pub async fn list_vixl_files_command(
+    app: AppHandle,
+    scope: String,
+    kind: String,
+    root_path: Option<String>,
+) -> Result<Vec<ProjectFileEntry>, String> {
+    if scope == "project" {
+        if let Some(root) = root_path.as_deref() {
+            if crate::commands::ssh::is_ssh_root(root) {
+                return list_remote_vixl_files_async(root, &kind).await;
+            }
+        }
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        list_vixl_files_at(&scope, &kind, root_path.as_deref(), || user_vixl_dir(&app))
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
+
+#[tauri::command(rename = "list_project_files")]
+pub async fn list_project_files_command(
+    root_path: String,
+    kind: String,
+) -> Result<Vec<ProjectFileEntry>, String> {
+    if root_is_home(&root_path) {
+        return Ok(vec![]);
+    }
+    if crate::commands::ssh::is_ssh_root(&root_path) {
+        return list_remote_vixl_files_async(&root_path, &kind).await;
+    }
+    tauri::async_runtime::spawn_blocking(move || list_project_files(root_path, kind))
+        .await
+        .map_err(|err| err.to_string())?
 }
 
 fn vixl_base_dir(
@@ -245,6 +495,9 @@ fn vixl_base_dir(
         "project" => {
             let root =
                 root_path.ok_or_else(|| "root_path required for project scope".to_string())?;
+            if crate::commands::ssh::is_ssh_root(root) {
+                return Ok(PathBuf::from(remote_project_vixl_uri(root)));
+            }
             Ok(resolve_project_vixl_dir(root))
         }
         other => Err(format!("unknown scope: {other}")),
@@ -420,18 +673,7 @@ fn list_flat_markdown_files(dir: &Path) -> Result<Vec<ProjectFileEntry>, String>
 }
 
 fn read_first_description(path: &Path) -> Option<String> {
-    let content = fs::read_to_string(path).ok()?;
-    if let Some(description) = read_frontmatter_field(&content, "description") {
-        return Some(description);
-    }
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with("---") {
-            continue;
-        }
-        return Some(trimmed.chars().take(120).collect());
-    }
-    None
+    description_from_content(&fs::read_to_string(path).ok()?)
 }
 
 #[cfg(test)]
@@ -1047,7 +1289,7 @@ mod tests {
         let _home_env = HomeEnvGuard::set_home(&home);
         let home_str = path_str(&home);
 
-        assert!(!has_project_vixl(home_str.to_string()).unwrap());
+        assert!(!project_has_vixl(home_str).unwrap());
         assert!(
             list_project_files(home_str.to_string(), "agents".to_string())
                 .unwrap()
@@ -1176,7 +1418,7 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err, HOME_PROJECT_SCOPE_ERROR);
-        assert!(!has_project_vixl(dotted).unwrap());
+        assert!(!project_has_vixl(&dotted).unwrap());
         assert!(!home.join(".vixl").exists());
     }
 
@@ -1196,7 +1438,7 @@ mod tests {
         let _home_env = HomeEnvGuard::set_home(&home);
         let project_str = path_str(&project);
 
-        assert!(has_project_vixl(project_str.to_string()).unwrap());
+        assert!(project_has_vixl(project_str).unwrap());
         let settings = read_scoped_json(
             "project",
             Some(project_str),
@@ -1248,7 +1490,7 @@ mod tests {
         std::os::unix::fs::symlink(&home, &link).expect("symlink home");
 
         let _home_env = HomeEnvGuard::set_home(&home);
-        assert!(!has_project_vixl(path_str(&link).to_string()).unwrap());
+        assert!(!project_has_vixl(path_str(&link)).unwrap());
         let err = write_scoped_json(
             "project",
             Some(path_str(&link)),
@@ -1311,5 +1553,117 @@ mod tests {
             }
         }
         chars.into_iter().collect()
+    }
+
+    struct UriDecoy(PathBuf);
+
+    impl Drop for UriDecoy {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+            let mut current = self.0.clone();
+            while current.pop() {
+                if current.as_os_str().is_empty() || current == Path::new(".") {
+                    break;
+                }
+                if fs::remove_dir(&current).is_err() {
+                    break;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn remote_vixl_config_requires_settings_or_mcp() {
+        assert!(!remote_vixl_names_have_config(["agents", "skills"]));
+        assert!(!remote_vixl_names_have_config(Vec::<&str>::new()));
+        assert!(remote_vixl_names_have_config(["agents", "settings.json"]));
+        assert!(remote_vixl_names_have_config(["mcp.json"]));
+    }
+
+    #[test]
+    fn ssh_list_does_not_list_local_directory_named_as_uri() {
+        let uri = "ssh://aidanhibbard@vixl-list-decoy.example/tmp/proj";
+        let decoy = PathBuf::from(uri);
+        let _ = fs::remove_dir_all(&decoy);
+        let agents = decoy.join(".vixl").join("agents");
+        mkdir(&agents);
+        write_file(&agents, "decoy.md", "laptop .vixl must not be listed");
+        write_file(&decoy.join(".vixl"), "settings.json", "{}");
+        let local_vixl = decoy.join(".vixl");
+        let _cleanup = UriDecoy(decoy);
+
+        assert_ssh_list_unreachable(
+            list_project_files(uri.to_string(), "agents".to_string()),
+            "vixl-list-decoy.example",
+        );
+        assert_ssh_list_unreachable(
+            list_vixl_files_at("project", "agents", Some(uri), unused_personal_dir),
+            "vixl-list-decoy.example",
+        );
+
+        match tauri::async_runtime::block_on(has_project_vixl(uri.to_string())) {
+            Ok(true) => panic!("URI-named local directory must not count as project .vixl"),
+            Ok(false) => panic!("expected unreachable, got false"),
+            Err(err) => assert!(
+                err.contains("vixl-list-decoy.example is unreachable."),
+                "got {err}"
+            ),
+        }
+
+        let vixl_dir = get_vixl_dir_at("project", Some(uri), unused_personal_dir).unwrap();
+        assert_eq!(vixl_dir, format!("{uri}/.vixl"));
+        let canonical_local = dunce::canonicalize(&local_vixl).expect("decoy .vixl");
+        assert_ne!(PathBuf::from(&vixl_dir), canonical_local);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ssh_list_dead_master_is_unreachable() {
+        let _lock = crate::commands::ssh::SESSION_TEST_LOCK.lock().await;
+        crate::commands::ssh::clear_sessions_for_tests().await;
+        let dir = tempfile::tempdir().expect("tempdir");
+        let paths = crate::commands::ssh::SshPaths::from_roots(
+            dir.path().join("vixl"),
+            dir.path().join("user"),
+        );
+        crate::commands::ssh::insert_test_session(
+            crate::commands::ssh::SshSessionStatus {
+                user: "aidanhibbard".to_string(),
+                hostname: "eva.local".to_string(),
+                port: 22,
+                destination: "eva".to_string(),
+                state: "disconnected".to_string(),
+                line: "eva.local is not connected".to_string(),
+                last_error: None,
+                master_alive: false,
+            },
+            paths,
+            dir.path().join("cm-missing"),
+        )
+        .await;
+        let root = "ssh://aidanhibbard@eva.local/home/aidanhibbard/proj";
+        assert_ssh_list_unreachable(
+            list_project_files(root.to_string(), "agents".to_string()),
+            "eva.local",
+        );
+        assert_ssh_list_unreachable(
+            list_vixl_files_at("project", "agents", Some(root), unused_personal_dir),
+            "eva.local",
+        );
+        crate::commands::ssh::clear_sessions_for_tests().await;
+    }
+
+    fn assert_ssh_list_unreachable(result: Result<Vec<ProjectFileEntry>, String>, hostname: &str) {
+        match result {
+            Ok(entries) => {
+                let names: Vec<&str> = entries.iter().map(|entry| entry.name.as_str()).collect();
+                panic!("expected {hostname} unreachable, listed {names:?}");
+            }
+            Err(err) => {
+                assert!(
+                    err.contains(&format!("{hostname} is unreachable.")),
+                    "got {err}"
+                );
+            }
+        }
     }
 }

@@ -1,6 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import contextMentionFromNode from '@/utils/context-mention-from-node'
 
+describe('contextMentionFromNode.mentionsEqual', () => {
+  it('treats a fresh copy of the same mentions as unchanged', () => {
+    const left = [{ type: 'file' as const, path: 'src/main.ts' }]
+    const right = [{ type: 'file' as const, path: 'src/main.ts' }]
+    expect(contextMentionFromNode.mentionsEqual(left, right)).toBe(true)
+  })
+
+  it('notices when mention file content arrives', () => {
+    const left = [{ type: 'file' as const, path: 'src/main.ts' }]
+    const right = [{ type: 'file' as const, path: 'src/main.ts', content: 'fn main' }]
+    expect(contextMentionFromNode.mentionsEqual(left, right)).toBe(false)
+  })
+
+  it('treats missing and empty mention content as the same', () => {
+    const left = [{ type: 'file' as const, path: 'src/main.ts' }]
+    const right = [{ type: 'file' as const, path: 'src/main.ts', content: '' }]
+    expect(contextMentionFromNode.mentionsEqual(left, right)).toBe(true)
+  })
+})
+
 describe('contextMentionFromNode.fromAttrs', () => {
   it('treats slash suggestion chars as skills even when mentionType defaults to file', () => {
     expect(

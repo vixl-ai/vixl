@@ -6,8 +6,8 @@ use uuid::Uuid;
 use super::{
     apply_group_update, apply_project_root_update, default_group_name, normalize_root_path,
     remove_fleet_group, unique_group_slug, unique_project_slug, upsert_fleet_group,
-    upsert_fleet_project, upsert_fleet_project_occupied, FleetProject, FleetProjectGroup,
-    WorktreeLink,
+    upsert_fleet_project, upsert_fleet_project_occupied, validate_registry_root, FleetProject,
+    FleetProjectGroup, WorktreeLink,
 };
 
 struct TempRoot {
@@ -370,6 +370,37 @@ fn root_update_clears_worktree_link_for_non_worktree_root() {
         apply_project_root_update(&mut projects, "missing", root_str, None).unwrap_err(),
         "Project not found"
     );
+}
+
+#[test]
+fn ssh_uri_is_stored_without_canonicalize() {
+    let uri = "ssh://aidanhibbard@eva.local/home/aidanhibbard/proj".to_string();
+    assert_eq!(normalize_root_path(uri.clone()), uri);
+    let mut projects = Vec::new();
+    let created = upsert_fleet_project(&mut projects, "proj".to_string(), uri.clone());
+    assert_eq!(created.root_path, uri);
+    let again = upsert_fleet_project(
+        &mut projects,
+        "other".to_string(),
+        "ssh://aidanhibbard@eva.local/home/aidanhibbard/proj".to_string(),
+    );
+    assert_eq!(projects.len(), 1);
+    assert_eq!(again.id, created.id);
+    assert_eq!(again.slug, created.slug);
+    assert_eq!(again.name, "proj");
+    let with_port = upsert_fleet_project(
+        &mut projects,
+        "renamed".to_string(),
+        "ssh://aidanhibbard@eva.local:22/home/aidanhibbard/proj".to_string(),
+    );
+    assert_eq!(projects.len(), 1);
+    assert_eq!(with_port.id, created.id);
+}
+
+#[test]
+fn opening_remote_slash_is_refused() {
+    let err = validate_registry_root("ssh://aidanhibbard@eva.local/").expect_err("slash");
+    assert_eq!(err, "Opening / on eva.local is refused.");
 }
 
 #[cfg(windows)]

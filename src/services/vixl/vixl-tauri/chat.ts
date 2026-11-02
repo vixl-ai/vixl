@@ -64,7 +64,18 @@ export const fileCheckpointCapture = (args: {
   path: string
   key?: string
   toolCallId?: string
+  content?: string
+  existed?: boolean
 }): Promise<FileCheckpointCaptureResult> => call('file_checkpoint_capture', args)
+
+export const fileCheckpointLoad = (args: {
+  projectSlug: string
+  chatId: string
+  userMessageId: string
+  path: string
+  key?: string
+}): Promise<{ skipped: boolean; existed: boolean; content?: string | null }> =>
+  call('file_checkpoint_load', args)
 
 export const fileCheckpointRestore = (args: {
   projectSlug: string

@@ -17,6 +17,17 @@ describe('onceApprovalLabel', () => {
   it('uses Run outside sandbox when the approval is unsandboxed', () => {
     expect(onceApprovalLabel(true)).toBe('Run outside sandbox')
   })
+
+  it('keeps Allow once for remote ssh cards that are not unsandboxed', () => {
+    expect(onceApprovalLabel(false)).toBe('Allow once')
+    expect(
+      approvalActionSpecs({
+        allowedScopes: ['once', 'session', 'never'],
+        unsandboxed: false,
+        kind: 'shell',
+      }).map((action) => action.tooltip),
+    ).toEqual(['Allow once', 'Allow session', 'Deny', 'Never'])
+  })
 })
 
 describe('isNetworkSandboxApproval', () => {

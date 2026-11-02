@@ -27,6 +27,11 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
 )
 
 import {
+  fileCheckpointLoad,
+  fsDelete,
+  fsWriteFile,
+} from '@/services/vixl/vixl-tauri'
+import {
   aggregateSubagentFileDiffs,
   aggregateTurnFileDiffs,
   collectMutationsAfterUserMessage,
@@ -500,5 +505,65 @@ describe('restoreFileCheckpoints group restore', () => {
       skipped: [],
       errors: [{ path: 'web/src/a.ts', error: 'Project is no longer available' }],
     })
+  })
+})
+
+describe('restoreFileCheckpoints ssh', () => {
+  const sshRoot = 'ssh://aidanhibbard@eva/home/aidanhibbard/proj'
+
+  beforeEach(() => {
+    fileCheckpointRestore.mockReset()
+    vi.mocked(fileCheckpointLoad).mockReset()
+    vi.mocked(fsWriteFile).mockReset()
+    vi.mocked(fsDelete).mockReset()
+  })
+
+  it('writes remote bytes through fs write and never restores onto this Mac', async () => {
+    vi.mocked(fileCheckpointLoad).mockResolvedValue({
+      skipped: false,
+      existed: true,
+      content: 'remote contents',
+    })
+    vi.mocked(fsWriteFile).mockResolvedValue(undefined)
+
+    const result = await restoreFileCheckpoints({
+      projectSlug: 'eva-proj',
+      chatId: 'chat-1',
+      projectRoot: sshRoot,
+      targets: [{ path: 'src/a.ts', userMessageId: 'u1' }],
+    })
+
+    expect(fileCheckpointRestore).not.toHaveBeenCalled()
+    expect(fsWriteFile).toHaveBeenCalledWith({
+      projectRoot: sshRoot,
+      path: 'src/a.ts',
+      content: 'remote contents',
+      allowSensitive: true,
+    })
+    expect(result.restored).toEqual(['src/a.ts'])
+  })
+
+  it('says the file was not written on the host and was not written on this Mac when restore fails', async () => {
+    vi.mocked(fileCheckpointLoad).mockResolvedValue({
+      skipped: false,
+      existed: true,
+      content: 'remote contents',
+    })
+    vi.mocked(fsWriteFile).mockRejectedValue(new Error('eva is unreachable'))
+
+    const result = await restoreFileCheckpoints({
+      projectSlug: 'eva-proj',
+      chatId: 'chat-1',
+      projectRoot: sshRoot,
+      targets: [{ path: 'src/a.ts', userMessageId: 'u1' }],
+    })
+
+    expect(fileCheckpointRestore).not.toHaveBeenCalled()
+    expect(result.errors).toEqual([
+      {
+        path: 'src/a.ts',
+        error: 'src/a.ts: Could not restore this file on eva. It was not written on this Mac.',
+      },
+    ])
   })
 })

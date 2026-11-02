@@ -27,6 +27,15 @@ describe('mcp-server-fingerprint', () => {
     const d = mcpServerFingerprint({ command: 'npx', args: ['-y', 'evil'] })
     expect(c).not.toBe(d)
   })
+
+  it('includes user@host so a laptop grant does not match an ssh root', () => {
+    const config = { command: 'npx', args: ['-y', 'pkg'] }
+    const laptop = mcpServerFingerprint(config, '/tmp/proj')
+    const remote = mcpServerFingerprint(config, 'ssh://user@host.example/tmp/proj')
+    const other = mcpServerFingerprint(config, 'ssh://user@other.example/tmp/proj')
+    expect(remote).not.toBe(laptop)
+    expect(remote).not.toBe(other)
+  })
 })
 
 describe('mcp-trust fingerprint', () => {

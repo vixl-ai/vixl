@@ -12,6 +12,7 @@ import {
 import { discoverProjectSkillIndex } from '@/services/skills/discover-project-skills'
 import { listSkillIndex, listStandaloneSkillIndex } from '@/services/skills/skill-registry'
 import { listAgentDefinitions } from '@/services/agents/resolve-agent-definition'
+import { catchUnlessUnreachable } from '@/services/harness/ssh/map-error'
 import formatMcpCatalog from './format-mcp'
 import formatProjectSection from './format-project-section'
 import loadAgentsMdBlock from './load-agents-md-block'
@@ -90,7 +91,10 @@ const loadUnionedSkillCatalog = async (
     return standalone.map((skill) => ({ ...skill }))
   }
 
-  const primary = await listSkillIndex(input.mode, input.projectRoot).catch(() => [])
+  const primary = await catchUnlessUnreachable(
+    () => listSkillIndex(input.mode, input.projectRoot),
+    [],
+  )
   const extras = extraMembers(input.members, input.projectRoot)
   const primarySlug = primaryMemberSlug(input.members, input.projectRoot)
   const catalog: CatalogSkill[] = primary.map((skill) => ({
@@ -106,7 +110,10 @@ const loadUnionedSkillCatalog = async (
     if (await isHomeWorkspaceRoot(member.rootPath)) {
       continue
     }
-    const skills = await discoverProjectSkillIndex(member.rootPath).catch(() => [])
+    const skills = await catchUnlessUnreachable(
+      () => discoverProjectSkillIndex(member.rootPath),
+      [],
+    )
     for (const skill of skills) {
       catalog.push({ ...skill, memberSlug: member.slug })
     }
@@ -155,8 +162,9 @@ export default async (input: SystemPromptInput): Promise<SystemPromptParts> => {
     }
   }
 
-  const definitions = await listAgentDefinitions(input.standalone ? null : input.projectRoot).catch(
-    () => [],
+  const definitions = await catchUnlessUnreachable(
+    () => listAgentDefinitions(input.standalone ? null : input.projectRoot),
+    [],
   )
   const agentCatalog =
     definitions.length > 0
@@ -190,7 +198,10 @@ export default async (input: SystemPromptInput): Promise<SystemPromptParts> => {
   const includeProjectRules =
     !input.standalone && !(await isHomeWorkspaceRoot(input.projectRoot))
   const projectRules = includeProjectRules
-    ? await listVixlFiles('project', 'rules', input.projectRoot).catch(() => [])
+    ? await catchUnlessUnreachable(
+        () => listVixlFiles('project', 'rules', input.projectRoot),
+        [],
+      )
     : []
   const personalRoot =
     personalRules.length > 0 ? await getVixlDir('personal').catch(() => '') : ''

@@ -276,6 +276,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers) => {
       diff: entry.diff,
       subagentId: entry.subagentId,
       subagentLabel: entry.subagentLabel,
+      runsAt: entry.runsAt,
     }))
     syncPendingMcpAuth()
     if (pendingMcpAuth.value.length > 0) {

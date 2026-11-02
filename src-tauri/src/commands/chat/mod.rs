@@ -20,7 +20,9 @@ mod usage;
 
 pub use append::append_chat_line;
 pub(crate) use copy_active_plan::copy_tree_skip_existing;
-pub use copy_active_plan::{copy_active_plan_to_root, source_mtime_is_strictly_newer};
+pub use copy_active_plan::{
+    copy_active_plan_for_move, copy_active_plan_to_root, source_mtime_is_strictly_newer,
+};
 pub use create::create_chat;
 pub use delete::delete_chat;
 pub use fork::fork_chat;

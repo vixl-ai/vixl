@@ -10,6 +10,7 @@ import {
   Pencil,
   ShieldAlert,
   Trash2,
+  Unplug,
 } from '@lucide/vue'
 import type { FleetSidebarChat } from '@/types/fleet/fleet-sidebar-chat'
 import {
@@ -55,15 +56,9 @@ import { deleteChat, updateChatMeta } from '@/services/vixl/vixl-tauri'
 import chatRouteFor from '@/utils/chat-route-for'
 import { findSidebarProject } from '@/utils/find-sidebar-project'
 import projectRouteFor from '@/utils/project-route-for'
-
-type ChatStatusKind =
-  | 'running'
-  | 'needs_approval'
-  | 'needs_input'
-  | 'needs_mcp_auth'
-  | 'completed'
-  | 'error'
-  | 'idle'
+import { chatStatusKind, type ChatStatusKind } from '@/utils/chat-status-kind'
+import useSshSession from '@/composables/use-ssh-session'
+import useFleetRegistry from '@/composables/use-fleet-registry'
 
 const props = defineProps<{
   projectSlug: string
@@ -73,6 +68,11 @@ const route = useRoute()
 const router = useRouter()
 const fleetSidebar = useFleetSidebar()
 const chatStore = useChatStore()
+const fleet = useFleetRegistry()
+const ssh = useSshSession()
+const projectRoot = computed(
+  () => fleet.projects.value.find((project) => project.slug === props.projectSlug)?.rootPath ?? null,
+)
 
 const renameOpen = ref(false)
 const deleteOpen = ref(false)
@@ -97,26 +97,12 @@ const statusFor = (
     meta && meta.id === chat.id && meta.projectSlug === props.projectSlug ? meta : null
   const status = live?.status ?? chat.status
   const attention = live?.attention ?? chat.attention ?? null
-
-  if (status === 'running') {
-    return { kind: 'running', label: 'Running' }
-  }
-  if (attention === 'needs_approval') {
-    return { kind: 'needs_approval', label: 'Needs approval' }
-  }
-  if (attention === 'needs_input') {
-    return { kind: 'needs_input', label: 'Needs input' }
-  }
-  if (attention === 'needs_mcp_auth') {
-    return { kind: 'needs_mcp_auth', label: 'Needs MCP auth' }
-  }
-  if (attention === 'completed') {
-    return { kind: 'completed', label: 'Done' }
-  }
-  if (attention === 'error') {
-    return { kind: 'error', label: 'Error' }
-  }
-  return { kind: 'idle', label: 'Idle' }
+  return chatStatusKind({
+    status,
+    attention,
+    sshDisconnected: ssh.isDisconnectedRoot(projectRoot.value),
+    sshNeedsInput: ssh.needsInputForRoot(projectRoot.value),
+  })
 }
 
 const chatRows = computed(() =>
@@ -269,6 +255,10 @@ watch(deleteOpen, (open) => {
                     <KeyRound
                       v-else-if="status.kind === 'needs_mcp_auth'"
                       class="size-3.5 text-amber-600 dark:text-amber-400"
+                    />
+                    <Unplug
+                      v-else-if="status.kind === 'disconnected'"
+                      class="size-3.5 text-muted-foreground"
                     />
                     <span
                       v-else-if="status.kind === 'completed'"

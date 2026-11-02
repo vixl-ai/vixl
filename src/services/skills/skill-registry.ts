@@ -13,6 +13,7 @@ import { isHomeWorkspaceRoot } from '@/services/config/is-home-workspace-root'
 import { discoverUserSkillIndex, loadUserSkill } from '@/services/skills/discover-user-skills'
 import isReservedSlashName from '@/services/skills/is-reserved-slash-name'
 import { MAX_SKILL_CONTENT_CHARS } from '@/services/skills/strip-skill-frontmatter'
+import { isUnreachableHostError } from '@/services/harness/ssh/map-error'
 
 const overlaySkillIndex = (
   byName: Map<string, SkillIndexEntry>,
@@ -45,7 +46,10 @@ const loadSkillIndexSafely = async (
 ): Promise<SkillIndexEntry[]> => {
   try {
     return await load()
-  } catch {
+  } catch (error) {
+    if (isUnreachableHostError(error)) {
+      throw error
+    }
     return []
   }
 }

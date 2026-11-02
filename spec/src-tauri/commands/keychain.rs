@@ -1,7 +1,8 @@
 use app_lib::commands::keychain::{
-    choose_secret_backend, merge_legacy_into_map, parse_vault, read_vault_file, require_vixl_key,
-    serialize_vault, vault_file_path, vault_from_file_read, vault_from_os_read, write_vault_file,
-    KeyringAccessFailure, SecretBackendKind, VaultMap, VAULT_ACCOUNT,
+    choose_secret_backend, deny_ssh_vault_from_webview, merge_legacy_into_map, parse_vault,
+    read_vault_file, require_vixl_key, serialize_vault, vault_file_path, vault_from_file_read,
+    vault_from_os_read, webview_secret_command_prepare, write_vault_file, KeyringAccessFailure,
+    SecretBackendKind, VaultMap, SSH_PASSPHRASE_PREFIX, SSH_PASSWORD_PREFIX, VAULT_ACCOUNT,
 };
 
 #[test]
@@ -43,6 +44,20 @@ fn require_vixl_key_rejects_prefix_and_vault_account() {
     assert!(require_vixl_key("other:key").is_err());
     assert!(require_vixl_key(VAULT_ACCOUNT).is_err());
     assert!(require_vixl_key("vixl:provider:openai").is_ok());
+}
+
+#[test]
+fn get_secret_set_secret_delete_secret_reject_ssh_prefixes() {
+    let password = format!("{SSH_PASSWORD_PREFIX}aidanhibbard@eva.local:22");
+    let passphrase = format!("{SSH_PASSPHRASE_PREFIX}/tmp/id_ed25519");
+    for key in [password.as_str(), passphrase.as_str()] {
+        let deny = deny_ssh_vault_from_webview(key).expect_err("ssh vault key");
+        assert!(deny
+            .contains("SSH secrets cannot be read or written through the generic secret commands"));
+        let prepare = webview_secret_command_prepare(key).expect_err("prepare");
+        assert!(prepare.contains("SSH secrets cannot"));
+    }
+    assert!(webview_secret_command_prepare("vixl:provider:openai").is_ok());
 }
 
 #[test]

@@ -24,6 +24,17 @@ import {
   slugArg,
 } from '@/services/harness/tool-roots'
 import { clipTerminalLabel } from '@/utils/clip-terminal-label'
+import { isSshProjectRoot, sshRunsAsLineFromRoot } from '@/utils/ssh-project-root'
+import {
+  commandLooksLikeSsh,
+  commandLooksLikeSudo,
+} from '@/services/harness/ssh/command'
+import { sshRunTerminalGuard } from '@/services/harness/ssh/run-terminal-guards'
+import {
+  SSH_SANDBOX_RETRY_BLOCKED,
+  sshHostFromRoot,
+  sudoNoTtyError,
+} from '@/services/harness/ssh/model-errors'
 
 const READ_ONLY_SANDBOX_DISABLED =
   'Read-only subagents cannot run an unsandboxed shell. Enable the OS sandbox, or spawn a write-capable subagent.'
@@ -50,17 +61,21 @@ export const isReadOnlySubagentShell = (ctx: HarnessToolContext): boolean => {
 const CWD_TOOL_HINT =
   'Optional cwd is a project slug; defaults to the primary project and is not kept between calls.'
 
+const SANDBOX_RETRY_HINT =
+  ' A sandbox block retries unsandboxed automatically within the same call.'
+
 const runTerminal = (ctx: HarnessToolContext) => {
   const readOnlyProject = isReadOnlySubagentShell(ctx)
   const multiRoot = isMultiRootWorkspace(ctx)
+  const sandboxRetryHint = isSshProjectRoot(ctx.projectRoot) ? '' : SANDBOX_RETRY_HINT
   return tool({
     description: readOnlyProject
       ? multiRoot
         ? 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. Optional cwd is a project slug; defaults to the primary project and is not kept between calls. When the sandbox blocks a command, report the denial as the result.'
         : 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. When the sandbox blocks a command, report the denial as the result.'
       : multiRoot
-        ? `Run a shell command in the project cwd. ${CWD_TOOL_HINT} A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell id and the harness wakes the parent when that terminal exits, so end the turn instead of polling. terminal_output reads output before exit. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`
-        : 'Run a shell command in the project cwd. A sandbox block retries unsandboxed automatically within the same call. is_background returns a shell id and the harness wakes the parent when that terminal exits, so end the turn instead of polling. terminal_output reads output before exit. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.',
+        ? `Run a shell command in the project cwd. ${CWD_TOOL_HINT}${sandboxRetryHint} is_background returns a shell id and the harness wakes the parent when that terminal exits, so end the turn instead of polling. terminal_output reads output before exit. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`
+        : `Run a shell command in the project cwd.${sandboxRetryHint} is_background returns a shell id and the harness wakes the parent when that terminal exits, so end the turn instead of polling. terminal_output reads output before exit. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`,
     inputSchema: z.object({
       description: z
         .string()
@@ -76,7 +91,19 @@ const runTerminal = (ctx: HarnessToolContext) => {
       const resolvedCwd = resolveWorkspaceSlug(ctx, slugArg(input, 'cwd'))
       const clippedDescription = clipTerminalLabel(description ?? '')
       const uiTitle = clippedDescription || command
+      const remoteRoot = isSshProjectRoot(resolvedCwd.projectRoot)
       const sandboxSettingEnabled = ctx.settings['agent.sandbox.enabled'] ?? true
+      if (remoteRoot) {
+        const guarded = sshRunTerminalGuard(
+          resolvedCwd.projectRoot,
+          command,
+          readOnlyProject,
+          resolvedCwd.slug,
+        )
+        if (guarded) {
+          return guarded
+        }
+      }
       if (readOnlyProject && !sandboxSettingEnabled) {
         return attachSandboxResult(
           { rejected: true, error: READ_ONLY_SANDBOX_DISABLED },
@@ -89,19 +116,23 @@ const runTerminal = (ctx: HarnessToolContext) => {
         )
       }
       // Read-only nested shells stay jailed: session unsandboxed allowances do not apply.
-      const sandboxEnabled = readOnlyProject
-        ? true
-        : sandboxSettingEnabled && !sessionAllowsUnsandboxed(ctx.sessionAllows)
+      const sandboxEnabled = remoteRoot
+        ? false
+        : readOnlyProject
+          ? true
+          : sandboxSettingEnabled && !sessionAllowsUnsandboxed(ctx.sessionAllows)
       const needsNetwork =
         sandboxEnabled && commandNeedsSandboxNetwork(command)
       const settingsAllowNetwork =
         (ctx.settings['agent.sandbox.network'] ?? SANDBOX_NETWORK_DEFAULT) ===
           'allow' || sessionAllowsNetwork(ctx.sessionAllows)
-      const firstCapability = needsNetwork
-        ? 'shell.network'
-        : sandboxEnabled
-          ? 'shell'
-          : 'shell.unsandboxed'
+      const firstCapability = remoteRoot
+        ? 'shell'
+        : needsNetwork
+          ? 'shell.network'
+          : sandboxEnabled
+            ? 'shell'
+            : 'shell.unsandboxed'
       const allowed = await gateToolPermission({
         ctx: toPermCtx(ctx),
         toolCallId,
@@ -111,9 +142,22 @@ const runTerminal = (ctx: HarnessToolContext) => {
         capability: firstCapability,
         title: uiTitle,
         detail: command,
-        unsandboxed: !sandboxEnabled,
+        unsandboxed: remoteRoot ? false : !sandboxEnabled,
+        runsAt: remoteRoot
+          ? (sshRunsAsLineFromRoot(resolvedCwd.projectRoot) ?? undefined)
+          : undefined,
       })
       if (!allowed) {
+        if (remoteRoot) {
+          return {
+            rejected: true,
+            error: 'Shell access denied',
+            remote: true,
+            cwd: resolvedCwd.projectRoot,
+            ...(resolvedCwd.slug ? { cwdSlug: resolvedCwd.slug } : {}),
+            runsAt: sshRunsAsLineFromRoot(resolvedCwd.projectRoot) ?? undefined,
+          }
+        }
         return attachSandboxResult(
           { rejected: true, error: 'Shell access denied' },
           resolveSandboxResultMeta({
@@ -126,6 +170,7 @@ const runTerminal = (ctx: HarnessToolContext) => {
       }
 
       const allowNetwork =
+        remoteRoot ||
         needsNetwork ||
         settingsAllowNetwork ||
         sessionAllowsNetwork(ctx.sessionAllows)
@@ -135,6 +180,7 @@ const runTerminal = (ctx: HarnessToolContext) => {
         cwd: resolvedCwd.projectRoot,
         cwdSlug: resolvedCwd.slug,
       })
+      const runsAt = sshRunsAsLineFromRoot(resolvedCwd.projectRoot)
 
       const runArgs = {
         command,
@@ -179,14 +225,34 @@ const runTerminal = (ctx: HarnessToolContext) => {
         }
       }
 
+      const blockUnsandboxedRetry =
+        remoteRoot || commandLooksLikeSsh(command)
+
       try {
-        return await runTerminalCommand(ctx, {
+        const result = await runTerminalCommand(ctx, {
           ...runArgs,
           sandboxed: sandboxEnabled,
           allowNetwork,
         })
+        if (remoteRoot) {
+          const { sandboxed: _sandboxed, sandboxing: _sandboxing, network: _network, ...rest } =
+            result
+          return {
+            ...rest,
+            remote: true,
+            ...(runsAt ? { runsAt } : {}),
+          }
+        }
+        return result
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
+
+        if (remoteRoot && commandLooksLikeSudo(command)) {
+          throw new Error(sudoNoTtyError(sshHostFromRoot(resolvedCwd.projectRoot)))
+        }
+        if (remoteRoot && commandLooksLikeSsh(command) && /no tty|no terminal/i.test(message)) {
+          throw new Error(sudoNoTtyError(sshHostFromRoot(resolvedCwd.projectRoot)))
+        }
 
         if (readOnlyProject) {
           if (message.startsWith('SANDBOX_UNAVAILABLE:')) {
@@ -198,6 +264,16 @@ const runTerminal = (ctx: HarnessToolContext) => {
           throw wrapWithSandboxingFooter(error, meta)
         }
 
+        if (sandboxEnabled && isSandboxSpawnError(message) && blockUnsandboxedRetry) {
+          return attachSandboxResult(
+            {
+              command,
+              error: SSH_SANDBOX_RETRY_BLOCKED,
+            },
+            meta,
+          )
+        }
+
         if (sandboxEnabled && isSandboxSpawnError(message)) {
           const priorPhase = attachSandboxResult(
             {
@@ -207,6 +283,10 @@ const runTerminal = (ctx: HarnessToolContext) => {
             meta,
           )
           return retryUnsandboxed(priorPhase)
+        }
+
+        if (remoteRoot) {
+          throw error instanceof Error ? error : new Error(message)
         }
 
         throw wrapWithSandboxingFooter(error, meta)

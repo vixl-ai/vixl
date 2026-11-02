@@ -62,6 +62,7 @@ vi.mock('@/services/mcp/mcp-runtime', () => ({
 
 import useFleetRegistry, {
   getFleetProjects,
+  resetFleetBootstrapForTests,
   upsertFleetProject,
 } from '@/composables/use-fleet-registry'
 
@@ -316,5 +317,81 @@ describe('useFleetRegistry upsertFleetProject', () => {
         managed: true,
       },
     })
+  })
+})
+
+describe('useFleetRegistry hasProjectVixl', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    isTauri.mockReturnValue(true)
+    const fleet = useFleetRegistry()
+    fleet.projects.value = []
+    fleet.activeProjectId.value = null
+    fleet.hasProjectVixl.value = true
+  })
+
+  it('loads the fleet when an ssh project is unreachable', async () => {
+    const sshProject = {
+      id: 'proj-ssh',
+      name: 'Eva',
+      slug: 'eva',
+      root_path: 'ssh://aidanhibbard@eva.local/home/aidanhibbard/proj',
+      last_opened: '2026-01-01T00:00:00.000Z',
+    }
+    registryListProjects.mockResolvedValue([sshProject])
+    getActiveProjectId.mockResolvedValue(sshProject.id)
+    hasProjectVixl.mockRejectedValue(new Error('eva.local is unreachable.'))
+
+    const fleet = useFleetRegistry()
+    await fleet.refresh()
+
+    expect(hasProjectVixl).toHaveBeenCalledWith(sshProject.root_path)
+    expect(fleet.projects.value).toEqual([
+      {
+        id: sshProject.id,
+        name: sshProject.name,
+        slug: sshProject.slug,
+        rootPath: sshProject.root_path,
+        lastOpened: sshProject.last_opened,
+      },
+    ])
+    expect(fleet.activeProjectId.value).toBe(sshProject.id)
+    expect(fleet.hasProjectVixl.value).toBe(false)
+    expect(fleet.loaded.value).toBe(true)
+  })
+})
+
+describe('useFleetRegistry bootstrap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetFleetBootstrapForTests()
+    isTauri.mockReturnValue(true)
+    registryListProjects.mockResolvedValue([projectA])
+    getActiveProjectId.mockResolvedValue(projectA.id)
+    hasProjectVixl.mockResolvedValue(true)
+    const fleet = useFleetRegistry()
+    fleet.loaded.value = false
+    fleet.projects.value = []
+    fleet.activeProjectId.value = null
+  })
+
+  it('checks the active project once when many sidebar rows mount', async () => {
+    const { defineComponent } = await import('vue')
+    const { flushPromises, mount } = await import('@vue/test-utils')
+    const Probe = defineComponent({
+      setup() {
+        useFleetRegistry()
+        return () => null
+      },
+    })
+
+    const first = mount(Probe)
+    const second = mount(Probe)
+    await flushPromises()
+
+    expect(ensureCodeGraph).toHaveBeenCalledTimes(1)
+    expect(ensureCodeGraph).toHaveBeenCalledWith('/tmp/project-a')
+    first.unmount()
+    second.unmount()
   })
 })

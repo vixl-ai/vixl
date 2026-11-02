@@ -45,6 +45,7 @@ import WorkbenchMonacoEditor from '@/components/workbench/MonacoEditor.vue'
 import useEditorAutoSave from '@/composables/use-editor-auto-save'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { fsReadFile, revealInFolder } from '@/services/vixl/vixl-tauri'
+import { sshCopyRemotePath, tryParseSshProjectRoot } from '@/utils/ssh-project-root'
 import type { EditorPayload, WorkbenchTab } from '@/types/workbench/workbench-tab'
 
 type EditorMode = 'edit' | 'preview'
@@ -251,6 +252,21 @@ const handleRevealInFinder = async (): Promise<void> => {
   const path = selectedPath.value
   if (!path) {
     return
+  }
+
+  const root = projectRoot.value
+  if (root) {
+    const parsed = tryParseSshProjectRoot(root)
+    if (parsed) {
+      try {
+        await navigator.clipboard.writeText(sshCopyRemotePath(parsed, path))
+      } catch (error) {
+        toast.error('Failed to copy path', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        })
+      }
+      return
+    }
   }
 
   const absolutePath = toAbsolutePath(path)

@@ -28,6 +28,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - name: Free runner disk
+        run: |
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/share/boost \
+            /usr/lib/jvm \
+            /opt/hostedtoolcache/CodeQL
+          sudo apt-get clean
+          df -h
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -37,12 +48,16 @@ jobs:
             librsvg2-dev \
             patchelf \
             xdg-utils
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
       - uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: Audit Rust dependencies
         run: cargo audit --file src-tauri/Cargo.lock
       - name: Run Rust tests
+        env:
+          CARGO_INCREMENTAL: "0"
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
   tauri-build:

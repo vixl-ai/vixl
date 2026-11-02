@@ -23,6 +23,7 @@ mod sandbox_protect;
 pub mod search;
 pub mod shell;
 mod skip_dirs;
+pub mod ssh;
 pub mod watch;
 pub mod web_fetch;
 pub mod workbench;
@@ -39,11 +40,14 @@ pub use config::{
     config_exists, read_json_file, read_lsp_config, read_mcp_config, read_settings,
     set_mcp_server_enabled, write_json_file, write_lsp_config, write_mcp_config, write_settings,
 };
-pub use file_checkpoint::{file_checkpoint_capture, file_checkpoint_restore};
+pub use file_checkpoint::{file_checkpoint_capture, file_checkpoint_load, file_checkpoint_restore};
 pub use fs::{
-    append_temp_log, fs_apply_patch, fs_copy, fs_delete, fs_edit_file, fs_list_dir,
-    fs_list_dir_tree, fs_mkdir, fs_move, fs_read_file, fs_rename, fs_stage_preview, fs_stat,
-    fs_write_file, write_temp_bytes, write_temp_handoff, write_text_file,
+    append_temp_log, fs_apply_patch, fs_apply_patch_command, fs_copy, fs_copy_command, fs_delete,
+    fs_delete_command, fs_edit_file, fs_edit_file_command, fs_list_dir, fs_list_dir_command,
+    fs_list_dir_tree, fs_list_dir_tree_command, fs_mkdir, fs_mkdir_command, fs_move,
+    fs_move_command, fs_read_file, fs_read_file_command, fs_rename, fs_rename_command,
+    fs_stage_preview, fs_stage_preview_command, fs_stat, fs_stat_command, fs_write_file,
+    fs_write_file_command, write_temp_bytes, write_temp_handoff, write_text_file,
 };
 pub use git::{
     git_branch_create, git_checkout_branch, git_commit, git_diff, git_list_branches, git_log,
@@ -66,7 +70,8 @@ pub use oauth::{
 };
 pub use paths::{
     get_default_workspace_root, get_user_vixl_dir, get_vixl_dir, has_project_vixl,
-    is_home_workspace_root, list_project_files, list_vixl_files,
+    is_home_workspace_root, list_project_files, list_project_files_command, list_vixl_files,
+    list_vixl_files_command,
 };
 pub use registry::{
     get_active_project, open_project_at_path, open_project_at_path_command, registry_add_group,
@@ -78,6 +83,13 @@ pub use search::{workspace_glob, workspace_grep};
 pub use shell::{
     reveal_in_folder, shell_kill_pty, shell_kill_tracked, shell_resize_pty, shell_spawn_pty,
     shell_spawn_tracked, shell_write_pty,
+};
+pub use ssh::{
+    ssh_answer_confirm, ssh_answer_secret, ssh_cancel_connect, ssh_cancel_prompt,
+    ssh_close_channel, ssh_connect, ssh_delete_passphrase, ssh_delete_password, ssh_disconnect,
+    ssh_exec, ssh_list_aliases, ssh_list_saved_identities, ssh_list_sessions, ssh_open_exec,
+    ssh_open_local_forward, ssh_open_sftp, ssh_open_tty, ssh_preview, ssh_remove_vixl_host_key,
+    ssh_save_passphrase, ssh_save_password, ssh_session_status,
 };
 pub use watch::{watch_vixl_paths, WatchState};
 pub use web_fetch::web_fetch;

@@ -17,6 +17,7 @@ import {
   withProjectRoots,
 } from '@/services/harness/tool-roots'
 import type { FileCheckpointCaptureResult } from '@/types/harness/file-checkpoint'
+import { previewIgnoringSensitiveBlock } from '@/services/harness/ssh/preview'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
@@ -82,8 +83,12 @@ const deleteFile = (ctx: HarnessToolContext) =>
       } else {
         try {
           diffs = mapDiffs(
-            await fsStagePreviewDelete(
-              withProjectRoots({ projectRoot: ctx.projectRoot, path }, ctx),
+            await previewIgnoringSensitiveBlock(
+              () =>
+                fsStagePreviewDelete(
+                  withProjectRoots({ projectRoot: ctx.projectRoot, path }, ctx),
+                ),
+              [{ path: gatedPath, operation: 'delete', hunks: [] }],
             ),
           )
         } catch {
@@ -110,7 +115,10 @@ const deleteFile = (ctx: HarnessToolContext) =>
         await captureBaselinesBeforeMutate(ctx, [path], toolCallId)
       }
       await fsDelete(
-        withProjectRoots({ projectRoot: ctx.projectRoot, path, recursive }, ctx),
+        withProjectRoots(
+          { projectRoot: ctx.projectRoot, path, recursive, allowSensitive: true },
+          ctx,
+        ),
       )
       notifyWorkspaceMutations(ctx, [gatedPath])
       const resultPath = recursiveDir ? gatedPath : (diffs[0]?.path ?? gatedPath)

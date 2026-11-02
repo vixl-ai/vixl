@@ -1,5 +1,6 @@
 mod glob;
 mod grep;
+mod ssh;
 pub mod walk;
 
 pub use glob::{workspace_glob, WorkspaceGlobRequest, WorkspaceGlobResult};

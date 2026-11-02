@@ -33,8 +33,10 @@ const {
   clipboard,
   copyRelativePath,
   copyAbsolutePath,
+  copyRemotePath,
   copyName,
   revealInFinder,
+  isSshRoot,
   openInEditor,
   handleRename,
   handleDelete,
@@ -69,6 +71,10 @@ const handleCopyName = async (): Promise<void> => {
 
 const handleRevealInFinder = async (): Promise<void> => {
   await revealInFinder(props.path, props.isDirectory)
+}
+
+const handleCopyRemotePath = async (): Promise<void> => {
+  await copyRemotePath(props.path)
 }
 
 const handleOpenInEditor = (): void => {
@@ -191,7 +197,11 @@ const handleNewFolderSelect = (): void => {
       <Copy />
       Copy name
     </ContextMenuItem>
-    <ContextMenuItem @select="handleRevealInFinder">
+    <ContextMenuItem v-if="isSshRoot" @select="handleCopyRemotePath">
+      <FolderOpen />
+      Copy remote path
+    </ContextMenuItem>
+    <ContextMenuItem v-else @select="handleRevealInFinder">
       <FolderOpen />
       Reveal in Finder
     </ContextMenuItem>

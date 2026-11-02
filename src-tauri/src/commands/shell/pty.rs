@@ -7,9 +7,13 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
+use crate::commands::fs::{
+    parse_ssh_project_root, resolve_command_path, validate_relative, WorkspaceRootArg,
+};
 use crate::commands::mcp::merged_shell_path;
-
-use super::super::fs::{resolve_command_path, WorkspaceRootArg};
+use crate::commands::ssh::{
+    is_ssh_root, key_for, map_unreachable, tty_argv_on_master, tty_login_command, SSH_BIN,
+};
 
 pub fn resolve_pty_shell() -> String {
     #[cfg(unix)]
@@ -59,6 +63,10 @@ pub async fn shell_spawn_pty(
     cwd: Option<String>,
     project_roots: Option<Vec<WorkspaceRootArg>>,
 ) -> Result<PtySessionInfo, String> {
+    if is_ssh_root(&project_root) {
+        return spawn_remote_pty(app, project_root, cols, rows, cwd).await;
+    }
+
     let merged_path = tauri::async_runtime::spawn_blocking(merged_shell_path)
         .await
         .map_err(|e| e.to_string())?;
@@ -76,14 +84,12 @@ pub async fn shell_spawn_pty(
     let mut cmd = CommandBuilder::new(resolve_pty_shell());
     cmd.args(pty_shell_args());
     let work_dir = match cwd {
-        Some(relative_cwd) => resolve_command_path(
-            &project_root,
-            project_roots.as_deref(),
-            &relative_cwd,
-        )?
-        .path
-        .to_string_lossy()
-        .to_string(),
+        Some(relative_cwd) => {
+            resolve_command_path(&project_root, project_roots.as_deref(), &relative_cwd)?
+                .path
+                .to_string_lossy()
+                .to_string()
+        }
         None => project_root,
     };
     cmd.cwd(work_dir);
@@ -95,7 +101,58 @@ pub async fn shell_spawn_pty(
     cmd.env_remove("GIT_WORK_TREE");
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    register_pty_session(app, pair, child)
+}
 
+async fn spawn_remote_pty(
+    app: AppHandle,
+    project_root: String,
+    cols: u16,
+    rows: u16,
+    cwd: Option<String>,
+) -> Result<PtySessionInfo, String> {
+    let ssh = parse_ssh_project_root(&project_root)?;
+    let remote_cwd = match cwd.as_deref() {
+        Some(relative) if !relative.trim().is_empty() && relative.trim() != "." => {
+            let parts = validate_relative(relative, &ssh.hostname)?;
+            let mut path = ssh.remote_path.trim_end_matches('/').to_string();
+            for part in parts {
+                path.push('/');
+                path.push_str(&part);
+            }
+            path
+        }
+        _ => ssh.remote_path.clone(),
+    };
+    let argv = tty_argv_on_master(key_for(&ssh), Some(tty_login_command(&remote_cwd)))
+        .await
+        .map_err(|err| map_unreachable(&ssh.hostname, err))?;
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| e.to_string())?;
+    let mut cmd = CommandBuilder::new(SSH_BIN);
+    cmd.args(argv.args);
+    cmd.env("TERM", "xterm-256color");
+    cmd.env_remove("GIT_DIR");
+    cmd.env_remove("GIT_WORK_TREE");
+    let child = pair
+        .slave
+        .spawn_command(cmd)
+        .map_err(|err| map_unreachable(&ssh.hostname, err.to_string()))?;
+    register_pty_session(app, pair, child)
+}
+
+fn register_pty_session(
+    app: AppHandle,
+    pair: portable_pty::PtyPair,
+    child: Box<dyn portable_pty::Child + Send>,
+) -> Result<PtySessionInfo, String> {
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
@@ -136,17 +193,19 @@ pub async fn shell_spawn_pty(
 
 #[tauri::command]
 pub fn shell_write_pty(session_id: String, data: String) -> Result<(), String> {
-    let sessions = PTY_SESSIONS.lock().unwrap();
-    let session = sessions
-        .get(&session_id)
-        .ok_or_else(|| "PTY session not found".to_string())?;
+    let session = {
+        let sessions = PTY_SESSIONS.lock().unwrap();
+        sessions
+            .get(&session_id)
+            .cloned()
+            .ok_or_else(|| "PTY session not found".to_string())?
+    };
     let mut guard = session.lock().unwrap();
     guard
         .writer
         .write_all(data.as_bytes())
         .map_err(|e| e.to_string())?;
-    guard.writer.flush().map_err(|e| e.to_string())?;
-    Ok(())
+    guard.writer.flush().map_err(|e| e.to_string())
 }
 
 #[tauri::command]

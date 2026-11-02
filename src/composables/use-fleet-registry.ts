@@ -16,6 +16,7 @@ import {
   registrySetActiveProject,
   registryUpdateGroup,
 } from '@/services/vixl/vixl-tauri'
+import { isUnreachableHostError } from '@/services/harness/ssh/map-error'
 import formatUnknownError from '@/utils/format-unknown-error'
 import { setFleetGroupReader } from '@/utils/fleet-group-reader'
 import {
@@ -30,6 +31,11 @@ const activeProjectId = ref<string | null>(null)
 const hasProjectVixlFlag = ref(false)
 const loaded = ref(false)
 let bootstrapPromise: Promise<void> | null = null
+let fleetBootstrapStarted = false
+
+export const resetFleetBootstrapForTests = (): void => {
+  fleetBootstrapStarted = false
+}
 
 type FleetProjectSnakeRecord = {
   id: string
@@ -81,7 +87,15 @@ const refreshHasVixl = async (): Promise<void> => {
     hasProjectVixlFlag.value = false
     return
   }
-  hasProjectVixlFlag.value = await hasProjectVixl(project.rootPath)
+  try {
+    hasProjectVixlFlag.value = await hasProjectVixl(project.rootPath)
+  } catch (error) {
+    if (isUnreachableHostError(error)) {
+      hasProjectVixlFlag.value = false
+      return
+    }
+    throw error
+  }
 }
 
 const refresh = async (): Promise<void> => {
@@ -243,11 +257,16 @@ export default () => {
   }
 
   onMounted(() => {
+    if (fleetBootstrapStarted) {
+      return
+    }
+    fleetBootstrapStarted = true
     void (async () => {
       try {
         await ensureFleetLoaded()
         await ensureDefaultProject()
       } catch (error) {
+        fleetBootstrapStarted = false
         toast.error('Failed to load fleet registry', {
           description: error instanceof Error ? error.message : 'Unknown error',
         })

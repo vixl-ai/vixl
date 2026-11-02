@@ -14,6 +14,7 @@ import {
   decidePermission,
   isStickyShellElevation,
 } from '@/services/harness/permission/policy'
+import { toolRunsAtLine } from '@/services/harness/ssh/location'
 
 export type PendingApprovalView = {
   toolCallId: string
@@ -28,10 +29,12 @@ export type PendingApprovalView = {
   serverId?: string
   subagentId?: string
   subagentLabel?: string
+  runsAt?: string
 }
 
 export type PermissionGateContext = {
   chatId: string
+  projectRoot?: string
   settings: VixlSettings
   permissionLevel: PermissionLevel
   sessionAllows: Set<string>
@@ -60,6 +63,7 @@ export const gateToolPermission = async (args: {
   paths?: string[]
   diff?: FileDiff[]
   serverId?: string
+  runsAt?: string
 }): Promise<boolean> => {
   const decision = decidePermission({
     action: args.action,
@@ -80,6 +84,10 @@ export const gateToolPermission = async (args: {
   }
 
   const needsNetwork = args.capability === 'shell.network' ? true : undefined
+  const runsAt =
+    args.runsAt ??
+    (args.ctx.projectRoot ? toolRunsAtLine(args.ctx.projectRoot, args.name) : undefined) ??
+    undefined
   const pendingTitle =
     args.action === 'fs.write' && decision.reason !== 'Sensitive path'
       ? 'Edit files in this workspace'
@@ -98,6 +106,7 @@ export const gateToolPermission = async (args: {
     serverId: args.serverId,
     subagentId: args.ctx.subagentId,
     subagentLabel: args.ctx.subagentLabel,
+    runsAt,
   })
 
   const result = await requestApproval({
@@ -115,6 +124,7 @@ export const gateToolPermission = async (args: {
     diff: args.diff,
     subagentId: args.ctx.subagentId,
     subagentLabel: args.ctx.subagentLabel,
+    runsAt,
   })
 
   if (!result.approved) {
