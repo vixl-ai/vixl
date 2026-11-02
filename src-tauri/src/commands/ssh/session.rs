@@ -75,7 +75,7 @@ lazy_static::lazy_static! {
     static ref SESSIONS: Mutex<HashMap<SessionKey, SessionRecord>> = Mutex::new(HashMap::new());
     static ref CONTROL_SOCKET_GATE: Mutex<()> = Mutex::new(());
     static ref CONNECT_CANCEL: Mutex<HashMap<SessionKey, Arc<AtomicBool>>> = Mutex::new(HashMap::new());
-    static ref PROMPT_OWNERS: Mutex<HashMap<SessionKey, u64>> = Mutex::new(HashMap::new());
+    static ref PROMPT_OWNERS: Mutex<HashMap<SessionKey, Vec<u64>>> = Mutex::new(HashMap::new());
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -319,13 +319,34 @@ async fn attach_connect_kill(
 }
 
 async fn remember_prompt_owner(key: &SessionKey, owner: u64) {
-    PROMPT_OWNERS.lock().await.insert(key.clone(), owner);
+    PROMPT_OWNERS
+        .lock()
+        .await
+        .entry(key.clone())
+        .or_default()
+        .push(owner);
 }
 
 async fn clear_prompt_owner(key: &SessionKey, owner: u64) {
     let mut owners = PROMPT_OWNERS.lock().await;
-    if owners.get(key).copied() == Some(owner) {
+    let Some(list) = owners.get_mut(key) else {
+        return;
+    };
+    list.retain(|item| *item != owner);
+    if list.is_empty() {
         owners.remove(key);
+    }
+}
+
+async fn cancel_session_prompts(key: &SessionKey) {
+    let owners = PROMPT_OWNERS
+        .lock()
+        .await
+        .get(key)
+        .cloned()
+        .unwrap_or_default();
+    for owner in owners {
+        cancel_owned_prompts(owner).await;
     }
 }
 
@@ -947,9 +968,7 @@ pub async fn cancel_connect(user: &str, hostname: &str, port: u16) -> Result<(),
     if let Some(flag) = CONNECT_CANCEL.lock().await.get(&key) {
         flag.store(true, Ordering::SeqCst);
     }
-    if let Some(owner) = PROMPT_OWNERS.lock().await.get(&key).copied() {
-        cancel_owned_prompts(owner).await;
-    }
+    cancel_session_prompts(&key).await;
     let _ = disconnect(user, hostname, port).await;
     Ok(())
 }
@@ -1426,5 +1445,33 @@ mod tests {
         assert!(last_error.is_none());
         acquire_control_lock(&paths.lock_path("cancel-lock")).expect("lock after cancel");
         clear_sessions_for_tests().await;
+    }
+
+    #[tokio::test]
+    async fn superseded_prompt_owner_stays_registered() {
+        let _lock = SESSION_TEST_LOCK.lock().await;
+        clear_sessions_for_tests().await;
+        let key = session_key("johnny", "appleseed.example", 2222);
+        let first = next_prompt_owner();
+        let second = next_prompt_owner();
+        remember_prompt_owner(&key, first).await;
+        remember_prompt_owner(&key, second).await;
+        let owners = PROMPT_OWNERS
+            .lock()
+            .await
+            .get(&key)
+            .cloned()
+            .expect("owners");
+        assert_eq!(owners, vec![first, second]);
+        clear_prompt_owner(&key, first).await;
+        let owners = PROMPT_OWNERS
+            .lock()
+            .await
+            .get(&key)
+            .cloned()
+            .expect("owners");
+        assert_eq!(owners, vec![second]);
+        clear_sessions_for_tests().await;
+        assert!(PROMPT_OWNERS.lock().await.get(&key).is_none());
     }
 }
