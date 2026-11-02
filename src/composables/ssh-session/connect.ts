@@ -16,7 +16,7 @@ import {
 } from '@/utils/ssh-destination'
 import { tryParseSshProjectRoot } from '@/utils/ssh-project-root'
 import { loadAliases } from './events'
-import { startFolderPicker } from './folder'
+import { startFolderPicker } from './folder-picker'
 import { rememberedSshIdentity, rememberSshIdentity } from './identity-memory'
 import * as state from './state'
 

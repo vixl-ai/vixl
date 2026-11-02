@@ -3,7 +3,7 @@ import { toast } from 'vue-sonner'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import { fsListDir, fsMkdir, registryAddProject } from '@/services/vixl/vixl-tauri'
-import { sshExec, type SshSessionStatus } from '@/services/vixl/vixl-tauri/ssh'
+import { sshExec } from '@/services/vixl/vixl-tauri/ssh'
 import { parseSshConnectError } from '@/utils/ssh-destination'
 import { formatSshUri, tryParseSshProjectRoot } from '@/utils/ssh-project-root'
 import * as state from './state'
@@ -31,7 +31,10 @@ const listingUri = (absolute: string) => {
   })
 }
 
-export const listAt = async (absolute: string, attempt?: number): Promise<void> => {
+export const listAt = async (
+  absolute: string,
+  attempt = state.connectAttempt.value,
+): Promise<void> => {
   const current = state.activePreview.value
   if (!current) {
     return
@@ -49,7 +52,7 @@ export const listAt = async (absolute: string, attempt?: number): Promise<void> 
   state.folderError.value = ''
   try {
     const entries = await fsListDir(uri, '.')
-    if (attempt !== undefined && attempt !== state.connectAttempt.value) {
+    if (attempt !== state.connectAttempt.value) {
       return
     }
     state.folderCurrent.value = path
@@ -57,20 +60,21 @@ export const listAt = async (absolute: string, attempt?: number): Promise<void> 
     state.folderEntries.value = entries.filter((entry) => entry.kind === 'directory')
     state.folderSelected.value = []
   } catch (error) {
-    if (attempt !== undefined && attempt !== state.connectAttempt.value) {
+    if (attempt !== state.connectAttempt.value) {
       return
     }
     state.folderError.value = error instanceof Error ? error.message : String(error)
   } finally {
-    if (attempt === undefined || attempt === state.connectAttempt.value) {
+    if (attempt === state.connectAttempt.value) {
       state.folderListing.value = false
     }
   }
 }
 
 export const listRemoteFolder = async (relative: string): Promise<void> => {
+  const attempt = state.connectAttempt.value
   if (relative.startsWith('/')) {
-    await listAt(relative)
+    await listAt(relative, attempt)
     return
   }
   const base = state.folderCurrent.value.replace(/\/$/, '')
@@ -78,10 +82,10 @@ export const listRemoteFolder = async (relative: string): Promise<void> => {
     return
   }
   if (relative === '.' || relative === '') {
-    await listAt(base)
+    await listAt(base, attempt)
     return
   }
-  await listAt(`${base}/${relative}`)
+  await listAt(`${base}/${relative}`, attempt)
 }
 
 export const folderChildPath = (name: string): string => {
@@ -112,6 +116,7 @@ const rejectedFolderName = (name: string, hostname: string): string | null => {
 }
 
 export const createRemoteFolder = async (name: string): Promise<void> => {
+  const attempt = state.connectAttempt.value
   const current = state.activePreview.value
   const parent = state.folderCurrent.value
   if (!current || !parent) {
@@ -130,55 +135,20 @@ export const createRemoteFolder = async (name: string): Promise<void> => {
   state.folderError.value = ''
   try {
     await fsMkdir({ projectRoot: uri, path: name.trim() })
-    await listAt(parent)
-    if (!state.folderError.value) {
-      state.folderSelected.value = [folderChildPath(name.trim())]
+    if (attempt !== state.connectAttempt.value) {
+      return
     }
+    await listAt(parent, attempt)
+    if (attempt !== state.connectAttempt.value || state.folderError.value) {
+      return
+    }
+    state.folderSelected.value = [folderChildPath(name.trim())]
   } catch (error) {
+    if (attempt !== state.connectAttempt.value) {
+      return
+    }
     state.folderError.value = error instanceof Error ? error.message : String(error)
     state.folderListing.value = false
-  }
-}
-
-export const startFolderPicker = async (status: SshSessionStatus): Promise<void> => {
-  const attempt = state.connectAttempt.value
-  state.folderListing.value = true
-  state.folderError.value = ''
-  try {
-    const result = await sshExec({
-      user: status.user,
-      hostname: status.hostname,
-      port: status.port,
-      command: 'printf %s "$HOME"',
-    })
-    if (attempt !== state.connectAttempt.value) {
-      return
-    }
-    const home = result.stdout.trim()
-    if (!home || home === '/') {
-      throw new Error(`Opening / on ${status.hostname} is refused.`)
-    }
-    state.folderHome.value = home
-    state.folderCurrent.value = home
-    state.folderRelative.value = '.'
-    state.connectPhase.value = 'pick-folder'
-    await listAt(home, attempt)
-  } catch (error) {
-    if (attempt !== state.connectAttempt.value) {
-      return
-    }
-    const copy = parseSshConnectError(error)
-    state.connectPhase.value = 'error'
-    state.connectErrorTitle.value = copy.title.startsWith('Opening /')
-      ? 'Could not open project.'
-      : copy.title
-    state.connectErrorBody.value = copy.title.startsWith('Opening /')
-      ? `Opening / on ${status.hostname} is refused.`
-      : copy.body || copy.title
-  } finally {
-    if (attempt === state.connectAttempt.value) {
-      state.folderListing.value = false
-    }
   }
 }
 
