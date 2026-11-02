@@ -87,6 +87,60 @@ struct RemoteWatch {
     stopped: Arc<AtomicBool>,
 }
 
+enum RemoteClaim {
+    Joined,
+    Started(Arc<AtomicBool>),
+}
+
+fn claim_remote(map: &mut HashMap<String, RemoteWatch>, key: String) -> RemoteClaim {
+    if let Some(entry) = map.get_mut(&key) {
+        if !entry.stopped.load(Ordering::SeqCst) {
+            entry.refcount = entry.refcount.saturating_add(1);
+            return RemoteClaim::Joined;
+        }
+        map.remove(&key);
+    }
+    let stopped = Arc::new(AtomicBool::new(false));
+    map.insert(
+        key,
+        RemoteWatch {
+            refcount: 1,
+            channel_id: String::new(),
+            stopped: stopped.clone(),
+        },
+    );
+    RemoteClaim::Started(stopped)
+}
+
+fn drop_remote_start(map: &mut HashMap<String, RemoteWatch>, key: &str, stopped: &Arc<AtomicBool>) {
+    let still_starting = map.get(key).is_some_and(|entry| {
+        Arc::ptr_eq(&entry.stopped, stopped) && entry.channel_id.is_empty()
+    });
+    if !still_starting {
+        return;
+    }
+    if let Some(entry) = map.get_mut(key) {
+        entry.stopped.store(true, Ordering::SeqCst);
+    }
+    map.remove(key);
+}
+
+fn publish_remote_channel(
+    map: &mut HashMap<String, RemoteWatch>,
+    key: &str,
+    stopped: &Arc<AtomicBool>,
+    channel_id: String,
+) -> bool {
+    let Some(entry) = map.get_mut(key) else {
+        return false;
+    };
+    if !Arc::ptr_eq(&entry.stopped, stopped) || entry.stopped.load(Ordering::SeqCst) {
+        return false;
+    }
+    entry.channel_id = channel_id;
+    true
+}
+
 pub struct WorkspaceWatchState {
     inner: Mutex<HashMap<String, RootEntry>>,
     remote: Mutex<HashMap<String, RemoteWatch>>,
@@ -634,12 +688,12 @@ pub async fn unwatch_workspace(app: AppHandle, project_root: String) -> Result<(
             if entry.refcount > 0 {
                 return Ok(());
             }
-            map.remove(&key).map(|entry| {
-                entry.stopped.store(true, Ordering::SeqCst);
-                entry.channel_id
-            })
+            entry.stopped.store(true, Ordering::SeqCst);
+            let channel_id = std::mem::take(&mut entry.channel_id);
+            map.remove(&key);
+            channel_id
         };
-        if let Some(channel_id) = channel_id {
+        if !channel_id.is_empty() {
             let _ = close_channel(channel_id).await;
         }
         return Ok(());
