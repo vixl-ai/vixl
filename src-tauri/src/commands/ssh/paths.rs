@@ -153,6 +153,21 @@ pub fn set_mode_0600(path: &Path) -> Result<(), String> {
     })
 }
 
+#[cfg(not(unix))]
+pub fn ensure_dir_mode_0700(path: &Path) -> Result<(), String> {
+    fs::create_dir_all(path).map_err(|err| {
+        format!(
+            "Could not create SSH directory {path}: {err}",
+            path = path.display()
+        )
+    })
+}
+
+#[cfg(not(unix))]
+pub fn set_mode_0600(_path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
 #[cfg(unix)]
 pub fn file_mode(path: &Path) -> Result<u32, String> {
     use std::os::unix::fs::PermissionsExt;

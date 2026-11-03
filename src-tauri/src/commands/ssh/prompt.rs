@@ -402,6 +402,20 @@ pub async fn serve_askpass_client(
     let _ = write_response(&mut stream, &response).await;
 }
 
+#[cfg(not(unix))]
+pub async fn run_askpass_listener(
+    _sock_path: std::path::PathBuf,
+    _app: Option<tauri::AppHandle>,
+    _ctx: Arc<ConnectCtx>,
+    mut stop: tokio::sync::watch::Receiver<bool>,
+) {
+    while stop.changed().await.is_ok() {
+        if *stop.borrow() {
+            break;
+        }
+    }
+}
+
 #[cfg(unix)]
 pub async fn run_askpass_listener(
     sock_path: std::path::PathBuf,

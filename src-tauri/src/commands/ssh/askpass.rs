@@ -219,6 +219,20 @@ pub fn write_askpass_helper(dest: &Path) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(not(unix))]
+pub fn write_askpass_helper(dest: &Path) -> Result<(), String> {
+    if let Some(parent) = dest.parent() {
+        super::paths::ensure_dir_mode_0700(parent)?;
+    }
+    std::fs::write(dest, ASKPASS_PERL.as_bytes())
+        .map_err(|err| format!("Could not write askpass helper: {err}"))
+}
+
+#[cfg(not(unix))]
+pub fn require_helper_mode_0700(_path: &Path, _hostname: &str) -> Result<(), String> {
+    Ok(())
+}
+
 #[cfg(unix)]
 pub fn require_helper_mode_0700(path: &Path, hostname: &str) -> Result<(), String> {
     let mode = super::paths::file_mode(path)?;
