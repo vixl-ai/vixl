@@ -1,6 +1,6 @@
 {
   "name": "vixl",
-  "version": "0.11.11",
+  "version": "0.12.0",
   "private": true,
   "description": "Local-first BYOK Agents UI",
   "license": "MIT",
