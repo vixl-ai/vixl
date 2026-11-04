@@ -8,28 +8,26 @@ const listProjectChats = vi.hoisted(
   () => vi.fn<(slug: string) => Promise<ChatMeta[]>>(async () => []),
 )
 
-const fleetProjects = vi.hoisted(() => ({
-  value: [] as Array<{
-    id: string
-    slug: string
-    name: string
-    rootPath?: string
-    lastOpened?: string
-    worktree?: { parentId: string; branch: string; managed: boolean }
-  }>,
-}))
+type FleetProjectStub = {
+  id: string
+  slug: string
+  name: string
+  rootPath?: string
+  lastOpened?: string
+  worktree?: { parentId: string; branch: string; managed: boolean }
+}
 
-const fleetGroups = vi.hoisted(() => ({
-  value: [] as Array<{
-    id: string
-    slug: string
-    name: string
-    memberSlugs: string[]
-  }>,
-}))
+type FleetGroupStub = {
+  id: string
+  slug: string
+  name: string
+  memberSlugs: string[]
+}
 
-const activeProjectId = vi.hoisted(() => ({
-  value: null as string | null,
+const fleetHandles = vi.hoisted(() => ({
+  projects: undefined as { value: FleetProjectStub[] } | undefined,
+  groups: undefined as { value: FleetGroupStub[] } | undefined,
+  activeProjectId: undefined as { value: string | null } | undefined,
 }))
 
 vi.mock('vue-sonner', () => ({
@@ -48,14 +46,23 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
   }),
 )
 
-vi.mock('@/composables/use-fleet-registry', () => ({
-  default: () => ({
-    projects: fleetProjects,
-    groups: fleetGroups,
-    activeProjectId,
-    refresh: vi.fn<() => Promise<void>>(async () => undefined),
-  }),
-}))
+vi.mock('@/composables/use-fleet-registry', async () => {
+  const { ref } = await import('vue')
+  const projects = ref<FleetProjectStub[]>([])
+  const groups = ref<FleetGroupStub[]>([])
+  const activeProjectId = ref<string | null>(null)
+  fleetHandles.projects = projects
+  fleetHandles.groups = groups
+  fleetHandles.activeProjectId = activeProjectId
+  return {
+    default: () => ({
+      projects,
+      groups,
+      activeProjectId,
+      refresh: vi.fn<() => Promise<void>>(async () => undefined),
+    }),
+  }
+})
 
 vi.mock('@/composables/use-chat-store', () => ({
   default: () => ({
@@ -63,11 +70,15 @@ vi.mock('@/composables/use-chat-store', () => ({
   }),
 }))
 
-import useFleetSidebar from '@/composables/use-fleet-sidebar'
+import useFleetSidebar, { refreshFleetSidebar } from '@/composables/use-fleet-sidebar'
 import {
   revealedProjectSlug,
   revealFleetProject,
 } from '@/composables/fleet-project-reveal'
+
+const fleetProjects = fleetHandles.projects!
+const fleetGroups = fleetHandles.groups!
+const activeProjectId = fleetHandles.activeProjectId!
 
 const makeChat = (
   overrides: Pick<ChatMeta, 'id' | 'title' | 'projectSlug' | 'updatedAt'> &
@@ -92,6 +103,11 @@ const seedSidebar = async (
   await sidebar.refreshChats()
   return sidebar
 }
+
+const activitySlugs = (sidebar: ReturnType<typeof useFleetSidebar>): string[] =>
+  sidebar.activityItems.value.map((item) =>
+    item.kind === 'home' ? 'home' : item.project.slug,
+  )
 
 describe('use-fleet-sidebar activityItems', () => {
   beforeEach(() => {
@@ -205,7 +221,7 @@ describe('use-fleet-sidebar activityItems', () => {
     ).toEqual(['beta', 'home', 'alpha'])
   })
 
-  it('pins a revealed project above newer chats', async () => {
+  it('pins a revealed project above newer chats after a full chat refresh', async () => {
     fleetProjects.value = [
       { id: 'proj-1', slug: 'alpha', name: 'Alpha' },
       { id: 'proj-2', slug: 'beta', name: 'Beta' },
@@ -230,13 +246,23 @@ describe('use-fleet-sidebar activityItems', () => {
       ],
     })
 
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha'])
+
     revealFleetProject('alpha')
 
-    expect(
-      sidebar.activityItems.value.map((item) =>
-        item.kind === 'home' ? 'home' : item.project.slug,
-      ),
-    ).toEqual(['alpha', 'beta'])
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha'])
+
+    await sidebar.refreshChats()
+
+    expect(activitySlugs(sidebar)).toEqual(['alpha', 'beta'])
+
+    revealedProjectSlug.value = null
+
+    expect(activitySlugs(sidebar)).toEqual(['alpha', 'beta'])
+
+    await sidebar.refreshChats()
+
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha'])
   })
 
   it('opens an active project only after its chats are loaded', async () => {
@@ -312,11 +338,263 @@ describe('use-fleet-sidebar activityItems', () => {
     expect(groupRow?.kind).toBe('group')
     expect(groupRow?.displayName).toBe('api, web')
     expect(groupRow?.chats.map((chat) => chat.id)).toEqual(['g1'])
+    expect(activitySlugs(sidebar)).toEqual(['api-web', 'alpha'])
+  })
+
+  it('keeps project order when a slug refresh makes an older project newer', async () => {
+    fleetProjects.value = [
+      { id: 'proj-1', slug: 'alpha', name: 'Alpha' },
+      { id: 'proj-2', slug: 'beta', name: 'Beta' },
+    ]
+    const chats: Record<string, ChatMeta[]> = {
+      alpha: [
+        makeChat({
+          id: 'a1',
+          title: 'Alpha chat',
+          projectSlug: 'alpha',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      beta: [
+        makeChat({
+          id: 'b1',
+          title: 'Beta chat',
+          projectSlug: 'beta',
+          updatedAt: '2026-01-04T00:00:00.000Z',
+        }),
+      ],
+    }
+    const sidebar = await seedSidebar(chats)
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha'])
+
+    chats.alpha = [
+      makeChat({
+        id: 'a1',
+        title: 'Alpha streaming',
+        projectSlug: 'alpha',
+        updatedAt: '2026-01-09T00:00:00.000Z',
+      }),
+    ]
+    await sidebar.refreshSlug('alpha')
+    await sidebar.refreshSlug('alpha')
+
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha'])
+    const alpha = sidebar.activityItems.value.find(
+      (item) => item.kind === 'project' && item.project.slug === 'alpha',
+    )
+    expect(alpha?.updatedAt).toBe('2026-01-09T00:00:00.000Z')
+    expect(alpha?.kind === 'project' ? alpha.project.chats.map((chat) => chat.title) : []).toEqual(
+      ['Alpha streaming'],
+    )
+
+    await refreshFleetSidebar()
+
+    expect(activitySlugs(sidebar)).toEqual(['alpha', 'beta'])
+  })
+
+  it('appends home when home chats arrive from a slug refresh', async () => {
+    fleetProjects.value = [
+      { id: 'proj-1', slug: 'alpha', name: 'Alpha' },
+      { id: 'proj-2', slug: 'beta', name: 'Beta' },
+    ]
+    const chats: Record<string, ChatMeta[]> = {
+      alpha: [
+        makeChat({
+          id: 'a1',
+          title: 'Alpha chat',
+          projectSlug: 'alpha',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      beta: [
+        makeChat({
+          id: 'b1',
+          title: 'Beta chat',
+          projectSlug: 'beta',
+          updatedAt: '2026-01-04T00:00:00.000Z',
+        }),
+      ],
+      [HOME_CHAT_SLUG]: [],
+    }
+    const sidebar = await seedSidebar(chats)
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha'])
+
+    chats[HOME_CHAT_SLUG] = [
+      makeChat({
+        id: 'h1',
+        title: 'Home chat',
+        projectSlug: HOME_CHAT_SLUG,
+        updatedAt: '2026-01-09T00:00:00.000Z',
+      }),
+    ]
+    await sidebar.refreshSlug(HOME_CHAT_SLUG)
+
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha', 'home'])
+    const home = sidebar.activityItems.value.find((item) => item.kind === 'home')
+    expect(home?.updatedAt).toBe('2026-01-09T00:00:00.000Z')
+
+    await sidebar.refreshChats()
+
+    expect(activitySlugs(sidebar)).toEqual(['home', 'beta', 'alpha'])
+  })
+
+  it('sorts a newly added project by current updatedAt', async () => {
+    fleetProjects.value = [
+      { id: 'proj-1', slug: 'alpha', name: 'Alpha' },
+      { id: 'proj-2', slug: 'beta', name: 'Beta' },
+    ]
+    const chats: Record<string, ChatMeta[]> = {
+      alpha: [
+        makeChat({
+          id: 'a1',
+          title: 'Alpha chat',
+          projectSlug: 'alpha',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      beta: [
+        makeChat({
+          id: 'b1',
+          title: 'Beta chat',
+          projectSlug: 'beta',
+          updatedAt: '2026-01-04T00:00:00.000Z',
+        }),
+      ],
+    }
+    const sidebar = await seedSidebar(chats)
+
+    chats.alpha = [
+      makeChat({
+        id: 'a1',
+        title: 'Alpha chat',
+        projectSlug: 'alpha',
+        updatedAt: '2026-01-08T00:00:00.000Z',
+      }),
+    ]
+    await sidebar.refreshSlug('alpha')
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha'])
+
+    chats.gamma = [
+      makeChat({
+        id: 'g1',
+        title: 'Gamma chat',
+        projectSlug: 'gamma',
+        updatedAt: '2026-01-09T00:00:00.000Z',
+      }),
+    ]
+    await sidebar.refreshSlug('gamma')
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha'])
+
+    fleetProjects.value = [
+      ...fleetProjects.value,
+      { id: 'proj-3', slug: 'gamma', name: 'Gamma' },
+    ]
+
+    expect(activitySlugs(sidebar)).toEqual(['gamma', 'alpha', 'beta'])
+  })
+
+  it('drops a removed project and resorts the rest by current updatedAt', async () => {
+    fleetProjects.value = [
+      { id: 'proj-1', slug: 'alpha', name: 'Alpha' },
+      { id: 'proj-2', slug: 'beta', name: 'Beta' },
+      { id: 'proj-3', slug: 'gamma', name: 'Gamma' },
+    ]
+    const chats: Record<string, ChatMeta[]> = {
+      alpha: [
+        makeChat({
+          id: 'a1',
+          title: 'Alpha chat',
+          projectSlug: 'alpha',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      beta: [
+        makeChat({
+          id: 'b1',
+          title: 'Beta chat',
+          projectSlug: 'beta',
+          updatedAt: '2026-01-04T00:00:00.000Z',
+        }),
+      ],
+      gamma: [
+        makeChat({
+          id: 'g1',
+          title: 'Gamma chat',
+          projectSlug: 'gamma',
+          updatedAt: '2026-01-03T00:00:00.000Z',
+        }),
+      ],
+    }
+    const sidebar = await seedSidebar(chats)
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'gamma', 'alpha'])
+
+    chats.alpha = [
+      makeChat({
+        id: 'a1',
+        title: 'Alpha chat',
+        projectSlug: 'alpha',
+        updatedAt: '2026-01-09T00:00:00.000Z',
+      }),
+    ]
+    await sidebar.refreshSlug('alpha')
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'gamma', 'alpha'])
+
+    fleetProjects.value = fleetProjects.value.filter((project) => project.slug !== 'gamma')
+
+    expect(activitySlugs(sidebar)).toEqual(['alpha', 'beta'])
+  })
+
+  it('does not reorder projects when a nested worktree is added', async () => {
+    fleetProjects.value = [
+      { id: 'proj-1', slug: 'alpha', name: 'Alpha' },
+      { id: 'proj-2', slug: 'beta', name: 'Beta' },
+    ]
+    const chats: Record<string, ChatMeta[]> = {
+      alpha: [
+        makeChat({
+          id: 'a1',
+          title: 'Alpha chat',
+          projectSlug: 'alpha',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      ],
+      beta: [
+        makeChat({
+          id: 'b1',
+          title: 'Beta chat',
+          projectSlug: 'beta',
+          updatedAt: '2026-01-04T00:00:00.000Z',
+        }),
+      ],
+    }
+    const sidebar = await seedSidebar(chats)
+
+    chats.alpha = [
+      makeChat({
+        id: 'a1',
+        title: 'Alpha chat',
+        projectSlug: 'alpha',
+        updatedAt: '2026-01-09T00:00:00.000Z',
+      }),
+    ]
+    await sidebar.refreshSlug('alpha')
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha'])
+
+    fleetProjects.value = [
+      ...fleetProjects.value,
+      {
+        id: 'proj-wt',
+        slug: 'alpha-wt',
+        name: 'wt',
+        worktree: { parentId: 'proj-1', branch: 'vixl/wt', managed: true },
+      },
+    ]
+
+    expect(activitySlugs(sidebar)).toEqual(['beta', 'alpha'])
+    expect(sidebar.sidebarProjects.value.map((item) => item.slug)).toEqual(['alpha', 'beta'])
     expect(
-      sidebar.activityItems.value.map((item) =>
-        item.kind === 'home' ? 'home' : item.project.slug,
-      ),
-    ).toEqual(['api-web', 'alpha'])
+      sidebar.sidebarProjects.value.find((item) => item.slug === 'alpha')?.worktrees?.[0]?.slug,
+    ).toBe('alpha-wt')
   })
 })
 
@@ -326,6 +604,7 @@ describe('use-fleet-sidebar worktree nesting', () => {
     listProjectChats.mockResolvedValue([])
     fleetGroups.value = []
     activeProjectId.value = null
+    revealedProjectSlug.value = null
   })
 
   it('nests worktree projects under the parent with chats, sorted by lastOpened desc', async () => {

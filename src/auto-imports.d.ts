@@ -20,6 +20,7 @@ declare global {
   const FileTreeStartRenameKey: typeof import('./composables/use-file-tree-node-menu').FileTreeStartRenameKey
   const asyncComputed: typeof import('@vueuse/core').asyncComputed
   const autoResetRef: typeof import('@vueuse/core').autoResetRef
+  const bindFleetSidebarOrder: typeof import('./composables/fleet-sidebar-order').bindFleetSidebarOrder
   const bindPersistedOpen: typeof import('./composables/use-chat-turn-open-state').bindPersistedOpen
   const chatProjectSlugForId: typeof import('./composables/use-fleet-sidebar').chatProjectSlugForId
   const chatTitleForId: typeof import('./composables/use-fleet-sidebar').chatTitleForId
@@ -78,6 +79,7 @@ declare global {
   const isRef: typeof import('vue').isRef
   const isShallow: typeof import('vue').isShallow
   const lastVixlFileChange: typeof import('./composables/use-vixl-live-sync').lastVixlFileChange
+  const latestChatUpdatedAt: typeof import('./composables/fleet-sidebar-order').latestChatUpdatedAt
   const loadWorktreeRemovePreview: typeof import('./composables/remove-fleet-worktree').loadWorktreeRemovePreview
   const makeDestructurable: typeof import('@vueuse/core').makeDestructurable
   const markRaw: typeof import('vue').markRaw
@@ -101,8 +103,10 @@ declare global {
   const onUnmounted: typeof import('vue').onUnmounted
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
+  const orderedActivityItems: typeof import('./composables/fleet-sidebar-order').orderedActivityItems
   const pausableWatch: typeof import('@vueuse/core').pausableWatch
   const primaryProjectForSlug: typeof import('./composables/use-fleet-registry').primaryProjectForSlug
+  const projectActivityUpdatedAt: typeof import('./composables/fleet-sidebar-order').projectActivityUpdatedAt
   const provide: typeof import('vue').provide
   const provideChatTurnOpenState: typeof import('./composables/use-chat-turn-open-state').provideChatTurnOpenState
   const provideLocal: typeof import('@vueuse/core').provideLocal
@@ -113,6 +117,7 @@ declare global {
   const reactiveOmit: typeof import('@vueuse/core').reactiveOmit
   const reactivePick: typeof import('@vueuse/core').reactivePick
   const readonly: typeof import('vue').readonly
+  const recomputeFleetSidebarOrder: typeof import('./composables/fleet-sidebar-order').recomputeFleetSidebarOrder
   const ref: typeof import('vue').ref
   const refAutoReset: typeof import('@vueuse/core').refAutoReset
   const refDebounced: typeof import('@vueuse/core').refDebounced
@@ -457,6 +462,7 @@ declare module 'vue' {
     readonly FileTreeStartRenameKey: UnwrapRef<typeof import('./composables/use-file-tree-node-menu')['FileTreeStartRenameKey']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
+    readonly bindFleetSidebarOrder: UnwrapRef<typeof import('./composables/fleet-sidebar-order')['bindFleetSidebarOrder']>
     readonly bindPersistedOpen: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['bindPersistedOpen']>
     readonly chatProjectSlugForId: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['chatProjectSlugForId']>
     readonly chatTitleForId: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['chatTitleForId']>
@@ -515,6 +521,7 @@ declare module 'vue' {
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
     readonly isShallow: UnwrapRef<typeof import('vue')['isShallow']>
     readonly lastVixlFileChange: UnwrapRef<typeof import('./composables/use-vixl-live-sync')['lastVixlFileChange']>
+    readonly latestChatUpdatedAt: UnwrapRef<typeof import('./composables/fleet-sidebar-order')['latestChatUpdatedAt']>
     readonly loadWorktreeRemovePreview: UnwrapRef<typeof import('./composables/remove-fleet-worktree')['loadWorktreeRemovePreview']>
     readonly makeDestructurable: UnwrapRef<typeof import('@vueuse/core')['makeDestructurable']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
@@ -538,8 +545,10 @@ declare module 'vue' {
     readonly onUnmounted: UnwrapRef<typeof import('vue')['onUnmounted']>
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
+    readonly orderedActivityItems: UnwrapRef<typeof import('./composables/fleet-sidebar-order')['orderedActivityItems']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
     readonly primaryProjectForSlug: UnwrapRef<typeof import('./composables/use-fleet-registry')['primaryProjectForSlug']>
+    readonly projectActivityUpdatedAt: UnwrapRef<typeof import('./composables/fleet-sidebar-order')['projectActivityUpdatedAt']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideChatTurnOpenState: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['provideChatTurnOpenState']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
@@ -550,6 +559,7 @@ declare module 'vue' {
     readonly reactiveOmit: UnwrapRef<typeof import('@vueuse/core')['reactiveOmit']>
     readonly reactivePick: UnwrapRef<typeof import('@vueuse/core')['reactivePick']>
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
+    readonly recomputeFleetSidebarOrder: UnwrapRef<typeof import('./composables/fleet-sidebar-order')['recomputeFleetSidebarOrder']>
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
     readonly refAutoReset: UnwrapRef<typeof import('@vueuse/core')['refAutoReset']>
     readonly refDebounced: UnwrapRef<typeof import('@vueuse/core')['refDebounced']>
