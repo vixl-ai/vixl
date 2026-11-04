@@ -39,5 +39,27 @@ fn patch_refreshes_tray(patch: &serde_json::Value) -> bool {
     let Some(obj) = patch.as_object() else {
         return false;
     };
-    obj.contains_key("status") || obj.contains_key("activePlanPath")
+    obj.contains_key("status") || obj.contains_key("activePlanPath") || obj.contains_key("title")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::patch_refreshes_tray;
+
+    #[test]
+    fn title_status_and_plan_patches_refresh_tray() {
+        assert!(patch_refreshes_tray(
+            &serde_json::json!({ "title": "Renamed" })
+        ));
+        assert!(patch_refreshes_tray(
+            &serde_json::json!({ "status": "running" })
+        ));
+        assert!(patch_refreshes_tray(
+            &serde_json::json!({ "activePlanPath": ".vixl/plans/a/PLAN.md" })
+        ));
+        assert!(!patch_refreshes_tray(
+            &serde_json::json!({ "pinned": true })
+        ));
+        assert!(!patch_refreshes_tray(&serde_json::json!("nope")));
+    }
 }

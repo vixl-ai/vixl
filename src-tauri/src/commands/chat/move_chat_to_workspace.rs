@@ -210,6 +210,10 @@ pub async fn move_chat_to_workspace(
         }
     }
 
+    if let Err(error) = crate::tray::refresh_agents(&app) {
+        log::error!("Failed to refresh tray agents: {error}");
+    }
+
     Ok(MoveChatToWorkspaceResult {
         project: FleetProjectView::from(project),
         chat: meta,
