@@ -30,6 +30,7 @@ pub(crate) use remote::{
     read_bytes_await, read_file_await, resolve_target, stat_await, uses_ssh_transport,
     validate_relative, write_bytes_await, FsTarget, SshProjectRoot,
 };
+pub(crate) use sftp::SftpClient;
 pub use types::{
     DiffLine, FileDiff, FileDiffHunk, FsDirEntry, FsEditReplacement, FsReadFileResult,
     FsStagePreviewRequest, FsStatResult, FsTreeNode, WriteTempHandoffResult,

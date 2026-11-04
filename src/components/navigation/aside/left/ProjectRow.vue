@@ -225,7 +225,7 @@ const handleOpenEditor = async (): Promise<void> => {
   }
 
   try {
-    await workbench.openEditor(workspace.activateId, 'README.md')
+    await workbench.openEditor(workspace.activateId)
   } catch (error) {
     toast.error('Could not open editor', {
       description: error instanceof Error ? error.message : 'Unknown error',

@@ -11,7 +11,18 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [path: string, projectId: string]
   'tree-changed': []
+  loading: [value: boolean]
 }>()
+
+const loadingById = ref<Record<string, boolean>>({})
+
+const handleLoading = (projectId: string, value: boolean): void => {
+  loadingById.value = { ...loadingById.value, [projectId]: value }
+  emit(
+    'loading',
+    Object.values(loadingById.value).some((pending) => pending),
+  )
+}
 
 type MemberTreeExpose = {
   handleNewFile: (parentDirPath?: string) => void
@@ -76,6 +87,7 @@ defineExpose({
         :root-node-name="member.slug"
         @select="handleSelect($event, member.id)"
         @tree-changed="handleTreeChanged"
+        @loading="handleLoading(member.id, $event)"
       />
     </div>
   </div>

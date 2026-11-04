@@ -45,6 +45,7 @@ impl From<FleetProject> for FleetProjectView {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn resolve_destination_root(
     root_path: &str,
     current_root: &str,

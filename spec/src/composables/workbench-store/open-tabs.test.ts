@@ -77,6 +77,21 @@ describe('openPlan home workspace', () => {
     })
   })
 
+  it('opens the editor with no file', async () => {
+    const { openEditor } = await import('@/composables/workbench-store/open-tabs')
+    const { tabs } = await import('@/composables/workbench-store/state')
+
+    await openEditor('proj-1')
+
+    expect(tabs.value).toHaveLength(1)
+    expect(tabs.value[0]).toMatchObject({
+      type: 'editor',
+      projectId: 'proj-1',
+      label: 'Editor',
+      payload: { path: '', openPaths: [] },
+    })
+  })
+
   it('does not look up the home dir for a fleet project plan', async () => {
     const { openPlan } = await import('@/composables/workbench-store/open-tabs')
     const { tabs, homeRootPath } = await import('@/composables/workbench-store/state')

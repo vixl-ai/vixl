@@ -21,7 +21,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
-import useFleetRegistry from '@/composables/use-fleet-registry'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 
 const props = withDefaults(
@@ -34,7 +33,6 @@ const props = withDefaults(
   },
 )
 
-const fleet = useFleetRegistry()
 const workbench = useWorkbenchStore()
 const route = useRoute()
 const open = ref(false)
@@ -43,8 +41,6 @@ const workspaceProjects = computed(() =>
   workbench.listWorkspaceProjects(contextSlug.value),
 )
 const isGroupWorkspace = computed(() => workspaceProjects.value.length > 1)
-
-const activeProjectId = computed(() => fleet.activeProjectId.value)
 
 const handleOpen = async (
   type: 'editor' | 'terminal',
@@ -57,10 +53,7 @@ const handleOpen = async (
   try {
     switch (type) {
       case 'editor':
-        await workbench.openEditor(
-          projectId,
-          activeProjectId.value ? 'README.md' : '',
-        )
+        await workbench.openEditor(projectId)
         break
       case 'terminal':
         await workbench.openTerminal(projectId)

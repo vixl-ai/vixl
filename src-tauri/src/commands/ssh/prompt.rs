@@ -125,6 +125,7 @@ fn register_prompt(
     Ok(rx)
 }
 
+#[cfg(test)]
 async fn wait_for_user(request_id: String, owner: u64) -> PromptAnswer {
     let rx = {
         let mut prompts = PROMPTS.lock().await;

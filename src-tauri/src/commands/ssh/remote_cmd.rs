@@ -45,15 +45,18 @@ pub fn inotifywait_missing(hostname: &str) -> String {
     format!("inotifywait is not installed on {hostname}.")
 }
 
-pub fn map_unreachable(hostname: &str, err: String) -> String {
+pub fn looks_like_unreachable(err: &str) -> bool {
     let lower = err.to_ascii_lowercase();
-    if lower.contains("unreachable")
+    lower.contains("unreachable")
         || lower.contains("not connected")
         || lower.contains("master is dead")
         || lower.contains("broken pipe")
         || lower.contains("connection reset")
         || lower.contains("connection lost")
-    {
+}
+
+pub fn map_unreachable(hostname: &str, err: String) -> String {
+    if looks_like_unreachable(&err) {
         unreachable_host(hostname)
     } else {
         err

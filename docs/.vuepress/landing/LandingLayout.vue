@@ -24,15 +24,15 @@ onMounted(() => {
 
 <template>
   <div class="vx-landing relative min-h-screen overflow-x-clip bg-background text-foreground">
-    <div
-      class="vx-page-aurora pointer-events-none absolute inset-x-0 top-0 z-[1] h-[min(100svh,56rem)] overflow-hidden"
-      aria-hidden="true"
-    >
-      <AuroraBackground intensity="hero" />
-    </div>
     <SiteHeader />
-    <main class="relative z-10">
-      <div class="vx-atmosphere relative">
+    <main class="relative z-10 -mt-14 sm:-mt-16">
+      <div class="vx-atmosphere relative isolate">
+        <div
+          class="vx-atmosphere-aurora pointer-events-none absolute inset-0"
+          aria-hidden="true"
+        >
+          <AuroraBackground intensity="hero" />
+        </div>
         <HeroSection />
         <HeroScreenshot />
       </div>

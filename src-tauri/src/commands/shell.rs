@@ -8,5 +8,6 @@ pub use pty::{
     shell_write_pty, PtySessionInfo,
 };
 pub use reveal::{is_reveal_path_allowed, reveal_in_folder};
+#[cfg(test)]
 pub(crate) use spawn::reap_remote_shell;
 pub use spawn::{shell_kill_tracked, shell_spawn_tracked, ShellExitResult};

@@ -13,6 +13,11 @@ import {
   loadedExpandedDirectories,
   type WorkspaceTreeChanged,
 } from './merge-directory-children'
+
+type WorkspaceWatchFailed = {
+  rootPath: string
+  message: string
+}
 import { recoverTreeSyncError, relistDirectories } from './workspace-tree-relist'
 import { reportWatchError, retryWorkspaceWatch } from './watch-error'
 import { createWorkspaceWatchSession } from './workspace-watch-session'
@@ -39,6 +44,7 @@ export const bindFileTreeWorkspaceSync = (
   let pendingRelist = false
   let treeListenCancelled = false
   let unlistenTree: UnlistenFn | null = null
+  let unlistenWatchFailed: UnlistenFn | null = null
   let mergeGeneration = 0
   let mergeQueue: Promise<void> = Promise.resolve()
   let homeWatchTimer: ReturnType<typeof setTimeout> | null = null
@@ -176,11 +182,25 @@ export const bindFileTreeWorkspaceSync = (
     const unlisten = await listen<WorkspaceTreeChanged>('workspace-tree-changed', (event) => {
       enqueueTreeMerge(() => applyWorkspaceTreeChanged(event.payload))
     })
+    const unlistenFailed = await listen<WorkspaceWatchFailed>(
+      'workspace-watch-failed',
+      (event) => {
+        if (!eventMatchesRoot(event.payload.rootPath)) {
+          return
+        }
+        reportWatchError(event.payload.message, state.watchError)
+        if (state.watchError) {
+          state.watchError.value = event.payload.message
+        }
+      },
+    )
     if (treeListenCancelled) {
       unlisten()
+      unlistenFailed()
       return
     }
     unlistenTree = unlisten
+    unlistenWatchFailed = unlistenFailed
   }
 
   onMounted(() => {
@@ -211,6 +231,8 @@ export const bindFileTreeWorkspaceSync = (
     document.removeEventListener('visibilitychange', handleVisibilityChange)
     unlistenTree?.()
     unlistenTree = null
+    unlistenWatchFailed?.()
+    unlistenWatchFailed = null
     if (homeWatchTimer !== null) {
       clearTimeout(homeWatchTimer)
       homeWatchTimer = null

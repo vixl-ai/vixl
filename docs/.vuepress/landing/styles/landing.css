@@ -114,6 +114,7 @@
   --vx-aurora-lavender: color-mix(in oklch, var(--vx-purple) 55%, white);
   --vx-aurora-blue: color-mix(in oklch, var(--vx-blue) 50%, white);
   --vx-aurora-mint: color-mix(in oklch, var(--vx-green) 50%, white);
+  --vx-aurora-violet: color-mix(in oklch, var(--vx-aurora-lavender) 55%, var(--vx-aurora-blue));
 
   color: var(--foreground);
   background-color: var(--background);
@@ -173,6 +174,7 @@
   --vx-aurora-lavender: var(--vx-purple);
   --vx-aurora-blue: var(--vx-blue);
   --vx-aurora-mint: #a7f3d0;
+  --vx-aurora-violet: color-mix(in oklch, var(--vx-aurora-lavender) 55%, var(--vx-aurora-blue));
 }
 
 @layer base {
@@ -286,6 +288,7 @@
 }
 
 .vx-landing .vx-atmosphere {
+  isolation: isolate;
   overflow: visible;
   padding-bottom: 0;
 }
@@ -367,27 +370,34 @@ html.vx-theme-override .vx-landing .vx-hero-shot {
 
 /* Soft-fade the aurora clip so the breathe/scale animation does not hard-cut
    into a thin pulsing line (often visible through the Sponsors band). */
-.vx-landing .vx-page-aurora {
+.vx-landing .vx-atmosphere-aurora {
   overflow: hidden;
+  z-index: 0;
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 58%,
-    rgb(0 0 0 / 0.55) 78%,
+    #000 40%,
+    rgb(0 0 0 / 0.7) 55%,
+    rgb(0 0 0 / 0.28) 78%,
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 58%,
-    rgb(0 0 0 / 0.55) 78%,
+    #000 40%,
+    rgb(0 0 0 / 0.7) 55%,
+    rgb(0 0 0 / 0.28) 78%,
     transparent 100%
   );
 }
 
-.vx-landing .vx-page-aurora > .vx-aurora {
+.vx-landing .vx-atmosphere-aurora > .vx-aurora {
   inset: 0;
   z-index: 0;
+}
+
+.vx-landing .vx-hero {
+  z-index: 1;
 }
 
 .vx-landing .vx-section-title {
@@ -481,37 +491,38 @@ html.vx-theme-override .vx-landing .vx-hero-shot {
 
 .vx-landing .vx-aurora-wash {
   position: absolute;
-  inset: 0 0 28% 0;
+  inset: 0;
   background:
     radial-gradient(
-      ellipse 95% 48% at 50% 0%,
-      color-mix(in oklch, var(--vx-aurora-lavender) 55%, var(--vx-aurora-blue)),
+      ellipse 78% 62% at 86% 40%,
+      color-mix(in oklch, var(--vx-aurora-blue) 62%, transparent),
       transparent 70%
     ),
     radial-gradient(
-      ellipse 80% 60% at 18% 4%,
-      color-mix(in oklch, var(--vx-aurora-lavender) 82%, transparent),
+      ellipse 52% 46% at 14% 16%,
+      color-mix(in oklch, var(--vx-aurora-lavender) 58%, transparent),
       transparent 72%
     ),
     radial-gradient(
-      ellipse 75% 55% at 84% 4%,
-      color-mix(in oklch, var(--vx-aurora-blue) 76%, transparent),
-      transparent 70%
+      ellipse 58% 44% at 46% 30%,
+      color-mix(in oklch, var(--vx-aurora-violet) 48%, transparent),
+      transparent 72%
     ),
     radial-gradient(
-      ellipse 85% 58% at 50% 18%,
+      ellipse 40% 34% at 52% 56%,
       color-mix(in oklch, var(--vx-aurora-mint) 52%, transparent),
-      transparent 74%
+      transparent 70%
     );
-  opacity: 0.95;
-  animation: vx-aurora-breathe 28s ease-in-out infinite;
+  opacity: 0.5;
+  transform-origin: 50% 32%;
+  animation: vx-aurora-breathe 12s ease-in-out infinite;
 }
 
 .vx-landing .vx-aurora-orb {
   position: absolute;
   border-radius: 50%;
   filter: blur(92px);
-  opacity: 0.42;
+  opacity: 0.26;
   animation: vx-aurora-drift 24s ease-in-out infinite;
 }
 
@@ -525,49 +536,49 @@ html.vx-theme-override .vx-landing .vx-hero-shot {
 }
 
 .vx-landing .vx-aurora-orb--a {
-  top: 0%;
-  left: 2%;
-  width: min(58vw, 640px);
-  height: min(36vw, 400px);
+  top: 2%;
+  left: -6%;
+  width: min(50vw, 560px);
+  height: min(34vw, 380px);
   background: var(--vx-aurora-lavender);
   animation-duration: 26s;
 }
 
 .vx-landing .vx-aurora-orb--b {
-  top: 0%;
-  right: 2%;
-  width: min(60vw, 660px);
-  height: min(34vw, 380px);
+  top: 22%;
+  right: -10%;
+  width: min(72vw, 820px);
+  height: min(50vw, 560px);
   background: var(--vx-aurora-blue);
   animation-delay: -8s;
   animation-duration: 30s;
 }
 
 .vx-landing .vx-aurora-orb--c {
-  top: 8%;
-  left: 28%;
-  width: min(46vw, 500px);
-  height: min(28vw, 320px);
+  top: 48%;
+  left: 32%;
+  width: min(34vw, 380px);
+  height: min(22vw, 250px);
   background: var(--vx-aurora-mint);
   animation-delay: -14s;
   animation-duration: 28s;
 }
 
 .vx-landing .vx-aurora-orb--d {
-  top: 14%;
-  left: 42%;
-  width: min(38vw, 420px);
-  height: min(24vw, 280px);
-  background: color-mix(in oklch, var(--vx-aurora-lavender) 55%, var(--vx-aurora-blue));
-  opacity: 0.26;
+  top: 12%;
+  left: 30%;
+  width: min(44vw, 480px);
+  height: min(30vw, 320px);
+  background: var(--vx-aurora-violet);
+  opacity: 0.2;
   animation-delay: -4s;
   animation-duration: 22s;
 }
 
 .vx-landing .vx-aurora-noise {
   position: absolute;
-  inset: 0 0 30% 0;
-  opacity: 0.028;
+  inset: 0;
+  opacity: 0.02;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 200px 200px;
   mix-blend-mode: soft-light;
@@ -578,12 +589,12 @@ html.vx-theme-override .vx-landing .vx-hero-shot {
 
 .dark .vx-landing .vx-aurora-wash,
 [data-theme='dark'] .vx-landing .vx-aurora-wash {
-  opacity: 0.72;
+  opacity: 0.7;
 }
 
 .dark .vx-landing .vx-aurora-orb,
 [data-theme='dark'] .vx-landing .vx-aurora-orb {
-  opacity: 0.36;
+  opacity: 0.34;
 }
 
 .dark .vx-landing .vx-aurora[data-intensity='soft'] .vx-aurora-orb,
@@ -591,9 +602,14 @@ html.vx-theme-override .vx-landing .vx-hero-shot {
   opacity: 0.18;
 }
 
+.dark .vx-landing .vx-aurora-orb--d,
+[data-theme='dark'] .vx-landing .vx-aurora-orb--d {
+  opacity: 0.28;
+}
+
 .dark .vx-landing .vx-aurora-noise,
 [data-theme='dark'] .vx-landing .vx-aurora-noise {
-  opacity: 0.04;
+  opacity: 0.032;
 }
 
 @keyframes vx-aurora-drift {
@@ -612,12 +628,12 @@ html.vx-theme-override .vx-landing .vx-hero-shot {
 @keyframes vx-aurora-breathe {
   0%,
   100% {
-    opacity: 0.75;
+    opacity: 0.36;
     transform: scale(1) translate3d(0, 0, 0);
   }
   50% {
-    opacity: 0.92;
-    transform: scale(1.03) translate3d(1%, -1%, 0);
+    opacity: 0.64;
+    transform: scale(1.08) translate3d(0, -1.5%, 0);
   }
 }
 
@@ -629,12 +645,12 @@ html.vx-theme-override .vx-landing .vx-hero-shot {
 @keyframes vx-aurora-breathe-dark {
   0%,
   100% {
-    opacity: 0.55;
+    opacity: 0.52;
     transform: scale(1) translate3d(0, 0, 0);
   }
   50% {
-    opacity: 0.72;
-    transform: scale(1.04) translate3d(1%, -1%, 0);
+    opacity: 0.86;
+    transform: scale(1.08) translate3d(0, -1.5%, 0);
   }
 }
 
