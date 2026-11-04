@@ -115,7 +115,7 @@ describe('bindFileTreeWorkspaceSync', () => {
         treeHandler = handler as TreeHandler
       }
       if (event === 'workspace-watch-failed') {
-        watchFailedHandler = handler as WatchFailedHandler
+        watchFailedHandler = handler as unknown as WatchFailedHandler
       }
       return () => {}
     })

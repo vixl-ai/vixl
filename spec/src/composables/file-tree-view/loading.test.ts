@@ -11,7 +11,7 @@ const treeRequest = vi.hoisted(() => {
     resolve: () => {},
     reject: () => {},
   }
-  const fsListDirTree = vi.fn(
+  const fsListDirTree = vi.fn<() => Promise<unknown>>(
     () =>
       new Promise((resolve, reject) => {
         state.resolve = resolve
@@ -25,12 +25,15 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
   mockVixlTauri({
     isTauri: () => false,
     fsListDirTree: treeRequest.fsListDirTree,
-    fsListDir: vi.fn(async () => []),
+    fsListDir: vi.fn<(projectRoot: string, path: string) => Promise<never[]>>(async () => []),
   }),
 )
 
 vi.mock('vue-sonner', () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: {
+    error: vi.fn<(...args: unknown[]) => void>(),
+    success: vi.fn<(...args: unknown[]) => void>(),
+  },
 }))
 
 vi.mock('@/composables/use-workbench-store', () => ({

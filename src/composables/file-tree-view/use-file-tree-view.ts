@@ -15,11 +15,8 @@ import useGitStatus, { FileTreeGitDecorationKey } from '@/composables/use-git-st
 import {
   type TreeNode,
   findNode,
-  findNodeKind,
   ancestorDirectoryPaths,
   treeErrorMessage,
-  parentPath,
-  joinPath,
 } from './path-helpers'
 import { createFileTreeMutations } from './mutations'
 import refreshExpandedChildren from './refresh-expanded-children'
@@ -222,7 +219,6 @@ export default (
     handleRenameCancel,
     handleDeleteConfirm,
     handleDeleteOpenChange,
-    createParentPath,
     handleCreateDialogOpenChange,
     handleNewFile,
     handleNewFolder,
