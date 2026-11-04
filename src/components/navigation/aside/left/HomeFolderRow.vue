@@ -39,11 +39,10 @@ const chatAt = (index: number): FleetSidebarChat[] => {
 const route = useRoute()
 const expansion = useProjectsExpansion()
 const { startingChat, startHomeChat } = useStartHomeChat()
-const manualOpen = ref<boolean | null>(null)
-
 const defaultExpanded = computed(
   () => route.name === 'home-chat' || route.name === 'home-chat-subagent',
 )
+const manualOpen = ref<boolean | null>(defaultExpanded.value ? true : null)
 
 const homeOpen = computed({
   get: (): boolean => expansion.resolveOpen(defaultExpanded.value, manualOpen.value),
@@ -53,9 +52,17 @@ const homeOpen = computed({
   },
 })
 
-watch(defaultExpanded, () => {
-  manualOpen.value = null
-})
+// Sticky by design: once a row opens it never auto-closes; only a manual toggle or Expand/Collapse All changes it.
+const latchOpenOnDefaultExpand = (expanded: boolean, wasExpanded: boolean | undefined): void => {
+  if (manualOpen.value !== null) {
+    return
+  }
+  if (expanded && !wasExpanded) {
+    manualOpen.value = true
+  }
+}
+
+watch(defaultExpanded, latchOpenOnDefaultExpand)
 
 watch(
   () => expansion.expansionMode.value,
