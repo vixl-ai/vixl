@@ -10,8 +10,14 @@ import type { ChatMeta } from '@/types/chat/chat-meta'
 import { isTauri, listPinnedChats } from '@/services/vixl/vixl-tauri'
 import type { FleetPinnedChat } from '@/types/fleet/fleet-pinned-chat'
 import { HOME_CHAT_SLUG } from '@/constants/home-chat'
-import { revealedProjectSlug } from '@/composables/fleet-project-reveal'
 import { sidebarChatSortKey } from '@/utils/sidebar-chat-sort-key'
+import {
+  bindFleetSidebarOrder,
+  latestChatUpdatedAt,
+  orderedActivityItems,
+  projectActivityUpdatedAt,
+  recomputeFleetSidebarOrder,
+} from '@/composables/fleet-sidebar-order'
 
 export type FleetSidebarActivityItem =
   | {
@@ -50,16 +56,6 @@ export const chatProjectSlugForId = (chatId: string): string | null => {
   return pinned?.projectSlug ?? null
 }
 
-const maxUpdatedAt = (chats: ChatMeta[]): string => {
-  if (chats.length === 0) {
-    return ''
-  }
-  return chats.reduce(
-    (latest, chat) => (chat.updatedAt > latest ? chat.updatedAt : latest),
-    chats[0]!.updatedAt,
-  )
-}
-
 const maxChatSortKey = (chats: ChatMeta[]): string | undefined => {
   let latest: string | undefined
   for (const chat of chats) {
@@ -88,6 +84,7 @@ const toSidebarChat = (chat: ChatMeta): FleetSidebarChat => ({
 export default () => {
   const fleet = useFleetRegistry()
   const chatStore = useChatStore()
+  bindFleetSidebarOrder(chatsBySlug, fleet)
 
   const sidebarProjects = computed<FleetSidebarProject[]>(() => {
     const mapChats = (slug: string): FleetSidebarChat[] =>
@@ -178,7 +175,7 @@ export default () => {
       items.push({
         kind: 'project',
         project,
-        updatedAt: maxUpdatedAt(metas) || '1970-01-01T00:00:00.000Z',
+        updatedAt: projectActivityUpdatedAt(metas),
       })
     }
 
@@ -186,20 +183,11 @@ export default () => {
       items.push({
         kind: 'home',
         chats: standaloneChats.value.map(toSidebarChat),
-        updatedAt: maxUpdatedAt(standaloneChats.value),
+        updatedAt: latestChatUpdatedAt(standaloneChats.value),
       })
     }
 
-    return items.sort((left, right) => {
-      const leftRevealed =
-        left.kind === 'project' && left.project.slug === revealedProjectSlug.value
-      const rightRevealed =
-        right.kind === 'project' && right.project.slug === revealedProjectSlug.value
-      if (leftRevealed !== rightRevealed) {
-        return leftRevealed ? -1 : 1
-      }
-      return right.updatedAt.localeCompare(left.updatedAt)
-    })
+    return orderedActivityItems(items)
   })
 
   const refreshSlug = async (projectSlug: string): Promise<void> => {
@@ -220,6 +208,7 @@ export default () => {
     }
     next[HOME_CHAT_SLUG] = await chatStore.listProjectChats(HOME_CHAT_SLUG)
     chatsBySlug.value = next
+    recomputeFleetSidebarOrder()
   }
 
   const refreshPinned = async (): Promise<void> => {
@@ -286,6 +275,7 @@ const isHomeLabel = (slug: string): boolean => slug === HOME_CHAT_SLUG
 
 export const refreshFleetSidebar = async (): Promise<void> => {
   const fleet = useFleetRegistry()
+  bindFleetSidebarOrder(chatsBySlug, fleet)
   const chatStore = useChatStore()
   const next: typeof chatsBySlug.value = {}
   for (const project of fleet.projects.value) {
@@ -296,6 +286,7 @@ export const refreshFleetSidebar = async (): Promise<void> => {
   }
   next[HOME_CHAT_SLUG] = await chatStore.listProjectChats(HOME_CHAT_SLUG)
   chatsBySlug.value = next
+  recomputeFleetSidebarOrder()
   const records = await listPinnedChats()
   pinnedChats.value = records.map((record) => ({
     chatId: record.id,

@@ -66,7 +66,7 @@ const decoration = computed(() => rollupDecoration(git.entries.value))
 const branchLabel = computed(
   () => props.project.worktree?.branch ?? props.project.displayName,
 )
-const manualOpen = ref<boolean | null>(null)
+const manualOpen = ref<boolean | null>(props.project.defaultExpanded ? true : null)
 const { startingChat, startWorktreeChat } = useStartWorktreeChat({
   project: () => props.project,
   openRow: () => {
@@ -97,9 +97,14 @@ const worktreeOpen = computed({
 })
 
 watch(
-  () => props.project.defaultExpanded,
-  () => {
-    manualOpen.value = null
+  () => props.project.defaultExpanded ?? false,
+  (expanded, wasExpanded) => {
+    if (manualOpen.value !== null) {
+      return
+    }
+    if (expanded && !wasExpanded) {
+      manualOpen.value = true
+    }
   },
 )
 

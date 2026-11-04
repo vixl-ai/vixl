@@ -57,7 +57,7 @@ const config = useVixlConfig()
 const expansion = useProjectsExpansion()
 const startingChat = ref(false)
 const removingProject = ref(false)
-const manualOpen = ref<boolean | null>(null)
+const manualOpen = ref<boolean | null>(props.project.defaultExpanded ? true : null)
 const isGroup = computed(() => props.project.kind === 'group')
 const resolveRowWorkspace = () => resolveProjectRowWorkspace(props.project, fleet)
 const parentRootPath = computed(() => resolveRowWorkspace()?.projectRoot ?? null)
@@ -124,9 +124,14 @@ const projectOpen = computed({
 })
 
 watch(
-  () => props.project.defaultExpanded,
-  () => {
-    manualOpen.value = null
+  () => props.project.defaultExpanded ?? false,
+  (expanded, wasExpanded) => {
+    if (manualOpen.value !== null) {
+      return
+    }
+    if (expanded && !wasExpanded) {
+      manualOpen.value = true
+    }
   },
 )
 

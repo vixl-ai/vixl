@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch, type HTMLAttributes } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
+import {
+  bindMeasuredRow,
+  heightForKey,
+  pruneMeasuredHeights,
+  recordMeasuredHeight,
+  unbindMeasuredRow,
+} from '@/utils/sidebar-measure-store'
 import { sidebarVirtualRange } from '@/utils/sidebar-virtual-range'
 
 const SIDEBAR_LIST_VIEWPORT = 168
@@ -18,12 +25,14 @@ const props = withDefaults(
 const scroller = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const viewport = ref(SIDEBAR_LIST_VIEWPORT)
-const measured = ref<number[]>([])
-const rowNodes = new Map<number, HTMLElement>()
+const measured = shallowRef<ReadonlyMap<string, number>>(new Map())
+const keyToEl = new Map<string, Element>()
+const elToKey = new Map<Element, string>()
 let scrollerObserver: ResizeObserver | null = null
 let rowObserver: ResizeObserver | null = null
 
-const heightAt = (index: number): number => measured.value[index] ?? props.estimate
+const heightAt = (index: number): number =>
+  heightForKey(measured.value, props.keyAt(index), props.estimate)
 
 const readViewport = (node: HTMLElement): number => {
   const height = node.clientHeight
@@ -53,12 +62,13 @@ const rows = computed(() => {
   const next: { index: number; key: string; top: number }[] = []
   let top = layout.value.offset
   for (let index = layout.value.start; index < layout.value.end; index += 1) {
+    const key = props.keyAt(index)
     next.push({
       index,
-      key: props.keyAt(index),
+      key,
       top,
     })
-    top += heightAt(index)
+    top += heightForKey(measured.value, key, props.estimate)
   }
   return next
 })
@@ -67,34 +77,40 @@ const onScroll = (): void => {
   scrollTop.value = scroller.value?.scrollTop ?? 0
 }
 
-const setMeasured = (index: number, height: number): void => {
-  const next = Math.ceil(height)
-  if (next <= 0 || measured.value[index] === next) {
-    return
+const setMeasured = (key: string, height: number): void => {
+  const next = recordMeasuredHeight(measured.value, key, height)
+  if (next !== measured.value) {
+    measured.value = next
   }
-  const copy = measured.value.slice()
-  copy[index] = next
-  measured.value = copy
 }
 
-const bindRow = (index: number, element: unknown): void => {
-  const previous = rowNodes.get(index)
-  if (previous && previous !== element && rowObserver) {
-    rowObserver.unobserve(previous)
-  }
+const bindRow = (key: string, element: unknown): void => {
   if (!(element instanceof HTMLElement)) {
-    rowNodes.delete(index)
+    const previous = unbindMeasuredRow(keyToEl, elToKey, key)
+    if (previous) {
+      rowObserver?.unobserve(previous)
+    }
     return
   }
-  rowNodes.set(index, element)
+  const detached = bindMeasuredRow(keyToEl, elToKey, key, element)
+  if (detached) {
+    rowObserver?.unobserve(detached)
+  }
   rowObserver?.observe(element)
 }
 
 watch(
-  () => props.count,
-  (count) => {
-    if (measured.value.length > count) {
-      measured.value = measured.value.slice(0, count)
+  () => {
+    const keys: string[] = []
+    for (let index = 0; index < props.count; index += 1) {
+      keys.push(props.keyAt(index))
+    }
+    return keys
+  },
+  (keys) => {
+    const next = pruneMeasuredHeights(measured.value, keys)
+    if (next !== measured.value) {
+      measured.value = next
     }
   },
 )
@@ -111,16 +127,14 @@ onMounted(() => {
   scrollerObserver.observe(node)
   rowObserver = new ResizeObserver((entries) => {
     for (const entry of entries) {
-      for (const [index, element] of rowNodes) {
-        if (element !== entry.target) {
-          continue
-        }
-        setMeasured(index, entry.contentRect.height)
-        break
+      const key = elToKey.get(entry.target)
+      if (!key) {
+        continue
       }
+      setMeasured(key, entry.contentRect.height)
     }
   })
-  for (const element of rowNodes.values()) {
+  for (const element of keyToEl.values()) {
     rowObserver.observe(element)
   }
 })
@@ -128,7 +142,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   scrollerObserver?.disconnect()
   rowObserver?.disconnect()
-  rowNodes.clear()
+  keyToEl.clear()
+  elToKey.clear()
 })
 </script>
 
@@ -156,7 +171,7 @@ onBeforeUnmount(() => {
       <li
         v-for="row in rows"
         :key="row.key"
-        :ref="(element) => bindRow(row.index, element)"
+        :ref="(element) => bindRow(row.key, element)"
         data-sidebar="menu-sub-item"
         class="absolute right-2.5 left-2.5"
         :style="{ top: `${row.top}px` }"
