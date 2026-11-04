@@ -6,6 +6,8 @@ mod launch;
 mod tray;
 mod vibrancy;
 
+use tray::tray_refresh_agents;
+
 pub use launch::parse_launch_path_arg;
 
 use tauri::Manager;
@@ -284,6 +286,7 @@ pub fn run_with_launch_path(launch_path: Option<String>) {
         ssh_save_passphrase,
         ssh_delete_passphrase,
         ssh_list_saved_identities,
+        tray_refresh_agents,
     ]);
 
     let app = builder

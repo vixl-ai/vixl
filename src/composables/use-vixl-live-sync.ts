@@ -4,7 +4,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import useVixlConfig from '@/composables/use-vixl-config'
 import useMcpServers from '@/composables/use-mcp-servers'
 import useFleetRegistry from '@/composables/use-fleet-registry'
-import { watchVixlPaths } from '@/services/vixl/vixl-tauri'
+import { trayRefreshAgents, watchVixlPaths } from '@/services/vixl/vixl-tauri'
 
 export type VixlFileKind =
   | 'settings'
@@ -64,6 +64,10 @@ export default () => {
     if (change.kind === 'mcp') {
       await mcp.loadConfigs(config.activeRootPath.value)
       await refreshMcpStates(config.activeRootPath.value)
+    }
+
+    if (change.kind === 'plans') {
+      await trayRefreshAgents()
     }
   }
 

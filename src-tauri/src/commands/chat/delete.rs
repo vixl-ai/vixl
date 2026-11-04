@@ -18,6 +18,9 @@ pub fn delete_chat(
         let conn = db.lock()?;
         store::delete_chat(&conn, &project_slug, &chat_id)?;
     }
+    if let Err(error) = crate::tray::refresh_agents(&app) {
+        log::error!("Failed to refresh tray agents: {error}");
+    }
     if dir.exists() {
         fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
     }

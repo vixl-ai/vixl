@@ -22,6 +22,7 @@ import useAppearance from '@/composables/use-appearance'
 import useAppUpdater from '@/composables/use-app-updater'
 import useCommandPalette from '@/composables/use-command-palette'
 import useMainPaneTransition from '@/composables/use-main-pane-transition'
+import useTrayEvents from '@/composables/use-tray-events'
 import useVixlLiveSync from '@/composables/use-vixl-live-sync'
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useWorkbenchStore from '@/composables/use-workbench-store'
@@ -41,6 +42,7 @@ useFleetRegistry()
 useAppearance()
 const { transparencyEnabled } = useTransparency()
 useVixlLiveSync()
+useTrayEvents()
 useMainPaneTransition()
 const updater = useAppUpdater()
 
