@@ -52,14 +52,17 @@ const homeOpen = computed({
   },
 })
 
-watch(defaultExpanded, (expanded, wasExpanded) => {
+// Sticky by design: once a row opens it never auto-closes; only a manual toggle or Expand/Collapse All changes it.
+const latchOpenOnDefaultExpand = (expanded: boolean, wasExpanded: boolean | undefined): void => {
   if (manualOpen.value !== null) {
     return
   }
   if (expanded && !wasExpanded) {
     manualOpen.value = true
   }
-})
+}
+
+watch(defaultExpanded, latchOpenOnDefaultExpand)
 
 watch(
   () => expansion.expansionMode.value,

@@ -96,16 +96,19 @@ const worktreeOpen = computed({
   },
 })
 
+// Sticky by design: once a row opens it never auto-closes; only a manual toggle or Expand/Collapse All changes it.
+const latchOpenOnDefaultExpand = (expanded: boolean, wasExpanded: boolean | undefined): void => {
+  if (manualOpen.value !== null) {
+    return
+  }
+  if (expanded && !wasExpanded) {
+    manualOpen.value = true
+  }
+}
+
 watch(
   () => props.project.defaultExpanded ?? false,
-  (expanded, wasExpanded) => {
-    if (manualOpen.value !== null) {
-      return
-    }
-    if (expanded && !wasExpanded) {
-      manualOpen.value = true
-    }
-  },
+  latchOpenOnDefaultExpand,
 )
 
 watch(
