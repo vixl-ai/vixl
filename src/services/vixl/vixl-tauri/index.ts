@@ -214,3 +214,4 @@ export type {
   SshSavedIdentity,
   SshExecResult,
 } from './ssh'
+export { trayRefreshAgents } from './tray'

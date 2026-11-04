@@ -519,3 +519,83 @@ fn permission_level_survives_insert_update_and_read() {
     let cleared = store::get_chat(&conn, "slug", "c1").expect("get after clear");
     assert_eq!(cleared.meta.permission_level, None);
 }
+
+fn running_meta(id: &str, updated_at: &str, status: &str) -> ChatMeta {
+    let mut meta = sample_meta(id, "slug", id, updated_at);
+    meta.status = status.to_string();
+    meta.project_root = format!("/tmp/{id}");
+    meta.active_plan_path = Some(format!(".vixl/plans/{id}/PLAN.md"));
+    meta
+}
+
+#[test]
+fn running_chats_are_newest_first_and_limited() {
+    let (_dir, conn) = open_migrated();
+    for day in 1..=10 {
+        let id = format!("run-{day:02}");
+        let updated_at = format!("2026-03-{day:02}T00:00:00Z");
+        store::insert_chat(&conn, &running_meta(&id, &updated_at, "running"), "pid")
+            .expect("insert running");
+    }
+    store::insert_chat(
+        &conn,
+        &running_meta("idle-new", "2026-04-01T00:00:00Z", "idle"),
+        "pid",
+    )
+    .expect("insert idle");
+
+    let rows = store::list_running_chats(&conn).expect("list running");
+    let ids: Vec<&str> = rows.iter().map(|row| row.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        ["run-10", "run-09", "run-08", "run-07", "run-06", "run-05", "run-04", "run-03"]
+    );
+    assert_eq!(rows[0].project_root, "/tmp/run-10");
+    assert_eq!(
+        rows[0].active_plan_path.as_deref(),
+        Some(".vixl/plans/run-10/PLAN.md")
+    );
+    assert_eq!(store::count_running_chats(&conn).expect("count"), 10);
+    assert!(rows.iter().all(|row| row.id != "idle-new"));
+}
+
+#[test]
+fn recent_harness_events_are_newest_first() {
+    let (_dir, conn) = open_migrated();
+    let meta = sample_meta("c1", "slug", "Chat", "2026-01-01T00:00:00Z");
+    store::insert_chat(&conn, &meta, "pid").expect("insert");
+    let old = serde_json::json!({
+        "id": "old",
+        "role": "assistant",
+        "parts": [],
+        "createdAt": "2026-01-01T00:00:00Z",
+        "harnessEvent": { "type": "todo-update", "todos": [{ "id": "a", "content": "old", "status": "completed" }] }
+    });
+    let middle = serde_json::json!({
+        "id": "middle",
+        "role": "assistant",
+        "parts": [],
+        "createdAt": "2026-01-01T00:00:01Z",
+        "harnessEvent": { "type": "text-delta", "delta": "hi" }
+    });
+    let newest = serde_json::json!({
+        "id": "newest",
+        "role": "assistant",
+        "parts": [],
+        "createdAt": "2026-01-01T00:00:02Z",
+        "harnessEvent": { "type": "todo-update", "todos": [{ "id": "b", "content": "new", "status": "pending" }] }
+    });
+    store::insert_message_value(&conn, "c1", 0, &old).expect("old");
+    store::insert_message_value(&conn, "c1", 1, &middle).expect("middle");
+    store::insert_message_value(&conn, "c1", 2, &newest).expect("newest");
+    store::insert_message_value(&conn, "c1", 3, &user_line("plain")).expect("plain");
+
+    let events = store::recent_harness_event_json(&conn, "c1", 10).expect("events");
+    assert_eq!(events.len(), 3);
+    let first: serde_json::Value = serde_json::from_str(&events[0]).expect("parse newest");
+    assert_eq!(first["type"], "todo-update");
+    assert_eq!(first["todos"][0]["content"], "new");
+    let limited = store::recent_harness_event_json(&conn, "c1", 1).expect("limited");
+    assert_eq!(limited.len(), 1);
+    assert_eq!(limited[0], events[0]);
+}

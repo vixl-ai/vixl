@@ -1,6 +1,7 @@
 mod chats;
 mod json;
 mod messages;
+mod running;
 mod usage;
 
 pub use chats::{
@@ -10,5 +11,8 @@ pub use chats::{
 pub use messages::{
     copy_messages, delete_from_seq, insert_message_value, list_messages, next_seq,
     upsert_message_value,
+};
+pub use running::{
+    count_running_chats, list_running_chats, recent_harness_event_json, RunningChatRow,
 };
 pub use usage::{insert_usage_row, list_usage, replace_usage};

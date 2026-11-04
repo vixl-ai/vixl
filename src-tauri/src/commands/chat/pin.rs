@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use super::meta::{now_iso, ChatMeta};
 use super::store;
@@ -7,12 +7,14 @@ use crate::db::AppDb;
 
 #[tauri::command]
 pub fn pin_chat(
+    app: AppHandle,
     db: State<AppDb>,
     project_slug: String,
     chat_id: String,
     pinned: bool,
 ) -> Result<ChatMeta, String> {
     update_chat_meta(
+        app,
         db,
         project_slug,
         chat_id,

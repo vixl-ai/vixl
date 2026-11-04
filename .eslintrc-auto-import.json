@@ -389,6 +389,7 @@
     "useToggle": true,
     "useTransition": true,
     "useTransparency": true,
+    "useTrayEvents": true,
     "useUrlSearchParams": true,
     "useUserMedia": true,
     "useVModel": true,

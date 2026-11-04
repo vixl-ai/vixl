@@ -13,10 +13,15 @@ mod project_id;
 mod read;
 mod rewrite_checkpoints;
 mod store;
+mod todo_line;
 mod truncate;
 mod update;
 mod upsert;
 mod usage;
+
+pub(crate) use store::{
+    count_running_chats, list_running_chats, recent_harness_event_json, RunningChatRow,
+};
 
 pub use append::append_chat_line;
 pub(crate) use copy_active_plan::copy_tree_skip_existing;
