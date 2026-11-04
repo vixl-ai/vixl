@@ -68,6 +68,12 @@ Use any catalog provider or a local host. Four [chat modes](https://vixl.app/con
 
 [Get started](https://vixl.app/getting-started/) or download the [latest release](https://github.com/vixl-ai/vixl/releases).
 
+- **Minimal system prompt.** Each turn is a short workspace identity, the mode skill, and catalogs of names. [Context](https://vixl.app/concepts/context)
+- **Progressive discovery.** The agent loads a full MCP schema or skill body when it needs one. [Context](https://vixl.app/concepts/context)
+- **Planning.** Plan mode writes a `PLAN.md` you keep. **Build** implements it in one agent run. **Orchestrate** hands each todo to a sub-agent. [Plans](https://vixl.app/using/work-with-plans)
+- **Built-in editor.** A Monaco editor with language servers sits beside the chat, with the file tree in the same window. [Workbench](https://vixl.app/using/use-the-workbench)
+- **SSH.** Add a remote folder over OpenSSH. The editor, the terminal, and the agent tools for that project run on the host.
+
 ## Roadmap
 
 View the [roadmap](https://vixl.app/resources/roadmap)
