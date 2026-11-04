@@ -42,7 +42,13 @@ export const createEditorInstances = (ctx: MonacoEditorContext, deps: EditorDeps
     })
 
     if (ctx.props.path) {
-      await deps.models.attachModel(ctx.props.path)
+      try {
+        await deps.models.attachModel(ctx.props.path)
+      } catch (error) {
+        toast.error('Failed to load file', {
+          description: formatMonacoError(error),
+        })
+      }
     }
 
     bindEditorViewStateListeners(ctx)

@@ -7,6 +7,7 @@ import {
   FileCode,
   FileSearch,
   List,
+  Loader2,
   Replace,
   X,
 } from '@lucide/vue'
@@ -69,6 +70,7 @@ const closeConfirmOpen = ref(false)
 const closeTargetPath = ref<string | null>(null)
 const closeSaving = ref(false)
 const fileSearchOpen = ref(false)
+const filesLoading = ref(false)
 const sidePaneOpen = ref(true)
 const sidePaneMode = ref<EditorSidePaneMode>('explorer')
 const isNavigatingHistory = ref(false)
@@ -656,12 +658,17 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
         >
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <FileCode />
+              <Loader2
+                v-if="filesLoading"
+                class="animate-spin"
+              />
+              <FileCode v-else />
             </EmptyMedia>
             <Button
               variant="ghost"
               size="sm"
               class="mt-2 text-muted-foreground"
+              :disabled="filesLoading"
               @click="handleOpenFileSearch"
             >
               <FileSearch class="mr-2 h-3.5 w-3.5" />
@@ -732,6 +739,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
         @copy-relative-path="handleCopyRelativePath"
         @toggle-diff-view="handleToggleDiffView"
         @open-file-search="handleOpenFileSearch"
+        @loading="filesLoading = $event"
       />
     </ResizablePanel>
   </ResizablePanelGroup>

@@ -15,7 +15,7 @@ const { el, visible } = useReveal({ rootMargin: '0px', threshold: 0 })
     aria-labelledby="hero-heading"
   >
     <div
-      class="vx-container relative flex flex-col items-center pt-8 text-center lg:pt-10"
+      class="vx-container relative flex flex-col items-center pt-[5.5rem] text-center sm:pt-24 lg:pt-[6.5rem]"
       :class="visible ? 'vx-reveal-in' : 'vx-reveal-out'"
     >
       <h1

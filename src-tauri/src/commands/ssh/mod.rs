@@ -35,8 +35,8 @@ pub use preview::SshPreview;
 pub(crate) use remote_cmd::{
     block_on, exec_on, indexer_cannot_run, inotify_enospc, inotifywait_missing, is_ssh_root,
     join_remote_argv, key_for, login_command, looks_like_enospc, looks_like_missing_program,
-    map_unreachable, missing_program, parse_root, posix_quote, probe_remote_program,
-    reject_git_hooks_write, ssh_uri_for, tty_login_command,
+    looks_like_unreachable, map_unreachable, missing_program, parse_root, posix_quote,
+    probe_remote_program, reject_git_hooks_write, ssh_uri_for, tty_login_command,
 };
 pub(crate) use session::require_live_master;
 pub use session::{session_key, SessionKey, SshConnectRequest, SshSessionStatus};

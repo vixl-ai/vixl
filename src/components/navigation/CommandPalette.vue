@@ -113,10 +113,7 @@ const handleSelect = async (item: CommandPaletteItem): Promise<void> => {
         const projectId = workbench.resolvePrimaryWorkspaceProjectId(
           contextSlug.value,
         )
-        await workbench.openEditor(
-          projectId,
-          fleet.activeProjectId.value ? 'README.md' : '',
-        )
+        await workbench.openEditor(projectId)
       } catch (error) {
         toast.error('Could not open editor', {
           description: error instanceof Error ? error.message : 'Unknown error',

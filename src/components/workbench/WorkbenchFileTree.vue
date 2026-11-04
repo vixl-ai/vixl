@@ -1,14 +1,5 @@
 <script setup lang="ts">
 import { FilePlus, FolderPlus, RefreshCw } from '@lucide/vue'
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/shadcn/ui/alert-dialog'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   ContextMenu,
@@ -17,21 +8,14 @@ import {
   ContextMenuTrigger,
 } from '@/components/shadcn/ui/context-menu'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/shadcn/ui/dialog'
-import { Input } from '@/components/shadcn/ui/input'
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
 import { FileTree } from '@/components/ai-elements/file-tree'
+import WorkbenchFileTreeDialogs from '@/components/workbench/WorkbenchFileTreeDialogs.vue'
 import WorkbenchFileTreeFolder from '@/components/workbench/WorkbenchFileTreeFolder.vue'
+import WorkbenchFileTreeSkeleton from '@/components/workbench/WorkbenchFileTreeSkeleton.vue'
 import WorkbenchFileTreeNode from '@/components/workbench/FileTreeNode.vue'
 import useFileTreeView from '@/composables/file-tree-view'
 
@@ -55,6 +39,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   select: [path: string]
   'tree-changed': []
+  loading: [value: boolean]
 }>()
 
 const {
@@ -65,6 +50,7 @@ const {
   deleteTarget,
   deleting,
   refreshing,
+  loading,
   createDialogOpen,
   createDialogMode,
   createName,
@@ -85,6 +71,9 @@ const {
   watchError,
   retryWatch,
 } = useFileTreeView(props, emit)
+
+watch(loading, (value) => emit('loading', value), { immediate: true })
+onUnmounted(() => emit('loading', false))
 
 defineExpose({
   refresh,
@@ -185,11 +174,15 @@ defineExpose({
           :class="
             embedded
               ? 'px-0'
-              : 'min-h-0 flex-1 overflow-y-auto px-2 pb-2'
+              : 'relative min-h-0 flex-1 overflow-y-auto px-2 pb-2'
           "
         >
+          <WorkbenchFileTreeSkeleton
+            v-if="loading && !tree"
+            :class="embedded ? undefined : 'absolute inset-0'"
+          />
           <FileTree
-            v-if="tree?.children"
+            v-else-if="tree?.children"
             unstyled
             class="border-0 bg-transparent p-0 font-sans text-[13px]"
             :expanded="expandedPaths"
@@ -237,71 +230,18 @@ defineExpose({
       </ContextMenuContent>
     </ContextMenu>
 
-    <Dialog
-      :open="createDialogOpen"
-      @update:open="handleCreateDialogOpenChange"
-    >
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {{ createDialogMode === 'folder' ? 'New folder' : 'New file' }}
-          </DialogTitle>
-          <DialogDescription>
-            Enter a name for the new {{ createDialogMode === 'folder' ? 'folder' : 'file' }}.
-          </DialogDescription>
-        </DialogHeader>
-        <Input
-          v-model="createName"
-          :placeholder="createDialogMode === 'folder' ? 'folder-name' : 'file-name.ts'"
-          @keydown.enter="handleCreateConfirm"
-        />
-        <DialogFooter>
-          <Button
-            variant="outline"
-            :disabled="creating"
-            @click="handleCreateDialogOpenChange(false)"
-          >
-            Cancel
-          </Button>
-          <Button
-            :disabled="creating || !createName.trim()"
-            @click="handleCreateConfirm"
-          >
-            Create
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <AlertDialog
-      :open="deleteTarget !== null"
-      @update:open="handleDeleteOpenChange"
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete {{ deleteTarget?.isDirectory ? 'folder' : 'file' }}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            <template v-if="deleteTarget?.isDirectory">
-              This will permanently delete "{{ deleteTarget.path }}" and all of its contents.
-            </template>
-            <template v-else>
-              This will permanently delete "{{ deleteTarget?.path }}".
-            </template>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel :disabled="deleting">
-            Cancel
-          </AlertDialogCancel>
-          <Button
-            variant="destructive"
-            :disabled="deleting"
-            @click="handleDeleteConfirm"
-          >
-            Delete
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <WorkbenchFileTreeDialogs
+      :create-dialog-open="createDialogOpen"
+      :create-dialog-mode="createDialogMode"
+      :create-name="createName"
+      :creating="creating"
+      :delete-target="deleteTarget"
+      :deleting="deleting"
+      @update:create-dialog-open="handleCreateDialogOpenChange"
+      @update:create-name="createName = $event"
+      @create-confirm="handleCreateConfirm"
+      @delete-open-change="handleDeleteOpenChange"
+      @delete-confirm="handleDeleteConfirm"
+    />
   </div>
 </template>

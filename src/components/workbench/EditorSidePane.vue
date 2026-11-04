@@ -64,6 +64,7 @@ const emit = defineEmits<{
   'update:wordWrap': [value: boolean]
   'update:autoSave': [value: boolean]
   'update:formatOnSave': [value: boolean]
+  loading: [value: boolean]
 }>()
 
 const isSshRoot = computed(() => isSshProjectRoot(props.projectRoot))
@@ -278,6 +279,7 @@ defineExpose({
         :selected-path="selectedPath"
         @select="handleSelect"
         @tree-changed="handleTreeChanged"
+        @loading="emit('loading', $event)"
       />
       <WorkbenchFileTree
         v-else
@@ -289,6 +291,7 @@ defineExpose({
         :show-toolbar="false"
         @select="handleSelect"
         @tree-changed="handleTreeChanged"
+        @loading="emit('loading', $event)"
       />
       <WorkspaceSearchPanel
         v-show="mode === 'search'"

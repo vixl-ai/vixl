@@ -9,6 +9,9 @@ import type { WorkspaceTreeChanged } from '@/composables/file-tree-view/merge-di
 import type { FileTreeWorkspaceSyncState } from '@/composables/file-tree-view/workspace-tree-sync'
 
 type TreeHandler = (event: { payload: WorkspaceTreeChanged }) => void
+type WatchFailedHandler = (event: {
+  payload: { rootPath: string; message: string }
+}) => void
 
 const isTauri = vi.hoisted(() => vi.fn<() => boolean>(() => true))
 const watchWorkspace = vi.hoisted(() =>
@@ -63,6 +66,7 @@ const sampleTree = (): TreeNode => ({
 })
 
 let treeHandler: TreeHandler | null = null
+let watchFailedHandler: WatchFailedHandler | null = null
 let wrapper: VueWrapper | null = null
 const wrappers: VueWrapper[] = []
 
@@ -105,9 +109,13 @@ describe('bindFileTreeWorkspaceSync', () => {
     ])
     listen.mockReset()
     treeHandler = null
+    watchFailedHandler = null
     listen.mockImplementation(async (event, handler) => {
       if (event === 'workspace-tree-changed') {
-        treeHandler = handler
+        treeHandler = handler as TreeHandler
+      }
+      if (event === 'workspace-watch-failed') {
+        watchFailedHandler = handler as WatchFailedHandler
       }
       return () => {}
     })
@@ -214,6 +222,31 @@ describe('bindFileTreeWorkspaceSync', () => {
 
     expect(fsListDir).toHaveBeenCalledWith('/Users/me', '.')
     expect(onTreeChanged).toHaveBeenCalled()
+  })
+
+  it('toasts when a remote watch poller exits', async () => {
+    const watchError = ref<string | null>(null)
+    await mountSync({
+      isHome: () => false,
+      tree: ref(sampleTree()),
+      expandedPaths: ref(new Set(['.'])),
+      selectedPath: ref(''),
+      renamingPath: ref(null),
+      deleteTarget: ref(null),
+      projectRoot: computed(() => '/Users/me'),
+      refreshGit: vi.fn<() => Promise<void>>(async () => undefined),
+      onTreeChanged: vi.fn<() => void>(),
+      watchError,
+    })
+
+    watchFailedHandler?.({
+      payload: { rootPath: '/canonical/me', message: 'Watch poller exited.' },
+    })
+
+    expect(toast.error).toHaveBeenCalledWith('Failed to watch workspace', {
+      description: 'Watch poller exited.',
+    })
+    expect(watchError.value).toBe('Watch poller exited.')
   })
 
   it('rewatches when home mode changes for the same project root', async () => {

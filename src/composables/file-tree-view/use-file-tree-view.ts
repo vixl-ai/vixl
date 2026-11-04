@@ -41,6 +41,7 @@ export default (
   const deleteTarget = ref<{ path: string; isDirectory: boolean } | null>(null)
   const deleting = ref(false)
   const refreshing = ref(false)
+  let loadGeneration = 0
   const createDialogOpen = ref(false)
   const createDialogMode = ref<'file' | 'folder'>('file')
   const createName = ref('')
@@ -58,6 +59,7 @@ export default (
   })
 
   const projectRoot = computed(() => workbench.getProject(props.projectId)?.rootPath ?? null)
+  const loading = ref(Boolean(projectRoot.value))
 
   const projectIdRef = computed(() => props.projectId)
 
@@ -71,29 +73,49 @@ export default (
     ignoredRoots: gitStatus.ignoredRoots,
   })
 
+  const finishLoading = (generation: number): void => {
+    if (generation !== loadGeneration) {
+      return
+    }
+    loading.value = false
+  }
+
   const loadTree = async (): Promise<void> => {
     const root = projectRoot.value
+    const generation = ++loadGeneration
     if (!root) {
       tree.value = null
+      finishLoading(generation)
       return
     }
-    // Home is huge and has many unreadable system dirs; keep the initial walk shallow.
-    const maxDepth = isHomeChatSlug(props.projectId) ? 2 : 4
-    tree.value = (await fsListDirTree(root, '.', maxDepth)) as TreeNode
-    const path = props.selectedPath
-    if (!path) {
-      return
+    if (tree.value === null) {
+      loading.value = true
     }
-    selectedPath.value = path
     try {
-      await revealPath(path)
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('__vnode')) {
+      // Home is huge and has many unreadable system dirs; keep the initial walk shallow.
+      const maxDepth = isHomeChatSlug(props.projectId) ? 2 : 4
+      const next = (await fsListDirTree(root, '.', maxDepth)) as TreeNode
+      if (generation !== loadGeneration) {
         return
       }
-      toast.error('Failed to reveal file in tree', {
-        description: treeErrorMessage(error),
-      })
+      tree.value = next
+      const path = props.selectedPath
+      if (!path) {
+        return
+      }
+      selectedPath.value = path
+      try {
+        await revealPath(path)
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('__vnode')) {
+          return
+        }
+        toast.error('Failed to reveal file in tree', {
+          description: treeErrorMessage(error),
+        })
+      }
+    } finally {
+      finishLoading(generation)
     }
   }
 
@@ -241,9 +263,11 @@ export default (
 
   onUnmounted(() => {
     document.removeEventListener('pointerdown', handlePointerDownOutsideRename)
+    loadGeneration += 1
   })
 
-  watch(projectRoot, () => {
+  watch(projectRoot, (root, previous) => {
+    if (root !== previous) tree.value = null
     loadTree()
       .then(() => gitStatus.refresh())
       .catch((error) => {
@@ -276,7 +300,6 @@ export default (
   )
 
   return {
-    workbench,
     tree,
     expandedPaths,
     selectedPath,
@@ -284,33 +307,17 @@ export default (
     deleteTarget,
     deleting,
     refreshing,
+    loading,
     createDialogOpen,
     createDialogMode,
     createName,
     creating,
     projectLabel,
-    projectRoot,
-    projectIdRef,
-    gitStatus,
-    findNode,
-    findNodeKind,
-    ancestorDirectoryPaths,
-    treeErrorMessage,
-    loadTree,
-    ensureChildrenLoaded,
-    scrollPathIntoView,
-    revealPath,
     refresh,
-    startRename,
-    startDelete,
-    startCreate,
-    parentPath,
-    joinPath,
     handleRenameConfirm,
     handleRenameCancel,
     handleDeleteConfirm,
     handleDeleteOpenChange,
-    createParentPath,
     handleCreateDialogOpenChange,
     handleNewFile,
     handleNewFolder,
@@ -318,7 +325,6 @@ export default (
     handleRefresh,
     handleSelect,
     handleExpandedChange,
-    handlePointerDownOutsideRename,
     watchError,
     retryWatch,
   }
