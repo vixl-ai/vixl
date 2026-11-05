@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { mount, type VueWrapper } from '@vue/test-utils'
+import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import { mockVixlTauri } from '../../test-utils/mocks/vixl-tauri'
 
 const treeRequest = vi.hoisted(() => {
@@ -38,14 +39,30 @@ vi.mock('vue-sonner', () => ({
 
 vi.mock('@/composables/use-workbench-store', () => ({
   default: () => ({
-    getProject: (id: string) =>
-      id === 'proj-1'
-        ? {
-            id,
-            name: 'eva',
-            rootPath: 'ssh://aidanhibbard@eva/home/aidanhibbard',
-          }
-        : null,
+    getProject: (id: string) => {
+      if (id === 'proj-1') {
+        return {
+          id,
+          name: 'eva',
+          rootPath: 'ssh://aidanhibbard@eva/home/aidanhibbard',
+        }
+      }
+      if (id === 'proj-local') {
+        return {
+          id,
+          name: 'local',
+          rootPath: '/Users/aidanhibbard/src/app',
+        }
+      }
+      if (id === '_home_') {
+        return {
+          id,
+          name: 'Home',
+          rootPath: '/Users/aidanhibbard',
+        }
+      }
+      return null
+    },
   }),
 }))
 
@@ -67,13 +84,13 @@ describe('file tree loading state', () => {
     wrapper = null
   })
 
-  const mountTree = async (): Promise<VueWrapper> => {
+  const mountTree = async (projectId = 'proj-1'): Promise<VueWrapper> => {
     const { default: WorkbenchFileTree } = await import(
       '@/components/workbench/WorkbenchFileTree.vue'
     )
     wrapper = mount(WorkbenchFileTree, {
       props: {
-        projectId: 'proj-1',
+        projectId,
         showToolbar: false,
         hideChrome: true,
         embedded: true,
@@ -113,5 +130,35 @@ describe('file tree loading state', () => {
 
     expect(view.findAll('[data-slot="skeleton"]')).toHaveLength(0)
     expect(view.emitted('loading')?.at(-1)).toEqual([false])
+  })
+
+  it('requests a depth-1 tree for ssh project roots', async () => {
+    await mountTree()
+
+    expect(treeRequest.fsListDirTree).toHaveBeenCalledWith(
+      'ssh://aidanhibbard@eva/home/aidanhibbard',
+      '.',
+      1,
+    )
+  })
+
+  it('requests a depth-4 tree for local project roots', async () => {
+    await mountTree('proj-local')
+
+    expect(treeRequest.fsListDirTree).toHaveBeenCalledWith(
+      '/Users/aidanhibbard/src/app',
+      '.',
+      4,
+    )
+  })
+
+  it('requests a depth-2 tree for the home chat slug', async () => {
+    await mountTree(HOME_CHAT_SLUG)
+
+    expect(treeRequest.fsListDirTree).toHaveBeenCalledWith(
+      '/Users/aidanhibbard',
+      '.',
+      2,
+    )
   })
 })
