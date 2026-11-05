@@ -1,3 +1,4 @@
+// Settings-UI summary copy. Keep entries deliberately short; behavioral detail lives in the live tool descriptions.
 export const TOOL_DESCRIPTIONS: Record<string, string> = {
   read_file: 'Read a file from the project workspace',
   write_file: 'Create or overwrite a file',
@@ -22,7 +23,7 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   git_checkout: 'Checkout a git branch or ref',
   git_branch_create: 'Create a new git branch',
   git_commit: 'Stage and commit changes',
-  lsp: 'Query language server (goToDefinition, findReferences, hover, symbols, workspaceSymbol, diagnostics). Use 0-based position for defs/refs/hover and query for workspaceSymbol. Prefer codebase_* for structural discovery; prefer over grep for precise symbols.',
+  lsp: 'Query the language server for definitions, references, hover, and diagnostics',
   diagnostics:
     'Read linter and diagnostic issues (omit path for project issues, items capped at 50; pass path for one file)',
   run_terminal: 'Run a shell command in the project',
