@@ -109,7 +109,6 @@ const statusDisplay = computed(() =>
   chatStatusKind({
     status: displayStatus.value,
     attention: displayAttention.value,
-    sshDisconnected: ssh.isDisconnectedRoot(projectRoot.value),
     sshNeedsInput: ssh.needsInputForRoot(projectRoot.value),
   }),
 )

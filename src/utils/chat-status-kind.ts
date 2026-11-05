@@ -18,7 +18,6 @@ export type ChatStatusDisplay = {
 export const chatStatusKind = (args: {
   status?: 'idle' | 'running' | string | null
   attention?: ChatAttention
-  sshDisconnected?: boolean
   sshNeedsInput?: boolean
 }): ChatStatusDisplay => {
   if (args.status === 'running') {
@@ -33,7 +32,7 @@ export const chatStatusKind = (args: {
   if (args.attention === 'needs_mcp_auth') {
     return { kind: 'needs_mcp_auth', label: 'Needs MCP auth' }
   }
-  if (args.attention === 'disconnected' || args.sshDisconnected) {
+  if (args.attention === 'disconnected') {
     return { kind: 'disconnected', label: 'Disconnected' }
   }
   if (args.attention === 'completed') {

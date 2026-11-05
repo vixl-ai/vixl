@@ -100,7 +100,6 @@ const statusFor = (
   return chatStatusKind({
     status,
     attention,
-    sshDisconnected: ssh.isDisconnectedRoot(projectRoot.value),
     sshNeedsInput: ssh.needsInputForRoot(projectRoot.value),
   })
 }

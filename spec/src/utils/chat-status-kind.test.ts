@@ -7,7 +7,6 @@ describe('chatStatusKind', () => {
       chatStatusKind({
         status: 'running',
         attention: 'disconnected',
-        sshDisconnected: true,
       }).kind,
     ).toBe('running')
   })
@@ -17,14 +16,12 @@ describe('chatStatusKind', () => {
       chatStatusKind({
         status: 'idle',
         attention: 'needs_input',
-        sshDisconnected: true,
       }),
     ).toEqual({ kind: 'needs_input', label: 'Needs input' })
     expect(
       chatStatusKind({
         status: 'idle',
         attention: 'disconnected',
-        sshDisconnected: true,
         sshNeedsInput: true,
       }),
     ).toEqual({ kind: 'needs_input', label: 'Needs input' })
@@ -34,28 +31,32 @@ describe('chatStatusKind', () => {
     expect(
       chatStatusKind({
         attention: 'needs_approval',
-        sshDisconnected: true,
       }).kind,
     ).toBe('needs_approval')
     expect(
       chatStatusKind({
         attention: 'needs_mcp_auth',
-        sshDisconnected: true,
       }).kind,
     ).toBe('needs_mcp_auth')
   })
 
-  it('lets disconnected beat done and error', () => {
+  it('keeps done and error on the chat', () => {
     expect(
       chatStatusKind({
         attention: 'completed',
-        sshDisconnected: true,
       }),
-    ).toEqual({ kind: 'disconnected', label: 'Disconnected' })
+    ).toEqual({ kind: 'completed', label: 'Done' })
     expect(
       chatStatusKind({
         attention: 'error',
-        sshDisconnected: true,
+      }),
+    ).toEqual({ kind: 'error', label: 'Error' })
+  })
+
+  it('reports disconnected only from the chat attention', () => {
+    expect(
+      chatStatusKind({
+        attention: 'disconnected',
       }),
     ).toEqual({ kind: 'disconnected', label: 'Disconnected' })
   })
