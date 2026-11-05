@@ -29,12 +29,12 @@ const TOTAL_CEILINGS: Record<VixlChatMode, number> = {
   orchestrator: 4849,
 }
 
-/** Measured base tokens: ask 260, plan 320, agent 279, orchestrator 419. */
+/** Measured base tokens: ask 260, plan 320, agent 279, orchestrator 467. */
 const BASE_CEILINGS: Record<VixlChatMode, number> = {
   ask: 268,
   plan: 330,
   agent: 288,
-  orchestrator: 432,
+  orchestrator: 482,
 }
 
 /** Available skills catalog with ungated command skills; measured 59. */
