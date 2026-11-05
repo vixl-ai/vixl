@@ -60,7 +60,7 @@ describe('load-prompt', () => {
       'After spawning, leave a one-line visible status: what was spawned, what is still running, what happens next.',
     )
     expect(rendered).toContain(
-      'Then end the turn; the harness resumes as each background subagent finishes.',
+      'End the turn and wait; the harness resumes when a background subagent finishes.',
     )
     expect(rendered).toContain("terminal_output reads only the parent's own shell_id values.")
     expect(rendered).toContain(

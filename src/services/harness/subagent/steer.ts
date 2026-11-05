@@ -1,12 +1,13 @@
 import { tool } from 'ai'
 import { z } from 'zod'
+import { steerAccepted } from '@/services/harness/guidance'
 import deliverSteer from '@/services/harness/subagent/deliver-steer'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
 const steerSubagent = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Send a follow-up to a spawned subagent. A running subagent receives it at its next step. A completed, failed, or interrupted one resumes in the background. A resume tool result is acceptance only: end the turn without reporting it. The harness wake brings the result.',
+      `Send a follow-up to a spawned subagent. A running subagent receives it at its next step. A completed, failed, or interrupted one resumes in the background. ${steerAccepted}`,
     inputSchema: z.object({
       subagentId: z.string().describe('Id returned by spawn_subagent'),
       agentName: z

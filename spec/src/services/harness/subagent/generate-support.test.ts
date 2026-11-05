@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModelMessage } from 'ai'
+import { noPollTerminal } from '@/services/harness/guidance'
 import {
   createSubagentToolExecutionHooks,
   historyAfterGenerate,
@@ -262,7 +263,7 @@ describe('createSubagentToolExecutionHooks', () => {
       : undefined
     expect(result).toEqual({
       error:
-        'command timed out after 30s\n\nHint: The shell command exceeded the timeout. For dev servers and watchers, use is_background: true on run_terminal and end the turn. The harness wakes the parent when that terminal exits. terminal_output reads output before exit.',
+        `command timed out after 30s\n\nHint: The shell command exceeded the timeout. For dev servers and watchers, use is_background: true on run_terminal. ${noPollTerminal}`,
     })
   })
 

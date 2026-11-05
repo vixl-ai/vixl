@@ -16,6 +16,7 @@ import {
 import { runTerminalCommand } from '@/services/harness/shell/run-command'
 import { getSubagent } from '@/services/harness/subagent/registry'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
+import { noPollTerminal } from '@/services/harness/guidance'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 import {
   cwdSlugFields,
@@ -74,8 +75,8 @@ const runTerminal = (ctx: HarnessToolContext) => {
         ? 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. Optional cwd is a project slug; defaults to the primary project and is not kept between calls. When the sandbox blocks a command, report the denial as the result.'
         : 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. When the sandbox blocks a command, report the denial as the result.'
       : multiRoot
-        ? `Run a shell command in the project cwd. ${CWD_TOOL_HINT}${sandboxRetryHint} is_background returns a shell id and the harness wakes the parent when that terminal exits, so end the turn instead of polling. terminal_output reads output before exit. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`
-        : `Run a shell command in the project cwd.${sandboxRetryHint} is_background returns a shell id and the harness wakes the parent when that terminal exits, so end the turn instead of polling. terminal_output reads output before exit. Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`,
+        ? `Run a shell command in the project cwd. ${CWD_TOOL_HINT}${sandboxRetryHint} ${noPollTerminal} Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`
+        : `Run a shell command in the project cwd.${sandboxRetryHint} ${noPollTerminal} Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`,
     inputSchema: z.object({
       description: z
         .string()
