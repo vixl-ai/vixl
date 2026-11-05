@@ -15,6 +15,7 @@ vi.mock('@/services/harness/subagent/resume', () => ({
   default: (...args: unknown[]) => resumeSubagent(...args),
 }))
 
+import { steerAccepted } from '@/services/harness/guidance'
 import steerSubagent from '@/services/harness/subagent/steer'
 import {
   drainSteers,
@@ -29,8 +30,7 @@ import {
   restoreSubagent,
 } from '@/services/harness/subagent/registry'
 
-const resumeNote =
-  'Resume accepted. This return is not output and not progress. Do not tell the user a status or a result from it. End the turn and wait. The harness wake brings the subagent result.'
+const resumeNote = `Resume accepted. ${steerAccepted}`
 
 const acceptedReturn = {
   subagentId: 'sub-1',

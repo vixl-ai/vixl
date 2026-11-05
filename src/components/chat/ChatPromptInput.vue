@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import type { ChatStatus } from 'ai'
-import { FolderIcon, Layers, Layers2, ChevronDownIcon, XIcon, SquareIcon } from '@lucide/vue'
+import { FolderIcon, Layers, Layers2, ChevronDownIcon, XIcon, SquareIcon, Check } from '@lucide/vue'
 import { Button } from '@/components/shadcn/ui/button'
 import {
   Tooltip,
@@ -15,6 +15,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/shadcn/ui/dropdown-menu'
 import {
@@ -65,6 +68,7 @@ import type { PermissionLevel } from '@/types/harness/permission'
 import type { VixlChatMode } from '@/types/vixl/vixl-settings'
 import type { FileUIPart } from 'ai'
 import type { ChatPromptWorkspace } from '@/types/chat/chat-prompt-workspace'
+import type { FleetProject } from '@/types/fleet/fleet-project'
 import contextMentionFromNode from '@/utils/context-mention-from-node'
 import normalizeAttachmentFiles from '@/utils/normalize-attachment-files'
 import { membersFromDeclaredSlugs } from '@/utils/parse-member-qualified-name'
@@ -171,6 +175,35 @@ const hasProviders = computed(
 const selectedModeMeta = computed(() => getChatModeMeta(session.selectedMode))
 
 const fleetGroups = computed(() => fleet.groups?.value ?? [])
+
+const topLevelProjects = computed(() => {
+  const ids = new Set(fleet.projects.value.map((project) => project.id))
+  return fleet.projects.value.filter((project) => {
+    const parentId = project.worktree?.parentId
+    return !parentId || !ids.has(parentId)
+  })
+})
+
+const worktreesByParentId = computed(() => {
+  const ids = new Set(fleet.projects.value.map((project) => project.id))
+  const grouped = new Map<string, FleetProject[]>()
+  for (const project of fleet.projects.value) {
+    const parentId = project.worktree?.parentId
+    if (!parentId || !ids.has(parentId)) {
+      continue
+    }
+    const existing = grouped.get(parentId)
+    if (existing) {
+      existing.push(project)
+    } else {
+      grouped.set(parentId, [project])
+    }
+  }
+  for (const children of grouped.values()) {
+    children.sort((a, b) => b.lastOpened.localeCompare(a.lastOpened))
+  }
+  return grouped
+})
 
 const selectedGroup = computed(
   () => fleetGroups.value.find((group) => group.id === session.selectedGroupId) ?? null,
@@ -701,15 +734,38 @@ watch(
           </DropdownMenuItem>
         </template>
         <DropdownMenuSeparator v-if="fleet.projects.value.length > 0" />
-        <DropdownMenuCheckboxItem
-          v-for="project in fleet.projects.value"
-          :key="project.id"
-          :model-value="session.selectedProjectIds.includes(project.id)"
-          @select.prevent
-          @update:model-value="(checked) => handleProjectToggle(project.id, Boolean(checked))"
-        >
-          {{ project.name }}
-        </DropdownMenuCheckboxItem>
+        <template v-for="project in topLevelProjects" :key="project.id">
+          <DropdownMenuSub v-if="worktreesByParentId.has(project.id)">
+            <DropdownMenuSubTrigger
+              @click="handleProjectToggle(project.id, !session.selectedProjectIds.includes(project.id))"
+            >
+              <span class="min-w-0 flex-1 truncate">{{ project.name }}</span>
+              <Check
+                v-if="session.selectedProjectIds.includes(project.id)"
+                class="size-4 shrink-0"
+              />
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuCheckboxItem
+                v-for="worktree in worktreesByParentId.get(project.id) ?? []"
+                :key="worktree.id"
+                :model-value="session.selectedProjectIds.includes(worktree.id)"
+                @select.prevent
+                @update:model-value="(checked) => handleProjectToggle(worktree.id, Boolean(checked))"
+              >
+                {{ worktree.worktree?.branch || worktree.name }}
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuCheckboxItem
+            v-else
+            :model-value="session.selectedProjectIds.includes(project.id)"
+            @select.prevent
+            @update:model-value="(checked) => handleProjectToggle(project.id, Boolean(checked))"
+          >
+            {{ project.name }}
+          </DropdownMenuCheckboxItem>
+        </template>
       </DropdownMenuContent>
     </DropdownMenu>
 

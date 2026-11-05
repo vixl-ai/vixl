@@ -15,7 +15,12 @@ import { HOME_CHAT_SLUG } from '@/constants/home-chat'
 import ModelOptionsRow from '@/components/models/options/ModelOptionsRow.vue'
 import { Button } from '@/components/shadcn/ui/button'
 import { Tooltip } from '@/components/shadcn/ui/tooltip'
-import { DropdownMenuCheckboxItem, DropdownMenuItem } from '@/components/shadcn/ui/dropdown-menu'
+import {
+  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from '@/components/shadcn/ui/dropdown-menu'
 
 const toastError = vi.hoisted(() => vi.fn<(...args: unknown[]) => void>())
 const normalizeAttachmentFiles = vi.hoisted(
@@ -61,7 +66,18 @@ const defaultFleetProject = (): FleetProject => ({
 
 const fleetState = vi.hoisted(() => ({
   projects: {
-    value: [] as Array<{ id: string, name: string, slug?: string, rootPath: string }>,
+    value: [] as Array<{
+      id: string
+      name: string
+      slug?: string
+      rootPath: string
+      lastOpened?: string
+      worktree?: {
+        parentId: string
+        branch: string
+        managed: boolean
+      }
+    }>,
   },
   groups: {
     value: [] as Array<{
@@ -704,6 +720,221 @@ describe('ChatPromptInput git branch select', () => {
     await flushPromises()
 
     expect(wrapper.findComponent(ChatGitBranchSelect).exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+})
+
+describe('ChatPromptInput project picker worktrees', () => {
+  const parentProject = {
+    id: 'p1',
+    name: 'api',
+    slug: 'api',
+    rootPath: '/tmp/api',
+    lastOpened: '2026-01-01T00:00:00.000Z',
+  }
+  const olderWorktree = {
+    id: 'wt-old',
+    name: 'api-fix',
+    slug: 'api-fix',
+    rootPath: '/tmp/api-fix',
+    lastOpened: '2026-01-02T00:00:00.000Z',
+    worktree: {
+      parentId: 'p1',
+      branch: 'fix/crash',
+      managed: true,
+    },
+  }
+  const newerWorktree = {
+    id: 'wt-new',
+    name: 'api-feat',
+    slug: 'api-feat',
+    rootPath: '/tmp/api-feat',
+    lastOpened: '2026-01-03T00:00:00.000Z',
+    worktree: {
+      parentId: 'p1',
+      branch: 'feat/login',
+      managed: true,
+    },
+  }
+
+  const topLevelProjectCheckboxes = (
+    wrapper: ReturnType<typeof mountPromptInput>,
+  ) => {
+    const nestedVms = new Set(
+      wrapper
+        .findAllComponents(DropdownMenuSubContent)
+        .flatMap((content) => content.findAllComponents(DropdownMenuCheckboxItem))
+        .map((item) => item.vm),
+    )
+    return wrapper
+      .findAllComponents(DropdownMenuCheckboxItem)
+      .filter((item) => !nestedVms.has(item.vm))
+  }
+
+  beforeEach(() => {
+    fleetState.projects.value = [parentProject, olderWorktree, newerWorktree]
+    fleetState.groups.value = []
+    fleetState.activeProject.value = {
+      id: parentProject.id,
+      name: parentProject.name,
+      rootPath: parentProject.rootPath,
+    }
+  })
+
+  it('does not list worktrees as top-level dropdown items', async () => {
+    const wrapper = mountPromptInput({ showProjectSelect: true })
+    await flushPromises()
+
+    const parentTrigger = wrapper
+      .findAllComponents(DropdownMenuSubTrigger)
+      .find((item) => item.text().includes('api'))
+    expect(parentTrigger).toBeDefined()
+
+    const topLevelLabels = topLevelProjectCheckboxes(wrapper).map((item) =>
+      item.text().replace(/\s+/g, ' ').trim(),
+    )
+    expect(topLevelLabels).not.toContain('api')
+    expect(topLevelLabels).not.toContain('api-feat')
+    expect(topLevelLabels).not.toContain('api-fix')
+    expect(topLevelLabels).not.toContain('feat/login')
+    expect(topLevelLabels).not.toContain('fix/crash')
+
+    wrapper.unmount()
+  })
+
+  it('lists only worktree branches in the parent flyout', async () => {
+    const wrapper = mountPromptInput({ showProjectSelect: true })
+    await flushPromises()
+
+    const parentTrigger = wrapper
+      .findAllComponents(DropdownMenuSubTrigger)
+      .find((item) => item.text().includes('api'))
+    expect(parentTrigger).toBeDefined()
+
+    const flyoutLabels = wrapper
+      .findComponent(DropdownMenuSubContent)
+      .findAllComponents(DropdownMenuCheckboxItem)
+      .map((item) => item.text().replace(/\s+/g, ' ').trim())
+    expect(flyoutLabels).not.toContain('api')
+    expect(flyoutLabels).toContain('feat/login')
+    expect(flyoutLabels).toContain('fix/crash')
+    expect(flyoutLabels).not.toContain('api-feat')
+    expect(flyoutLabels).not.toContain('api-fix')
+
+    wrapper.unmount()
+  })
+
+  it('clicking the parent sub trigger toggles the parent selection', async () => {
+    const wrapper = mountPromptInput({ showProjectSelect: true })
+    await flushPromises()
+
+    const parentTrigger = wrapper
+      .findAllComponents(DropdownMenuSubTrigger)
+      .find((item) => item.text().includes('api'))
+    expect(parentTrigger).toBeDefined()
+    await parentTrigger!.trigger('click')
+    await flushPromises()
+
+    const homePicker = wrapper
+      .findAllComponents(Button)
+      .find((button) => button.attributes('title') === 'Home')
+    expect(homePicker).toBeDefined()
+
+    await wrapper.findComponent(PromptInput).vm.$emit('submit', {
+      text: 'multi',
+      files: [],
+    })
+    await flushPromises()
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual(
+      expect.objectContaining({
+        workspace: { kind: 'home' },
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it('toggling a worktree in the flyout updates project selection', async () => {
+    const wrapper = mountPromptInput({ showProjectSelect: true })
+    await flushPromises()
+
+    const featItem = wrapper
+      .findComponent(DropdownMenuSubContent)
+      .findAllComponents(DropdownMenuCheckboxItem)
+      .find((item) => item.text().includes('feat/login'))
+    expect(featItem).toBeDefined()
+    await featItem!.vm.$emit('update:modelValue', true)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('api, api-feat')
+
+    await wrapper.findComponent(PromptInput).vm.$emit('submit', {
+      text: 'multi',
+      files: [],
+    })
+    await flushPromises()
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual(
+      expect.objectContaining({
+        workspace: { kind: 'projects', projectIds: ['p1', 'wt-new'] },
+      }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it('lists an orphan worktree as a top-level checkbox item', async () => {
+    fleetState.projects.value = [
+      parentProject,
+      olderWorktree,
+      newerWorktree,
+      {
+        id: 'wt-orphan',
+        name: 'stranded',
+        slug: 'stranded',
+        rootPath: '/tmp/stranded',
+        lastOpened: '2026-01-04T00:00:00.000Z',
+        worktree: {
+          parentId: 'missing-parent',
+          branch: 'orphan-branch',
+          managed: true,
+        },
+      },
+    ]
+    const wrapper = mountPromptInput({ showProjectSelect: true })
+    await flushPromises()
+
+    const orphanItem = topLevelProjectCheckboxes(wrapper).find((item) =>
+      item.text().includes('stranded'),
+    )
+    expect(orphanItem).toBeDefined()
+    expect(orphanItem!.text()).not.toContain('orphan-branch')
+
+    const nestedLabels = wrapper
+      .findComponent(DropdownMenuSubContent)
+      .findAllComponents(DropdownMenuCheckboxItem)
+      .map((item) => item.text().replace(/\s+/g, ' ').trim())
+    expect(nestedLabels).not.toContain('stranded')
+    expect(nestedLabels).not.toContain('orphan-branch')
+
+    wrapper.unmount()
+  })
+
+  it('lists worktrees in the flyout by lastOpened descending', async () => {
+    const wrapper = mountPromptInput({ showProjectSelect: true })
+    await flushPromises()
+
+    const flyoutLabels = wrapper
+      .findComponent(DropdownMenuSubContent)
+      .findAllComponents(DropdownMenuCheckboxItem)
+      .map((item) => item.text().replace(/\s+/g, ' ').trim())
+    const newerIndex = flyoutLabels.findIndex((label) => label.includes('feat/login'))
+    const olderIndex = flyoutLabels.findIndex((label) => label.includes('fix/crash'))
+    expect(newerIndex).toBeGreaterThan(-1)
+    expect(olderIndex).toBeGreaterThan(-1)
+    expect(newerIndex).toBeLessThan(olderIndex)
 
     wrapper.unmount()
   })

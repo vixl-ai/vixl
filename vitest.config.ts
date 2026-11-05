@@ -7,6 +7,8 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: 'jsdom',
+      // Node 26 jsdom workers warn that localStorage needs --localstorage-file.
+      execArgv: ['--disable-warning=ExperimentalWarning'],
       exclude: [...configDefaults.exclude, 'e2e/**'],
       include: ['spec/src/**/*.{test,spec}.ts', 'spec/eslint-rules/**/*.{test,spec}.ts'],
       root: fileURLToPath(new URL('./', import.meta.url)),

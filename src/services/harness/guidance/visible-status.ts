@@ -1,4 +1,4 @@
-type VisibleStatusVerb = 'spawned' | 'steered' | 'finished'
+type VisibleStatusVerb = 'spawned' | 'finished'
 
 const visibleStatusSubject = (verb: VisibleStatusVerb): string =>
   verb === 'finished' ? 'what finished' : `what was ${verb}`

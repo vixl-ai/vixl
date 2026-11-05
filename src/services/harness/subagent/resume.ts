@@ -1,4 +1,5 @@
 import type { ModelMessage } from 'ai'
+import { steerAccepted } from '@/services/harness/guidance'
 import {
   emitSubagentResult,
   finishSubagentWithError,
@@ -113,7 +114,7 @@ const resumeSubagent = async (
     subagentId,
     name: record.agentName,
     accepted: true,
-    note: 'Resume accepted. This return is not output and not progress. Do not tell the user a status or a result from it. End the turn and wait. The harness wake brings the subagent result.',
+    note: `Resume accepted. ${steerAccepted}`,
   }
 }
 
