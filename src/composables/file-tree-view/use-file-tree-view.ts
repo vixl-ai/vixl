@@ -3,6 +3,7 @@ import { toast } from 'vue-sonner'
 import { fsListDir, fsListDirTree } from '@/services/vixl/vixl-tauri'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { isHomeChatSlug } from '@/constants/home-chat'
+import { isSshProjectRoot } from '@/utils/ssh-project-root'
 import {
   FileTreeProjectIdKey,
   FileTreeProjectRootKey,
@@ -90,7 +91,8 @@ export default (
     }
     try {
       // Home is huge and has many unreadable system dirs; keep the initial walk shallow.
-      const maxDepth = isHomeChatSlug(props.projectId) ? 2 : 4
+      // SSH tree walks cost one round trip per entry, so stay shallow and fetch children on expand.
+      const maxDepth = isSshProjectRoot(root) ? 1 : isHomeChatSlug(props.projectId) ? 2 : 4
       const next = (await fsListDirTree(root, '.', maxDepth)) as TreeNode
       if (generation !== loadGeneration) {
         return
