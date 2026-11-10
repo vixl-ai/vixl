@@ -11,6 +11,24 @@ describe('chatStatusKind', () => {
     ).toBe('running')
   })
 
+  it('lets blocked-on-user attention beat running', () => {
+    expect(
+      chatStatusKind({ status: 'running', attention: 'needs_approval' }),
+    ).toEqual({ kind: 'needs_approval', label: 'Needs approval' })
+    expect(
+      chatStatusKind({ status: 'running', attention: 'needs_input' }),
+    ).toEqual({ kind: 'needs_input', label: 'Needs input' })
+    expect(
+      chatStatusKind({ status: 'running', attention: 'needs_mcp_auth' }),
+    ).toEqual({ kind: 'needs_mcp_auth', label: 'Needs MCP auth' })
+  })
+
+  it('keeps running over ssh needs input', () => {
+    expect(
+      chatStatusKind({ status: 'running', sshNeedsInput: true }).kind,
+    ).toBe('running')
+  })
+
   it('lets needs input beat disconnected', () => {
     expect(
       chatStatusKind({
