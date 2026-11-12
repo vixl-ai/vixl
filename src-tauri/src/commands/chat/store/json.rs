@@ -32,10 +32,10 @@ pub fn column_opt_string(value: ValueRef<'_>) -> rusqlite::Result<Option<String>
         ValueRef::Null => Ok(None),
         ValueRef::Text(bytes) => std::str::from_utf8(bytes)
             .map(|s| Some(s.to_string()))
-            .map_err(|e| rusqlite::Error::Utf8Error(e)),
+            .map_err(|e| rusqlite::Error::Utf8Error(0, e)),
         ValueRef::Blob(bytes) => std::str::from_utf8(bytes)
             .map(|s| Some(s.to_string()))
-            .map_err(|e| rusqlite::Error::Utf8Error(e)),
+            .map_err(|e| rusqlite::Error::Utf8Error(0, e)),
         other => Err(rusqlite::Error::InvalidColumnType(
             0,
             "text".to_string(),
