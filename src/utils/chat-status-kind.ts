@@ -20,17 +20,22 @@ export const chatStatusKind = (args: {
   attention?: ChatAttention
   sshNeedsInput?: boolean
 }): ChatStatusDisplay => {
-  if (args.status === 'running') {
-    return { kind: 'running', label: 'Running' }
-  }
+  // A chat blocked on the user stays status "running" in its meta (the turn is
+  // held open on the gate), so these must win over running or the stall is hidden.
   if (args.attention === 'needs_approval') {
     return { kind: 'needs_approval', label: 'Needs approval' }
   }
-  if (args.attention === 'needs_input' || args.sshNeedsInput) {
+  if (args.attention === 'needs_input') {
     return { kind: 'needs_input', label: 'Needs input' }
   }
   if (args.attention === 'needs_mcp_auth') {
     return { kind: 'needs_mcp_auth', label: 'Needs MCP auth' }
+  }
+  if (args.status === 'running') {
+    return { kind: 'running', label: 'Running' }
+  }
+  if (args.sshNeedsInput) {
+    return { kind: 'needs_input', label: 'Needs input' }
   }
   if (args.attention === 'disconnected') {
     return { kind: 'disconnected', label: 'Disconnected' }
