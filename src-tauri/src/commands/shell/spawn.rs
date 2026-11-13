@@ -61,10 +61,61 @@ lazy_static::lazy_static! {
 }
 
 #[cfg(unix)]
-fn kill_process_group(child: &mut tokio::process::Child) {
+fn signal_process_group(child: &tokio::process::Child, signal: i32) {
     if let Some(pid) = child.id() {
         unsafe {
-            libc::killpg(pid as i32, libc::SIGTERM);
+            libc::killpg(pid as i32, signal);
+        }
+    }
+}
+
+fn shell_exit_from_wait(status: std::io::Result<std::process::ExitStatus>) -> ShellExitResult {
+    match status {
+        Ok(status) => shell_exit_from_status(status),
+        Err(_) => ShellExitResult {
+            exit_code: -1,
+            signal: None,
+        },
+    }
+}
+
+const KILL_GRACE_PERIOD: Duration = Duration::from_millis(300);
+
+async fn terminate_child(
+    child: &mut tokio::process::Child,
+    should_kill: bool,
+) -> std::io::Result<std::process::ExitStatus> {
+    if !should_kill {
+        return child.wait().await;
+    }
+    #[cfg(unix)]
+    return terminate_with_group_escalation(child).await;
+    #[cfg(not(unix))]
+    return terminate_forced(child).await;
+}
+
+#[cfg(not(unix))]
+async fn terminate_forced(
+    child: &mut tokio::process::Child,
+) -> std::io::Result<std::process::ExitStatus> {
+    let _ = child.start_kill();
+    child.wait().await
+}
+
+// The child is a process-group leader (setpgid in the spawn builders), so
+// killpg reaches its whole tree. Grace the group on SIGTERM, then escalate
+// to SIGKILL so grandchildren cannot ignore or trap the stop.
+#[cfg(unix)]
+async fn terminate_with_group_escalation(
+    child: &mut tokio::process::Child,
+) -> std::io::Result<std::process::ExitStatus> {
+    signal_process_group(child, libc::SIGTERM);
+    match tokio::time::timeout(KILL_GRACE_PERIOD, child.wait()).await {
+        Ok(status) => status,
+        Err(_) => {
+            signal_process_group(child, libc::SIGKILL);
+            let _ = child.start_kill();
+            child.wait().await
         }
     }
 }
@@ -200,34 +251,21 @@ pub async fn shell_spawn_tracked(
         // Keep the map entry until exit so kill can find this shell. The wait task
         // owns the Child and handles kill via kill_rx (avoids remove-then-wait race).
         let exit = tokio::select! {
-          status = child.wait() => match status {
-            Ok(status) => shell_exit_from_status(status),
-            Err(_) => ShellExitResult {
-              exit_code: -1,
-              signal: None,
-            },
-          },
+          status = child.wait() => shell_exit_from_wait(status),
           kill = kill_rx.recv() => {
-            if kill.is_some() {
-              #[cfg(unix)]
-              kill_process_group(&mut child);
-              let _ = child.start_kill();
-            }
-            match child.wait().await {
-              Ok(status) => shell_exit_from_status(status),
-              Err(_) => ShellExitResult {
-                exit_code: -1,
-                signal: None,
-              },
-            }
+            shell_exit_from_wait(terminate_child(&mut child, kill.is_some()).await)
           }
         };
 
-        // Drain remaining stdout/stderr before exit so the frontend does not
-        // drop the tail when it unregisters listeners on the exit event.
+        // Publish the exit before draining output so shell_kill_tracked callers
+        // (force-send handoff, stop buttons) return as soon as the process is
+        // gone, even when a grandchild keeps the pipe open.
+        let _ = exit_tx.send(Some(exit.clone()));
+
+        // Drain remaining stdout/stderr before the exit event so the frontend
+        // does not drop the tail when it unregisters listeners on that event.
         join_output_pumps(stdout_task, stderr_task).await;
 
-        let _ = exit_tx.send(Some(exit.clone()));
         TRACKED_SHELLS.lock().unwrap().remove(&shell_wait);
 
         let _ = app_wait.emit(
@@ -311,12 +349,12 @@ async fn spawn_tracked_remote(
     let exit_watch = channel_exit_rx(&channel_id).await?;
     tokio::spawn(async move {
         let exit_code = reap_remote_shell(channel_id, exit_watch, kill_rx).await;
-        join_output_pumps(stdout_task, stderr_task).await;
         let exit = ShellExitResult {
             exit_code,
             signal: None,
         };
         let _ = exit_tx.send(Some(exit.clone()));
+        join_output_pumps(stdout_task, stderr_task).await;
         TRACKED_SHELLS.lock().unwrap().remove(&shell_wait);
         let _ = app_wait.emit(
             &format!("shell-exit-{shell_wait}"),
@@ -378,5 +416,69 @@ mod tests {
         join_output_pumps_with_timeout(stdout, stderr, Duration::from_millis(50)).await;
 
         assert!(started.elapsed() < Duration::from_millis(500));
+    }
+
+    #[cfg(unix)]
+    fn spawn_test_child(command: &str) -> tokio::process::Child {
+        tokio::process::Command::new("sh")
+            .arg("-c")
+            .arg(command)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .process_group(0)
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap()
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn terminate_child_kills_sigterm_responsive_group() {
+        let mut child = spawn_test_child("sleep 30 & wait");
+        let pid = child.id().unwrap() as i32;
+        let started = Instant::now();
+
+        let status = terminate_child(&mut child, true).await.unwrap();
+
+        assert!(started.elapsed() < Duration::from_secs(2));
+        assert_eq!(status.signal(), Some(libc::SIGTERM));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(unsafe { libc::killpg(pid, 0) }, -1);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn terminate_child_escalates_to_sigkill_when_sigterm_ignored() {
+        // SIG_IGN survives exec, so the exec'd sleep ignores group SIGTERM;
+        // only the post-grace SIGKILL escalation can stop it. The marker file
+        // guarantees the trap is installed before the kill is sent.
+        let marker = std::env::temp_dir().join(format!(
+            "vixl-test-escalate-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&marker);
+        let marker_path = marker.to_string_lossy().to_string();
+        let mut child = spawn_test_child(&format!(
+            "trap '' TERM; : > '{marker_path}'; exec sleep 30"
+        ));
+        let pid = child.id().unwrap() as i32;
+
+        for _ in 0..100 {
+            if marker.exists() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(marker.exists(), "child never installed the TERM trap");
+        let _ = std::fs::remove_file(&marker);
+
+        let started = Instant::now();
+        let status = terminate_child(&mut child, true).await.unwrap();
+
+        assert!(started.elapsed() >= KILL_GRACE_PERIOD);
+        assert!(started.elapsed() < Duration::from_secs(2));
+        assert_eq!(status.signal(), Some(libc::SIGKILL));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(unsafe { libc::killpg(pid, 0) }, -1);
     }
 }

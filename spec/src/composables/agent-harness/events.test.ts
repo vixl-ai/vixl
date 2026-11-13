@@ -827,6 +827,27 @@ describe('agent-harness events idle resume flush', () => {
     expect(attention.refreshSidebar).toHaveBeenCalled()
   })
 
+  it('keeps a busy handoff status when a late idle event arrives', () => {
+    const state = buildState()
+    state.status.value = 'submitted'
+    state.holdBackgroundResume.value = true
+    const attention = buildAttention()
+    const { handleEvent } = createEvents(state, attention, deps)
+
+    handleEvent({
+      type: 'chat-status-changed',
+      projectSlug: 'proj',
+      chatId: 'chat-1',
+      status: 'idle',
+    })
+
+    // A force-send handoff owns the busy status; the stale idle write must
+    // not demote it or flash the sidebar back to an idle row.
+    expect(state.status.value).toBe('submitted')
+    expect(state.session.patchMeta).toHaveBeenCalledWith({ status: 'idle' })
+    expect(attention.refreshSidebar).toHaveBeenCalled()
+  })
+
   it('does not flush background resume on idle while the force-send hold is set', () => {
     const state = buildState()
     state.holdBackgroundResume.value = true

@@ -348,6 +348,111 @@ describe('agent-shell-registry', () => {
     expect(runningShells.value).toEqual([])
   })
 
+  it('dedupes concurrent kills of the same shell into one backend call', async () => {
+    const { createAgentShell, killAgentShell, getAgentShell } = await import(
+      '@/services/harness/shell/registry'
+    )
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run dev',
+    })
+
+    let resolveKill: (() => void) | undefined
+    shellKillTracked.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveKill = () => resolve({ exitCode: 0 })
+        }),
+    )
+
+    const first = killAgentShell(shell.shellId)
+    const second = killAgentShell(shell.shellId)
+
+    expect(shellKillTracked).toHaveBeenCalledTimes(1)
+
+    resolveKill?.()
+    await Promise.all([first, second])
+
+    expect(getAgentShell(shell.shellId)?.status).toBe('completed')
+  })
+
+  it('kills shells for a chat in parallel', async () => {
+    const { createAgentShell, killShellsForChat } = await import(
+      '@/services/harness/shell/registry'
+    )
+
+    const first = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run dev',
+    })
+    const second = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm test',
+    })
+
+    const resolvers: Array<() => void> = []
+    shellKillTracked.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(() => resolve({ exitCode: 0 }))
+        }),
+    )
+
+    const killing = killShellsForChat('chat-1')
+
+    // A serial loop would still be awaiting the first kill here.
+    expect(shellKillTracked).toHaveBeenCalledTimes(2)
+
+    for (const resolve of resolvers) {
+      resolve()
+    }
+    await killing
+
+    expect(shellKillTracked).toHaveBeenCalledWith(first.shellId)
+    expect(shellKillTracked).toHaveBeenCalledWith(second.shellId)
+  })
+
+  it('keeps output listeners attached after a kill so the tail can drain', async () => {
+    const handlers = new Map<string, (event: { payload: unknown }) => void>()
+    const unlisten = vi.fn<() => void>()
+    listen.mockImplementation(async (name, handler) => {
+      handlers.set(name, handler as (event: { payload: unknown }) => void)
+      return unlisten
+    })
+
+    const { createAgentShell, killAgentShell, getAgentShell } = await import(
+      '@/services/harness/shell/registry'
+    )
+
+    const shell = await createAgentShell({
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run dev',
+    })
+
+    await killAgentShell(shell.shellId)
+
+    // The kill resolves before the backend finished pumping; listeners stay
+    // attached so the shell-exit event (emitted after the drain) detaches them.
+    expect(unlisten).not.toHaveBeenCalled()
+
+    handlers.get(`shell-output-${shell.shellId}`)?.({
+      payload: { shellId: shell.shellId, stream: 'stdout', data: 'tail line\n' },
+    })
+    expect(getAgentShell(shell.shellId)?.stdout).toContain('tail line')
+
+    handlers.get(`shell-exit-${shell.shellId}`)?.({
+      payload: { shellId: shell.shellId, exitCode: 0 },
+    })
+    expect(unlisten).toHaveBeenCalledTimes(2)
+
+    listen.mockReset()
+  })
+
   it('queues a clipped deliverable once when a parent background shell exits', async () => {
     const { clipTerminalOutput } = await import('@/utils/clip-terminal-output')
     type OutputListener = (event: {

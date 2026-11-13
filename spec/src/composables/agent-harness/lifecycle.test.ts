@@ -128,6 +128,7 @@ const buildState = (): AgentHarnessState =>
       clearLocalQueuedSubagentSteers: vi.fn<(id: string) => void>(),
       finishAgentTurn: vi.fn<() => void>(),
       patchMeta: vi.fn<(patch: unknown) => void>(),
+      activeTurnId: ref<string | null>(null),
     },
     status: ref('streaming'),
     subagents: shallowRef([
@@ -162,7 +163,9 @@ const buildAttention = (): AttentionHelpers =>
   }) as unknown as AttentionHelpers
 
 const buildDeps = () => ({
-  send: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
+  send: vi
+    .fn<(...args: unknown[]) => Promise<'completed' | 'skipped' | 'failed' | void>>()
+    .mockResolvedValue(undefined),
   stopMcpAuthPolling: vi.fn<() => void>(),
   syncPendingMcpAuth: vi.fn<() => void>(),
   maybeFlushBackgroundSubagentResume: vi.fn<() => void>(),
@@ -195,6 +198,87 @@ describe('agent-harness lifecycle stop', () => {
     )
     expect(state.subagents.value[0]?.status).toBe('stopped')
     expect(state.status.value).toBe('ready')
+  })
+
+  it('keeps the busy status and skips the idle meta write during a handoff stop', async () => {
+    const state = buildState()
+    let terminalKilled = false
+    let resolveKill: () => void = () => undefined
+    killShellsForChat.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveKill = () => {
+            terminalKilled = true
+            resolve()
+          }
+        }),
+    )
+    const { stop } = createLifecycle(state, buildAttention(), buildDeps())
+
+    await stop({ keepBackground: true, handoff: true })
+
+    expect(state.status.value).toBe('submitted')
+    expect(updateChatMeta).not.toHaveBeenCalled()
+    expect(state.session.patchMeta).not.toHaveBeenCalled()
+    expect(killShellsForChat).toHaveBeenCalledWith('chat-1', {
+      keepBackground: true,
+    })
+    // stop() returned without waiting for the terminal to exit.
+    expect(terminalKilled).toBe(false)
+    resolveKill()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(terminalKilled).toBe(true)
+  })
+
+  it('force-sends with handoff and leaves the busy status when a turn starts', async () => {
+    const state = buildState()
+    state.messageQueue.items.value = [
+      {
+        id: 'q-1',
+        text: 'queued',
+        files: [],
+        mode: 'agent',
+        model: 'openai::gpt-4o',
+      },
+    ]
+    const deps = buildDeps()
+    deps.send.mockResolvedValue('completed')
+    const attention = buildAttention()
+    const { forceSendQueued } = createLifecycle(state, attention, deps)
+
+    const pending = forceSendQueued('q-1')
+
+    // The idle meta write must not happen mid-handoff, even after stop().
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(state.status.value).toBe('submitted')
+    expect(updateChatMeta).not.toHaveBeenCalled()
+
+    await pending
+
+    expect(state.status.value).toBe('submitted')
+    expect(attention.refreshSidebar).not.toHaveBeenCalled()
+  })
+
+  it('restores the ready status when a handoff force-send starts no turn', async () => {
+    const state = buildState()
+    state.messageQueue.items.value = [
+      {
+        id: 'q-1',
+        text: 'queued',
+        files: [],
+        mode: 'agent',
+        model: 'openai::gpt-4o',
+      },
+    ]
+    const deps = buildDeps()
+    deps.send.mockResolvedValue('skipped')
+    const attention = buildAttention()
+    const { forceSendQueued } = createLifecycle(state, attention, deps)
+
+    await forceSendQueued('q-1')
+
+    expect(state.status.value).toBe('ready')
+    expect(attention.refreshSidebar).toHaveBeenCalledTimes(1)
   })
 
   it('finalizes a steered-and-resumed subagent missing from the live list', async () => {

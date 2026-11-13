@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
+import type { ChatStatus } from 'ai'
 import type { AgentHarnessSession } from '@/composables/agent-harness/types'
 import type { AgentStop } from '@/types/chat/agent-stop'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
@@ -51,6 +52,7 @@ const buildInput = (
     setAgentTurnError,
     setAgentTurnStop,
     finishAgentTurn,
+    activeTurnId: ref<string | null>('turn-1'),
   } as unknown as AgentHarnessSession
   return {
     session,
@@ -69,7 +71,7 @@ const buildInput = (
         model: 'openai::gpt-4o',
         autoRetryAttempt: 0,
       },
-      status: ref('submitted' as const),
+      status: ref<ChatStatus>('submitted'),
       error: ref<string | null>(null),
       abortController: ref<AbortController | null>(null),
       session,
@@ -90,6 +92,43 @@ describe('handleSendCatch terminal stop', () => {
     vi.clearAllMocks()
     retryParentTransient.mockResolvedValue('fallthrough')
     persistTurnEnded.mockResolvedValue(undefined)
+  })
+
+  it('keeps a busy handoff status, skips the closed turn, and defers the sidebar refresh', async () => {
+    const { input, finishAgentTurn } = buildInput([])
+    input.aborted = true
+    input.status.value = 'submitted'
+    input.session.activeTurnId.value = 'turn-2'
+    let slugRefreshed = false
+    let resolveSlug: () => void = () => undefined
+    input.refreshSlug = vi.fn<(slug: string) => Promise<void>>(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSlug = () => {
+            slugRefreshed = true
+            resolve()
+          }
+        }),
+    )
+
+    await expect(handleSendCatch(input)).resolves.toBe('failed')
+
+    expect(input.status.value).toBe('submitted')
+    expect(finishAgentTurn).not.toHaveBeenCalled()
+    expect(slugRefreshed).toBe(false)
+    resolveSlug()
+  })
+
+  it('demotes a non-busy aborted status and finishes the still-active turn', async () => {
+    const { input, finishAgentTurn } = buildInput([])
+    input.aborted = true
+    input.status.value = 'ready'
+    input.session.activeTurnId.value = 'turn-1'
+
+    await expect(handleSendCatch(input)).resolves.toBe('failed')
+
+    expect(input.status.value).toBe('ready')
+    expect(finishAgentTurn).toHaveBeenCalledTimes(1)
   })
 
   it('writes a timeout stop after retry falls through', async () => {

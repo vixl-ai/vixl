@@ -13,6 +13,7 @@ type AppendSendUserMessageArgs = {
   agentNames: string[]
   projectRoot: string | null
   aborted: () => boolean
+  skillNames?: string[]
 }
 
 const buildUserParts = (
@@ -68,9 +69,11 @@ export default async (
     return null
   }
 
-  const skillNames = (
-    await listSlashSkillIndex(args.projectRoot).catch(() => [])
-  ).map((skill) => skill.name)
+  const skillNames =
+    args.skillNames ??
+    (await listSlashSkillIndex(args.projectRoot).catch(() => [])).map(
+      (skill) => skill.name,
+    )
 
   const mentionHighlights = buildMentionHighlights(
     args.text,

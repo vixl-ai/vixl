@@ -14,7 +14,7 @@ type ApplyParentTurnStartArgs = {
   effectiveSettings: VixlSettings
 }
 
-export default async (args: ApplyParentTurnStartArgs): Promise<void> => {
+export default (args: ApplyParentTurnStartArgs): void => {
   const { state, mode, model, reasoning, mentions, effectiveSettings } = args
   const { options, session, lastRunConfig, subagents, contextBudgetSync } = state
 
@@ -28,16 +28,15 @@ export default async (args: ApplyParentTurnStartArgs): Promise<void> => {
   subagents.value = subagents.value.filter((item) => item.status === 'running')
   contextBudgetSync.setDraftMentions(mentions)
 
-  try {
-    await updateChatMeta(options.projectSlug, options.chatId, {
-      model,
-      mode,
+  // The turn must not wait on this write; failures are surfaced, never thrown.
+  updateChatMeta(options.projectSlug, options.chatId, { model, mode })
+    .then(() => {
+      session.patchMeta({ model, mode })
     })
-    session.patchMeta({ model, mode })
-  } catch (metaError) {
-    toast.error('Failed to save chat model', {
-      description:
-        metaError instanceof Error ? metaError.message : 'Unknown error',
+    .catch((metaError: unknown) => {
+      toast.error('Failed to save chat model', {
+        description:
+          metaError instanceof Error ? metaError.message : 'Unknown error',
+      })
     })
-  }
 }

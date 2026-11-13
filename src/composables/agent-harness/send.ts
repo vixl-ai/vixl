@@ -1,18 +1,16 @@
 import { toast } from 'vue-sonner'
 import type { FileUIPart } from 'ai'
-import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import listConfiguredProviders from '@/services/providers/list-configured-providers'
 import parseModelRef from '@/utils/parse-model-ref'
-import { listAgentIndex } from '@/services/agents/registry'
 import dropUnresolvedAgentMentions from '@/services/agents/drop-unresolved-agent-mentions'
 import collectExplicitAgentMentions from '@/utils/collect-explicit-agent-mentions'
-import { loadEffectiveSettings } from '@/services/config/vixl-config'
 import normalizeAttachmentFiles from '@/utils/normalize-attachment-files'
 import appendSendUserMessage from './append-send-user-message'
 import applyParentTurnStart from './apply-parent-turn-start'
 import deferOverlappingParentTurn from './defer-overlapping-parent-turn'
 import enqueueComposerSend from './enqueue-composer-send'
 import handleSendCatch from './handle-send-catch'
+import loadTurnSetup from './load-turn-setup'
 import runParentWithPrefinished from './run-parent-with-prefinished'
 import type { SendArgs, SendDeps, SendResult } from './send-types'
 import {
@@ -100,15 +98,17 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
 
     const settingsRoot = options.standalone ? null : options.projectRoot
     const catalogRoot = options.projectRoot
-    let chatSettings: VixlSettings
-    try {
-      chatSettings = await loadEffectiveSettings(settingsRoot)
-    } catch (settingsError) {
+    const turnSetup = await loadTurnSetup(settingsRoot, catalogRoot)
+    if (!turnSetup.ok) {
       toast.error('Failed to load project settings', {
-        description: settingsError instanceof Error ? settingsError.message : 'Unknown error',
+        description:
+          turnSetup.error instanceof Error
+            ? turnSetup.error.message
+            : 'Unknown error',
       })
       return 'skipped'
     }
+    const { settings: chatSettings, agentIndex, skillNames } = turnSetup
 
     if (!args.internal && attention.isParentBusy()) {
       enqueueComposerSend(messageQueue, args)
@@ -119,7 +119,6 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
     status.value = 'submitted'
     toolRuns.value = []
 
-    const agentIndex = await listAgentIndex(catalogRoot).catch(() => [])
     const mentions = await dropUnresolvedAgentMentions(
       collectExplicitAgentMentions(args.text, args.mentions ?? [], agentIndex),
       catalogRoot,
@@ -179,6 +178,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
           files,
           mentions,
           agentNames: agentIndex.map((agent) => agent.name),
+          skillNames,
           projectRoot: catalogRoot,
           aborted: () => controller.signal.aborted,
         })
@@ -189,6 +189,11 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         }
         appendedUserMessageId = appended.id
         userMessageAppended = true
+      }
+      if (args.queuedItemId) {
+        // The message is on screen now; drop the queue row before the
+        // remaining (non-blocking) turn setup instead of after it.
+        messageQueue.remove(args.queuedItemId)
       }
 
       if (
@@ -228,7 +233,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         return 'skipped'
       }
 
-      await applyParentTurnStart({
+      applyParentTurnStart({
         state,
         mode: args.mode,
         model: args.model,
@@ -244,9 +249,6 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Sen
         session.startAgentTurn(turnId)
       }
       turnStarted = true
-      if (args.queuedItemId) {
-        messageQueue.remove(args.queuedItemId)
-      }
       suppressQueueDrainAfterStop.value = false
       clearBackgroundResumeHold(state, resumeHoldEpoch)
       await runParentWithPrefinished({

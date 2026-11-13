@@ -55,11 +55,22 @@ export default async (input: HandleSendCatchArgs): Promise<SendResult> => {
   const failureStop = parentFailureStop(err)
 
   if (aborted) {
-    status.value = 'ready'
-    if (turnStarted) {
+    // A force-send handoff (or a Stop followed by a new send) may already
+    // have started the next turn; never demote a busy status here.
+    if (status.value !== 'streaming' && status.value !== 'submitted') {
+      status.value = 'ready'
+    }
+    if (turnStarted && session.activeTurnId.value === turnId) {
       session.finishAgentTurn()
     }
-    await refreshSlug(projectSlug)
+    void refreshSlug(projectSlug).catch((refreshError: unknown) => {
+      toast.error('Failed to refresh sidebar', {
+        description:
+          refreshError instanceof Error
+            ? refreshError.message
+            : 'Unknown error',
+      })
+    })
     return 'failed'
   }
 
