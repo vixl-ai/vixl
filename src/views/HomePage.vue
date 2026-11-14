@@ -122,8 +122,17 @@ const handleSubmit = async (payload: {
         ? { mentions: payload.mentions }
         : {}),
     })
-    await refreshFleetSidebar()
+    // The full sidebar re-list serializes every chat row with its prompt
+    // snapshot, so it must not gate navigation: that delayed the first paint
+    // of the pending user message in the new thread. Start it now and await
+    // it only after the route push so failures still surface.
+    const sidebarRefresh = refreshFleetSidebar().catch((error: unknown) => {
+      toast.error('Failed to refresh chat list', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      })
+    })
     await router.push(chatRouteFor(chat.projectSlug, chat.id))
+    await sidebarRefresh
   } catch (error) {
     toast.error('Could not start chat', {
       description: error instanceof Error ? error.message : 'Unknown error',

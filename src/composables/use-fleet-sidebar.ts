@@ -199,14 +199,21 @@ export default () => {
   }
 
   const refreshChats = async (): Promise<void> => {
+    const slugs = [
+      ...fleet.projects.value.map((project) => project.slug),
+      ...(fleet.groups?.value ?? []).map((group) => group.slug),
+      HOME_CHAT_SLUG,
+    ]
+    const lists = await Promise.all(
+      slugs.map((slug) => chatStore.listProjectChats(slug)),
+    )
     const next: typeof chatsBySlug.value = {}
-    for (const project of fleet.projects.value) {
-      next[project.slug] = await chatStore.listProjectChats(project.slug)
-    }
-    for (const group of fleet.groups?.value ?? []) {
-      next[group.slug] = await chatStore.listProjectChats(group.slug)
-    }
-    next[HOME_CHAT_SLUG] = await chatStore.listProjectChats(HOME_CHAT_SLUG)
+    slugs.forEach((slug, index) => {
+      const chats = lists[index]
+      if (chats) {
+        next[slug] = chats
+      }
+    })
     chatsBySlug.value = next
     recomputeFleetSidebarOrder()
   }
@@ -277,14 +284,21 @@ export const refreshFleetSidebar = async (): Promise<void> => {
   const fleet = useFleetRegistry()
   bindFleetSidebarOrder(chatsBySlug, fleet)
   const chatStore = useChatStore()
+  const slugs = [
+    ...fleet.projects.value.map((project) => project.slug),
+    ...(fleet.groups?.value ?? []).map((group) => group.slug),
+    HOME_CHAT_SLUG,
+  ]
+  const lists = await Promise.all(
+    slugs.map((slug) => chatStore.listProjectChats(slug)),
+  )
   const next: typeof chatsBySlug.value = {}
-  for (const project of fleet.projects.value) {
-    next[project.slug] = await chatStore.listProjectChats(project.slug)
-  }
-  for (const group of fleet.groups?.value ?? []) {
-    next[group.slug] = await chatStore.listProjectChats(group.slug)
-  }
-  next[HOME_CHAT_SLUG] = await chatStore.listProjectChats(HOME_CHAT_SLUG)
+  slugs.forEach((slug, index) => {
+    const chats = lists[index]
+    if (chats) {
+      next[slug] = chats
+    }
+  })
   chatsBySlug.value = next
   recomputeFleetSidebarOrder()
   const records = await listPinnedChats()

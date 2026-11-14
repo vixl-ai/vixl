@@ -1,4 +1,5 @@
 import { convertToModelMessages, type ModelMessage } from 'ai'
+import { toast } from 'vue-sonner'
 import type { MentionHighlight } from '@/types/chat/mention-highlight'
 import type { OrchestratorInput } from '@/types/harness/orchestrator-input'
 import { mentionHighlightSchema } from '@/schemas/mention-highlight'
@@ -100,9 +101,21 @@ export default async (input: OrchestratorInput): Promise<void> => {
     })
   }
 
-  if (isFirstUserMessage && userText.trim().length > 0) {
-    // Keep the short "New Agent" placeholder while naming runs. Never copy the
-    // user prompt into the sidebar title (including sync fallbacks).
+  const shouldNameChat = isFirstUserMessage && userText.trim().length > 0
+  let titleTaskStarted = false
+
+  const startTitleTask = (): void => {
+    if (titleTaskStarted) {
+      return
+    }
+    titleTaskStarted = true
+    // Keep the short "New Agent" placeholder while naming runs. Never copy
+    // the user prompt into the sidebar title (including sync fallbacks).
+    // Naming waits until the main stream is producing content. When
+    // models.title is unset the title task falls back to the chat model,
+    // and a title request sent before the main one makes serialized or
+    // single slot providers queue the main prompt behind it: the turn then
+    // looks stalled until the title finishes.
     runSideTask({
       projectSlug: workspace.projectSlug,
       chatId,
@@ -112,11 +125,17 @@ export default async (input: OrchestratorInput): Promise<void> => {
       fallbackModelId: input.modelId,
       turnId: assistantId,
       onEvent: input.onEvent,
-    }).then((generatedTitle) => {
-      if (generatedTitle && !isDefaultChatTitle(generatedTitle)) {
-        emitTitleChange(generatedTitle)
-      }
     })
+      .then((generatedTitle) => {
+        if (generatedTitle && !isDefaultChatTitle(generatedTitle)) {
+          emitTitleChange(generatedTitle)
+        }
+      })
+      .catch((error: unknown) => {
+        toast.error('Failed to generate chat title', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        })
+      })
   }
 
   const activeContextMeta = await readChatMeta(workspace.projectSlug, chatId).catch(() => null)
@@ -214,6 +233,19 @@ export default async (input: OrchestratorInput): Promise<void> => {
 
   await runHarnessStream({
     ...streamInput,
+    onEvent: (event) => {
+      if (
+        shouldNameChat &&
+        !titleTaskStarted &&
+        (event.type === 'text-delta' ||
+          event.type === 'reasoning-delta' ||
+          event.type === 'tool-input-start' ||
+          event.type === 'tool-start')
+      ) {
+        startTitleTask()
+      }
+      return streamInput.onEvent(event)
+    },
     workspace,
     projectSlug: workspace.projectSlug,
     chatId,
@@ -227,4 +259,7 @@ export default async (input: OrchestratorInput): Promise<void> => {
     persistPermission: input.persistPermission,
     activeContext,
   })
+  if (shouldNameChat) {
+    startTitleTask()
+  }
 }
