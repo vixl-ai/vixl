@@ -2,7 +2,7 @@ import { listen } from '@tauri-apps/api/event'
 import { ref } from 'vue'
 import appendStreamText from '@/services/harness/shell/append-stream-text'
 import { isRunningBackgroundSubagent } from '@/services/harness/subagent/registry'
-import { shellKillTracked, shellSpawnTracked, type IpcProjectRoot } from '@/services/vixl/vixl-tauri'
+import { shellSpawnTracked, type IpcProjectRoot } from '@/services/vixl/vixl-tauri'
 import type {
   AgentShellRecord,
   AgentShellStatus,
@@ -19,6 +19,7 @@ import {
   resetShellWakeQueueForTests,
 } from './shell-wake-queue'
 import rollbackFailedAgentShellCreate, { trackShellForChat } from './rollback-failed-agent-shell'
+import createKillAgentShell from './kill-agent-shell'
 import waitForTrackedShellExit from './wait-for-shell-exit'
 
 export type { ShellWakeResult }
@@ -113,19 +114,34 @@ const cleanupShellListeners = (shellId: string): void => {
   shellUnlisteners.delete(shellId)
 }
 
-const markShellComplete = (shellId: string, exit: ShellExitResult): void => {
+const markShellComplete = (
+  shellId: string,
+  exit: ShellExitResult,
+  options?: { keepListeners?: boolean },
+): void => {
   const shell = shells.get(shellId)
-  if (!shell || shell.status !== 'running') {
+  if (!shell) {
     return
   }
 
-  const hasExitWaiters = (exitWaiters.get(shellId) ?? []).length > 0
-  setShellStatus(shell, exit.exitCode === 0 ? 'completed' : 'failed', exit)
-  enqueueDeliverableShellResult(shell, exit, hasExitWaiters)
-  emitHarnessEvent(shell.chatId, { type: 'shell-complete', shellId, exitCode: exit.exitCode })
-  bumpRevision()
-  resolveExitWaiters(shellId, exit)
-  cleanupShellListeners(shellId)
+  if (shell.status === 'running') {
+    const hasExitWaiters = (exitWaiters.get(shellId) ?? []).length > 0
+    setShellStatus(shell, exit.exitCode === 0 ? 'completed' : 'failed', exit)
+    enqueueDeliverableShellResult(shell, exit, hasExitWaiters)
+    emitHarnessEvent(shell.chatId, {
+      type: 'shell-complete',
+      shellId,
+      exitCode: exit.exitCode,
+    })
+    bumpRevision()
+    resolveExitWaiters(shellId, exit)
+  }
+
+  // The kill path resolves before the backend has finished draining output
+  // pumps; keep listeners until the shell-exit event delivers the tail.
+  if (!options?.keepListeners) {
+    cleanupShellListeners(shellId)
+  }
 }
 
 const registerShellListeners = async (shellId: string): Promise<void> => {
@@ -244,36 +260,12 @@ export const tailShellOutput = (
   }
 }
 
-export const killAgentShell = async (shellId: string): Promise<AgentShellRecord> => {
-  const shell = shells.get(shellId)
-  if (!shell) {
-    throw new Error(`Shell not found: ${shellId}`)
-  }
-
-  if (shell.status === 'running') {
-    shell.wakeParent = false
-    try {
-      const exit = await shellKillTracked(shellId)
-      markShellComplete(shellId, exit)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      // Backend may have already reaped the process between our status check and kill.
-      if (!message.includes('Shell not found')) {
-        throw error
-      }
-      if (shell.status === 'running') {
-        const waitResult = await waitForShellExit(shellId, 5_000)
-        markShellComplete(shellId, {
-          exitCode: waitResult.exitCode,
-          signal: waitResult.signal,
-        })
-      }
-    }
-  }
-
-  bumpRevision()
-  return shell
-}
+export const { killAgentShell, resetKillInFlight } = createKillAgentShell({
+  shells,
+  markShellComplete,
+  waitForShellExit,
+  bumpRevision,
+})
 
 export const discardShellWakeForChat = (chatId: string): void => {
   if (!discardShellWakeQueueForChat(chatId)) {
@@ -302,15 +294,17 @@ export const killShellsForChat = async (
     }
     toKill.push(shellId)
   }
-  for (const shellId of toKill) {
-    try {
-      await killAgentShell(shellId)
-    } catch {
-      shells.delete(shellId)
-      cleanupShellListeners(shellId)
-    }
-    shellIds.delete(shellId)
-  }
+  await Promise.all(
+    toKill.map(async (shellId) => {
+      try {
+        await killAgentShell(shellId)
+      } catch {
+        shells.delete(shellId)
+        cleanupShellListeners(shellId)
+      }
+      shellIds.delete(shellId)
+    }),
+  )
 
   if (!options?.keepBackground || shellIds.size === 0) {
     chatShells.delete(chatId)
@@ -335,5 +329,6 @@ export const resetAgentShellRegistryForTests = (): void => {
   chatShells.clear()
   exitWaiters.clear()
   eventEmitters.clear()
+  resetKillInFlight()
   resetShellWakeQueueForTests()
 }

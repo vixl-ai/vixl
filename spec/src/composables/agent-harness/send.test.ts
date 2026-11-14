@@ -1601,7 +1601,9 @@ describe('agent-harness send persist model/mode', () => {
       },
     ]
     state.session.startAgentTurn = vi.fn<(turnId: string) => void>(() => {
-      expect(state.messageQueue.remove).not.toHaveBeenCalled()
+      // Force-send drops the queue row as soon as the message is on screen,
+      // before the turn formally starts.
+      expect(state.messageQueue.remove).toHaveBeenCalledWith('q-1')
     })
     const { send } = createSend(state, buildAttention(), {
       handleEvent: vi.fn<(...args: unknown[]) => void>(),
@@ -1730,7 +1732,8 @@ describe('agent-harness send persist model/mode', () => {
     })
     state.session.startAgentTurn = vi.fn<(turnId: string) => void>(() => {
       expect(state.holdBackgroundResume.value).toBe(true)
-      expect(state.messageQueue.remove).not.toHaveBeenCalled()
+      // The queue row is removed at message-append time, before turn start.
+      expect(state.messageQueue.remove).toHaveBeenCalledWith('q-1')
       timeline.push({ type: 'agent-turn' })
     })
     const { send } = createSend(state, buildAttention(), {

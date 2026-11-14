@@ -243,7 +243,15 @@ export default (
       }
     }
     if (event.type === 'chat-status-changed') {
-      status.value = mapMetaStatusToChatStatus(event.status, false)
+      const mapped = mapMetaStatusToChatStatus(event.status, false)
+      // During a force-send handoff an in-flight turn already owns the local
+      // status; a late 'idle' meta event must not demote it back to ready.
+      const localBusy =
+        status.value === 'streaming' || status.value === 'submitted'
+      const incomingBusy = mapped === 'streaming' || mapped === 'submitted'
+      if (!localBusy || incomingBusy) {
+        status.value = mapped
+      }
       session.patchMeta({ status: event.status })
       attention.refreshSidebar()
       if (event.status === 'idle' && !holdBackgroundResume.value) {

@@ -25,11 +25,16 @@ import {
 } from './hold-background-resume'
 import waitUntilParentUnblocked from './wait-until-parent-unblocked'
 import type { QueuedChatMessage } from '@/types/chat/queued-chat-message'
-import type { SendArgs } from './send'
+import type { SendArgs, SendResult } from './send'
 import type { AgentHarnessState, AttentionHelpers } from './types'
 
+type StopFlags = {
+  keepBackground?: boolean
+  handoff?: boolean
+}
+
 type LifecycleDeps = {
-  send: (args: SendArgs) => Promise<void>
+  send: (args: SendArgs) => Promise<SendResult | void>
   stopMcpAuthPolling: () => void
   syncPendingMcpAuth: () => void
   maybeFlushBackgroundSubagentResume: () => void
@@ -71,8 +76,11 @@ export default (
     deps.maybeFlushBackgroundSubagentResume()
   }
 
-  const stop = async (flags?: { keepBackground?: boolean }): Promise<void> => {
+  const stop = async (flags?: StopFlags): Promise<void> => {
     const keepBackground = flags?.keepBackground === true
+    // Handoff mode (force-send): the next turn starts immediately, so keep
+    // the UI busy and never persist the intermediate idle state.
+    const handoff = flags?.handoff === true
     suppressQueueDrainAfterStop.value = true
     abortController.value?.abort()
     const keepOpts = keepBackground ? { keepBackground: true } : undefined
@@ -115,26 +123,32 @@ export default (
           : item,
       )
     }
-    status.value = 'ready'
+    status.value = handoff ? 'submitted' : 'ready'
     session.finishAgentTurn()
-    try {
-      await updateChatMeta(options.projectSlug, options.chatId, {
-        status: 'idle',
-      })
-      session.patchMeta({ status: 'idle' })
-      attention.refreshSidebar()
-    } catch (metaError) {
-      toast.error('Failed to update chat status', {
-        description:
-          metaError instanceof Error ? metaError.message : 'Unknown error',
-      })
+    if (!handoff) {
+      try {
+        await updateChatMeta(options.projectSlug, options.chatId, {
+          status: 'idle',
+        })
+        session.patchMeta({ status: 'idle' })
+        attention.refreshSidebar()
+      } catch (metaError) {
+        toast.error('Failed to update chat status', {
+          description:
+            metaError instanceof Error ? metaError.message : 'Unknown error',
+        })
+      }
     }
-    try {
-      await killShellsForChat(options.chatId, keepOpts)
-    } catch (stopError) {
+    const shellsStop = Promise.resolve(
+      killShellsForChat(options.chatId, keepOpts),
+    ).catch((stopError: unknown) => {
       toast.error('Failed to stop terminals', {
-        description: stopError instanceof Error ? stopError.message : 'Unknown error',
+        description:
+          stopError instanceof Error ? stopError.message : 'Unknown error',
       })
+    })
+    if (!handoff) {
+      await shellsStop
     }
   }
 
@@ -146,7 +160,7 @@ export default (
     const epoch = claimBackgroundResumeHold(state)
     const previousSend = state.parentSendInFlight?.current ?? null
     try {
-      await stop({ keepBackground: true })
+      await stop({ keepBackground: true, handoff: true })
       if (previousSend) {
         await Promise.resolve(previousSend).catch(() => null)
       }
@@ -155,7 +169,7 @@ export default (
         return
       }
       try {
-        await deps.send({
+        const result = await deps.send({
           text: item.text,
           files: item.files,
           mode: item.mode,
@@ -169,7 +183,19 @@ export default (
           queuedItemId: id,
           resumeHoldEpoch: epoch,
         })
+        if (
+          result !== 'completed' &&
+          status.value === 'submitted' &&
+          !session.activeTurnId.value
+        ) {
+          // Handoff kept the UI busy but no turn started; restore idle UI.
+          status.value = 'ready'
+          attention.refreshSidebar()
+        }
       } catch (err) {
+        if (status.value === 'submitted') {
+          status.value = 'ready'
+        }
         toast.error('Failed to send queued message', {
           description: err instanceof Error ? err.message : 'Unknown error',
         })

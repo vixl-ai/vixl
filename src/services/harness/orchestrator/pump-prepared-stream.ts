@@ -1,4 +1,5 @@
 import { isLoopFinished, smoothStream, streamText, type ModelMessage } from 'ai'
+import { toast } from 'vue-sonner'
 import captureBillableUsage from '@/services/billing/capture-billable-usage'
 import { rejectPendingForChat } from '@/services/harness/permission/approval-gate'
 import { rejectPendingQuestionsForChat } from '@/services/harness/permission/question-gate'
@@ -102,12 +103,24 @@ export default async (
       return preparedStep
     },
     abortSignal: signal,
+    // The AI SDK awaits this callback before emitting the 'abort' stream
+    // part (ai@7 stream wrapper), so awaiting the persistence and
+    // turn-ended emits here guarantees the old turn's events land before
+    // a force-send's next turn. Shell kills deliberately stay off this
+    // path so a hung terminal cannot delay the next turn; lifecycle
+    // stop() issues the same kill (registry dedupes concurrent kills).
     onAbort: async () => {
       rejectPendingForChat(chatId, { keepBackground: true })
       rejectPendingQuestionsForChat(chatId)
       rejectPendingMcpAuthForChat(chatId, { keepBackground: true })
       clearStagedImages({ chatId, turnId: assistantId })
-      await killShellsForChat(chatId, { keepBackground: true })
+      void Promise.resolve(killShellsForChat(chatId, { keepBackground: true })).catch(
+        (err: unknown) => {
+          toast.error('Failed to stop terminals', {
+            description: err instanceof Error ? err.message : 'Unknown error',
+          })
+        },
+      )
       abortBlocking(chatId)
       steps.sealReasoningDuration()
       await persistCollectedAssistant(true)
