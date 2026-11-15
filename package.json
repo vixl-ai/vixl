@@ -176,7 +176,7 @@
     "proxy-addr": "2.0.8",
     "postcss-selector-parser": "7.1.6",
     "tinypool": "2.1.2",
-    "hono": "4.13.13",
+    "hono": "4.13.16",
     "body-parser": "2.4.0",
     "ip-address": "10.7.4",
     "undici": "7.30.1",
