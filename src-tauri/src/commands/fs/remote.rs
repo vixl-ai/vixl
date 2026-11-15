@@ -2088,7 +2088,10 @@ async fn apply_patch_ssh(
                                         )
                                     })?;
                                     let new_content =
-                                        super::edit::apply_update_patch(&old_content, &content)?;
+                                        super::edit::apply_update_patch(&old_content, &content)
+                                            .map_err(|error| {
+                                                format!("{}: {error}", resolved.reported_path())
+                                            })?;
                                     sftp_atomic_write(client, &remote, new_content.as_bytes())
                                         .await?;
                                     Ok((resolved.reported_path(), old_content, new_content))
@@ -2361,7 +2364,10 @@ async fn preview_patch_ssh(
                             })
                         })
                         .await?;
-                        let new_content = super::edit::apply_update_patch(&old_content, &content)?;
+                        let new_content = super::edit::apply_update_patch(&old_content, &content)
+                            .map_err(|error| {
+                            format!("{}: {error}", resolved.reported_path())
+                        })?;
                         diffs.push(build_file_diff(
                             resolved.reported_path(),
                             "update",

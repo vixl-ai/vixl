@@ -11,7 +11,7 @@ const ERROR_HINTS: Array<{ pattern: RegExp; hint: string }> = [
   },
   {
     pattern: /patch context does not match/i,
-    hint: 'The patch hunks do not match the current file contents. Re-read the file and try edit_file instead.',
+    hint: 'A hunk line was not found at or after the previous match; the error quotes the line that failed. Context lines may be written verbatim or with one leading space. Confirm the current file text before retrying, or use edit_file for a small exact replacement.',
   },
   {
     pattern: /at least one replacement is required/i,

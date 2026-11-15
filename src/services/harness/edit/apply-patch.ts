@@ -24,11 +24,15 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 const applyPatch = (ctx: HarnessToolContext) =>
   tool({
     description: withMultiRootPathHint(
-      'Apply an OpenCode-style patch (not git diff). Format: *** Update File: path, then @@ hunks with +/- lines.',
+      'Apply a multi-file patch (not git diff). Sections: *** Add File: path with + lines, ' +
+        '*** Update File: path with @@ hunks, *** Delete File: path; optionally wrapped in ' +
+        '*** Begin Patch / *** End Patch. In a hunk, - removes a line, + adds one, and any other ' +
+        'line is context that must exist later in the file (written verbatim or with one leading ' +
+        'space). @@ line numbers are ignored; hunks apply top to bottom.',
       ctx,
     ),
     inputSchema: z.object({
-      patch: z.string().describe('OpenCode patch text'),
+      patch: z.string().describe('Patch text; hunk grammar is in the tool description'),
     }),
     execute: async ({ patch }, { toolCallId }) => {
       const diffs = mapDiffs(
