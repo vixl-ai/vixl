@@ -407,6 +407,92 @@ describe('upsertToolInStep args merge', () => {
   })
 })
 
+describe('upsertToolInStep name merge', () => {
+  it('keeps the real name when a late result carries the placeholder', () => {
+    const step = {
+      ...createStep('step-1'),
+      tools: [
+        {
+          toolCallId: 'tc-spawn',
+          name: 'spawn_subagent',
+          status: 'done' as const,
+          args: { agentName: 'Verify the integration branch' },
+          result: { subagentId: 'sa-1', status: 'running' },
+        },
+      ],
+    }
+    const next = upsertToolInStep(step, {
+      toolCallId: 'tc-spawn',
+      name: 'tool',
+      status: 'done',
+      result: { subagentId: 'sa-1', summary: 'Branch verified' },
+    })
+    expect(next.tools[0]?.name).toBe('spawn_subagent')
+    expect(next.tools[0]?.result).toEqual({
+      subagentId: 'sa-1',
+      summary: 'Branch verified',
+    })
+  })
+
+  it('takes the real name when the existing run only has the placeholder', () => {
+    const step = {
+      ...createStep('step-1'),
+      tools: [
+        {
+          toolCallId: 'tc-1',
+          name: 'tool',
+          status: 'done' as const,
+        },
+      ],
+    }
+    const next = upsertToolInStep(step, {
+      toolCallId: 'tc-1',
+      name: 'read_file',
+      status: 'done',
+      result: { content: 'ok' },
+    })
+    expect(next.tools[0]?.name).toBe('read_file')
+  })
+
+  it('lets a late placeholder result land on the finished spawn turn', () => {
+    const session = createSession('proj', 'chat-spawn-late')
+    const ops = createSessionAgentOps(session)
+    session.activeTurnId.value = 'turn-spawn'
+    ops.startAgentStep('step-1')
+    ops.upsertLocalToolRun({
+      toolCallId: 'tc-spawn',
+      name: 'spawn_subagent',
+      status: 'done',
+      args: { agentName: 'Verify the integration branch', mode: 'background' },
+      result: { subagentId: 'sa-1', status: 'running' },
+      started: true,
+    })
+    ops.finishAgentTurn()
+
+    session.activeTurnId.value = 'turn-wake'
+    ops.startAgentStep('step-wake')
+    ops.upsertLocalToolRun({
+      toolCallId: 'tc-spawn',
+      name: 'tool',
+      status: 'done',
+      result: { subagentId: 'sa-1', summary: 'Branch verified' },
+    })
+
+    const spawnItem = session.timeline.value.find(
+      (item) => item.type === 'agent-turn' && item.turn.id === 'turn-spawn',
+    )
+    expect(spawnItem?.type).toBe('agent-turn')
+    if (spawnItem?.type !== 'agent-turn') {
+      return
+    }
+    expect(spawnItem.turn.steps[0]?.tools[0]).toMatchObject({
+      toolCallId: 'tc-spawn',
+      name: 'spawn_subagent',
+      result: { subagentId: 'sa-1', summary: 'Branch verified' },
+    })
+  })
+})
+
 describe('finishAgentTurn truncated tool close', () => {
   it('closes an unstarted local tool as cut off', () => {
     const session = createSession('proj', 'chat-cut')

@@ -84,6 +84,12 @@ const isEmptyPlainObject = (value: unknown): boolean =>
   !Array.isArray(value) &&
   Object.keys(value as Record<string, unknown>).length === 0
 
+// Late tool-results (e.g. background sub-agent finalize on a wake turn) carry
+// no name, so the event layer fills in the generic placeholder. Never let it
+// clobber a real name — that would drop the run from the sub-agent timeline
+// claim and re-render its card after the turn end (#89).
+const isGenericToolName = (name: string): boolean => name === 'tool'
+
 export const upsertToolInStep = (step: AgentStep, run: ToolRun): AgentStep => {
   const tools = [...step.tools]
   const index = tools.findIndex((item) => item.toolCallId === run.toolCallId)
@@ -95,9 +101,12 @@ export const upsertToolInStep = (step: AgentStep, run: ToolRun): AgentStep => {
         ? existing.status
         : run.status
     const keepExistingArgs = run.args == null || isEmptyPlainObject(run.args)
+    const keepExistingName =
+      isGenericToolName(run.name) && !isGenericToolName(existing.name)
     tools[index] = {
       ...existing,
       ...run,
+      name: keepExistingName ? existing.name : run.name,
       status,
       args: keepExistingArgs ? existing.args : run.args,
       result: run.result ?? existing.result,
