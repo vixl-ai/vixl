@@ -1,6 +1,6 @@
 import type { ModelMessage } from 'ai'
-import estimateTextTokens from '@/utils/estimate-text-tokens'
 import compactBudgets from './budgets'
+import estimateModelMessageTokens from './estimate-model-message-tokens'
 import { estimatePromptTokens } from './prompt-high-water'
 import repairToolPairing from './repair-tool-pairing'
 import truncateModelMessage from './truncate-model-message'
@@ -12,7 +12,7 @@ const isCheckpoint = (message: ModelMessage): boolean =>
   message.content.startsWith(compactBudgets.CHECKPOINT_PREFIX)
 
 const messageTokens = (message: ModelMessage): number =>
-  estimateTextTokens(JSON.stringify(message))
+  estimateModelMessageTokens(message)
 
 const dropOldestTail = (messages: ModelMessage[]): ModelMessage[] | null => {
   const checkpointIndex = messages.findIndex(isCheckpoint)

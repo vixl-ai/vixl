@@ -4,7 +4,10 @@ import type {
   ToolContent,
   ToolResultPart,
 } from 'ai'
-import estimateTextTokens from '@/utils/estimate-text-tokens'
+import { redactImageDataURLs } from '@/utils/redact-image-data-urls'
+import estimateModelMessageTokens, {
+  isImagePartLike,
+} from './estimate-model-message-tokens'
 import modelMessageText from './model-message-text'
 
 const CHARS_PER_TOKEN = 4
@@ -16,19 +19,75 @@ const omittedFilePart = (): { type: 'text'; text: string } => ({
   text: FILE_OMITTED_PLACEHOLDER,
 })
 
-export const omitCompactFileParts = (message: ModelMessage): ModelMessage => {
+type OmitOptions = { keepImages?: boolean }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const omitToolImageOutput = (part: ToolResultPart): ToolResultPart => {
+  if (part.output.type === 'content') {
+    let changed = false
+    const value = part.output.value.map((item) => {
+      if (isRecord(item) && isImagePartLike(item)) {
+        changed = true
+        return omittedFilePart()
+      }
+      return item
+    })
+    return changed
+      ? { ...part, output: { ...part.output, value } }
+      : part
+  }
+  if (
+    (part.output.type === 'text' || part.output.type === 'error-text') &&
+    part.output.value.includes('data:image')
+  ) {
+    return {
+      ...part,
+      output: {
+        ...part.output,
+        value: redactImageDataURLs(part.output.value, () => FILE_OMITTED_PLACEHOLDER),
+      },
+    }
+  }
+  return part
+}
+
+const omitToolContentParts = (content: ToolContent): ToolContent => {
+  let changed = false
+  const next = content.map((part) => {
+    if (part.type !== 'tool-result') {
+      return part
+    }
+    const omitted = omitToolImageOutput(part)
+    if (omitted !== part) {
+      changed = true
+    }
+    return omitted
+  })
+  return changed ? next : content
+}
+
+export const omitCompactFileParts = (
+  message: ModelMessage,
+  options: OmitOptions = {},
+): ModelMessage => {
   if (typeof message.content === 'string') {
     return message
   }
+  const keepImages = options.keepImages === true
 
   if (message.role === 'user') {
     let changed = false
     const content = message.content.map((part) => {
-      if (part.type === 'file' || part.type === 'image') {
-        changed = true
-        return omittedFilePart()
+      if (part.type !== 'file' && part.type !== 'image') {
+        return part
       }
-      return part
+      if (keepImages && isImagePartLike(part)) {
+        return part
+      }
+      changed = true
+      return omittedFilePart()
     })
     return changed ? { ...message, content } : message
   }
@@ -36,13 +95,21 @@ export const omitCompactFileParts = (message: ModelMessage): ModelMessage => {
   if (message.role === 'assistant') {
     let changed = false
     const content = message.content.map((part) => {
-      if (part.type === 'file' || part.type === 'reasoning-file') {
-        changed = true
-        return omittedFilePart()
+      if (part.type !== 'file' && part.type !== 'reasoning-file') {
+        return part
       }
-      return part
+      if (keepImages && isImagePartLike(part)) {
+        return part
+      }
+      changed = true
+      return omittedFilePart()
     })
     return changed ? { ...message, content } : message
+  }
+
+  if (message.role === 'tool') {
+    const content = omitToolContentParts(message.content)
+    return content === message.content ? message : { ...message, content }
   }
 
   return message
@@ -99,7 +166,7 @@ const truncateToolContent = (
 export default (message: ModelMessage, maxTokens: number): ModelMessage => {
   const next = omitCompactFileParts(message)
   const serialized = JSON.stringify(next)
-  if (estimateTextTokens(serialized) <= maxTokens) {
+  if (estimateModelMessageTokens(next) <= maxTokens) {
     return next
   }
 

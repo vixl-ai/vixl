@@ -220,6 +220,58 @@ describe('runCompactRewrite', () => {
     )
   })
 
+  it('does not skip the checkpoint for images and prunes old ones from the summarizer', async () => {
+    generateCheckpoint.mockResolvedValue({
+      summary: 'Short recap',
+      usage: { inputTokens: 2, outputTokens: 1 },
+      providerMetadata: undefined,
+      responseId: 'r-images',
+      modelRef,
+    })
+    const imageUser = (payload: string): ModelMessage => ({
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Look at this render.' },
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          data: `data:image/png;base64,${payload.repeat(30_000)}`,
+        },
+      ],
+    })
+    const messages: ModelMessage[] = [
+      imageUser('A'),
+      { role: 'assistant', content: 'Adjusting the shader.' },
+      imageUser('B'),
+    ]
+
+    const result = await runCompactRewrite({
+      checkpointInput: checkpointInput(messages),
+      system,
+      messages,
+      highWater,
+      hardWindow: 30_000,
+    })
+
+    // Base64 bytes no longer inflate the estimate past the hard window.
+    expect(generateCheckpoint).toHaveBeenCalledTimes(1)
+    expect(result.compacted?.responseId).toBe('r-images')
+
+    const summarizerInput = JSON.stringify(
+      generateCheckpoint.mock.calls[0]?.[0],
+    )
+    expect(summarizerInput).not.toContain('A'.repeat(1000))
+    expect(summarizerInput).toContain('B'.repeat(1000))
+    expect(summarizerInput).toContain('[image omitted by compaction]')
+
+    const serialized = JSON.stringify(result.messages)
+    expect(serialized).not.toContain('A'.repeat(1000))
+    expect(serialized).toContain('B'.repeat(1000))
+    expect(estimatePromptTokens(system, result.messages)).toBeLessThanOrEqual(
+      highWater,
+    )
+  })
+
   it('rewrites a finished-task transcript without dropping tail work for a screenshot question', async () => {
     const summary = [
       'Goal: Deliver RCA for the login refresh incident.',
@@ -282,8 +334,10 @@ describe('runCompactRewrite', () => {
     expect(firstContent).not.toContain('email thread '.repeat(5_000))
 
     const serialized = JSON.stringify(result.messages)
-    expect(serialized).not.toContain('A'.repeat(1000))
-    expect(serialized).toContain('[image omitted by compaction]')
+    // The newest screenshot is retained: image payloads are pixel-cost bounded
+    // now, so compaction keeps the one the agent needs to act on.
+    expect(serialized).toContain('A'.repeat(1000))
+    expect(serialized).not.toContain('[image omitted by compaction]')
     expect(serialized).toContain('Does this screenshot match the RCA?')
     expect(serialized).toContain(
       'RCA is complete. Login refresh regression is in place.',

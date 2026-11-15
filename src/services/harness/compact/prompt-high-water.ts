@@ -7,6 +7,7 @@ import {
   resolveModelCallOptions,
 } from '@/services/models/resolve-model-call-options'
 import estimateTextTokens from '@/utils/estimate-text-tokens'
+import estimateModelMessageTokens from './estimate-model-message-tokens'
 
 const HIGH_WATER_RATIO = 0.7
 
@@ -15,10 +16,7 @@ export const estimatePromptTokens = (
   messages: ModelMessage[],
 ): number =>
   estimateTextTokens(system) +
-  messages.reduce(
-    (sum, message) => sum + estimateTextTokens(JSON.stringify(message)),
-    0,
-  )
+  messages.reduce((sum, message) => sum + estimateModelMessageTokens(message), 0)
 
 export const resolveCompactWindow = (
   settings: VixlSettings,

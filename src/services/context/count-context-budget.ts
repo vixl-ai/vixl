@@ -8,6 +8,7 @@ import type { PrefixSnapshot } from '@/types/harness/prefix-snapshot'
 import type { HarnessWorkspaceMember } from '@/types/harness/harness-workspace'
 import { CONTEXT_BUCKET_META, CONTEXT_BUCKET_ORDER } from '@/types/harness/context-bucket-meta'
 import estimateTextTokens from '@/utils/estimate-text-tokens'
+import { redactImageDataURLsWithTokens } from '@/utils/redact-image-data-urls'
 import assembleSystemPromptParts from '@/services/context/system-prompt-parts/assemble'
 import buildMentionInjectionText from '@/services/context/system-prompt-parts/build-mention-injection-text'
 import type { SystemPromptParts } from '@/services/context/system-prompt-parts/types'
@@ -177,6 +178,12 @@ export default async (input: CountContextBudgetInput): Promise<ContextBudget> =>
   // Tools counts builtin definition schemas; mcp counts thin catalog spines in the prefix.
   // Full MCP schemas arrive as tool results and are counted in messages via timeline serialization.
   // Conversation prefers timeline serialization so tool args and results count; chatStore.messages only keeps assistant text and reasoning.
+  // Base64 image payloads must not be charged as text: replace them with
+  // labels and add their bounded pixel-based cost back as image tokens.
+  const conversation = serializeConversation(input)
+  const { text: conversationText, imageTokens } =
+    redactImageDataURLsWithTokens(conversation)
+
   const bucketTokens: Record<ContextBucketId, number> = {
     system: estimateTextTokens(parts.base) + estimateTextTokens(parts.tools),
     tools: builtinToolSchemas,
@@ -185,7 +192,7 @@ export default async (input: CountContextBudgetInput): Promise<ContextBudget> =>
     skills: estimateTextTokens(parts.skills),
     mentions: resolveMentionsTokens(parts, input.mentions),
     subagentDefinitions: estimateTextTokens(parts.subagents),
-    messages: estimateTextTokens(serializeConversation(input)),
+    messages: estimateTextTokens(conversationText) + imageTokens,
   }
 
   const buckets = CONTEXT_BUCKET_ORDER.map((id) => buildBucket(id, bucketTokens[id]))

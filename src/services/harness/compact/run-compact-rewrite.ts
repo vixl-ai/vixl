@@ -6,6 +6,7 @@ import type {
 import boundRewrittenMessages from './bound-rewritten-messages'
 import buildFallbackCheckpoint from './build-fallback-checkpoint'
 import generateCheckpoint from './generate-checkpoint'
+import pruneOldImages from './prune-old-images'
 import { estimatePromptTokens } from './prompt-high-water'
 import repairToolPairing from './repair-tool-pairing'
 import rewriteModelMessages from './rewrite-model-messages'
@@ -62,20 +63,24 @@ export default async (
   const finalizeSummary = (raw: string): string =>
     input.transformSummary ? input.transformSummary(raw) : raw
 
+  // The summarizer never needs stale screenshots; keep only the latest image.
+  const checkpointInput: GenerateCheckpointInput = {
+    ...input.checkpointInput,
+    messages: pruneOldImages(input.checkpointInput.messages),
+  }
+
   if (skipGenerate) {
     summary = finalizeSummary(buildFallbackCheckpoint(input.messages))
   } else {
     try {
-      compacted = await generateCheckpoint(input.checkpointInput)
+      compacted = await generateCheckpoint(checkpointInput)
       summary = finalizeSummary(compacted.summary)
     } catch (error) {
       if (input.checkpointInput.signal.aborted) {
         throw error
       }
       try {
-        compacted = await generateCheckpoint(
-          withRetryNote(input.checkpointInput),
-        )
+        compacted = await generateCheckpoint(withRetryNote(checkpointInput))
         summary = finalizeSummary(compacted.summary)
       } catch (retryError) {
         if (input.checkpointInput.signal.aborted) {
