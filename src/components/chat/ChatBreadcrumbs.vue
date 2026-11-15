@@ -16,7 +16,6 @@ import { HOME_CHAT_SLUG, isHomeChatSlug } from '@/constants/home-chat'
 import chatRouteFor from '@/utils/chat-route-for'
 import { findSidebarProject } from '@/utils/find-sidebar-project'
 import projectRouteFor from '@/utils/project-route-for'
-import formatModelLabelFromRef from '@/utils/format-model-label-from-ref'
 
 const route = useRoute()
 const fleet = useFleetRegistry()
@@ -94,12 +93,7 @@ const subagentTitle = computed(() => {
     return null
   }
   const item = chatStore.forChat(projectSlug.value, chatId.value).getSubagent(subagentId.value)
-  const name = item?.name?.trim() || 'Sub-agent'
-  const modelLabel = formatModelLabelFromRef(item?.model)
-  if (!modelLabel) {
-    return name
-  }
-  return `${name} on ${modelLabel}`
+  return item?.name?.trim() || 'Sub-agent'
 })
 
 const parentChatTo = computed(() => chatRouteFor(projectSlug.value, chatId.value))
