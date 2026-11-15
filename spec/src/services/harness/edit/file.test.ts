@@ -54,6 +54,7 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
 )
 
 import editFile from '@/services/harness/edit/file'
+import { takeToolDiff } from '@/services/harness/shared/tool-diff-handoff'
 
 const previewDiff: FileDiff = {
   path: 'src/main.ts',
@@ -114,7 +115,7 @@ describe('edit_file', () => {
     fsEditFile.mockResolvedValue(appliedDiff)
   })
 
-  it('returns the post-apply diff instead of the preview diff', async () => {
+  it('returns terse counts and hands the post-apply diff to the UI channel', async () => {
     const result = await execute(
       editFile(baseCtx()),
       { path: 'src/main.ts', old_string: 'before', new_string: 'landed' },
@@ -123,8 +124,12 @@ describe('edit_file', () => {
     expect(result).toEqual({
       ok: true,
       path: 'src/main.ts',
-      diffs: [appliedDiff],
+      operation: 'edit',
+      added: 1,
+      removed: 1,
     })
+    expect(JSON.stringify(result)).not.toContain('landed')
+    expect(takeToolDiff('call-1')).toEqual([appliedDiff])
     expect(gateToolPermission).toHaveBeenCalledWith(
       expect.objectContaining({
         diff: [previewDiff],

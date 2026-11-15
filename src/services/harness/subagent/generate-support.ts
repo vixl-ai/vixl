@@ -7,6 +7,10 @@ import {
   nowIso,
   resolveToolErrorMessage,
 } from '@/services/harness/orchestrator/helpers'
+import {
+  discardToolDiff,
+  takeToolDiff,
+} from '@/services/harness/shared/tool-diff-handoff'
 import { withTerminalOutputDescription } from '@/services/harness/shell/with-terminal-output-description'
 import { getSubagent, setMessages } from '@/services/harness/subagent/registry'
 import {
@@ -58,7 +62,12 @@ export const createSubagentToolExecutionHooks = (args: {
       toolCall.input,
       isError,
     )
-    const diffs = isError ? undefined : deriveToolDiffs(toolResult)
+    if (isError) {
+      discardToolDiff(toolCall.toolCallId)
+    }
+    const diffs = isError
+      ? undefined
+      : (takeToolDiff(toolCall.toolCallId) ?? deriveToolDiffs(toolResult))
     args.emitNestedEvent({
       type: 'tool-result',
       toolCallId: toolCall.toolCallId,

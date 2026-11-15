@@ -3,6 +3,7 @@ import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
 import { mockVixlTauri } from '../../../test-utils/mocks/vixl-tauri'
+import { takeToolDiff } from '@/services/harness/shared/tool-diff-handoff'
 
 const fsStagePreviewWrite = vi.fn<
   (args: { projectRoot: string; path: string; content: string }) => Promise<FileDiff[]>
@@ -331,8 +332,11 @@ describe('build-tools stage preview wiring', () => {
     expect(result).toEqual({
       ok: true,
       paths: ['src/gone.ts'],
-      diffs: [deleteDiff],
+      files: 1,
+      added: 0,
+      removed: 0,
     })
+    expect(takeToolDiff('tc-delete')).toEqual([deleteDiff])
   })
 
   it('apply_patch does not apply when a delete gate rejects', async () => {
@@ -361,7 +365,7 @@ describe('build-tools stage preview wiring', () => {
     expect(fsApplyPatch).not.toHaveBeenCalled()
   })
 
-  it('apply_patch returns hunks without file bodies and still gates with bodies', async () => {
+  it('apply_patch keeps file bodies out of the model result and hands them to the UI diff channel', async () => {
     const hunks = [
       {
         oldStart: 1,
@@ -403,17 +407,17 @@ describe('build-tools stage preview wiring', () => {
     expect(result).toEqual({
       ok: true,
       paths: ['src/main.ts'],
-      diffs: [
-        {
-          path: 'src/main.ts',
-          operation: 'update',
-          hunks,
-        },
-      ],
+      files: 1,
+      added: 1,
+      removed: 1,
     })
-    const returnedDiff = (result as { diffs: FileDiff[] }).diffs[0]
-    expect(returnedDiff).not.toHaveProperty('oldContent')
-    expect(returnedDiff).not.toHaveProperty('newContent')
+    expect(JSON.stringify(result)).not.toContain('newContent')
+    const handedOff = takeToolDiff('tc-bodies')
+    expect(handedOff).toHaveLength(1)
+    expect(handedOff?.[0]?.path).toBe('src/main.ts')
+    expect(handedOff?.[0]?.oldContent).toBe('old')
+    expect(handedOff?.[0]?.newContent).toBe('new')
+    expect(handedOff?.[0]?.hunks).toEqual(hunks)
   })
 })
 

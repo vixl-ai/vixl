@@ -6,6 +6,7 @@ import { fsWriteCapability } from '@/services/harness/permission/policy'
 import captureBaselinesBeforeMutate from '@/services/harness/capture-baselines-before-mutate'
 import mapDiffs from '@/services/harness/shared/map-diffs'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
+import { diffCounts, recordToolDiff } from '@/services/harness/shared/tool-diff-handoff'
 import {
   permissionPath,
   sensitiveCheckPaths,
@@ -75,7 +76,8 @@ const editFile = (ctx: HarnessToolContext) =>
         )
         const diffs = mapDiffs([applied])
         const resultPath = diffs[0]?.path ?? path
-        return { ok: true, path: resultPath, diffs }
+        recordToolDiff(toolCallId, diffs)
+        return { ok: true, path: resultPath, operation: 'edit', ...diffCounts(diffs) }
       })
     },
   })

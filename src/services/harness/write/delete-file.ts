@@ -8,6 +8,7 @@ import captureBaselinesBeforeMutate, {
 } from '@/services/harness/capture-baselines-before-mutate'
 import mapDiffs from '@/services/harness/shared/map-diffs'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
+import { diffCounts, recordToolDiff } from '@/services/harness/shared/tool-diff-handoff'
 import {
   ipcProjectRoots,
   notifyWorkspaceMutations,
@@ -122,7 +123,8 @@ const deleteFile = (ctx: HarnessToolContext) =>
       )
       notifyWorkspaceMutations(ctx, [gatedPath])
       const resultPath = recursiveDir ? gatedPath : (diffs[0]?.path ?? gatedPath)
-      return { ok: true, path: resultPath, diffs }
+      recordToolDiff(toolCallId, diffs)
+      return { ok: true, path: resultPath, operation: 'delete', ...diffCounts(diffs) }
     },
   })
 
