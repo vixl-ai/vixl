@@ -135,20 +135,51 @@ pub(crate) fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, String> {
     Ok(operations)
 }
 
+/// Characters of an unanchored hunk line quoted in a mismatch error.
+const CONTEXT_SNIPPET_LIMIT: usize = 60;
+
+fn context_mismatch(target: &str) -> String {
+    let total = target.chars().count();
+    let quoted: String = target.chars().take(CONTEXT_SNIPPET_LIMIT).collect();
+    let ellipsis = if total > CONTEXT_SNIPPET_LIMIT {
+        "…"
+    } else {
+        ""
+    };
+    format!("Patch context does not match file contents: no line matching \"{quoted}{ellipsis}\"")
+}
+
+fn find_next(old_lines: &[&str], from: usize, target: &str) -> Option<usize> {
+    (from..old_lines.len()).find(|&index| old_lines[index] == target)
+}
+
 fn seek_matching_line<'a>(
     old_lines: &[&'a str],
     old_index: &mut usize,
     target: &str,
     result: &mut Vec<&'a str>,
 ) -> Result<(), String> {
-    while *old_index < old_lines.len() && old_lines[*old_index] != target {
-        result.push(old_lines[*old_index]);
-        *old_index += 1;
+    match find_next(old_lines, *old_index, target) {
+        Some(index) => {
+            result.extend_from_slice(&old_lines[*old_index..index]);
+            *old_index = index;
+            Ok(())
+        }
+        None => Err(context_mismatch(target)),
     }
-    if *old_index >= old_lines.len() {
-        return Err("Patch context does not match file contents".to_string());
-    }
-    Ok(())
+}
+
+/// Locate a context line at or after `from`. Hunk context is matched verbatim first, then with a single
+/// leading space dropped, because a context line may be written either as the file's own text or with
+/// the marker a model emits ahead of it. Verbatim wins so hunks that anchor today keep anchoring
+/// identically; callers emit the file's line, never the patch's, so a marker cannot leak into output.
+fn resolve_context<'a>(old_lines: &[&'a str], from: usize, raw: &str) -> Option<(&'a str, usize)> {
+    find_next(old_lines, from, raw)
+        .or_else(|| {
+            raw.strip_prefix(' ')
+                .and_then(|unmarked| find_next(old_lines, from, unmarked))
+        })
+        .map(|index| (old_lines[index], index))
 }
 
 pub(crate) fn apply_update_patch<'a>(
@@ -178,9 +209,12 @@ pub(crate) fn apply_update_patch<'a>(
             patch_index += 1;
             continue;
         }
-        seek_matching_line(&old_lines, &mut old_index, line, &mut result)?;
-        result.push(line);
-        old_index += 1;
+        let Some((context_line, matched_at)) = resolve_context(&old_lines, old_index, line) else {
+            return Err(context_mismatch(line));
+        };
+        result.extend_from_slice(&old_lines[old_index..matched_at]);
+        result.push(context_line);
+        old_index = matched_at + 1;
         patch_index += 1;
     }
 
@@ -324,7 +358,8 @@ fn preview_one(
             reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
             let old_content =
                 fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
-            let new_content = apply_update_patch(&old_content, &content)?;
+            let new_content = apply_update_patch(&old_content, &content)
+                .map_err(|error| format!("{}: {error}", resolved.reported_path()))?;
             Ok(build_file_diff(
                 resolved.reported_path(),
                 "update",
@@ -392,7 +427,8 @@ fn apply_one(
             reject_resolved_sensitive_path_unless_allowed(&resolved, allow_sensitive)?;
             let old_content =
                 fs::read_to_string(&resolved.path).map_err(|error| error.to_string())?;
-            let new_content = apply_update_patch(&old_content, &content)?;
+            let new_content = apply_update_patch(&old_content, &content)
+                .map_err(|error| format!("{}: {error}", resolved.reported_path()))?;
             fs::write(&resolved.path, &new_content).map_err(|error| error.to_string())?;
             Ok(build_file_diff(
                 resolved.reported_path(),
@@ -675,7 +711,67 @@ mod tests {
         let existing = "hello\nworld";
         let patched = "@@\n-missing\n+x";
         let error = apply_update_patch(existing, patched).expect_err("mismatch");
-        assert_eq!(error, "Patch context does not match file contents");
+        assert!(error.starts_with("Patch context does not match file contents"));
+    }
+
+    #[test]
+    fn marked_context_matches_without_leaking_the_marker() {
+        let existing = "alpha\n    leg_rx = [9.2, 8.4]\nbeta\n";
+        let patched = "@@\n alpha\n     leg_rx = [9.2, 8.4]\n-beta\n+gamma";
+        let result = apply_update_patch(existing, patched).expect("marked context");
+        assert_eq!(result, "alpha\n    leg_rx = [9.2, 8.4]\ngamma\n");
+    }
+
+    #[test]
+    fn marked_blank_context_matches_an_empty_line() {
+        let existing = "a\n\nc\n";
+        let patched = "@@\n a\n \n-c\n+C";
+        let result = apply_update_patch(existing, patched).expect("marked blank context");
+        assert_eq!(result, "a\n\nC\n");
+    }
+
+    #[test]
+    fn verbatim_context_wins_over_the_marker_fallback() {
+        let existing = "keep\n b\nmid\nb\ntarget\n";
+        let patched = "@@\n b\n-mid\n+X";
+        let result = apply_update_patch(existing, patched).expect("verbatim anchor");
+        assert_eq!(result, "keep\n b\nX\nb\ntarget\n");
+    }
+
+    #[test]
+    fn marked_context_absent_in_both_forms_still_errors() {
+        let existing = "hello\nworld";
+        let patched = "@@\n   missing\n-hello\n+x";
+        let error = apply_update_patch(existing, patched).expect_err("marked mismatch");
+        assert!(error.starts_with("Patch context does not match file contents"));
+        assert!(error.contains("missing"));
+    }
+
+    #[test]
+    fn marked_hunk_with_line_numbers_applies_to_indented_code() {
+        let existing = concat!(
+            "leg_secs = [\n",
+            "    (6.05, 0.0, 47.5), (6.15, -0.25, 40.0),\n",
+            "    (6.55, 0.0, 16.0), (6.6, 0.3, 11.0),\n",
+            "]\n",
+            "leg_rx = [9.2, 8.4, 7.0]\n",
+            "leg_ry = [9.6, 8.7, 7.3]\n",
+            "leg_r = path_loft(\"CHR_leg_R\", P(leg_secs), R(leg_rx), R(leg_ry))\n",
+        );
+        let patched = concat!(
+            "@@ -6,7 +6,7 @@\n",
+            "     (6.55, 0.0, 16.0), (6.6, 0.3, 11.0),\n",
+            " ]\n",
+            "-leg_rx = [9.2, 8.4, 7.0]\n",
+            "+leg_rx = [9.4, 8.4, 7.0]\n",
+            "-leg_ry = [9.6, 8.7, 7.3]\n",
+            "+leg_ry = [9.8, 8.7, 7.3]\n",
+            " leg_r = path_loft(\"CHR_leg_R\", P(leg_secs), R(leg_rx), R(leg_ry))\n",
+        );
+        let result = apply_update_patch(existing, patched).expect("marked hunk");
+        assert!(result.starts_with("leg_secs = [\n    (6.05, 0.0, 47.5)"));
+        assert!(result.contains("\n    (6.55, 0.0, 16.0), (6.6, 0.3, 11.0),\n]\n"));
+        assert!(result.contains("leg_rx = [9.4, 8.4, 7.0]\nleg_ry = [9.8, 8.7, 7.3]\n"));
     }
 
     #[test]
@@ -708,6 +804,22 @@ mod tests {
         match &operations[..] {
             [PatchOperation::Add { content, .. }] => assert_eq!(content, "hello\n"),
             _ => panic!("expected a single Add operation"),
+        }
+    }
+
+    #[test]
+    fn add_file_body_keeps_interior_blank_lines() {
+        for patch in [
+            "*** Add File: p.py\n+a = [\n+\n+    1,\n+]",
+            "*** Add File: p.py\n+a = [\n\n+    1,\n+]",
+        ] {
+            let operations = parse_patch(patch).expect("add file with blank line");
+            match &operations[..] {
+                [PatchOperation::Add { content, .. }] => {
+                    assert_eq!(content, "a = [\n\n    1,\n]\n");
+                }
+                _ => panic!("expected a single Add operation"),
+            }
         }
     }
 

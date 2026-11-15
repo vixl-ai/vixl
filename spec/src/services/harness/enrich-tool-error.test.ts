@@ -12,6 +12,14 @@ describe('enrich-tool-error', () => {
     expect(result).toBe('Something unexpected happened')
   })
 
+  it('adds a hint when a patch hunk fails to anchor', () => {
+    const result = enrichToolError(
+      'src/a.py: Patch context does not match file contents: no line matching "     leg_rx = [9.2]"',
+    )
+    expect(result).toContain('Hint:')
+    expect(result).toContain('leading space')
+  })
+
   it('does not prefer edit_file on SANDBOX_ jail errors', () => {
     const result = enrichToolError(
       'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (isolated devices). Isolated /dev has no block devices. Command failed (exit 1): lsblk not available',
