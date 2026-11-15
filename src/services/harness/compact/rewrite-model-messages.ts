@@ -1,12 +1,14 @@
 import type { ModelMessage } from 'ai'
-import estimateTextTokens from '@/utils/estimate-text-tokens'
 import compactBudgets from './budgets'
+import estimateModelMessageTokens, {
+  messageHasImagePart,
+} from './estimate-model-message-tokens'
 import truncateModelMessage, {
   omitCompactFileParts,
 } from './truncate-model-message'
 
 const estimateMessageTokens = (message: ModelMessage): number =>
-  estimateTextTokens(JSON.stringify(message))
+  estimateModelMessageTokens(message)
 
 const hasAssistantText = (message: ModelMessage): boolean => {
   if (message.role !== 'assistant') {
@@ -80,7 +82,12 @@ const frameFirstUser = (message: ModelMessage): ModelMessage => {
 }
 
 export default (messages: ModelMessage[], summary: string): ModelMessage[] => {
-  const normalized = messages.map(omitCompactFileParts)
+  // Keep the most recent image alive through compaction so the agent can act
+  // on the latest screenshot; older image payloads are placeholders.
+  const lastImageIndex = lastIndexWhere(messages, messageHasImagePart)
+  const normalized = messages.map((message, index) =>
+    omitCompactFileParts(message, { keepImages: index === lastImageIndex }),
+  )
   const firstUserIndex = normalized.findIndex(
     (message) => message.role === 'user' && !isCheckpointUser(message),
   )

@@ -421,4 +421,39 @@ describe('countContextBudget', () => {
       timelineAndMessages.buckets.find((bucket) => bucket.id === 'messages')?.tokens ?? 0
     expect(bothTokens).toBe(onlyTokens)
   })
+
+  it('charges base64 image parts at bounded pixel cost, not char cost', async () => {
+    const imageUser: UIMessage = {
+      id: 'img-1',
+      role: 'user',
+      parts: [
+        { type: 'text', text: 'Reference render attached.' },
+        {
+          type: 'file',
+          url: `data:image/png;base64,${'A'.repeat(2_000_000)}`,
+          mediaType: 'image/png',
+          filename: 'ref.png',
+        },
+      ],
+      metadata: { createdAt: '2026-01-04T00:00:00.000Z' },
+    }
+
+    const budget = await countContextBudget({
+      modelId: 'gpt-4.1',
+      mode: 'agent',
+      projectName: 'demo',
+      projectRoot: '/tmp/demo',
+      mentions: [],
+      messages: [
+        message('1', '2026-01-01T00:00:00.000Z', 'x'.repeat(4000)),
+        imageUser,
+      ],
+    })
+
+    const tokens =
+      budget.buckets.find((bucket) => bucket.id === 'messages')?.tokens ?? 0
+    // Text ~1000 + one unknown image 1600, instead of ~500K from the blob.
+    expect(tokens).toBeGreaterThan(2_000)
+    expect(tokens).toBeLessThan(4_000)
+  })
 })

@@ -63,33 +63,43 @@ describe('rewriteModelMessages', () => {
     expect(rewritten).toContain(onlyAssistant)
   })
 
-  it('replaces file parts with a placeholder so a screenshot cannot consume the window', () => {
+  it('keeps the newest image and placeholders older screenshots', () => {
     const firstTask = user('Spawn: find the auth bug in login.')
-    const olderAssistant = assistant('The token refresh path is stale.')
-    const imageUser: ModelMessage = {
+    const olderImageUser: ModelMessage = {
       role: 'user',
       content: [
-        { type: 'text', text: 'See this screenshot.' },
+        { type: 'text', text: 'Inspect this old screenshot.' },
         {
           type: 'file',
           mediaType: 'image/png',
-          data: 'A'.repeat(300_000),
+          data: 'A'.repeat(8_000),
+        },
+      ],
+    }
+    const newestImageUser: ModelMessage = {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Inspect this latest screenshot.' },
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          data: 'B'.repeat(8_000),
         },
       ],
     }
     const summary = 'Auth login fails when the token is expired.'
 
     const rewritten = rewriteModelMessages(
-      [firstTask, olderAssistant, imageUser],
+      [firstTask, olderImageUser, newestImageUser],
       summary,
     )
 
-    expect(JSON.stringify(rewritten)).not.toContain('A'.repeat(1000))
-    expect(JSON.stringify(rewritten)).toContain(
-      '[image omitted by compaction]',
-    )
-    expect(rewritten).toContain(olderAssistant)
-    expect(rewritten.some((message) => message === imageUser)).toBe(false)
+    const serialized = JSON.stringify(rewritten)
+    expect(serialized).not.toContain('A'.repeat(1000))
+    expect(serialized).toContain('[image omitted by compaction]')
+    expect(serialized).toContain('B'.repeat(1000))
+    expect(serialized).toContain('Inspect this latest screenshot.')
+    expect(rewritten).toContain(newestImageUser)
   })
 
   it('skips an oversize middle message instead of dropping older recent turns', () => {

@@ -60,6 +60,74 @@ describe('omitCompactFileParts', () => {
     const message: ModelMessage = { role: 'user', content: 'plain' }
     expect(omitCompactFileParts(message)).toBe(message)
   })
+
+  it('omits images nested in tool-result content outputs', () => {
+    const message: ModelMessage = {
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: 'call-1',
+          toolName: 'blender_look',
+          output: {
+            type: 'content',
+            value: [
+              { type: 'text', text: 'viewport' },
+              {
+                type: 'file',
+                mediaType: 'image/png',
+                data: { type: 'data', data: 'A'.repeat(8_000) },
+              },
+            ],
+          },
+        },
+      ],
+    }
+
+    const omitted = omitCompactFileParts(message)
+
+    expect(JSON.stringify(omitted)).not.toContain('A'.repeat(1000))
+    expect(JSON.stringify(omitted)).toContain('[image omitted by compaction]')
+    expect(JSON.stringify(omitted)).toContain('viewport')
+    expect(omitted).not.toBe(message)
+  })
+
+  it('redacts data URLs in text tool outputs', () => {
+    const message: ModelMessage = {
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: 'call-1',
+          toolName: 'blender_look',
+          output: {
+            type: 'text',
+            value: `shot: data:image/png;base64,${'B'.repeat(8_000)}`,
+          },
+        },
+      ],
+    }
+
+    expect(JSON.stringify(omitCompactFileParts(message))).not.toContain(
+      'B'.repeat(1000),
+    )
+  })
+
+  it('keeps image parts when keepImages is set but drops other files', () => {
+    const message: ModelMessage = {
+      role: 'user',
+      content: [
+        { type: 'file', mediaType: 'image/png', data: 'A'.repeat(8_000) },
+        { type: 'file', mediaType: 'application/pdf', data: 'B'.repeat(8_000) },
+      ],
+    }
+
+    const kept = omitCompactFileParts(message, { keepImages: true })
+
+    expect(JSON.stringify(kept)).toContain('A'.repeat(1000))
+    expect(JSON.stringify(kept)).not.toContain('B'.repeat(1000))
+    expect(JSON.stringify(kept)).toContain('[image omitted by compaction]')
+  })
 })
 
 describe('truncateModelMessage', () => {
