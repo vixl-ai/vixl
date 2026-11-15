@@ -75,6 +75,7 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
 )
 
 import deleteFile from '@/services/harness/write/delete-file'
+import { takeToolDiff } from '@/services/harness/shared/tool-diff-handoff'
 
 const emptyDiff = (path: string, operation: FileDiff['operation']): FileDiff => ({
   path,
@@ -232,11 +233,14 @@ describe('delete_file recursive directory checkpoints', () => {
     expect(result).toEqual({
       ok: true,
       path: 'eval-dir',
-      diffs: [
-        emptyDiff('eval-dir/a.md', 'delete'),
-        emptyDiff('eval-dir/nested/b.md', 'delete'),
-      ],
+      operation: 'delete',
+      added: 0,
+      removed: 0,
     })
+    expect(takeToolDiff('call-1')).toEqual([
+      emptyDiff('eval-dir/a.md', 'delete'),
+      emptyDiff('eval-dir/nested/b.md', 'delete'),
+    ])
   })
 
   it('refuses recursive delete when capture skips oversize files', async () => {
@@ -297,11 +301,14 @@ describe('delete_file recursive directory checkpoints', () => {
     expect(result).toEqual({
       ok: true,
       path: 'rpg-test/eval-dir',
-      diffs: [
-        emptyDiff('rpg-test/eval-dir/a.md', 'delete'),
-        emptyDiff('rpg-test/eval-dir/nested/b.md', 'delete'),
-      ],
+      operation: 'delete',
+      added: 0,
+      removed: 0,
     })
+    expect(takeToolDiff('call-1')).toEqual([
+      emptyDiff('rpg-test/eval-dir/a.md', 'delete'),
+      emptyDiff('rpg-test/eval-dir/nested/b.md', 'delete'),
+    ])
   })
 
   it('does not capture a directory when recursive is absent', async () => {
@@ -322,8 +329,11 @@ describe('delete_file recursive directory checkpoints', () => {
     expect(result).toEqual({
       ok: true,
       path: 'eval-dir',
-      diffs: [emptyDiff('eval-dir', 'delete')],
+      operation: 'delete',
+      added: 0,
+      removed: 0,
     })
+    expect(takeToolDiff('call-1')).toEqual([emptyDiff('eval-dir', 'delete')])
   })
 
   it('feeds per-file diffs into revert aggregation', async () => {
@@ -338,10 +348,11 @@ describe('delete_file recursive directory checkpoints', () => {
       skippedOversize: [],
     })
 
-    const result = (await execute(deleteFile(baseCtx()), {
+    await execute(deleteFile(baseCtx()), {
       path: 'eval-dir',
       recursive: true,
-    })) as { diffs: FileDiff[] }
+    })
+    const diffs = takeToolDiff('call-1') ?? []
 
     const timeline: ChatTimelineItem[] = [
       {
@@ -354,7 +365,7 @@ describe('delete_file recursive directory checkpoints', () => {
       },
       {
         type: 'agent-turn',
-        turn: turnFromDiffs('t1', result.diffs),
+        turn: turnFromDiffs('t1', diffs),
       },
     ]
 

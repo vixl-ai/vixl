@@ -9,6 +9,7 @@ import {
 import captureBaselinesBeforeMutate from '@/services/harness/capture-baselines-before-mutate'
 import mapDiffs from '@/services/harness/shared/map-diffs'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
+import { diffCounts, recordToolDiff } from '@/services/harness/shared/tool-diff-handoff'
 import {
   notifyWorkspaceMutations,
   permissionPath,
@@ -86,14 +87,12 @@ const applyPatch = (ctx: HarnessToolContext) =>
         withProjectRoots({ projectRoot: ctx.projectRoot, patch, allowSensitive: true }, ctx),
       )
       notifyWorkspaceMutations(ctx, gatedPaths)
+      recordToolDiff(toolCallId, diffs)
       return {
         ok: true,
         paths,
-        diffs: diffs.map((diff) => ({
-          path: diff.path,
-          operation: diff.operation,
-          hunks: diff.hunks,
-        })),
+        files: paths.length,
+        ...diffCounts(diffs),
       }
     },
   })

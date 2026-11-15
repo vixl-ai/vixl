@@ -4,6 +4,7 @@ import deriveToolArtifact from '@/services/harness/derive-tool-artifact'
 import parseTodoUpdate from '@/services/harness/parse-todo-update'
 import { withTerminalOutputDescription } from '@/services/harness/shell/with-terminal-output-description'
 import truncateToolResult from '@/utils/truncate-tool-result'
+import { discardToolDiff, takeToolDiff } from '@/services/harness/shared/tool-diff-handoff'
 import { deriveToolDiffs } from './helpers'
 import {
   persistStepBoundary,
@@ -132,7 +133,12 @@ export default (options: StepControllerOptions) => {
     completedToolIds.add(toolCallId)
     const truncated = isError ? result : truncateToolResult(result)
     const artifact = deriveToolArtifact(name, truncated, args, isError)
-    const diffs = isError ? undefined : deriveToolDiffs(truncated)
+    if (isError) {
+      discardToolDiff(toolCallId)
+    }
+    const diffs = isError
+      ? undefined
+      : (takeToolDiff(toolCallId) ?? deriveToolDiffs(truncated))
     onEvent({
       type: 'tool-result',
       toolCallId,

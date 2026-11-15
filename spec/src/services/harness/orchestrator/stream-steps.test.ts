@@ -22,6 +22,7 @@ vi.mock('@/services/harness/orchestrator/persistence', () => ({
 }))
 
 import createStreamSteps from '@/services/harness/orchestrator/stream-steps'
+import { recordToolDiff, takeToolDiff } from '@/services/harness/shared/tool-diff-handoff'
 
 describe('stream-steps live workspace persist', () => {
   beforeEach(() => {
@@ -191,5 +192,71 @@ describe('stream-steps reasoning duration', () => {
 
     expect(durationEvents(onEvent)).toEqual([])
     expect(steps.sealedReasoningSeconds).toBe(0)
+  })
+})
+
+describe('stream-steps tool-result diffs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const makeSteps = () => {
+    const onEvent = vi.fn<(event: HarnessEvent) => void>()
+    const steps = createStreamSteps({
+      workspace: {
+        projectSlug: 'proj',
+        projectRoot: '/proj',
+        projectName: 'Proj',
+      },
+      chatId: 'chat-1',
+      onEvent,
+    })
+    return { steps, onEvent }
+  }
+
+  const resultEvents = (onEvent: ReturnType<typeof vi.fn>): HarnessEvent[] =>
+    onEvent.mock.calls
+      .map((call) => call[0])
+      .filter((event) => event.type === 'tool-result')
+
+  const diff = { path: 'src/a.ts', operation: 'update' as const, hunks: [] }
+
+  it('prefers the recorded handoff diff over the model-facing result', async () => {
+    recordToolDiff('tc-handoff', [diff])
+    const { steps, onEvent } = makeSteps()
+    await steps.beginStep()
+    await steps.emitToolResult('tc-handoff', 'edit_file', {
+      ok: true,
+      path: 'src/a.ts',
+      operation: 'edit',
+      added: 1,
+      removed: 1,
+    })
+
+    const event = resultEvents(onEvent)[0]
+    expect(event && event.type === 'tool-result' ? event.diffs : undefined).toEqual([diff])
+    const persisted = persistToolRun.mock.calls[0]
+    expect(persisted?.[9]).toEqual([diff])
+    expect(takeToolDiff('tc-handoff')).toBeUndefined()
+  })
+
+  it('falls back to diffs embedded in the result', async () => {
+    const { steps, onEvent } = makeSteps()
+    await steps.beginStep()
+    await steps.emitToolResult('tc-legacy', 'some_tool', { ok: true, diffs: [diff] })
+
+    const event = resultEvents(onEvent)[0]
+    expect(event && event.type === 'tool-result' ? event.diffs : undefined).toEqual([diff])
+  })
+
+  it('discards a recorded handoff diff when the call errored', async () => {
+    recordToolDiff('tc-error', [diff])
+    const { steps, onEvent } = makeSteps()
+    await steps.beginStep()
+    await steps.emitToolResult('tc-error', 'edit_file', { error: 'boom' }, true)
+
+    const event = resultEvents(onEvent)[0]
+    expect(event && event.type === 'tool-result' ? event.diffs : undefined).toBeUndefined()
+    expect(takeToolDiff('tc-error')).toBeUndefined()
   })
 })
