@@ -75,13 +75,13 @@
   - Better MCP handling to prevent cache misses
   - Disconnect and reconnect servers without rebuilding the system prompt
 - [**Plans**](https://vixl.app/using/work-with-plans)
-  - Durable plans saved to your home or project folder.
+  - Durable plans saved to your home or project folder
 - **Orchestration**
-  - Lock models to only calling sub agents to save costs.
+  - Lock models to only calling sub agents to save costs
 - **Built-in editor**
-  - A full [workbench](https://vixl.app/using/use-the-workbench) with editor, and terminals.
+  - A full [workbench](https://vixl.app/using/use-the-workbench) with editor, and terminals
 - **SSH (Beta)**
-  - Add a remote project without installing a server, or dependencies on the host.
+  - Add a remote project without installing a server, or dependencies on the host
 
 ## Roadmap
 
@@ -89,6 +89,6 @@ View the [roadmap](https://vixl.app/resources/roadmap)
 
 ## Contributing
 
-- Read [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, PR process, and signed commits.
-- Follow [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
-- Report vulnerabilities via [SECURITY.md](./SECURITY.md).
+- Read [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, PR process, and signed commits
+- Follow [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- Report vulnerabilities via [SECURITY.md](./SECURITY.md)
