@@ -62,17 +62,28 @@
 
 ---
 
-**Vixl is a local-first, bring-your-own-key alternative to Cursor, Antigravity, and VS Code agents.** There is no Vixl account and no Vixl subscription.
+**For the local era**
 
-Use any catalog provider or a local host. Four [chat modes](https://vixl.app/concepts/chat-modes), durable [plans](https://vixl.app/using/work-with-plans), [MCP](https://vixl.app/customize/mcp-servers), and a workbench. In a [worked example](https://vixl.app/using/best-practices), planning once and running implementation on a cheaper sub-agent costs about 70% less than one long full-price chat.
+[Get started](https://vixl.app/getting-started/) or download the [latest release](https://github.com/vixl-ai/vixl/releases)
 
-[Get started](https://vixl.app/getting-started/) or download the [latest release](https://github.com/vixl-ai/vixl/releases).
-
-- **Minimal system prompt.** Each turn is a short workspace identity, the mode skill, and catalogs of names. [Context](https://vixl.app/concepts/context)
-- **Progressive discovery.** The agent loads a full MCP schema or skill body when it needs one. [Context](https://vixl.app/concepts/context)
-- **Planning.** Plan mode writes a `PLAN.md` you keep. **Build** implements it in one agent run. **Orchestrate** hands each todo to a sub-agent. [Plans](https://vixl.app/using/work-with-plans)
-- **Built-in editor.** A Monaco editor with language servers sits beside the chat, with the file tree in the same window. [Workbench](https://vixl.app/using/use-the-workbench)
-- **SSH.** Add a remote folder over OpenSSH. The editor, the terminal, and the agent tools for that project run on the host.
+- **Minimal system prompt**
+  - Your model is only provided technical documentation on the harness, how it's used is up to you
+  - Use `/create-rule` to tell your agents how to act
+  - Add a `.vixl/agents.md` to tell your agents about what they're working on 
+- **Build your own agents**
+  - Orchestration, Ask, Plan, and Agent come default
+  - Build your own agents with `/create-agent` with custom persmissions and models
+- **Progressive discovery**
+  - Better MCP handling to prevent cache misses
+  - Disconnect and reconnect servers without rebuilding the system prompt
+- [**Plans**](https://vixl.app/using/work-with-plans)
+  - Durable plans saved to your home or project folder.
+- **Orchestration**
+  - Lock models to only calling sub agents to save costs.
+- **Built-in editor**
+  - A full [workbench](https://vixl.app/using/use-the-workbench) with editor, and terminals.
+- **SSH (Beta)**
+  - Add a remote project without installing a server, or dependencies on the host.
 
 ## Roadmap
 
