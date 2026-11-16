@@ -62,8 +62,6 @@
 
 ---
 
-**For the local era**
-
 [Get started](https://vixl.app/getting-started/) or download the [latest release](https://github.com/vixl-ai/vixl/releases)
 
 - **Minimal system prompt**
