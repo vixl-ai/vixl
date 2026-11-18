@@ -176,7 +176,10 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
       />
     </AiElementsMessageMessage>
 
-    <p v-if="showActivity" class="shimmer shimmer-duration-1500 shimmer-angle-0 w-fit text-sm">
+    <p
+      v-if="showActivity"
+      class="shimmer shimmer-duration-1500 shimmer-angle-0 w-fit text-sm text-muted-foreground"
+    >
       {{ activityLabel }}
     </p>
 
