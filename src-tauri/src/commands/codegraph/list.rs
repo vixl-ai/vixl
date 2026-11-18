@@ -18,7 +18,7 @@ pub struct GraphListItem {
     pub missing: bool,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_graphs(app: AppHandle) -> Result<Vec<GraphListItem>, String> {
     let store_root = graph_store_dir(&app)?;
     let mut items = Vec::new();

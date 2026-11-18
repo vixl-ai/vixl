@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use uuid::Uuid;
 
 use crate::commands::fs::{
@@ -54,7 +54,7 @@ lazy_static::lazy_static! {
     Mutex::new(HashMap::new());
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn shell_spawn_pty(
     app: AppHandle,
     project_root: String,
@@ -153,31 +153,11 @@ fn register_pty_session(
     pair: portable_pty::PtyPair,
     child: Box<dyn portable_pty::Child + Send>,
 ) -> Result<PtySessionInfo, String> {
-    let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
+    let reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
     let session_id = Uuid::new_v4().to_string();
-    let event_name = format!("pty-output-{session_id}");
-    let app_handle = app.clone();
-    let sid = session_id.clone();
-
-    std::thread::spawn(move || {
-        let mut buffer = [0u8; 4096];
-        loop {
-            match reader.read(&mut buffer) {
-                Ok(0) => break,
-                Ok(count) => {
-                    let data = String::from_utf8_lossy(&buffer[..count]).to_string();
-                    let _ = app_handle.emit(&event_name, data);
-                }
-                Err(_) => break,
-            }
-        }
-        let _ = app_handle.emit(
-            &format!("pty-exit-{sid}"),
-            serde_json::json!({ "sessionId": sid }),
-        );
-    });
+    super::pty_output::spawn_output_forwarder(app.clone(), session_id.clone(), reader);
 
     PTY_SESSIONS.lock().unwrap().insert(
         session_id.clone(),
@@ -208,7 +188,7 @@ pub fn shell_write_pty(session_id: String, data: String) -> Result<(), String> {
     guard.writer.flush().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn shell_resize_pty(session_id: String, cols: u16, rows: u16) -> Result<(), String> {
     let sessions = PTY_SESSIONS.lock().unwrap();
     let session = sessions
@@ -226,7 +206,7 @@ pub fn shell_resize_pty(session_id: String, cols: u16, rows: u16) -> Result<(), 
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn shell_kill_pty(session_id: String) -> Result<(), String> {
     let session = PTY_SESSIONS.lock().unwrap().remove(&session_id);
     if let Some(session) = session {

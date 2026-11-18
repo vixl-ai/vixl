@@ -305,7 +305,7 @@ fn same_watch_dir(personal_dir: &Path, project_dir: &Path) -> bool {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn watch_vixl_paths(app: AppHandle, project_root: Option<String>) -> Result<(), String> {
     let personal_dir = user_vixl_dir(&app)?;
     let project_dir = project_root.as_ref().and_then(|root| {

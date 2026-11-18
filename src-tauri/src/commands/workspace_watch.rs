@@ -717,7 +717,7 @@ fn start_session(app: AppHandle, root: PathBuf, shallow: bool) -> Result<Arc<Sha
     Ok(shared)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub async fn watch_workspace(
     app: AppHandle,
     project_root: String,

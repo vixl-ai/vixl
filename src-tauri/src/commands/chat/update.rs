@@ -4,10 +4,9 @@ use super::meta::{now_iso, ChatMeta};
 use super::store;
 use crate::db::AppDb;
 
-#[tauri::command]
-pub fn update_chat_meta(
-    app: AppHandle,
-    db: State<AppDb>,
+pub(super) fn update_chat_meta_blocking(
+    app: &AppHandle,
+    db: AppDb,
     project_slug: String,
     chat_id: String,
     patch: serde_json::Value,
@@ -28,11 +27,25 @@ pub fn update_chat_meta(
         updated
     };
     if refresh {
-        if let Err(error) = crate::tray::refresh_agents(&app) {
-            log::error!("Failed to refresh tray agents: {error}");
-        }
+        crate::tray::request_agents_refresh(app);
     }
     Ok(updated)
+}
+
+#[tauri::command]
+pub async fn update_chat_meta(
+    app: AppHandle,
+    db: State<'_, AppDb>,
+    project_slug: String,
+    chat_id: String,
+    patch: serde_json::Value,
+) -> Result<ChatMeta, String> {
+    let conn = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        update_chat_meta_blocking(&app, conn, project_slug, chat_id, patch)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn patch_refreshes_tray(patch: &serde_json::Value) -> bool {

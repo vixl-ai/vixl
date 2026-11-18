@@ -33,42 +33,49 @@ fn opened_urls_to_dirs(urls: Vec<tauri::Url>) -> Vec<PathBuf> {
 }
 
 pub fn handle_second_instance(app: &AppHandle, args: Vec<String>) {
-    if let Some(path_arg) = parse_launch_path_arg(args) {
-        match resolve_launch_path(&path_arg) {
-            Ok(path) => {
-                if let Err(error) = open_project_at_path(app, path) {
-                    log::error!("Failed to open CLI project: {error}");
-                }
-            }
-            Err(error) => log::error!("Invalid CLI path: {error}"),
-        }
-    }
-
     focus_main_window(app);
 
-    if let Err(error) = app.emit("vixl-project-opened", ()) {
-        log::error!("Failed to emit project opened event: {error}");
-    }
+    // Registry writes and worktree detection stay off the main thread.
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Some(path_arg) = parse_launch_path_arg(args) {
+            match resolve_launch_path(&path_arg) {
+                Ok(path) => {
+                    if let Err(error) = open_project_at_path(&app, path) {
+                        log::error!("Failed to open CLI project: {error}");
+                    }
+                }
+                Err(error) => log::error!("Invalid CLI path: {error}"),
+            }
+        }
+
+        if let Err(error) = app.emit("vixl-project-opened", ()) {
+            log::error!("Failed to emit project opened event: {error}");
+        }
+    });
 }
 
 #[cfg_attr(not(any(target_os = "macos", target_os = "ios")), allow(dead_code))]
 pub fn handle_opened_urls(app: &AppHandle, urls: Vec<tauri::Url>) {
-    let mut opened_any = false;
-    for path in opened_urls_to_dirs(urls) {
-        if let Err(error) = open_project_at_path(app, path) {
-            log::error!("Failed to open CLI project: {error}");
-        } else {
-            opened_any = true;
-        }
-    }
-
     focus_main_window(app);
 
-    if opened_any {
-        if let Err(error) = app.emit("vixl-project-opened", ()) {
-            log::error!("Failed to emit project opened event: {error}");
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut opened_any = false;
+        for path in opened_urls_to_dirs(urls) {
+            if let Err(error) = open_project_at_path(&app, path) {
+                log::error!("Failed to open CLI project: {error}");
+            } else {
+                opened_any = true;
+            }
         }
-    }
+
+        if opened_any {
+            if let Err(error) = app.emit("vixl-project-opened", ()) {
+                log::error!("Failed to emit project opened event: {error}");
+            }
+        }
+    });
 }
 
 #[cfg(test)]

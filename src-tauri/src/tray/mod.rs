@@ -17,7 +17,10 @@ use summary::{resolve_agent_progress, TrayAgentRow, TraySnapshot, HARNESS_EVENT_
 mod menu;
 #[path = "plan-todos.rs"]
 mod plan_todos;
+mod refresh;
 mod summary;
+
+pub use refresh::request_refresh as request_agents_refresh;
 
 #[cfg(test)]
 #[path = "path-tests.rs"]

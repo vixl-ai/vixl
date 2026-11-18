@@ -2,10 +2,11 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 import { toast } from 'vue-sonner'
 import shouldStreamRequest from '@/services/providers/should-stream-request'
 import { httpProxyRequest, isTauri } from '@/services/vixl/vixl-tauri'
+import base64ToBytes from '@/utils/base64-to-bytes'
 
 type HttpProxyStreamEvent =
   | { kind: 'headers'; status: number; headers: Record<string, string> }
-  | { kind: 'chunk'; bytes: number[] }
+  | { kind: 'chunk'; data: string }
   | { kind: 'end' }
   | { kind: 'error'; message: string }
 
@@ -118,7 +119,7 @@ const streamProxyFetch = async (
           return
         }
         if (event.kind === 'chunk') {
-          controller.enqueue(Uint8Array.from(event.bytes))
+          controller.enqueue(base64ToBytes(event.data))
           return
         }
         if (event.kind === 'end') {

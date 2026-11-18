@@ -279,6 +279,7 @@
     "useFileTreeNodeMenu": true,
     "useFleetRegistry": true,
     "useFleetSidebar": true,
+    "useFleetSidebarSlugRefresh": true,
     "useFocus": true,
     "useFocusWithin": true,
     "useFps": true,

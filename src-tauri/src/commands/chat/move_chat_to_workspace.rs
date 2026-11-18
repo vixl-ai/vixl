@@ -11,7 +11,7 @@ use super::rewrite_checkpoints::rewrite_file_checkpoints_for_root;
 use super::store;
 use crate::commands::fs::{canonical_project_root, ensure_ssh_project_directory_await};
 use crate::commands::registry::{
-    add_or_update_project, registry_set_active_project, roots_match, FleetProject,
+    add_or_update_project, roots_match, set_active_project_blocking, FleetProject,
 };
 use crate::commands::ssh::{is_ssh_root, parse_root, ssh_uri_for};
 use crate::db::AppDb;
@@ -174,7 +174,7 @@ pub async fn move_chat_to_workspace(
     let dest_root_str = resolve_destination_root_command(&root_path, &old_root).await?;
     let project =
         add_or_update_project(&app, folder_name(Path::new(&dest_root_str)), dest_root_str)?;
-    registry_set_active_project(app.clone(), Some(project.id.clone()))?;
+    set_active_project_blocking(&app, Some(project.id.clone()))?;
 
     let dest_dir = rename_chat_directory(&app, &from_project_slug, &project.slug, &chat_id)?;
 
@@ -210,9 +210,7 @@ pub async fn move_chat_to_workspace(
         }
     }
 
-    if let Err(error) = crate::tray::refresh_agents(&app) {
-        log::error!("Failed to refresh tray agents: {error}");
-    }
+    crate::tray::request_agents_refresh(&app);
 
     Ok(MoveChatToWorkspaceResult {
         project: FleetProjectView::from(project),

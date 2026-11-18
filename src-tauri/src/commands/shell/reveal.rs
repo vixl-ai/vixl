@@ -20,7 +20,7 @@ pub fn is_reveal_path_allowed(canonical: &Path, home: Option<&Path>, user_vixl: 
     under_home || under_vixl || under_temp
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn reveal_in_folder(app: AppHandle, path: String) -> Result<(), String> {
     let canonical = PathBuf::from(&path)
         .canonicalize()

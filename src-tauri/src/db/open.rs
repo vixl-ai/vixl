@@ -25,6 +25,12 @@ pub fn apply_pragmas(conn: &Connection) -> Result<(), String> {
         .map_err(|error| format!("Failed to set busy_timeout: {error}"))?;
     conn.pragma_update(None, "journal_mode", "WAL")
         .map_err(|error| format!("Failed to set journal_mode=WAL: {error}"))?;
+    // NORMAL is the recommended pairing with WAL: no fsync per commit, and
+    // durability still holds across app crashes (only power loss can drop
+    // the last transactions). Chat lines are written per harness event, so
+    // FULL's per-commit fsync was a visible stall.
+    conn.pragma_update(None, "synchronous", "NORMAL")
+        .map_err(|error| format!("Failed to set synchronous=NORMAL: {error}"))?;
     conn.pragma_update(None, "foreign_keys", "ON")
         .map_err(|error| format!("Failed to set foreign_keys=ON: {error}"))?;
     Ok(())

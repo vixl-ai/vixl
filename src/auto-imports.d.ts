@@ -246,6 +246,7 @@ declare global {
   const useFileTreeNodeMenu: typeof import('./composables/use-file-tree-node-menu').default
   const useFleetRegistry: typeof import('./composables/use-fleet-registry').default
   const useFleetSidebar: typeof import('./composables/use-fleet-sidebar').default
+  const useFleetSidebarSlugRefresh: typeof import('./composables/use-fleet-sidebar-slug-refresh').default
   const useFocus: typeof import('@vueuse/core').useFocus
   const useFocusWithin: typeof import('@vueuse/core').useFocusWithin
   const useFps: typeof import('@vueuse/core').useFps
@@ -688,6 +689,7 @@ declare module 'vue' {
     readonly useFileTreeNodeMenu: UnwrapRef<typeof import('./composables/use-file-tree-node-menu')['default']>
     readonly useFleetRegistry: UnwrapRef<typeof import('./composables/use-fleet-registry')['default']>
     readonly useFleetSidebar: UnwrapRef<typeof import('./composables/use-fleet-sidebar')['default']>
+    readonly useFleetSidebarSlugRefresh: UnwrapRef<typeof import('./composables/use-fleet-sidebar-slug-refresh')['default']>
     readonly useFocus: UnwrapRef<typeof import('@vueuse/core')['useFocus']>
     readonly useFocusWithin: UnwrapRef<typeof import('@vueuse/core')['useFocusWithin']>
     readonly useFps: UnwrapRef<typeof import('@vueuse/core')['useFps']>

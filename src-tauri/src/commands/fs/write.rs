@@ -528,7 +528,7 @@ fn decode_base64(content_base64: &str) -> Result<Vec<u8>, String> {
         .map_err(|error| format!("Invalid base64 content: {error}"))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_temp_handoff(content: String) -> Result<WriteTempHandoffResult, String> {
     let timestamp = chrono::Utc::now().format("%Y-%m-%dT%H-%M-%S").to_string();
     let filename = format!("handoff-{timestamp}.md");
@@ -545,7 +545,7 @@ pub fn write_temp_handoff(content: String) -> Result<WriteTempHandoffResult, Str
 }
 
 /// Writes binary bytes (base64-encoded) under the app temp dir.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_temp_bytes(
     content_base64: String,
     kind: String,
@@ -569,7 +569,7 @@ pub fn write_temp_bytes(
 }
 
 /// Appends a text line to a temp log file. Creates the file when `path` is omitted.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn append_temp_log(
     path: Option<String>,
     kind: String,
@@ -619,7 +619,7 @@ pub fn append_temp_log(
 }
 
 /// Writes plain text to an absolute path chosen by the user (e.g. save dialog).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_text_file(path: String, content: String) -> Result<(), String> {
     let absolute = PathBuf::from(&path);
     if let Some(parent) = absolute.parent() {

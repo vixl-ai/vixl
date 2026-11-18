@@ -9,7 +9,7 @@ use super::super::lsp_registry::{
     allowlisted_lsp_basenames, builtin_server_map, builtin_spec_by_id, dedicated_extension_rank,
     root_marker_score, tier_rank, LspInstallKind,
 };
-use super::super::registry::{get_active_project, registry_list_projects};
+use super::super::registry::{active_project_blocking, list_projects_blocking};
 use super::helpers::{is_absolute_program, normalize_extension};
 use super::typescript::{
     apply_typescript_stack_command, resolve_spec_for_command, workspace_native_tsc,
@@ -252,8 +252,8 @@ pub(crate) fn find_server_for_extension(
 }
 
 pub(crate) fn active_project_root(app: &AppHandle) -> Option<String> {
-    let project_id = get_active_project(app.clone()).ok()??;
-    let projects = registry_list_projects(app.clone()).ok()?;
+    let project_id = active_project_blocking(app).ok()??;
+    let projects = list_projects_blocking(app).ok()?;
     projects
         .into_iter()
         .find(|project| project.id == project_id)

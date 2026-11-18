@@ -135,6 +135,42 @@ describe('proxyFetch buffered abort', () => {
     )
   })
 
+  it('decodes base64 stream chunks into the response body', async () => {
+    const payload = 'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n'
+    const payloadBase64 = btoa(payload)
+    invoke.mockImplementation(async (cmd, args) => {
+      if (cmd !== 'http_proxy_stream') {
+        return undefined
+      }
+      const onEvent = args?.onEvent as {
+        onmessage?: (event: {
+          kind: string
+          status?: number
+          headers?: Record<string, string>
+          data?: string
+        }) => void
+      }
+      onEvent.onmessage?.({
+        kind: 'headers',
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      })
+      onEvent.onmessage?.({ kind: 'chunk', data: payloadBase64 })
+      onEvent.onmessage?.({ kind: 'end' })
+      return undefined
+    })
+
+    const fetch = createProxyFetch()
+    const response = await fetch('https://api.example/v1/chat/completions', {
+      method: 'POST',
+      headers: { Accept: 'text/event-stream' },
+      body: JSON.stringify({ model: 'test', messages: [], stream: true }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe(payload)
+  })
+
   it('rejects with AbortError when the proxy reports Request aborted', async () => {
     httpProxyRequest.mockRejectedValue(new Error('Request aborted'))
 

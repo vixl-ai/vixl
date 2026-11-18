@@ -3,6 +3,7 @@ use std::net::IpAddr;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use base64::Engine;
 use futures_util::StreamExt;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::Deserialize;
@@ -14,6 +15,11 @@ use uuid::Uuid;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const BUFFERED_REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
+/// Coalescing window for stream chunks (about one frame at 60Hz). One IPC
+/// message per window bounds the webview eval rate when many agents stream.
+const STREAM_FLUSH_WINDOW: Duration = Duration::from_millis(16);
+/// Flush early when a burst is large so memory stays bounded.
+const STREAM_MAX_BATCH_BYTES: usize = 64 * 1024;
 
 #[derive(Default)]
 pub struct HttpStreamRegistry {
@@ -65,8 +71,10 @@ pub enum HttpProxyStreamEvent {
         status: u16,
         headers: HashMap<String, String>,
     },
+    /// Base64 keeps the IPC payload compact; a JSON number array costs about
+    /// four bytes per payload byte.
     Chunk {
-        bytes: Vec<u8>,
+        data: String,
     },
     End,
     Error {
@@ -339,6 +347,10 @@ async fn run_proxy_stream(
     }
 
     let mut stream = response.bytes_stream();
+    let mut batch: Vec<u8> = Vec::new();
+    let flush_timer = tokio::time::sleep(STREAM_FLUSH_WINDOW);
+    tokio::pin!(flush_timer);
+    let mut flush_armed = false;
     loop {
         tokio::select! {
           chunk = stream.next() => {
@@ -347,22 +359,34 @@ async fn run_proxy_stream(
                 if bytes.is_empty() {
                   continue;
                 }
-                if on_event
-                  .send(HttpProxyStreamEvent::Chunk {
-                    bytes: bytes.to_vec(),
-                  })
-                  .is_err()
-                {
-                  break;
+                batch.extend_from_slice(&bytes);
+                if !flush_armed {
+                  flush_timer
+                    .as_mut()
+                    .reset(tokio::time::Instant::now() + STREAM_FLUSH_WINDOW);
+                  flush_armed = true;
+                }
+                if batch.len() >= STREAM_MAX_BATCH_BYTES {
+                  flush_armed = false;
+                  if !send_chunk_batch(&on_event, &mut batch) {
+                    break;
+                  }
                 }
               }
               Some(Err(error)) => {
+                let _ = send_chunk_batch(&on_event, &mut batch);
                 let _ = on_event.send(HttpProxyStreamEvent::Error {
                   message: error.to_string(),
                 });
                 return Err(error.to_string());
               }
               None => break,
+            }
+          }
+          _ = &mut flush_timer, if flush_armed => {
+            flush_armed = false;
+            if !send_chunk_batch(&on_event, &mut batch) {
+              break;
             }
           }
           _ = &mut *cancel_rx => {
@@ -375,6 +399,18 @@ async fn run_proxy_stream(
         }
     }
 
+    let _ = send_chunk_batch(&on_event, &mut batch);
     let _ = on_event.send(HttpProxyStreamEvent::End);
     Ok(())
+}
+
+/// Sends the buffered bytes as one base64 chunk. Returns false when the
+/// channel is closed (the webview stopped listening).
+fn send_chunk_batch(on_event: &Channel<HttpProxyStreamEvent>, batch: &mut Vec<u8>) -> bool {
+    if batch.is_empty() {
+        return true;
+    }
+    let data = base64::engine::general_purpose::STANDARD.encode(&batch);
+    batch.clear();
+    on_event.send(HttpProxyStreamEvent::Chunk { data }).is_ok()
 }
