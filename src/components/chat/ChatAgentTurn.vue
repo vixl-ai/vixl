@@ -14,17 +14,12 @@ import AiElementsMessageMessageResponse from '@/components/ai-elements/message/M
 import AiElementsReasoningReasoning from '@/components/ai-elements/reasoning/Reasoning.vue'
 import AiElementsReasoningReasoningContent from '@/components/ai-elements/reasoning/ReasoningContent.vue'
 import AiElementsReasoningReasoningTrigger from '@/components/ai-elements/reasoning/ReasoningTrigger.vue'
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import ChatAgentTurnUsage from '@/components/chat/ChatAgentTurnUsage.vue'
 import ChatSubAgentTurn from '@/components/chat/SubAgentTurn.vue'
 import ChatToolRun from '@/components/chat/ChatToolRun.vue'
 import ChatTurnFilesChanged from '@/components/chat/ChatTurnFilesChanged.vue'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from '@/components/shadcn/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/shadcn/ui/alert'
 import formatToolGroupHeader from '@/utils/format-tool-group-header'
 import resolveSpawnSubagent from '@/utils/resolve-spawn-subagent'
 import segmentStepTools from '@/utils/segment-step-tools'
@@ -50,9 +45,7 @@ const emit = defineEmits<{
   stopSubagent: [subagentId: string]
 }>()
 
-const isStreaming = computed(
-  () => props.status === 'streaming' || props.status === 'submitted',
-)
+const isStreaming = computed(() => props.status === 'streaming' || props.status === 'submitted')
 
 const showActivity = computed(
   () => typeof props.activityLabel === 'string' && props.activityLabel.length > 0,
@@ -104,17 +97,16 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
       Sub-agents render inline at their tool call site so later
       assistant text stays below them instead of pushing a bottom stack.
     -->
-    <template
-      v-for="{ step, index, segments, hasSpawnSubagent } in stepEntries"
-      :key="step.id"
-    >
+    <template v-for="{ step, index, segments, hasSpawnSubagent } in stepEntries" :key="step.id">
       <AiElementsReasoningReasoning
         v-if="step.reasoning.trim().length > 0"
-        :is-streaming="isStepStreaming(index) && step.text.trim().length === 0 && step.tools.length === 0"
+        :is-streaming="
+          isStepStreaming(index) && step.text.trim().length === 0 && step.tools.length === 0
+        "
         :duration="step.reasoningSeconds"
         :default-open="
-          (isStepStreaming(index) && step.text.trim().length === 0 && step.tools.length === 0)
-          || hasSpawnSubagent
+          (isStepStreaming(index) && step.text.trim().length === 0 && step.tools.length === 0) ||
+          hasSpawnSubagent
         "
         :persist-key="chatTurnOpenKeys.reasoning(turn.id, step.id)"
         :content-streaming="isStepStreaming(index)"
@@ -140,19 +132,13 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
         />
       </AiElementsMessageMessage>
 
-      <template
-        v-for="(segment, segmentIndex) in segments"
-        :key="`${step.id}-seg-${segmentIndex}`"
-      >
+      <template v-for="(segment, segmentIndex) in segments" :key="`${step.id}-seg-${segmentIndex}`">
         <ChatSubAgentTurn
           v-if="segment.type === 'subagent'"
           :subagent="resolveSubagent(segment.run)"
           @stop-subagent="emit('stopSubagent', $event)"
         />
-        <ChatToolRun
-          v-else-if="segment.tools.length === 1"
-          :run="segment.tools[0]!"
-        />
+        <ChatToolRun v-else-if="segment.tools.length === 1" :run="segment.tools[0]!" />
         <AiElementsChainOfThoughtChainOfThought
           v-else
           :is-streaming="isStepStreaming(index)"
@@ -161,22 +147,17 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
           class="w-full max-w-full"
         >
           <AiElementsChainOfThoughtChainOfThoughtHeader>
-            <AiElementsShimmerShimmer
+            <span
               v-if="hasRunningTool(segment.tools)"
-              :duration="1"
-              as="span"
+              class="shimmer shimmer-duration-1000 shimmer-angle-0"
             >
               {{ formatToolGroupHeader(segment.tools) }}
-            </AiElementsShimmerShimmer>
+            </span>
             <span v-else>{{ formatToolGroupHeader(segment.tools) }}</span>
           </AiElementsChainOfThoughtChainOfThoughtHeader>
           <AiElementsChainOfThoughtChainOfThoughtContent class="space-y-2">
             <div class="flex flex-col gap-0.5">
-              <ChatToolRun
-                v-for="tool in segment.tools"
-                :key="tool.toolCallId"
-                :run="tool"
-              />
+              <ChatToolRun v-for="tool in segment.tools" :key="tool.toolCallId" :run="tool" />
             </div>
           </AiElementsChainOfThoughtChainOfThoughtContent>
         </AiElementsChainOfThoughtChainOfThought>
@@ -195,14 +176,9 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
       />
     </AiElementsMessageMessage>
 
-    <AiElementsShimmerShimmer
-      v-if="showActivity"
-      :duration="1.5"
-      as="p"
-      class="text-sm"
-    >
+    <p v-if="showActivity" class="shimmer shimmer-duration-1500 shimmer-angle-0 text-sm">
       {{ activityLabel }}
-    </AiElementsShimmerShimmer>
+    </p>
 
     <ChatTurnFilesChanged
       v-if="showFilesChanged"
@@ -214,10 +190,7 @@ const resolveSubagent = (run: ToolRun): SubagentTimelineItem =>
       @restore="emit('restoreFiles')"
     />
 
-    <ChatAgentTurnUsage
-      v-if="!isStreaming"
-      :turn-id="turn.id"
-    />
+    <ChatAgentTurnUsage v-if="!isStreaming" :turn-id="turn.id" />
 
     <Alert
       v-if="turn.error && turn.error.kind !== 'aborted'"

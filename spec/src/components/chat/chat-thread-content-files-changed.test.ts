@@ -170,10 +170,6 @@ const mountContent = (
         ChatCompactionMarker: true,
         ChatQuestionCard: true,
         ChatMcpAuthCard: true,
-        AiElementsShimmerShimmer: {
-          name: 'AiElementsShimmerShimmer',
-          template: '<span><slot /></span>',
-        },
         MessageScroller: { name: 'MessageScroller', template: '<div><slot /></div>' },
         MessageScrollerViewport: {
           name: 'MessageScrollerViewport',

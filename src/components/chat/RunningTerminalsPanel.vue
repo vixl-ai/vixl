@@ -2,17 +2,9 @@
 import type { AgentShellRecord } from '@/types/harness/agent-shell'
 import { shellDisplayTitle } from '@/utils/shell-display-title'
 import { SquareIcon } from '@lucide/vue'
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
-import {
-  QueueItem,
-  QueueItemActions,
-} from '@/components/ai-elements/queue'
+import { QueueItem, QueueItemActions } from '@/components/ai-elements/queue'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 defineProps<{
   shells: AgentShellRecord[]
@@ -29,19 +21,16 @@ const truncateCommand = (command: string, max = 60): string =>
 
 <template>
   <ul class="flex flex-col gap-1">
-    <QueueItem
-      v-for="shell in shells"
-      :key="shell.shellId"
-    >
+    <QueueItem v-for="shell in shells" :key="shell.shellId">
       <div class="flex w-full items-center gap-2">
         <button
           type="button"
           class="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80 text-left"
           @click="emit('openShell', shell.shellId)"
         >
-          <AiElementsShimmerShimmer :duration="1" as="span">
+          <span class="shimmer shimmer-duration-1000 shimmer-angle-0">
             {{ truncateCommand(shellDisplayTitle(shell)) }}
-          </AiElementsShimmerShimmer>
+          </span>
         </button>
         <QueueItemActions class="ml-auto shrink-0">
           <Tooltip>

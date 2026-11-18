@@ -19,8 +19,8 @@ const buildStubContext = (settings: VixlSettings): HarnessToolContext => ({
   onPendingApproval: () => {},
 })
 
-export default (mode: VixlChatMode, settings?: VixlSettings): number => {
-  const tools = buildTools(buildStubContext(settings ?? defaultVixlSettings()))
+const estimateForSettings = (mode: VixlChatMode, settings: VixlSettings): number => {
+  const tools = buildTools(buildStubContext(settings))
   const allow = new Set(MODE_TOOL_ALLOWLIST[mode])
   let total = 0
 
@@ -29,16 +29,33 @@ export default (mode: VixlChatMode, settings?: VixlSettings): number => {
       continue
     }
 
-    const description =
-      typeof definition.description === 'string' ? definition.description : name
+    const description = typeof definition.description === 'string' ? definition.description : name
     const schema = asSchema(definition.inputSchema as FlexibleSchema<unknown>)
     const json = JSON.stringify(schema.jsonSchema)
 
-    total +=
-      estimateTextTokens(name) +
-      estimateTextTokens(description) +
-      estimateTextTokens(json)
+    total += estimateTextTokens(name) + estimateTextTokens(description) + estimateTextTokens(json)
   }
 
+  return total
+}
+
+// Building 46 tool definitions and converting every zod schema to JSON schema
+// is the most expensive constant cost in a budget recount, and the result only
+// changes when settings change. Settings objects are replaced immutably by the
+// config store, so identity-keyed caching is safe.
+const cacheBySettings = new WeakMap<VixlSettings, Map<VixlChatMode, number>>()
+const defaultCache = new Map<VixlChatMode, number>()
+
+export default (mode: VixlChatMode, settings?: VixlSettings): number => {
+  const cache = settings ? (cacheBySettings.get(settings) ?? new Map()) : defaultCache
+  const cached = cache.get(mode)
+  if (cached !== undefined) {
+    return cached
+  }
+  const total = estimateForSettings(mode, settings ?? defaultVixlSettings())
+  cache.set(mode, total)
+  if (settings && !cacheBySettings.has(settings)) {
+    cacheBySettings.set(settings, cache)
+  }
   return total
 }

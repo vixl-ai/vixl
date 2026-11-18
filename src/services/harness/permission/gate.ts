@@ -1,3 +1,4 @@
+import { toast } from 'vue-sonner'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type {
   PermissionAction,
@@ -6,14 +7,8 @@ import type {
   PermissionScope,
 } from '@/types/harness/permission'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
-import {
-  requestApproval,
-  type ApprovalKind,
-} from '@/services/harness/permission/approval-gate'
-import {
-  decidePermission,
-  isStickyShellElevation,
-} from '@/services/harness/permission/policy'
+import { requestApproval, type ApprovalKind } from '@/services/harness/permission/approval-gate'
+import { decidePermission, isStickyShellElevation } from '@/services/harness/permission/policy'
 import { toolRunsAtLine } from '@/services/harness/ssh/location'
 
 export type PendingApprovalView = {
@@ -48,6 +43,17 @@ export type PermissionGateContext = {
   ) => Promise<void>
   subagentId?: string
   subagentLabel?: string
+}
+
+// Persisting a permission writes settings and reloads the effective config.
+// The session allow/deny sets already cover this turn's decisions, so the disk
+// write must not block the tool from resuming after the user picks an option.
+const persistPermissionInBackground = (promise: Promise<void> | undefined): void => {
+  promise?.catch((error: unknown) => {
+    toast.error('Failed to save permission', {
+      description: error instanceof Error ? error.message : 'Unknown error',
+    })
+  })
 }
 
 export const gateToolPermission = async (args: {
@@ -130,15 +136,13 @@ export const gateToolPermission = async (args: {
   if (!result.approved) {
     if (result.scope === 'never') {
       args.ctx.sessionDenies.add(args.capability)
-      await args.ctx.persistPermission?.(args.capability, 'deny', 'always')
+      persistPermissionInBackground(args.ctx.persistPermission?.(args.capability, 'deny', 'always'))
     }
     return false
   }
 
   const rememberKey =
-    args.action === 'fs.write' || args.action === 'fs.delete'
-      ? args.action
-      : args.capability
+    args.action === 'fs.write' || args.action === 'fs.delete' ? args.action : args.capability
 
   if (
     result.scope === 'session' ||
@@ -149,10 +153,12 @@ export const gateToolPermission = async (args: {
     args.ctx.sessionAllows.add(rememberKey)
   }
   if (result.scope === 'workspace' || result.scope === 'always') {
-    await args.ctx.persistPermission?.(
-      rememberKey,
-      'allow',
-      result.scope === 'workspace' ? 'workspace' : 'always',
+    persistPermissionInBackground(
+      args.ctx.persistPermission?.(
+        rememberKey,
+        'allow',
+        result.scope === 'workspace' ? 'workspace' : 'always',
+      ),
     )
   }
 

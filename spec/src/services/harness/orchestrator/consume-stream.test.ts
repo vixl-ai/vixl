@@ -415,6 +415,36 @@ describe('consumeStream tool-input-delta', () => {
     )
   })
 
+  it('emits tool-input-delta only when extracted fields change', async () => {
+    streamText.mockImplementation(() => ({
+      fullStream: (async function* () {
+        yield { type: 'tool-input-start', id: 'call-1', toolName: 'write_file' }
+        yield { type: 'tool-input-delta', id: 'call-1', delta: '{"path":"src/a.ts","content":"' }
+        yield { type: 'tool-input-delta', id: 'call-1', delta: 'chunk-one' }
+        yield { type: 'tool-input-delta', id: 'call-1', delta: 'chunk-two' }
+        yield { type: 'tool-input-delta', id: 'call-1', delta: '"}' }
+      })(),
+      text: Promise.resolve(''),
+      responseMessages: Promise.resolve([]),
+      usage: Promise.resolve(undefined),
+    }))
+
+    const prepared = makePrepared()
+    await consumeStream(prepared)
+
+    const deltaEvents = prepared.onEvent.mock.calls
+      .map((call) => call[0])
+      .filter((event) => (event as { type?: string }).type === 'tool-input-delta')
+    expect(deltaEvents).toEqual([
+      {
+        type: 'tool-input-delta',
+        toolCallId: 'call-1',
+        name: 'write_file',
+        args: { path: 'src/a.ts' },
+      },
+    ])
+  })
+
   it('does not emit tool-input-delta before the path string is complete', async () => {
     streamText.mockImplementation(() => ({
       fullStream: (async function* () {

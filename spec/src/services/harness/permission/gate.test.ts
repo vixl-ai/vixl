@@ -437,4 +437,67 @@ describe('gateToolPermission fs broad grants', () => {
     await expect(pending).resolves.toBe(true)
     expect(ctx.sessionAllows.has('fs.delete')).toBe(false)
   })
+
+  it('resumes the tool without waiting for the permission write to finish', async () => {
+    const ctx = makeCtx()
+    let releasePersist: (() => void) | undefined
+    ctx.persistPermission.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releasePersist = resolve
+        }),
+    )
+    const pending = gateToolPermission({
+      ctx,
+      toolCallId: 'tc-fs-slow-persist',
+      name: 'edit_file',
+      kind: 'fs',
+      action: 'fs.write',
+      capability: 'fs.write:src/a.ts',
+      title: 'Edit src/a.ts',
+      paths: ['src/a.ts'],
+    })
+    await waitForPending('tc-fs-slow-persist')
+    resolveApproval('tc-fs-slow-persist', { approved: true, scope: 'workspace' })
+
+    // The gate resolves while the settings write is still pending.
+    await expect(pending).resolves.toBe(true)
+    expect(ctx.sessionAllows.has('fs.write')).toBe(true)
+    expect(ctx.persistPermission).toHaveBeenCalledWith('fs.write', 'allow', 'workspace')
+
+    releasePersist?.()
+  })
+
+  it('resumes a never-deny without waiting for the permission write', async () => {
+    const ctx = makeCtx()
+    let releasePersist: (() => void) | undefined
+    ctx.persistPermission.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releasePersist = resolve
+        }),
+    )
+    const pending = gateToolPermission({
+      ctx,
+      toolCallId: 'tc-fs-slow-deny',
+      name: 'edit_file',
+      kind: 'fs',
+      action: 'fs.write',
+      capability: 'fs.write:src/a.ts',
+      title: 'Edit src/a.ts',
+      paths: ['src/a.ts'],
+    })
+    await waitForPending('tc-fs-slow-deny')
+    resolveApproval('tc-fs-slow-deny', { approved: false, scope: 'never' })
+
+    await expect(pending).resolves.toBe(false)
+    expect(ctx.sessionDenies.has('fs.write:src/a.ts')).toBe(true)
+    expect(ctx.persistPermission).toHaveBeenCalledWith(
+      'fs.write:src/a.ts',
+      'deny',
+      'always',
+    )
+
+    releasePersist?.()
+  })
 })

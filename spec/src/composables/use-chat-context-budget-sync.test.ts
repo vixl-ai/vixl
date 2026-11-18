@@ -447,7 +447,7 @@ describe('useChatContextBudgetSync refresh scheduling', () => {
   }
 
   it('coalesces a burst of streaming timeline changes into one trailing recount', async () => {
-    const { default: useChatContextBudgetSync, CONTEXT_BUDGET_STREAM_DEBOUNCE_MS } =
+    const { default: useChatContextBudgetSync, CONTEXT_BUDGET_STREAM_THROTTLE_MS } =
       await import('@/composables/use-chat-context-budget-sync')
     useChatContextBudgetSync()
     await flushPromptRefresh()
@@ -463,15 +463,37 @@ describe('useChatContextBudgetSync refresh scheduling', () => {
     }
 
     await nextTick()
-    await vi.advanceTimersByTimeAsync(CONTEXT_BUDGET_STREAM_DEBOUNCE_MS - 1)
+    await vi.advanceTimersByTimeAsync(CONTEXT_BUDGET_STREAM_THROTTLE_MS - 1)
     expect(refresh).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(1)
     expect(refresh).toHaveBeenCalledTimes(1)
   })
 
+  it('does not starve the stream recount when timeline changes keep arriving', async () => {
+    const { default: useChatContextBudgetSync, CONTEXT_BUDGET_STREAM_THROTTLE_MS } =
+      await import('@/composables/use-chat-context-budget-sync')
+    useChatContextBudgetSync()
+    await flushPromptRefresh()
+    const refresh = latestRefresh()
+    refresh.mockClear()
+
+    activeTurnId.value = 'turn-1'
+    await flushPromptRefresh()
+    refresh.mockClear()
+
+    timeline.value = [{ type: 'compaction', summary: 'chunk-0', focus: null }]
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(CONTEXT_BUDGET_STREAM_THROTTLE_MS - 100)
+    // A late change inside the window must not push the timer back.
+    timeline.value = [{ type: 'compaction', summary: 'chunk-1', focus: null }]
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
   it('recounts promptly on turn start, step finish, tool completion, and idle timeline changes', async () => {
-    const { default: useChatContextBudgetSync, CONTEXT_BUDGET_STREAM_DEBOUNCE_MS } =
+    const { default: useChatContextBudgetSync, CONTEXT_BUDGET_STREAM_THROTTLE_MS } =
       await import('@/composables/use-chat-context-budget-sync')
     useChatContextBudgetSync()
     await flushPromptRefresh()
@@ -485,7 +507,7 @@ describe('useChatContextBudgetSync refresh scheduling', () => {
     expect(refresh).toHaveBeenCalledTimes(1)
     refresh.mockClear()
 
-    await vi.advanceTimersByTimeAsync(CONTEXT_BUDGET_STREAM_DEBOUNCE_MS)
+    await vi.advanceTimersByTimeAsync(CONTEXT_BUDGET_STREAM_THROTTLE_MS)
     expect(refresh).not.toHaveBeenCalled()
 
     activeStepId.value = null
@@ -510,7 +532,7 @@ describe('useChatContextBudgetSync refresh scheduling', () => {
 
   it('does not start a second recount while one is already running', async () => {
     let release: (() => void) | undefined
-    const { default: useChatContextBudgetSync, CONTEXT_BUDGET_STREAM_DEBOUNCE_MS } =
+    const { default: useChatContextBudgetSync, CONTEXT_BUDGET_STREAM_THROTTLE_MS } =
       await import('@/composables/use-chat-context-budget-sync')
     useChatContextBudgetSync()
     await flushPromptRefresh()
@@ -531,7 +553,7 @@ describe('useChatContextBudgetSync refresh scheduling', () => {
       timeline.value = [{ type: 'compaction', summary: `live-${index}`, focus: null }]
     }
     await nextTick()
-    await vi.advanceTimersByTimeAsync(CONTEXT_BUDGET_STREAM_DEBOUNCE_MS)
+    await vi.advanceTimersByTimeAsync(CONTEXT_BUDGET_STREAM_THROTTLE_MS)
     expect(refresh).toHaveBeenCalledTimes(1)
 
     release?.()

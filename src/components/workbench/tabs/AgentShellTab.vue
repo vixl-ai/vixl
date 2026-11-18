@@ -10,7 +10,6 @@ import {
   TerminalHeader,
   TerminalTitle,
 } from '@/components/ai-elements/terminal'
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import { Button } from '@/components/shadcn/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -87,13 +86,16 @@ const handleStop = async (): Promise<void> => {
       v-else
       :output="output"
       :is-streaming="running"
-      :class="['h-full min-h-0 flex-1 rounded-none border-0', transparencyEnabled ? 'bg-transparent' : '']"
+      :class="[
+        'h-full min-h-0 flex-1 rounded-none border-0',
+        transparencyEnabled ? 'bg-transparent' : '',
+      ]"
     >
       <TerminalHeader>
         <TerminalTitle class="min-w-0 truncate">
-          <AiElementsShimmerShimmer v-if="running" :duration="1" as="span">
+          <span v-if="running" class="shimmer shimmer-duration-1000 shimmer-angle-0">
             {{ title }}
-          </AiElementsShimmerShimmer>
+          </span>
           <template v-else>{{ title }}</template>
         </TerminalTitle>
         <div class="flex shrink-0 items-center gap-1">

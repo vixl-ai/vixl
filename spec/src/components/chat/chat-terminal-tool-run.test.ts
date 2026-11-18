@@ -3,7 +3,6 @@ import { shallowMount } from '@vue/test-utils'
 import { ChevronRightIcon } from '@lucide/vue'
 import ChatTerminalToolRun from '@/components/chat/ChatTerminalToolRun.vue'
 import ChatTipIcon from '@/components/chat/ChatTipIcon.vue'
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import {
   TerminalCopyButton,
   TerminalHeader,
@@ -190,7 +189,7 @@ describe('ChatTerminalToolRun layout', () => {
   it('does not shimmer a done tool run while the live shell is still running', () => {
     mockGetAgentShell.mockReturnValue({ status: 'running', exitCode: null })
     const wrapper = mountRun(backgroundRun)
-    expect(wrapper.findComponent(AiElementsShimmerShimmer).exists()).toBe(false)
+    expect(wrapper.find('.shimmer').exists()).toBe(false)
     const tips = wrapper.findAllComponents(ChatTipIcon)
     expect(tips.some((tip) => tip.props('tooltip') === 'Running')).toBe(false)
   })

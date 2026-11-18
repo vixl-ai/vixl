@@ -33,12 +33,6 @@ const mountRun = (diffs: FileDiff[]) =>
     },
     global: {
       renderStubDefaultSlot: true,
-      stubs: {
-        AiElementsShimmerShimmer: {
-          name: 'AiElementsShimmerShimmer',
-          template: '<span><slot /></span>',
-        },
-      },
     },
   })
 

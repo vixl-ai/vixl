@@ -6,6 +6,7 @@ import { mapMetaStatusToChatStatus } from '@/services/harness/orchestrator'
 import { withTerminalOutputDescription } from '@/services/harness/shell/with-terminal-output-description'
 import mapSubagentResultStatus from '@/utils/map-subagent-result-status'
 import mergeToolRunArgs from '@/utils/merge-tool-run-args'
+import rawToolPayload from '@/utils/raw-tool-payload'
 import toolArgsPath from '@/utils/tool-args-path'
 import applyVisibleContextEvent from './apply-visible-context-event'
 import rebindWorkspace from './rebind-workspace'
@@ -19,11 +20,7 @@ type EventDeps = {
   maybeFlushBackgroundSubagentResume: () => void
 }
 
-export default (
-  state: AgentHarnessState,
-  attention: AttentionHelpers,
-  deps: EventDeps,
-) => {
+export default (state: AgentHarnessState, attention: AttentionHelpers, deps: EventDeps) => {
   const {
     options,
     session,
@@ -60,9 +57,7 @@ export default (
       if (HOLD_PATH_TOOLS.has(event.name)) {
         status.value = 'streaming'
       } else {
-        const existing = toolRuns.value.find(
-          (item) => item.toolCallId === event.toolCallId,
-        )
+        const existing = toolRuns.value.find((item) => item.toolCallId === event.toolCallId)
         if (!existing || existing.status === 'running') {
           const run: ToolRun = {
             toolCallId: event.toolCallId,
@@ -81,13 +76,10 @@ export default (
       }
     }
     if (event.type === 'tool-input-delta') {
-      const existing = toolRuns.value.find(
-        (item) => item.toolCallId === event.toolCallId,
-      )
+      const existing = toolRuns.value.find((item) => item.toolCallId === event.toolCallId)
       const name = event.name || existing?.name || 'tool'
-      const args = withTerminalOutputDescription(
-        name,
-        mergeToolRunArgs(existing?.args, event.args),
+      const args = rawToolPayload(
+        withTerminalOutputDescription(name, mergeToolRunArgs(existing?.args, event.args)),
       )
       if (HOLD_PATH_TOOLS.has(name) && !toolArgsPath(args)) {
         status.value = 'streaming'
@@ -108,16 +100,13 @@ export default (
       }
     }
     if (event.type === 'tool-start') {
-      const existing = toolRuns.value.find(
-        (item) => item.toolCallId === event.toolCallId,
-      )
+      const existing = toolRuns.value.find((item) => item.toolCallId === event.toolCallId)
       const run: ToolRun = {
         toolCallId: event.toolCallId,
         name: event.name,
         status: 'running',
-        args: withTerminalOutputDescription(
-          event.name,
-          mergeToolRunArgs(existing?.args, event.args),
+        args: rawToolPayload(
+          withTerminalOutputDescription(event.name, mergeToolRunArgs(existing?.args, event.args)),
         ),
         started: true,
       }
@@ -134,17 +123,15 @@ export default (
     }
     if (event.type === 'tool-result') {
       deps.syncPendingMcpAuth()
-      const existing = toolRuns.value.find(
-        (item) => item.toolCallId === event.toolCallId,
-      )
+      const existing = toolRuns.value.find((item) => item.toolCallId === event.toolCallId)
       const run: ToolRun = {
         toolCallId: event.toolCallId,
         name: existing?.name ?? 'tool',
         status: event.isError ? 'error' : 'done',
         args: existing?.args,
-        result: event.result,
+        result: rawToolPayload(event.result),
         artifact: event.artifact ?? existing?.artifact,
-        diffs: event.diffs ?? existing?.diffs,
+        diffs: rawToolPayload(event.diffs ?? existing?.diffs),
         started: true,
       }
       toolRuns.value = toolRuns.value.map((item) =>
@@ -178,15 +165,12 @@ export default (
     if (event.type === 'subagent-event') {
       const targetId =
         event.subagentId ||
-        [...subagents.value].reverse().find((item) => item.status === 'running')
-          ?.subagentId
+        [...subagents.value].reverse().find((item) => item.status === 'running')?.subagentId
       if (targetId) {
         const nested = event.event
         if (nested.type !== 'reasoning-delta' && nested.type !== 'text-delta') {
           subagents.value = subagents.value.map((item) =>
-            item.subagentId === targetId
-              ? { ...item, events: [...item.events, nested] }
-              : item,
+            item.subagentId === targetId ? { ...item, events: [...item.events, nested] } : item,
           )
         }
         session.appendLocalSubagentToolEvent(targetId, nested)
@@ -202,12 +186,7 @@ export default (
           ? { ...item, status: resultStatus, summary: event.summary }
           : item,
       )
-      session.completeLocalSubagent(
-        event.subagentId,
-        event.summary,
-        resultStatus,
-        event.stop,
-      )
+      session.completeLocalSubagent(event.subagentId, event.summary, resultStatus, event.stop)
       deps.maybeFlushBackgroundSubagentResume()
     }
     if (event.type === 'question-request') {
@@ -225,10 +204,7 @@ export default (
       session.finishAgentStep()
     }
     if (event.type === 'tool-pending-approval') {
-      pendingApprovals.value = [
-        ...pendingApprovals.value,
-        event as unknown as PendingApprovalView,
-      ]
+      pendingApprovals.value = [...pendingApprovals.value, event as unknown as PendingApprovalView]
       attention.setChatAttention('needs_approval')
     }
     if (event.type === 'billable-usage') {
@@ -246,8 +222,7 @@ export default (
       const mapped = mapMetaStatusToChatStatus(event.status, false)
       // During a force-send handoff an in-flight turn already owns the local
       // status; a late 'idle' meta event must not demote it back to ready.
-      const localBusy =
-        status.value === 'streaming' || status.value === 'submitted'
+      const localBusy = status.value === 'streaming' || status.value === 'submitted'
       const incomingBusy = mapped === 'streaming' || mapped === 'submitted'
       if (!localBusy || incomingBusy) {
         status.value = mapped
@@ -259,10 +234,7 @@ export default (
       }
     }
     if (event.type === 'chat-meta-changed') {
-      if (
-        event.projectSlug === options.projectSlug &&
-        event.chatId === options.chatId
-      ) {
+      if (event.projectSlug === options.projectSlug && event.chatId === options.chatId) {
         session.patchMeta(event.patch)
       }
       attention.refreshSidebar()

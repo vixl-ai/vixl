@@ -18,7 +18,7 @@ const draftModelRef = ref('')
 const draftMode = ref<VixlChatMode>('agent')
 const draftMentions = ref<ContextMention[]>([])
 
-export const CONTEXT_BUDGET_STREAM_DEBOUNCE_MS = 500
+export const CONTEXT_BUDGET_STREAM_THROTTLE_MS = 500
 
 let watchStarted = false
 let stopBudgetWatch: (() => void) | null = null
@@ -117,12 +117,15 @@ const scheduleRefresh = (mode: 'prompt' | 'stream'): void => {
   if (scheduledMode === 'prompt') {
     return
   }
-  clearScheduledRefresh()
+  // Throttle, not debounce: continuous streaming replaces the timeline every
+  // delta batch, so resetting the timer on each change would starve the
+  // recount until the stream pauses. Keep the first scheduled timer; it reads
+  // the latest state when it fires.
+  if (scheduledTimer !== null) {
+    return
+  }
   scheduledMode = 'stream'
-  scheduledTimer = setTimeout(
-    runScheduledRefresh,
-    CONTEXT_BUDGET_STREAM_DEBOUNCE_MS,
-  )
+  scheduledTimer = setTimeout(runScheduledRefresh, CONTEXT_BUDGET_STREAM_THROTTLE_MS)
 }
 
 export default () => {
@@ -168,7 +171,7 @@ export default () => {
 
     const modelId =
       draftModelRef.value ||
-      (meta.model ? normalizeStoredModelRef(meta.model) ?? meta.model : '') ||
+      (meta.model ? (normalizeStoredModelRef(meta.model) ?? meta.model) : '') ||
       ''
     if (!modelId) {
       contextUsage.bindChat(selectedChatId)
@@ -197,10 +200,10 @@ export default () => {
         })
     const projectName = standalone
       ? 'Home'
-      : members?.find((member) => member.rootPath === projectRoot)?.name ??
+      : (members?.find((member) => member.rootPath === projectRoot)?.name ??
         project?.name ??
         meta.projectSlug ??
-        'Home'
+        'Home')
 
     await contextUsage.refresh({
       modelId,

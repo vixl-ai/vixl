@@ -44,10 +44,6 @@ const mountTurn = (item: SubagentTimelineItem): VueWrapper => {
     global: {
       renderStubDefaultSlot: true,
       stubs: {
-        AiElementsShimmerShimmer: {
-          name: 'AiElementsShimmerShimmer',
-          template: '<span><slot /></span>',
-        },
         Tooltip: { name: 'Tooltip', template: '<span><slot /></span>' },
         TooltipTrigger: { name: 'TooltipTrigger', template: '<span><slot /></span>' },
         TooltipContent: { name: 'TooltipContent', template: '<span><slot /></span>' },

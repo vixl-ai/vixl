@@ -12,7 +12,6 @@ import countDiffLines from '@/utils/count-diff-lines'
 import formatToolRunLabel from '@/utils/format-tool-run-label'
 import { isTerminalToolName } from '@/utils/parse-terminal-tool-view'
 import resolveFileDiffHunks from '@/utils/resolve-file-diff-hunks'
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import ChatArtifactLink from '@/components/chat/ChatArtifactLink.vue'
 import ChatInlineFileDiff from '@/components/chat/InlineFileDiff.vue'
 import ChatTerminalToolRun from '@/components/chat/ChatTerminalToolRun.vue'
@@ -58,9 +57,7 @@ const formatDetail = (value: unknown): string => {
   }
 }
 
-const { open } = usePersistedCollapsibleOpen(
-  () => chatTurnOpenKeys.tool(props.run.toolCallId),
-)
+const { open } = usePersistedCollapsibleOpen(() => chatTurnOpenKeys.tool(props.run.toolCallId))
 
 const hasArtifactChip = computed(
   () => props.run.artifact !== undefined && props.run.status === 'done',
@@ -162,11 +159,12 @@ const diffCounts = computed(() => {
 </script>
 
 <template>
-  <ChatTerminalToolRun
-    v-if="isTerminalRun"
-    :run="run"
-  />
-  <Collapsible v-else-if="hasCollapsibleContent" v-model:open="open" class="w-full min-w-0 max-w-full">
+  <ChatTerminalToolRun v-if="isTerminalRun" :run="run" />
+  <Collapsible
+    v-else-if="hasCollapsibleContent"
+    v-model:open="open"
+    class="w-full min-w-0 max-w-full"
+  >
     <div class="flex w-full min-w-0 items-center gap-1">
       <CollapsibleTrigger
         class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm transition-colors hover:text-foreground"
@@ -178,14 +176,12 @@ const diffCounts = computed(() => {
           class="size-3.5 shrink-0 transition-transform"
           :class="open ? 'rotate-90' : ''"
         />
-        <AiElementsShimmerShimmer
+        <span
           v-if="isRunning"
-          :duration="1"
-          as="span"
-          class="min-w-0 truncate"
+          class="shimmer shimmer-duration-1000 shimmer-angle-0 min-w-0 truncate"
         >
           {{ label }}
-        </AiElementsShimmerShimmer>
+        </span>
         <span v-else class="min-w-0 truncate">{{ label }}</span>
         <ChatArtifactLink v-if="run.artifact && hasArtifactChip" :artifact="run.artifact" />
         <span
@@ -206,14 +202,12 @@ const diffCounts = computed(() => {
     <CollapsibleContent
       class="mt-1 space-y-2 border-l border-border/60 pl-5 text-xs text-muted-foreground"
     >
-      <AiElementsShimmerShimmer
+      <p
         v-if="isRunning && !hasDetails"
-        :duration="1.5"
-        as="p"
-        class="text-muted-foreground"
+        class="shimmer shimmer-duration-1500 shimmer-angle-0 text-muted-foreground"
       >
         Running
-      </AiElementsShimmerShimmer>
+      </p>
       <p v-if="ownerTitle" class="text-muted-foreground">Held by {{ ownerTitle }}</p>
       <div v-if="argsText">
         <p class="mb-1 font-medium text-foreground/80">Input</p>
@@ -252,14 +246,9 @@ const diffCounts = computed(() => {
     :class="isError ? 'text-destructive/90' : 'text-muted-foreground'"
   >
     <XIcon v-if="isError" class="size-3.5 shrink-0 text-destructive" />
-    <AiElementsShimmerShimmer
-      v-if="isRunning"
-      :duration="1"
-      as="span"
-      class="min-w-0 truncate"
-    >
+    <span v-if="isRunning" class="shimmer shimmer-duration-1000 shimmer-angle-0 min-w-0 truncate">
       {{ label }}
-    </AiElementsShimmerShimmer>
+    </span>
     <span v-else class="min-w-0 truncate">{{ label }}</span>
   </div>
 </template>

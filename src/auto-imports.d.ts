@@ -9,7 +9,7 @@
 export {}
 declare global {
   const CHAT_TURN_OPEN_STATE_KEY: typeof import('./composables/use-chat-turn-open-state').CHAT_TURN_OPEN_STATE_KEY
-  const CONTEXT_BUDGET_STREAM_DEBOUNCE_MS: typeof import('./composables/use-chat-context-budget-sync').CONTEXT_BUDGET_STREAM_DEBOUNCE_MS
+  const CONTEXT_BUDGET_STREAM_THROTTLE_MS: typeof import('./composables/use-chat-context-budget-sync').CONTEXT_BUDGET_STREAM_THROTTLE_MS
   const EffectScope: typeof import('vue').EffectScope
   const FileTreeGitDecorationKey: typeof import('./composables/use-git-status').FileTreeGitDecorationKey
   const FileTreeProjectIdKey: typeof import('./composables/use-file-tree-node-menu').FileTreeProjectIdKey
@@ -452,7 +452,7 @@ declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
     readonly CHAT_TURN_OPEN_STATE_KEY: UnwrapRef<typeof import('./composables/use-chat-turn-open-state')['CHAT_TURN_OPEN_STATE_KEY']>
-    readonly CONTEXT_BUDGET_STREAM_DEBOUNCE_MS: UnwrapRef<typeof import('./composables/use-chat-context-budget-sync')['CONTEXT_BUDGET_STREAM_DEBOUNCE_MS']>
+    readonly CONTEXT_BUDGET_STREAM_THROTTLE_MS: UnwrapRef<typeof import('./composables/use-chat-context-budget-sync')['CONTEXT_BUDGET_STREAM_THROTTLE_MS']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly FileTreeGitDecorationKey: UnwrapRef<typeof import('./composables/use-git-status')['FileTreeGitDecorationKey']>
     readonly FileTreeProjectIdKey: UnwrapRef<typeof import('./composables/use-file-tree-node-menu')['FileTreeProjectIdKey']>

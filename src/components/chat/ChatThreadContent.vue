@@ -9,7 +9,6 @@ import type { AggregatedTurnFileChange } from '@/types/harness/file-checkpoint'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { McpConfig } from '@/types/vixl/mcp-config'
 import type { PendingApprovalView } from '@/services/harness/permission/gate'
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import ChatAgentTurn from '@/components/chat/ChatAgentTurn.vue'
 import ChatCompactionMarker from '@/components/chat/ChatCompactionMarker.vue'
 import ChatMessageTurn from '@/components/chat/ChatMessageTurn.vue'
@@ -111,9 +110,7 @@ const buildSubagentMaps = (items: SubagentTimelineItem[]): SubagentMaps => {
   return { byToolCallId, byId }
 }
 
-const collectCompletedFileTools = (
-  timeline: ChatTimelineItem[],
-): CompletedFileToolMark[] => {
+const collectCompletedFileTools = (timeline: ChatTimelineItem[]): CompletedFileToolMark[] => {
   const marks: CompletedFileToolMark[] = []
   const takeTools = (tools: ToolRun[]): void => {
     for (const tool of tools) {
@@ -146,10 +143,7 @@ const sameCompletedFileTools = (
   for (let index = 0; index < left.length; index += 1) {
     const leftMark = left[index]
     const rightMark = right[index]
-    if (
-      leftMark?.toolCallId !== rightMark?.toolCallId ||
-      leftMark?.diffs !== rightMark?.diffs
-    ) {
+    if (leftMark?.toolCallId !== rightMark?.toolCallId || leftMark?.diffs !== rightMark?.diffs) {
       return false
     }
   }
@@ -179,8 +173,7 @@ const isLive = computed(() => props.status === 'streaming' || props.status === '
 
 const runningSubagents = computed(() =>
   props.timeline.filter(
-    (item): item is SubagentTimelineItem =>
-      item.type === 'subagent' && item.status === 'running',
+    (item): item is SubagentTimelineItem => item.type === 'subagent' && item.status === 'running',
   ),
 )
 
@@ -260,10 +253,7 @@ const streamRevision = computed(() => {
         props.timeline.length,
         prior.turn.text.length,
         prior.turn.steps
-          .map(
-            (step) =>
-              `${step.text.length}:${step.reasoning.length}:${step.tools.length}`,
-          )
+          .map((step) => `${step.text.length}:${step.reasoning.length}:${step.tools.length}`)
           .join(';'),
         subagentRevision.value,
       ].join(':')
@@ -312,11 +302,7 @@ const claimedSubagentKeys = computed(() => {
     }
   }
   for (const item of props.timeline) {
-    if (
-      item.type === 'subagent' &&
-      item.toolCallId &&
-      toolCallIds.has(item.toolCallId)
-    ) {
+    if (item.type === 'subagent' && item.toolCallId && toolCallIds.has(item.toolCallId)) {
       subagentIds.add(item.subagentId)
     }
   }
@@ -466,10 +452,7 @@ const hasUserMessageAfterLastTurn = computed(() => {
 
 const activityOnLastAgentTurn = computed(() => {
   const lastIndex = visibleTimeline.value.length - 1
-  return (
-    lastIndex >= 0 &&
-    visibleTimeline.value[lastIndex]?.type === 'agent-turn'
-  )
+  return lastIndex >= 0 && visibleTimeline.value[lastIndex]?.type === 'agent-turn'
 })
 
 const trailingActivityLabel = computed(() => {
@@ -499,15 +482,11 @@ type VisibleTimelineRow = {
 const timelineRows = computed((): VisibleTimelineRow[] => {
   const items = visibleTimeline.value
   const windowed = windowedMessageIds.value
-  const pinTail =
-    isLive.value || Boolean(activityLabel.value) || props.compacting === true
+  const pinTail = isLive.value || Boolean(activityLabel.value) || props.compacting === true
   const lastIndex = items.length - 1
   return items.map((item, index) => {
     const id = timelineItemId(item, index)
-    const mount =
-      (pinTail && index === lastIndex) ||
-      windowed == null ||
-      windowed.has(id)
+    const mount = (pinTail && index === lastIndex) || windowed == null || windowed.has(id)
     return {
       id,
       index,
@@ -543,12 +522,7 @@ watch(
 )
 
 const followLiveOutput = async (settleReady = false): Promise<void> => {
-  if (
-    !settleReady &&
-    !isLive.value &&
-    !activityLabel.value &&
-    !props.compacting
-  ) {
+  if (!settleReady && !isLive.value && !activityLabel.value && !props.compacting) {
     return
   }
   try {
@@ -613,10 +587,7 @@ watch(
     }
     // Ready unmounts the activity row and mounts files-changed after the last
     // stick. Follow once more so that render is included.
-    if (
-      (previous === 'streaming' || previous === 'submitted') &&
-      isFollowingLive()
-    ) {
+    if ((previous === 'streaming' || previous === 'submitted') && isFollowingLive()) {
       followLiveOutput(true)
     }
   },
@@ -642,9 +613,7 @@ watch(
             :message="row.item.message"
             :editable="!readOnly && !isLive"
           />
-          <ChatCompactionMarker
-            v-else-if="row.item.type === 'compaction'"
-          />
+          <ChatCompactionMarker v-else-if="row.item.type === 'compaction'" />
           <ChatSubAgentTurn
             v-else-if="row.item.type === 'subagent'"
             :subagent="row.item"
@@ -657,10 +626,18 @@ watch(
             :activity-label="agentTurnActivityLabel(row.index)"
             :subagents-by-tool-call-id="subagentsByToolCallId"
             :subagents-by-id="subagentsById"
-            :restore-enabled="!readOnly && !isLive && (row.index !== lastVisibleAgentTurnIndex || lastTurnCanRestore)"
+            :restore-enabled="
+              !readOnly &&
+              !isLive &&
+              (row.index !== lastVisibleAgentTurnIndex || lastTurnCanRestore)
+            "
             :chat-file-changes="row.index === lastVisibleAgentTurnIndex ? chatFileChanges : null"
-            :restore-changes="row.index === lastVisibleAgentTurnIndex ? lastTurnRestoreChanges : undefined"
-            :restore-discards-latest-message="row.index === lastVisibleAgentTurnIndex ? hasUserMessageAfterLastTurn : undefined"
+            :restore-changes="
+              row.index === lastVisibleAgentTurnIndex ? lastTurnRestoreChanges : undefined
+            "
+            :restore-discards-latest-message="
+              row.index === lastVisibleAgentTurnIndex ? hasUserMessageAfterLastTurn : undefined
+            "
             :can-continue="row.item.turn.id === continuableTurnId"
             @retry="emit('retry')"
             @continue="emit('continue')"
@@ -674,19 +651,14 @@ watch(
           :scroll-anchor="true"
           class="min-w-0 max-w-full"
         >
-          <AiElementsShimmerShimmer
+          <p
             v-if="trailingActivityLabel"
-            :duration="1.5"
-            as="p"
-            class="text-sm"
+            class="shimmer shimmer-duration-1500 shimmer-angle-0 text-sm"
           >
             {{ trailingActivityLabel }}
-          </AiElementsShimmerShimmer>
+          </p>
         </MessageScrollerItem>
-        <ChatCompactionMarker
-          v-if="compacting"
-          pending
-        />
+        <ChatCompactionMarker v-if="compacting" pending />
         <ChatQuestionCard
           v-if="!readOnly && pendingQuestion"
           :question="pendingQuestion"

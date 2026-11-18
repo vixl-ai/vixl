@@ -1,13 +1,8 @@
 <script setup lang="ts">
 import type { SubagentEntry } from '@/types/harness/subagent-entry'
 import { SquareIcon } from '@lucide/vue'
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 defineProps<{
   subagents: SubagentEntry[]
@@ -26,10 +21,7 @@ const displayName = (name: string): string => {
 
 <template>
   <ul class="flex flex-col gap-1">
-    <li
-      v-for="subagent in subagents"
-      :key="subagent.subagentId"
-    >
+    <li v-for="subagent in subagents" :key="subagent.subagentId">
       <div class="flex w-full items-center gap-2">
         <button
           type="button"
@@ -38,18 +30,13 @@ const displayName = (name: string): string => {
         >
           <span class="flex min-w-0 items-center gap-1.5">
             <ChatRunningDots v-if="subagent.status === 'running'" />
-            <AiElementsShimmerShimmer
+            <span
               v-if="subagent.status === 'running'"
-              :duration="1"
-              as="span"
-              class="min-w-0 truncate"
+              class="shimmer shimmer-duration-1000 shimmer-angle-0 min-w-0 truncate"
             >
               {{ displayName(subagent.name) }}
-            </AiElementsShimmerShimmer>
-            <span
-              v-else
-              class="min-w-0 truncate"
-            >{{ displayName(subagent.name) }}</span>
+            </span>
+            <span v-else class="min-w-0 truncate">{{ displayName(subagent.name) }}</span>
           </span>
         </button>
         <Tooltip>
