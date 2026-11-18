@@ -653,7 +653,7 @@ watch(
         >
           <p
             v-if="trailingActivityLabel"
-            class="shimmer shimmer-duration-1500 shimmer-angle-0 text-sm"
+            class="shimmer shimmer-duration-1500 shimmer-angle-0 w-fit text-sm"
           >
             {{ trailingActivityLabel }}
           </p>

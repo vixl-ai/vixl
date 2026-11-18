@@ -111,7 +111,7 @@ const handleStop = (): void => {
           <span class="block truncate text-foreground/90">{{ displayName }}</span>
           <span
             v-if="activityLabel"
-            class="shimmer shimmer-duration-1000 shimmer-angle-0 block min-w-0 truncate text-[10px] leading-tight"
+            class="shimmer shimmer-duration-1000 shimmer-angle-0 block w-fit max-w-full min-w-0 truncate text-[10px] leading-tight"
           >
             {{ activityLabel }}
           </span>

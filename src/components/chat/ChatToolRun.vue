@@ -204,7 +204,7 @@ const diffCounts = computed(() => {
     >
       <p
         v-if="isRunning && !hasDetails"
-        class="shimmer shimmer-duration-1500 shimmer-angle-0 text-muted-foreground"
+        class="shimmer shimmer-duration-1500 shimmer-angle-0 w-fit text-muted-foreground"
       >
         Running
       </p>
