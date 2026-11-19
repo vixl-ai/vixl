@@ -32,7 +32,7 @@ describe('deriveSubagentActivity', () => {
     ).toBeNull()
   })
 
-  it('returns Generating when running with no tools yet', () => {
+  it('returns null when running with no tools yet', () => {
     expect(
       deriveSubagentActivity(
         base({
@@ -40,7 +40,7 @@ describe('deriveSubagentActivity', () => {
           tools: [],
         }),
       ),
-    ).toBe('Generating')
+    ).toBeNull()
   })
 
   it('prefers the latest running tool label', () => {

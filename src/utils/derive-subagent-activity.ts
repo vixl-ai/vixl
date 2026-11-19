@@ -11,18 +11,15 @@ export default (subagent: SubagentTimelineItem): string | null => {
   }
 
   const tools = subagent.tools
-  if (tools.length === 0) {
-    return 'Generating'
-  }
-
   const running = [...tools].reverse().find((tool) => tool.status === 'running')
   if (running) {
     return formatToolRunLabel(running)
   }
 
+  // No tools yet: the card's running dots already show it is live.
   const last = tools.at(-1)
   if (!last) {
-    return 'Generating'
+    return null
   }
   return formatToolRunLabel(last)
 }
