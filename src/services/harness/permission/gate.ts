@@ -8,7 +8,7 @@ import type {
 } from '@/types/harness/permission'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 import { requestApproval, type ApprovalKind } from '@/services/harness/permission/approval-gate'
-import { decidePermission, isStickyShellElevation } from '@/services/harness/permission/policy'
+import { decidePermission } from '@/services/harness/permission/policy'
 import { toolRunsAtLine } from '@/services/harness/ssh/location'
 
 export type PendingApprovalView = {
@@ -147,8 +147,7 @@ export const gateToolPermission = async (args: {
   if (
     result.scope === 'session' ||
     result.scope === 'workspace' ||
-    result.scope === 'always' ||
-    (result.scope === 'once' && isStickyShellElevation(args.capability))
+    result.scope === 'always'
   ) {
     args.ctx.sessionAllows.add(rememberKey)
   }

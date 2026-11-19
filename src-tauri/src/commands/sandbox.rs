@@ -126,6 +126,15 @@ fn render_seatbelt_profile(
 (allow file-write* (subpath (string-append (param "HOME") "/.local")))
 (allow file-write* (subpath (string-append (param "HOME") "/Library/Caches")))
 
+; Deny writes to executable-planting paths inside the writable tool caches.
+; A planted binary or cargo runner config would run outside the sandbox later.
+(deny file-write* (subpath (string-append (param "HOME") "/.local/bin")))
+(deny file-write* (subpath (string-append (param "HOME") "/.cargo/bin")))
+(deny file-write* (literal (string-append (param "HOME") "/.cargo/config.toml")))
+(deny file-write* (literal (string-append (param "HOME") "/.cargo/config")))
+(deny file-write* (subpath (string-append (param "HOME") "/.npm/_cacache")))
+(deny file-write* (subpath (string-append (param "HOME") "/.npm/_npx")))
+
 ; Deny sensitive credential directories inside HOME
 (deny file-read*  (subpath (string-append (param "HOME") "/.ssh")))
 (deny file-write* (subpath (string-append (param "HOME") "/.ssh")))
@@ -133,6 +142,33 @@ fn render_seatbelt_profile(
 (deny file-write* (subpath (string-append (param "HOME") "/.aws")))
 (deny file-read*  (subpath (string-append (param "HOME") "/.gnupg")))
 (deny file-write* (subpath (string-append (param "HOME") "/.gnupg")))
+; Credential files and dirs with the same sensitivity as the file-tool checks.
+; Reads are denied too: with network allowed, a readable token is exfiltratable.
+(deny file-read*  (literal (string-append (param "HOME") "/.npmrc")))
+(deny file-write* (literal (string-append (param "HOME") "/.npmrc")))
+(deny file-read*  (literal (string-append (param "HOME") "/.netrc")))
+(deny file-write* (literal (string-append (param "HOME") "/.netrc")))
+(deny file-read*  (literal (string-append (param "HOME") "/.pypirc")))
+(deny file-write* (literal (string-append (param "HOME") "/.pypirc")))
+(deny file-read*  (subpath (string-append (param "HOME") "/.config/gh")))
+(deny file-write* (subpath (string-append (param "HOME") "/.config/gh")))
+(deny file-read*  (subpath (string-append (param "HOME") "/.kube")))
+(deny file-write* (subpath (string-append (param "HOME") "/.kube")))
+(deny file-read*  (subpath (string-append (param "HOME") "/.docker")))
+(deny file-write* (subpath (string-append (param "HOME") "/.docker")))
+; Browser profiles and system credential stores hold session cookies and logins.
+(deny file-read*  (subpath (string-append (param "HOME") "/Library/Application Support/Google/Chrome")))
+(deny file-write* (subpath (string-append (param "HOME") "/Library/Application Support/Google/Chrome")))
+(deny file-read*  (subpath (string-append (param "HOME") "/Library/Application Support/Chromium")))
+(deny file-write* (subpath (string-append (param "HOME") "/Library/Application Support/Chromium")))
+(deny file-read*  (subpath (string-append (param "HOME") "/Library/Application Support/Firefox")))
+(deny file-write* (subpath (string-append (param "HOME") "/Library/Application Support/Firefox")))
+(deny file-read*  (subpath (string-append (param "HOME") "/Library/Safari")))
+(deny file-write* (subpath (string-append (param "HOME") "/Library/Safari")))
+(deny file-read*  (subpath (string-append (param "HOME") "/Library/Cookies")))
+(deny file-write* (subpath (string-append (param "HOME") "/Library/Cookies")))
+(deny file-read*  (subpath (string-append (param "HOME") "/Library/Keychains")))
+(deny file-write* (subpath (string-append (param "HOME") "/Library/Keychains")))
 {project_write_rules}
 ; TMPDIR (macOS uses /private/var/folders/…/T by default)
 (allow file-read*  (subpath (param "TMPDIR")))
@@ -227,6 +263,92 @@ pub fn path_ancestors(path: &str) -> Vec<String> {
 
 fn format_ancestor_read_rules(home: &str, project_root: &str) -> String {
     format_ancestor_read_rules_many(home, &[project_root.to_string()])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const HOME: &str = "/Users/tester";
+    const ROOT: &str = "/Users/tester/code/proj";
+
+    #[test]
+    fn profile_denies_credential_reads_and_writes() {
+        let profile = generate_seatbelt_profile(true, HOME, ROOT);
+        for path in [
+            "/.npmrc",
+            "/.netrc",
+            "/.pypirc",
+            "/.ssh",
+            "/.aws",
+            "/.gnupg",
+            "/.config/gh",
+            "/.kube",
+            "/.docker",
+            "/Library/Application Support/Google/Chrome",
+            "/Library/Application Support/Firefox",
+            "/Library/Safari",
+            "/Library/Cookies",
+            "/Library/Keychains",
+        ] {
+            let needle = format!("(string-append (param \"HOME\") \"{path}\")");
+            assert!(
+                profile.contains(&format!("(deny file-read*  (subpath {needle}))"))
+                    || profile.contains(&format!("(deny file-read*  (literal {needle}))")),
+                "missing read deny for {path}"
+            );
+            assert!(
+                profile.contains(&format!("(deny file-write* (subpath {needle}))"))
+                    || profile.contains(&format!("(deny file-write* (literal {needle}))")),
+                "missing write deny for {path}"
+            );
+        }
+    }
+
+    #[test]
+    fn profile_denies_executable_planting_after_cache_allows() {
+        let profile = generate_seatbelt_profile(true, HOME, ROOT);
+        let cache_allow = profile
+            .find("(allow file-write* (subpath (string-append (param \"HOME\") \"/.local\")))")
+            .expect("cache allow present");
+        for path in [
+            "/.local/bin",
+            "/.cargo/bin",
+            "/.cargo/config.toml",
+            "/.cargo/config",
+            "/.npm/_cacache",
+            "/.npm/_npx",
+        ] {
+            let needle = format!("(string-append (param \"HOME\") \"{path}\")");
+            let deny_pos = profile
+                .find(&format!("(deny file-write* (subpath {needle}))"))
+                .or_else(|| profile.find(&format!("(deny file-write* (literal {needle}))")))
+                .unwrap_or_else(|| panic!("missing write deny for {path}"));
+            assert!(
+                deny_pos > cache_allow,
+                "write deny for {path} must come after the cache allow (later rules win)"
+            );
+        }
+    }
+
+    #[test]
+    fn credential_denies_apply_to_read_only_projects_too() {
+        let profile = generate_seatbelt_profile_with(false, false, HOME, ROOT);
+        assert!(profile.contains("(deny file-read*  (literal (string-append (param \"HOME\") \"/.npmrc\")))"));
+        assert!(profile.contains("(deny file-read*  (subpath (string-append (param \"HOME\") \"/.config/gh\")))"));
+    }
+
+    #[test]
+    fn multi_root_profile_inherits_credential_denies() {
+        let profile = generate_seatbelt_profile_for_roots(
+            true,
+            true,
+            HOME,
+            &["/Users/tester/code/a", "/Users/tester/code/b"],
+        );
+        assert!(profile.contains("(deny file-read*  (literal (string-append (param \"HOME\") \"/.npmrc\")))"));
+        assert!(profile.contains("(deny file-write* (subpath (string-append (param \"HOME\") \"/.local/bin\")))"));
+    }
 }
 
 fn format_ancestor_read_rules_many(home: &str, project_roots: &[String]) -> String {

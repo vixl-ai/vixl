@@ -5,6 +5,14 @@ export type SandboxResultMeta = {
   network: SandboxNetworkPolicy
   cwd?: string
   cwdSlug?: string
+  background?: boolean
+}
+
+const sandboxBlockLine = (background: boolean | undefined): string => {
+  if (background) {
+    return 'A background run stays sandboxed for its whole life: a spawn failure here is not retried unsandboxed, so run the command again without is_background to get the approved unsandboxed retry. No workaround such as a .py script, in-repo temp dirs, TMPDIR redirects, or .gitignore edits.'
+  }
+  return 'On a sandbox spawn failure, the harness asks before retrying outside the sandbox; a runtime sandbox block is reported as the result, with no workaround such as a .py script, in-repo temp dirs, TMPDIR redirects, or .gitignore edits.'
 }
 
 const hasSandboxingFooter = (text: string): boolean => text.includes('SANDBOXING:')
@@ -14,11 +22,13 @@ export const resolveSandboxResultMeta = (args: {
   allowNetwork?: boolean
   cwd?: string
   cwdSlug?: string
+  background?: boolean
 }): SandboxResultMeta => {
   const sandboxed = args.sandboxed !== false
   const cwdFields = {
     ...(args.cwd ? { cwd: args.cwd } : {}),
     ...(args.cwdSlug ? { cwdSlug: args.cwdSlug } : {}),
+    ...(args.background ? { background: true } : {}),
   }
   if (!sandboxed) {
     return { sandboxed: false, network: 'allow', ...cwdFields }
@@ -49,7 +59,7 @@ export const sandboxingFooter = (meta: SandboxResultMeta): string => {
 
   const lines = [
     `SANDBOXING: writes limited to the project, devices isolated (no /dev/disk). Network: ${meta.network}`,
-    'On a sandbox block, the harness retries outside the sandbox when the user already approved this command; otherwise report the denial as the result, with no workaround such as a .py script, in-repo temp dirs, TMPDIR redirects, or .gitignore edits.',
+    sandboxBlockLine(meta.background),
   ]
   if (cwdLine) {
     lines.push(cwdLine)

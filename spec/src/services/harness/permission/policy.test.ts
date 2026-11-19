@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  decidePermission,
-  isStickyShellElevation,
-} from '@/services/harness/permission/policy'
+import { decidePermission } from '@/services/harness/permission/policy'
 import type { VixlSettings } from '@/types/vixl/vixl-settings'
 
 const baseSettings = (
@@ -134,7 +131,7 @@ describe('decidePermission shell', () => {
   it('does not let session allow of shell cover shell.unsandboxed', () => {
     const decision = decidePermission(shellInput('shell.unsandboxed', ['shell']))
     expect(decision.verdict).toBe('ask')
-    expect(decision.allowedScopes).toEqual(['once', 'session', 'never'])
+    expect(decision.allowedScopes).toEqual(['session', 'never'])
   })
 
   it('allows shell.unsandboxed when sessionAllows has shell.unsandboxed', () => {
@@ -158,7 +155,7 @@ describe('decidePermission shell', () => {
   it('does not let session allow of shell cover shell.network', () => {
     const decision = decidePermission(shellInput('shell.network', ['shell']))
     expect(decision.verdict).toBe('ask')
-    expect(decision.allowedScopes).toEqual(['once', 'session', 'never'])
+    expect(decision.allowedScopes).toEqual(['session', 'never'])
   })
 
   it('allows shell.network when sessionAllows has shell.network', () => {
@@ -320,13 +317,13 @@ describe('decidePermission bypass', () => {
   })
 
   it.each([
-    'shell',
-    'shell.network',
-    'shell.unsandboxed',
-  ] as const)('allows %s', (action) => {
+    ['shell', ['once', 'session', 'never']],
+    ['shell.network', ['session', 'never']],
+    ['shell.unsandboxed', ['session', 'never']],
+  ] as const)('allows %s', (action, scopes) => {
     const decision = decidePermission(bypassInput(action))
     expect(decision.verdict).toBe('allow')
-    expect(decision.allowedScopes).toEqual(['once', 'session', 'never'])
+    expect(decision.allowedScopes).toEqual([...scopes])
   })
 
   it('allows mcp.call', () => {
@@ -391,11 +388,18 @@ describe('decidePermission bypass', () => {
   })
 })
 
-describe('isStickyShellElevation', () => {
-  it('is true only for network and unsandboxed hops', () => {
-    expect(isStickyShellElevation('shell.network')).toBe(true)
-    expect(isStickyShellElevation('shell.unsandboxed')).toBe(true)
-    expect(isStickyShellElevation('shell')).toBe(false)
-    expect(isStickyShellElevation('web.fetch')).toBe(false)
+describe('shell elevation scopes', () => {
+  it('offers no once scope for network and unsandboxed hops', () => {
+    for (const action of ['shell.network', 'shell.unsandboxed'] as const) {
+      const decision = decidePermission(shellInput(action, []))
+      expect(decision.verdict).toBe('ask')
+      expect(decision.allowedScopes).toEqual(['session', 'never'])
+      expect(decision.allowedScopes).not.toContain('once')
+    }
+  })
+
+  it('keeps once for sandboxed shell', () => {
+    const decision = decidePermission(shellInput('shell', []))
+    expect(decision.allowedScopes).toEqual(['once', 'session', 'never'])
   })
 })

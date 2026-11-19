@@ -79,6 +79,14 @@ describe('harness guidance clauses', () => {
     expect(runTerminal(baseCtx()).description).toContain(noPollTerminal)
   })
 
+  it('states the approved unsandboxed retry is blocking-only on the run_terminal description', () => {
+    const description = runTerminal(baseCtx()).description
+    expect(description).toContain(
+      'A sandbox spawn failure retries unsandboxed after approval',
+    )
+    expect(description).toContain('blocking runs only')
+  })
+
   it('puts the steer-accepted clause on the steer_subagent description and resume note', async () => {
     expect(steerAccepted).toContain('acceptance only')
     expect(steerAccepted).toContain('end the turn without reporting it')

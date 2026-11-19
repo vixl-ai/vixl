@@ -154,14 +154,30 @@ describe('approvalActionSpecs', () => {
     )
   })
 
-  it('labels the once action for unsandboxed hops', () => {
+  it('labels the session action as session-wide for unsandboxed hops', () => {
     const unsandboxed = approvalActionSpecs({
-      allowedScopes: ['once', 'session'],
+      allowedScopes: ['session', 'never'],
       unsandboxed: true,
       kind: 'shell',
     })
-    expect(unsandboxed.find((action) => action.key === 'once')?.tooltip).toBe(
-      'Run outside sandbox',
+    expect(unsandboxed.map((action) => action.key)).toEqual([
+      'session',
+      'deny',
+      'never',
+    ])
+    expect(unsandboxed.find((action) => action.key === 'session')?.tooltip).toBe(
+      'Allow outside sandbox for this session',
+    )
+  })
+
+  it('labels the session action as session-wide for network hops', () => {
+    const network = approvalActionSpecs({
+      allowedScopes: ['session', 'never'],
+      needsNetwork: true,
+      kind: 'shell',
+    })
+    expect(network.find((action) => action.key === 'session')?.tooltip).toBe(
+      'Allow network for this session',
     )
   })
 

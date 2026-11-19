@@ -5,10 +5,13 @@ import type {
   SandboxRuntimeDenialKind,
 } from '@/services/harness/shell/sandbox-denial-detectors'
 
+// Only wrapper-level spawn failures may drive an unsandboxed retry. These
+// prefixes come from the Rust sandbox builder rejecting the spawn, not from
+// child output. SANDBOX_RUNTIME_BLOCKED is derived from untrusted command
+// stdout/stderr, so it is reported as a denial and never auto-escalated.
 const isSandboxSpawnError = (message: string): boolean =>
   message.startsWith('SANDBOX_FAILED:') ||
-    message.startsWith('SANDBOX_UNAVAILABLE:') ||
-    message.startsWith('SANDBOX_RUNTIME_BLOCKED:')
+    message.startsWith('SANDBOX_UNAVAILABLE:')
 
 const parseSandboxRuntimeDenialKind = (
   message: string,

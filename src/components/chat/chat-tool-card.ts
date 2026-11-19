@@ -56,6 +56,7 @@ const SCOPE_TOOLTIPS: Record<Exclude<PermissionScope, 'once' | 'never'>, string>
 export const approvalActionSpecs = (args: {
   allowedScopes: PermissionScope[]
   unsandboxed?: boolean
+  needsNetwork?: boolean
   kind?: ApprovalKind
 }): ApprovalActionSpec[] => {
   const actions: ApprovalActionSpec[] = orderedApprovalScopes(
@@ -68,6 +69,10 @@ export const approvalActionSpecs = (args: {
       tooltip = 'Allow file edits in this workspace'
     } else if (args.kind === 'fs' && scope === 'always') {
       tooltip = 'Always allow file edits'
+    } else if (scope === 'session' && args.unsandboxed) {
+      tooltip = 'Allow outside sandbox for this session'
+    } else if (scope === 'session' && args.needsNetwork) {
+      tooltip = 'Allow network for this session'
     } else if (scope === 'session' || scope === 'workspace' || scope === 'always') {
       tooltip = SCOPE_TOOLTIPS[scope]
     }

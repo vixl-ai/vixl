@@ -49,10 +49,7 @@ const SENSITIVE_PATH_PATTERNS = [
 export const isSensitivePath = (path: string): boolean =>
   SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(path))
 
-/** Once-approvals for these hop onto sessionAllows for the rest of the stream. */
-export const isStickyShellElevation = (
-  capability: PermissionCapabilityKey,
-): boolean => capability === 'shell.network' || capability === 'shell.unsandboxed'
+
 
 export const sessionAllowsUnsandboxed = (sessionAllows: Set<string>): boolean =>
   sessionAllows.has('shell.unsandboxed')
@@ -97,6 +94,11 @@ const findPersisted = (
 
 const shellScopesPhaseA = (): PermissionScope[] => ['once', 'session', 'never']
 
+// Network and unsandboxed hops are session-wide by nature (one approval covers
+// the rest of the stream), so they offer no "once" scope that would mislabel
+// the grant as a single command.
+const shellElevationScopes = (): PermissionScope[] => ['session', 'never']
+
 const defaultScopes = (): PermissionScope[] => [
   'once',
   'session',
@@ -131,8 +133,9 @@ export const decidePermission = (input: PermissionDecisionInput): PermissionDeci
     action === 'shell.network' ||
     action === 'shell.unsandboxed'
   ) {
-    // Bypass auto-allows shell. Approval scopes are once/session/never only
-    // (no workspace/always persist). Session allows still work as documented below.
+    // Bypass auto-allows shell. Sandboxed shell offers once/session/never;
+    // network and unsandboxed hops offer session/never only (no workspace/always
+    // persist). Session allows still work as documented below.
     // OS sandboxing (Seatbelt / bwrap) is separate from this permission gate;
     // sandboxed vs unsandboxed is chosen at spawn time and is unchanged.
     // Session allow of `shell` must not cover `shell.network` or `shell.unsandboxed`.
@@ -145,15 +148,17 @@ export const decidePermission = (input: PermissionDecisionInput): PermissionDeci
         : action === 'shell.network'
           ? sessionAllowsNetwork(sessionAllows)
           : sessionAllows.has('shell') || sessionAllowsUnsandboxed(sessionAllows)
+    const scopes =
+      action === 'shell' ? shellScopesPhaseA() : shellElevationScopes()
     if (sessionAllowed) {
-      return { verdict: 'allow', allowedScopes: shellScopesPhaseA() }
+      return { verdict: 'allow', allowedScopes: scopes }
     }
     if (permissionLevel === 'bypass') {
-      return { verdict: 'allow', allowedScopes: shellScopesPhaseA() }
+      return { verdict: 'allow', allowedScopes: scopes }
     }
     return {
       verdict: 'ask',
-      allowedScopes: shellScopesPhaseA(),
+      allowedScopes: scopes,
       reason: sandboxEnabled ? undefined : 'Unsandboxed shell',
     }
   }

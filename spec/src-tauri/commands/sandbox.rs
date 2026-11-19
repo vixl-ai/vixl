@@ -226,6 +226,79 @@ fn profile_allows_project_root_ancestors_read() {
 }
 
 #[test]
+fn sandbox_exec_denies_credential_reads_and_cache_planting() {
+    use std::env;
+    use std::process::Command;
+
+    // A synthetic HOME so the test never touches real credentials.
+    let home_raw = format!("/tmp/vixl-sandbox-home-{}", std::process::id());
+    std::fs::create_dir_all(format!("{home_raw}/.config/gh")).expect("mkdir gh");
+    std::fs::create_dir_all(format!("{home_raw}/.local/bin")).expect("mkdir local bin");
+    std::fs::create_dir_all(format!("{home_raw}/.cache")).expect("mkdir cache");
+    std::fs::write(format!("{home_raw}/.npmrc"), "token").expect("write npmrc");
+    std::fs::write(format!("{home_raw}/.config/gh/hosts.yml"), "token").expect("write hosts");
+    let home = std::fs::canonicalize(&home_raw)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or(home_raw.clone());
+    let tmpdir_raw = env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_string());
+    let tmpdir = std::fs::canonicalize(&tmpdir_raw)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or(tmpdir_raw);
+    let project_root_raw = format!("/tmp/vixl-sandbox-cred-{}", std::process::id());
+    std::fs::create_dir_all(&project_root_raw).expect("create project root");
+    let project_root = std::fs::canonicalize(&project_root_raw)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| project_root_raw.clone());
+
+    let profile = generate_seatbelt_profile(true, &home, &project_root);
+    let run = |script: &str| {
+        Command::new("/usr/bin/sandbox-exec")
+            .arg("-D")
+            .arg(format!("HOME={home}"))
+            .arg("-D")
+            .arg(format!("PROJECT_ROOT={project_root}"))
+            .arg("-D")
+            .arg(format!("TMPDIR={tmpdir}"))
+            .arg("-p")
+            .arg(&profile)
+            .current_dir(&project_root)
+            .arg("sh")
+            .arg("-c")
+            .arg(script)
+            .output()
+            .expect("sandbox-exec spawn")
+    };
+
+    let npmrc = run(&format!("cat '{home}/.npmrc'"));
+    let gh = run(&format!("cat '{home}/.config/gh/hosts.yml'"));
+    let plant = run(&format!("printf 'x' > '{home}/.local/bin/tool'"));
+    let cache = run(&format!("printf 'x' > '{home}/.cache/probe'"));
+    let _ = std::fs::remove_dir_all(&home_raw);
+    let _ = std::fs::remove_dir_all(&project_root_raw);
+
+    assert!(
+        !npmrc.status.success(),
+        "sandbox must deny reading ~/.npmrc: stdout={}",
+        String::from_utf8_lossy(&npmrc.stdout)
+    );
+    assert!(
+        !gh.status.success(),
+        "sandbox must deny reading ~/.config/gh/hosts.yml: stdout={}",
+        String::from_utf8_lossy(&gh.stdout)
+    );
+    assert!(
+        !plant.status.success(),
+        "sandbox must deny planting a binary in ~/.local/bin: stderr={}",
+        String::from_utf8_lossy(&plant.stderr)
+    );
+    assert!(
+        cache.status.success(),
+        "sandbox must keep ordinary cache writes working: stderr={}",
+        String::from_utf8_lossy(&cache.stderr)
+    );
+}
+
+#[test]
 fn sandbox_exec_echo_succeeds_with_profile() {
     use std::env;
     use std::process::Command;

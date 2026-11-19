@@ -41,12 +41,13 @@ const actions = computed(() =>
   approvalActionSpecs({
     allowedScopes: props.approval.allowedScopes,
     unsandboxed: props.approval.unsandboxed,
+    needsNetwork: props.approval.needsNetwork,
     kind: props.approval.kind,
   }),
 )
 
 const iconFor = (key: ApprovalActionKey) => {
-  if (key === 'once' && props.approval.unsandboxed) {
+  if ((key === 'once' || key === 'session') && props.approval.unsandboxed) {
     return UnlockIcon
   }
   if (key === 'once') {

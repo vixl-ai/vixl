@@ -20,20 +20,34 @@ describe('sandbox-result', () => {
     ).toEqual({ sandboxed: false, network: 'allow' })
   })
 
-  it('tells the model the harness retries unsandboxed and to report denials without workarounds', () => {
+  it('tells the model the harness asks before an unsandboxed retry and to report runtime blocks without workarounds', () => {
     const footer = sandboxingFooter({ sandboxed: true, network: 'deny' })
     expect(footer.startsWith('SANDBOXING:')).toBe(true)
     expect(footer).toContain('Network: deny')
     expect(footer).toContain(
-      'the harness retries outside the sandbox when the user already approved this command',
+      'the harness asks before retrying outside the sandbox',
     )
     expect(footer).not.toContain('Run outside sandbox')
-    expect(footer).toContain('report the denial as the result')
+    expect(footer).toContain('reported as the result')
     expect(footer).toContain('.py script')
     expect(footer).toContain('in-repo temp dirs')
     expect(footer).toContain('TMPDIR redirects')
     expect(footer).toContain('.gitignore edits')
     expect(footer).not.toContain('required_permissions')
+  })
+
+  it('keeps background meta so the footer cannot promise a retry', () => {
+    expect(
+      resolveSandboxResultMeta({ sandboxed: true, allowNetwork: true, background: true }),
+    ).toEqual({ sandboxed: true, network: 'allow', background: true })
+  })
+
+  it('tells the model a background block is never retried unsandboxed', () => {
+    const footer = sandboxingFooter({ sandboxed: true, network: 'allow', background: true })
+    expect(footer).toContain('A background run stays sandboxed for its whole life')
+    expect(footer).toContain('run the command again without is_background')
+    expect(footer).toContain('.gitignore edits')
+    expect(footer).not.toContain('the harness retries outside the sandbox')
   })
 
   it('reports unsandboxed runs in one line', () => {

@@ -407,6 +407,12 @@ describe('sandboxRuntimeDenialError', () => {
 
     expect(network.message).toContain('Sandboxed shell has no network.')
     expect(network.message).not.toContain('by default')
-    expect(isSandboxSpawnError(devices.message)).toBe(true)
+  })
+
+  it('only treats wrapper spawn failures as retryable, not output-derived runtime blocks', () => {
+    const runtime = sandboxRuntimeDenialError('filesystem', 'operation not permitted')
+    expect(isSandboxSpawnError(runtime.message)).toBe(false)
+    expect(isSandboxSpawnError('SANDBOX_FAILED: bwrap')).toBe(true)
+    expect(isSandboxSpawnError('SANDBOX_UNAVAILABLE: no OS sandbox on this platform')).toBe(true)
   })
 })
