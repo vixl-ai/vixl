@@ -6,7 +6,8 @@ use crate::commands::fs::{workspace_roots_from_args, WorkspaceRootArg};
 use crate::commands::mcp::merged_shell_path;
 #[cfg(target_os = "linux")]
 use crate::commands::sandbox_protect::{
-    canonicalize_sandbox_path, collect_env_protection_paths, resolve_git_protection_paths,
+    canonicalize_sandbox_path, collect_env_protection_paths, home_sandbox_bind_args,
+    resolve_git_protection_paths,
 };
 
 #[cfg(target_os = "macos")]
@@ -192,6 +193,9 @@ fn build_sandboxed_command(
     apply_merged_shell_path(&mut cmd);
     strip_inherited_git_env(&mut cmd);
     cmd.env("TMPDIR", &tmpdir);
+    // The profile denies writes to ~/.npm/_cacache and ~/.npm/_npx (cache
+    // poisoning runs code outside the sandbox later), so npm caches in TMPDIR.
+    cmd.env("npm_config_cache", format!("{tmpdir}/npm-cache"));
 
     #[cfg(unix)]
     unsafe {
@@ -285,12 +289,18 @@ fn build_bubblewrap_command(
         apply_ro_protections(&mut cmd, &roots, project_writable);
     }
 
-    // HOME: read-write so tool caches work, but only if it differs from every root
+    // HOME: read-only with writable tool caches and masked credentials, but
+    // only if it differs from every root (a root bind already covers it).
     if let Ok(home) = std::env::var("HOME") {
         if !home.is_empty() && roots.iter().all(|root| root != &home) {
-            cmd.arg("--bind").arg(&home).arg(&home);
+            for arg in home_sandbox_bind_args(std::path::Path::new(&home)) {
+                cmd.arg(arg);
+            }
         }
     }
+
+    // PID namespace so /proc only shows sandboxed processes.
+    cmd.arg("--unshare-pid");
 
     // Network isolation
     if !allow_network {
@@ -310,6 +320,9 @@ fn build_bubblewrap_command(
     apply_merged_shell_path(&mut cmd);
     strip_inherited_git_env(&mut cmd);
     cmd.env("TMPDIR", "/tmp");
+    // ~/.npm/_cacache and ~/.npm/_npx are read-only (cache poisoning runs code
+    // outside the sandbox later), so npm caches in the sandbox tmpfs instead.
+    cmd.env("npm_config_cache", "/tmp/npm-cache");
 
     #[cfg(unix)]
     unsafe {

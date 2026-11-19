@@ -30,7 +30,7 @@ describe('gateToolPermission sticky shell elevation', () => {
     })
   }
 
-  it('adds shell.network to sessionAllows on once', async () => {
+  it('adds shell.network to sessionAllows on session', async () => {
     const ctx = makeCtx()
     const pending = gateToolPermission({
       ctx,
@@ -42,12 +42,12 @@ describe('gateToolPermission sticky shell elevation', () => {
       title: 'curl localhost',
     })
     await waitForPending('tc-net')
-    resolveApproval('tc-net', { approved: true, scope: 'once' })
+    resolveApproval('tc-net', { approved: true, scope: 'session' })
     await expect(pending).resolves.toBe(true)
     expect(ctx.sessionAllows.has('shell.network')).toBe(true)
   })
 
-  it('adds shell.unsandboxed to sessionAllows on once', async () => {
+  it('adds shell.unsandboxed to sessionAllows on session', async () => {
     const ctx = makeCtx()
     const pending = gateToolPermission({
       ctx,
@@ -60,9 +60,27 @@ describe('gateToolPermission sticky shell elevation', () => {
       unsandboxed: true,
     })
     await waitForPending('tc-un')
-    resolveApproval('tc-un', { approved: true, scope: 'once' })
+    resolveApproval('tc-un', { approved: true, scope: 'session' })
     await expect(pending).resolves.toBe(true)
     expect(ctx.sessionAllows.has('shell.unsandboxed')).toBe(true)
+  })
+
+  it('does not add shell.unsandboxed to sessionAllows on once', async () => {
+    const ctx = makeCtx()
+    const pending = gateToolPermission({
+      ctx,
+      toolCallId: 'tc-un-once',
+      name: 'run_terminal',
+      kind: 'shell',
+      action: 'shell.unsandboxed',
+      capability: 'shell.unsandboxed',
+      title: 'ss -tlnp',
+      unsandboxed: true,
+    })
+    await waitForPending('tc-un-once')
+    resolveApproval('tc-un-once', { approved: true, scope: 'once' })
+    await expect(pending).resolves.toBe(true)
+    expect(ctx.sessionAllows.has('shell.unsandboxed')).toBe(false)
   })
 
   it('does not add sandboxed shell to sessionAllows on once', async () => {
@@ -174,7 +192,7 @@ describe('gateToolPermission sticky shell elevation', () => {
       }),
     )
     expect(getPendingApproval('tc-net-view')?.needsNetwork).toBe(true)
-    resolveApproval('tc-net-view', { approved: true, scope: 'once' })
+    resolveApproval('tc-net-view', { approved: true, scope: 'session' })
     await expect(pending).resolves.toBe(true)
   })
 })

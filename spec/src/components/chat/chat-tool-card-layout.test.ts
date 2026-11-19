@@ -32,7 +32,7 @@ const networkApproval: PendingApprovalView = {
   name: 'run_terminal',
   kind: 'shell',
   title: 'curl example.com',
-  allowedScopes: ['once', 'session'],
+  allowedScopes: ['session', 'never'],
   needsNetwork: true,
 }
 
@@ -108,8 +108,7 @@ describe('ChatToolCard layout', () => {
       },
     })
     expect(wrapper.findComponent(WifiIcon).exists()).toBe(false)
-    expect(wrapper.html()).toContain('Allow once')
-    expect(wrapper.html()).toContain('Allow session')
+    expect(wrapper.html()).toContain('Allow network for this session')
     expect(wrapper.html()).not.toContain('Allow network in sandbox')
   })
 

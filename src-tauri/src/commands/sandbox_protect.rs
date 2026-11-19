@@ -96,9 +96,134 @@ fn walk_env_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+/// bwrap args for a read-only HOME with writable tool caches.
+///
+/// HOME is bound read-only; only common cache dirs stay writable, and the
+/// executable-planting paths inside them (bin dirs, cargo runner config, npm
+/// caches) are bound back read-only. Credential dirs are masked with an empty
+/// tmpfs and credential files with /dev/null, mirroring the Seatbelt denies.
+/// Only existing paths are bound: bwrap requires bind sources to exist.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub(crate) fn home_sandbox_bind_args(home: &Path) -> Vec<String> {
+    let mut args = vec![
+        "--ro-bind".to_string(),
+        home.to_string_lossy().to_string(),
+        home.to_string_lossy().to_string(),
+    ];
+    let mut bind = |flag: &str, path: &Path| {
+        args.push(flag.to_string());
+        args.push(path.to_string_lossy().to_string());
+        args.push(path.to_string_lossy().to_string());
+    };
+    for cache in [".npm", ".cache", ".cargo", ".local"] {
+        let path = home.join(cache);
+        if path.is_dir() {
+            bind("--bind", &path);
+        }
+    }
+    for ro_dir in [".local/bin", ".cargo/bin", ".npm/_cacache", ".npm/_npx"] {
+        let path = home.join(ro_dir);
+        if path.is_dir() {
+            bind("--ro-bind", &path);
+        }
+    }
+    for ro_file in [".cargo/config.toml", ".cargo/config"] {
+        let path = home.join(ro_file);
+        if path.is_file() {
+            bind("--ro-bind", &path);
+        }
+    }
+    for masked_dir in [
+        ".ssh",
+        ".aws",
+        ".gnupg",
+        ".config/gh",
+        ".kube",
+        ".docker",
+        ".config/google-chrome",
+        ".config/chromium",
+        ".mozilla/firefox",
+    ] {
+        let path = home.join(masked_dir);
+        if path.is_dir() {
+            args.push("--tmpfs".to_string());
+            args.push(path.to_string_lossy().to_string());
+        }
+    }
+    for masked_file in [".npmrc", ".netrc", ".pypirc"] {
+        let path = home.join(masked_file);
+        if path.is_file() {
+            args.push("--ro-bind".to_string());
+            args.push("/dev/null".to_string());
+            args.push(path.to_string_lossy().to_string());
+        }
+    }
+    args
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn home_binds_are_read_only_with_writable_caches_and_masked_credentials() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let root = home.path();
+        for dir in [
+            ".npm/_cacache",
+            ".npm/_npx",
+            ".cache",
+            ".cargo/bin",
+            ".local/bin",
+            ".local/share",
+            ".ssh",
+            ".config/gh",
+            ".docker",
+        ] {
+            fs::create_dir_all(root.join(dir)).expect("mkdir");
+        }
+        fs::write(root.join(".cargo/config.toml"), "runner = 'x'\n").expect("write config");
+        fs::write(root.join(".npmrc"), "//registry/:_authToken=secret\n").expect("write npmrc");
+
+        let args = home_sandbox_bind_args(root);
+        let joined = args.join(" ");
+        let home_str = root.to_string_lossy();
+
+        assert!(joined.contains(&format!("--ro-bind {home_str} {home_str}")));
+        assert!(joined.contains(&format!(
+            "--bind {}/.npm {}/.npm",
+            home_str, home_str
+        )));
+        assert!(joined.contains(&format!(
+            "--ro-bind {}/.cargo/bin {}/.cargo/bin",
+            home_str, home_str
+        )));
+        assert!(joined.contains(&format!(
+            "--ro-bind {}/.npm/_cacache {}/.npm/_cacache",
+            home_str, home_str
+        )));
+        assert!(joined.contains(&format!(
+            "--ro-bind {}/.cargo/config.toml {}/.cargo/config.toml",
+            home_str, home_str
+        )));
+        assert!(joined.contains(&format!("--tmpfs {}/.ssh", home_str)));
+        assert!(joined.contains(&format!("--tmpfs {}/.config/gh", home_str)));
+        assert!(joined.contains(&format!(
+            "--ro-bind /dev/null {}/.npmrc",
+            home_str
+        )));
+        // Absent paths are never bound (bwrap would fail on a missing source).
+        assert!(!joined.contains(".netrc"));
+        assert!(!joined.contains(".aws"));
+        // The writable .local bind must come before the read-only .local/bin bind.
+        let local_bind = joined
+            .find(&format!("--bind {}/.local ", home_str))
+            .expect("local bind");
+        let local_bin_ro = joined
+            .find(&format!("--ro-bind {}/.local/bin", home_str))
+            .expect("local bin ro");
+        assert!(local_bin_ro > local_bind);
+    }
 
     #[test]
     fn git_dir_is_protected() {
