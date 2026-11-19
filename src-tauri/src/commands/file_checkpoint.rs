@@ -387,7 +387,7 @@ fn capture_provided(
 /// Directories are expanded into one baseline per contained file (no gitignore).
 /// Idempotent: if a baseline already exists for a path, it is reused.
 #[tauri::command]
-pub fn file_checkpoint_capture(
+pub async fn file_checkpoint_capture(
     app: AppHandle,
     project_slug: String,
     chat_id: String,
@@ -402,22 +402,26 @@ pub fn file_checkpoint_capture(
     if user_message_id.trim().is_empty() {
         return Err("User message id is required to capture file checkpoints".to_string());
     }
-    let dir = message_dir(&app, &project_slug, &chat_id, &user_message_id)?;
-    if content.is_some() || existed == Some(false) {
-        return capture_provided(
-            &dir,
-            &path,
-            key.as_deref(),
-            tool_call_id,
-            content.as_deref(),
-            provided_baseline_existed(content.as_deref(), existed),
-        );
-    }
-    capture_into(&dir, &project_root, &path, key.as_deref(), tool_call_id)
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = message_dir(&app, &project_slug, &chat_id, &user_message_id)?;
+        if content.is_some() || existed == Some(false) {
+            return capture_provided(
+                &dir,
+                &path,
+                key.as_deref(),
+                tool_call_id,
+                content.as_deref(),
+                provided_baseline_existed(content.as_deref(), existed),
+            );
+        }
+        capture_into(&dir, &project_root, &path, key.as_deref(), tool_call_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-pub fn file_checkpoint_load(
+pub async fn file_checkpoint_load(
     app: AppHandle,
     project_slug: String,
     chat_id: String,
@@ -425,40 +429,44 @@ pub fn file_checkpoint_load(
     path: String,
     key: Option<String>,
 ) -> Result<FileCheckpointLoadResult, String> {
-    let dir = message_dir(&app, &project_slug, &chat_id, &user_message_id)?;
-    let entries = read_manifest(&dir)?;
-    let lookup = manifest_key(&path, key.as_deref());
-    let Some(entry) = find_entry(&entries, &lookup) else {
-        return Ok(FileCheckpointLoadResult {
-            skipped: true,
-            existed: false,
-            content: None,
-        });
-    };
-    if !entry.existed {
-        return Ok(FileCheckpointLoadResult {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = message_dir(&app, &project_slug, &chat_id, &user_message_id)?;
+        let entries = read_manifest(&dir)?;
+        let lookup = manifest_key(&path, key.as_deref());
+        let Some(entry) = find_entry(&entries, &lookup) else {
+            return Ok(FileCheckpointLoadResult {
+                skipped: true,
+                existed: false,
+                content: None,
+            });
+        };
+        if !entry.existed {
+            return Ok(FileCheckpointLoadResult {
+                skipped: false,
+                existed: false,
+                content: None,
+            });
+        }
+        let bytes =
+            fs::read(content_path(&dir, &entry.path_hash)).map_err(|error| error.to_string())?;
+        if bytes == ABSENT_MARKER.as_bytes() {
+            return Err(format!("Corrupt checkpoint content for {path}"));
+        }
+        let content = String::from_utf8(bytes)
+            .unwrap_or_else(|error| String::from_utf8_lossy(error.as_bytes()).into_owned());
+        Ok(FileCheckpointLoadResult {
             skipped: false,
-            existed: false,
-            content: None,
-        });
-    }
-    let bytes =
-        fs::read(content_path(&dir, &entry.path_hash)).map_err(|error| error.to_string())?;
-    if bytes == ABSENT_MARKER.as_bytes() {
-        return Err(format!("Corrupt checkpoint content for {path}"));
-    }
-    let content = String::from_utf8(bytes)
-        .unwrap_or_else(|error| String::from_utf8_lossy(error.as_bytes()).into_owned());
-    Ok(FileCheckpointLoadResult {
-        skipped: false,
-        existed: true,
-        content: Some(content),
+            existed: true,
+            content: Some(content),
+        })
     })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 /// Restore explicit path baselines. Frontend supplies which (path, userMessageId) to use.
 #[tauri::command]
-pub fn file_checkpoint_restore(
+pub async fn file_checkpoint_restore(
     app: AppHandle,
     project_slug: String,
     chat_id: String,
@@ -468,41 +476,45 @@ pub fn file_checkpoint_restore(
     if project_root.trim().is_empty() {
         return Err("Project root is required to restore file checkpoints".to_string());
     }
-    refuse_ssh_local_fallback(&project_root)?;
-    let _root = canonical_project_root(&project_root)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        refuse_ssh_local_fallback(&project_root)?;
+        let _root = canonical_project_root(&project_root)?;
 
-    let mut restored = Vec::new();
-    let mut deleted = Vec::new();
-    let mut skipped = Vec::new();
-    let mut errors = Vec::new();
+        let mut restored = Vec::new();
+        let mut deleted = Vec::new();
+        let mut skipped = Vec::new();
+        let mut errors = Vec::new();
 
-    for target in targets {
-        match restore_one(
-            &app,
-            &project_slug,
-            &chat_id,
-            &project_root,
-            &target.path,
-            target.key.as_deref(),
-            &target.user_message_id,
-        ) {
-            Ok("restored") => restored.push(target.path),
-            Ok("deleted") => deleted.push(target.path),
-            Ok("skipped") => skipped.push(target.path),
-            Ok(other) => skipped.push(format!("{} ({other})", target.path)),
-            Err(error) => errors.push(FileCheckpointPathError {
-                path: target.path,
-                error,
-            }),
+        for target in targets {
+            match restore_one(
+                &app,
+                &project_slug,
+                &chat_id,
+                &project_root,
+                &target.path,
+                target.key.as_deref(),
+                &target.user_message_id,
+            ) {
+                Ok("restored") => restored.push(target.path),
+                Ok("deleted") => deleted.push(target.path),
+                Ok("skipped") => skipped.push(target.path),
+                Ok(other) => skipped.push(format!("{} ({other})", target.path)),
+                Err(error) => errors.push(FileCheckpointPathError {
+                    path: target.path,
+                    error,
+                }),
+            }
         }
-    }
 
-    Ok(FileCheckpointRestoreResult {
-        restored,
-        deleted,
-        skipped,
-        errors,
+        Ok(FileCheckpointRestoreResult {
+            restored,
+            deleted,
+            skipped,
+            errors,
+        })
     })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 fn restore_one(

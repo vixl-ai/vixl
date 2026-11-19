@@ -190,13 +190,15 @@ export default () => {
     return orderedActivityItems(items)
   })
 
-  const refreshSlug = async (projectSlug: string): Promise<void> => {
-    const chats = await chatStore.listProjectChats(projectSlug)
-    chatsBySlug.value = {
-      ...chatsBySlug.value,
-      [projectSlug]: chats,
-    }
-  }
+  const refreshSlug = useFleetSidebarSlugRefresh(
+    (slug) => chatStore.listProjectChats(slug),
+    (slug, chats) => {
+      chatsBySlug.value = {
+        ...chatsBySlug.value,
+        [slug]: chats,
+      }
+    },
+  )
 
   const refreshChats = async (): Promise<void> => {
     const slugs = [

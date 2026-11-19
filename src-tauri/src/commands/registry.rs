@@ -339,9 +339,15 @@ fn upsert_fleet_project_occupied_inner(
     project
 }
 
+pub fn list_projects_blocking(app: &AppHandle) -> Result<Vec<FleetProject>, String> {
+    Ok(read_registry(app)?.projects)
+}
+
 #[tauri::command]
-pub fn registry_list_projects(app: AppHandle) -> Result<Vec<FleetProject>, String> {
-    Ok(read_registry(&app)?.projects)
+pub async fn registry_list_projects(app: AppHandle) -> Result<Vec<FleetProject>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_projects_blocking(&app))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 pub fn resolve_launch_path(path_arg: &str) -> Result<PathBuf, String> {
@@ -403,16 +409,18 @@ pub fn open_project_at_path(app: &AppHandle, root_path: PathBuf) -> Result<Fleet
         .to_string();
     let root_path_str = root_path.to_string_lossy().to_string();
     let project = add_or_update_project(app, name, root_path_str)?;
-    registry_set_active_project(app.clone(), Some(project.id.clone()))?;
+    set_active_project_blocking(app, Some(project.id.clone()))?;
     Ok(project)
 }
 
 #[tauri::command(rename = "open_project_at_path")]
-pub fn open_project_at_path_command(
+pub async fn open_project_at_path_command(
     app: AppHandle,
     root_path: PathBuf,
 ) -> Result<FleetProject, String> {
-    open_project_at_path(&app, root_path)
+    tauri::async_runtime::spawn_blocking(move || open_project_at_path(&app, root_path))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -449,52 +457,71 @@ pub fn apply_project_root_update(
 }
 
 #[tauri::command]
-pub fn registry_update_project_root(
+pub async fn registry_update_project_root(
     app: AppHandle,
     project_id: String,
     root_path: String,
 ) -> Result<FleetProject, String> {
-    let mut registry = read_registry(&app)?;
-    let vixl = user_vixl_dir(&app).ok();
-    let updated = apply_project_root_update(
-        &mut registry.projects,
-        &project_id,
-        root_path,
-        vixl.as_deref(),
-    )?;
-    write_registry(&app, &registry)?;
-    Ok(updated)
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut registry = read_registry(&app)?;
+        let vixl = user_vixl_dir(&app).ok();
+        let updated = apply_project_root_update(
+            &mut registry.projects,
+            &project_id,
+            root_path,
+            vixl.as_deref(),
+        )?;
+        write_registry(&app, &registry)?;
+        Ok(updated)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-pub fn registry_remove_project(app: AppHandle, project_id: String) -> Result<(), String> {
-    let mut registry = read_registry(&app)?;
-    registry.projects.retain(|p| p.id != project_id);
-    clear_worktree_links_to_parent(&mut registry.projects, &project_id);
-    write_registry(&app, &registry)?;
+pub async fn registry_remove_project(app: AppHandle, project_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut registry = read_registry(&app)?;
+        registry.projects.retain(|p| p.id != project_id);
+        clear_worktree_links_to_parent(&mut registry.projects, &project_id);
+        write_registry(&app, &registry)?;
 
-    let active = get_active_project(app.clone())?;
-    if active.as_deref() == Some(project_id.as_str()) {
-        registry_set_active_project(app, None)?;
-    }
+        let active = active_project_blocking(&app)?;
+        if active.as_deref() == Some(project_id.as_str()) {
+            set_active_project_blocking(&app, None)?;
+        }
 
-    Ok(())
+        Ok(())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
-#[tauri::command]
-pub fn registry_set_active_project(
-    app: AppHandle,
+pub fn set_active_project_blocking(
+    app: &AppHandle,
     project_id: Option<String>,
 ) -> Result<(), String> {
-    let path = active_path(&app)?;
+    let path = active_path(app)?;
     let active = ActiveProject { project_id };
     let content = serde_json::to_string_pretty(&active).map_err(|e| e.to_string())?;
     fs::write(path, content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn registry_list_groups(app: AppHandle) -> Result<Vec<FleetProjectGroup>, String> {
-    Ok(read_groups_registry(&app)?.groups)
+pub async fn registry_set_active_project(
+    app: AppHandle,
+    project_id: Option<String>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || set_active_project_blocking(&app, project_id))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn registry_list_groups(app: AppHandle) -> Result<Vec<FleetProjectGroup>, String> {
+    tauri::async_runtime::spawn_blocking(move || Ok(read_groups_registry(&app)?.groups))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 fn add_or_reuse_group(
@@ -578,60 +605,78 @@ pub(crate) fn remove_fleet_group(groups: &mut Vec<FleetProjectGroup>, group_id: 
 }
 
 #[tauri::command]
-pub fn registry_add_group(
+pub async fn registry_add_group(
     app: AppHandle,
     member_slugs: Vec<String>,
     name: Option<String>,
 ) -> Result<FleetProjectGroup, String> {
-    let projects = read_registry(&app)?.projects;
-    let mut registry = read_groups_registry(&app)?;
-    let group = add_or_reuse_group(
-        &mut registry.groups,
-        &projects,
-        member_slugs,
-        name.as_deref(),
-    )?;
-    write_groups_registry(&app, &registry)?;
-    Ok(group)
+    tauri::async_runtime::spawn_blocking(move || {
+        let projects = read_registry(&app)?.projects;
+        let mut registry = read_groups_registry(&app)?;
+        let group = add_or_reuse_group(
+            &mut registry.groups,
+            &projects,
+            member_slugs,
+            name.as_deref(),
+        )?;
+        write_groups_registry(&app, &registry)?;
+        Ok(group)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-pub fn registry_update_group(
+pub async fn registry_update_group(
     app: AppHandle,
     group_id: String,
     name: String,
     member_slugs: Vec<String>,
 ) -> Result<FleetProjectGroup, String> {
-    let projects = read_registry(&app)?.projects;
-    let mut registry = read_groups_registry(&app)?;
-    let updated = update_group_in_place(
-        &mut registry.groups,
-        &projects,
-        &group_id,
-        name,
-        member_slugs,
-    )?;
-    write_groups_registry(&app, &registry)?;
-    Ok(updated)
+    tauri::async_runtime::spawn_blocking(move || {
+        let projects = read_registry(&app)?.projects;
+        let mut registry = read_groups_registry(&app)?;
+        let updated = update_group_in_place(
+            &mut registry.groups,
+            &projects,
+            &group_id,
+            name,
+            member_slugs,
+        )?;
+        write_groups_registry(&app, &registry)?;
+        Ok(updated)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-pub fn registry_remove_group(app: AppHandle, group_id: String) -> Result<(), String> {
-    let mut registry = read_groups_registry(&app)?;
-    remove_group_by_id(&mut registry.groups, &group_id);
-    write_groups_registry(&app, &registry)?;
-    Ok(())
+pub async fn registry_remove_group(app: AppHandle, group_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut registry = read_groups_registry(&app)?;
+        remove_group_by_id(&mut registry.groups, &group_id);
+        write_groups_registry(&app, &registry)?;
+        Ok(())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
-#[tauri::command]
-pub fn get_active_project(app: AppHandle) -> Result<Option<String>, String> {
-    let path = active_path(&app)?;
+pub fn active_project_blocking(app: &AppHandle) -> Result<Option<String>, String> {
+    let path = active_path(app)?;
     if !path.exists() {
         return Ok(None);
     }
     let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
     let active: ActiveProject = serde_json::from_str(&content).map_err(|e| e.to_string())?;
     Ok(active.project_id)
+}
+
+#[tauri::command]
+pub async fn get_active_project(app: AppHandle) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || active_project_blocking(&app))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 pub fn sync_project_worktree_link(

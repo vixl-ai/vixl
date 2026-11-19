@@ -38,6 +38,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
 
   const toolInputBuffers = new Map<string, string>()
   const toolInputNames = new Map<string, string>()
+  const toolInputEmitted = new Map<string, string>()
 
   const captureStepUsage = async (
     usage: Parameters<typeof captureBillableUsage>[0]['usage'],
@@ -81,9 +82,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
         publishedStop = {
           reason: 'error',
           detail:
-            error instanceof Error
-              ? error.message
-              : 'Failed to save subagent resume snapshot',
+            error instanceof Error ? error.message : 'Failed to save subagent resume snapshot',
         }
       }
     }
@@ -124,6 +123,7 @@ export default async (prepared: PreparedHarnessStream): Promise<void> => {
     emitTurnEnded,
     toolInputBuffers,
     toolInputNames,
+    toolInputEmitted,
   }
 
   let pumped = await pumpPreparedStream({

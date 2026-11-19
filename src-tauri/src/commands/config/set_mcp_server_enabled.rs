@@ -50,14 +50,18 @@ pub fn set_mcp_server_enabled_at_path(
 }
 
 #[tauri::command]
-pub fn set_mcp_server_enabled(
+pub async fn set_mcp_server_enabled(
     app: AppHandle,
     scope: String,
     root_path: Option<String>,
     server_id: String,
     enabled: bool,
 ) -> Result<bool, String> {
-    set_scoped_mcp_server_enabled(&scope, root_path.as_deref(), &server_id, enabled, || {
-        user_vixl_dir(&app)
+    tauri::async_runtime::spawn_blocking(move || {
+        set_scoped_mcp_server_enabled(&scope, root_path.as_deref(), &server_id, enabled, || {
+            user_vixl_dir(&app)
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }

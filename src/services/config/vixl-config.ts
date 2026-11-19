@@ -17,11 +17,7 @@ import {
   HOME_PROJECT_SCOPE_ERROR,
   isHomeWorkspaceRoot,
 } from '@/services/config/is-home-workspace-root'
-import {
-  readSettings,
-  writeSettings,
-  type ConfigScope,
-} from '@/services/vixl/vixl-tauri'
+import { readSettings, writeSettings, type ConfigScope } from '@/services/vixl/vixl-tauri'
 
 export type VixlConfigScope = ConfigScope | 'effective'
 
@@ -76,9 +72,7 @@ export const loadProjectSettings = async (rootPath: string): Promise<VixlSetting
   return stripped
 }
 
-export const loadEffectiveSettings = async (
-  rootPath: string | null,
-): Promise<VixlSettings> => {
+export const loadEffectiveSettings = async (rootPath: string | null): Promise<VixlSettings> => {
   const personal = await loadPersonalSettings()
   if (!rootPath || (await isHomeWorkspaceRoot(rootPath))) {
     return personal
@@ -87,7 +81,7 @@ export const loadEffectiveSettings = async (
   return mergeSettings(personal, project)
 }
 
-export const saveSettings = async (
+const writeSettingsNow = async (
   scope: ConfigScope,
   settings: VixlSettings,
   rootPath?: string | null,
@@ -95,13 +89,37 @@ export const saveSettings = async (
   if (scope === 'project' && (await isHomeWorkspaceRoot(rootPath))) {
     throw new Error(HOME_PROJECT_SCOPE_ERROR)
   }
-  const toSave =
-    scope === 'project' ? stripPersonalOnlyProjectOverrides(settings) : settings
+  const toSave = scope === 'project' ? stripPersonalOnlyProjectOverrides(settings) : settings
   const validated = validateVixlSettings(toSave)
   if (!validated.success) {
     throw new Error(`Invalid settings: ${validated.error}`)
   }
   await writeSettings(scope, validated.data as Record<string, unknown>, rootPath)
+}
+
+// Permission approvals persist in the background, so two saves can be issued
+// before the first write lands. Serialize writes per settings file so a later
+// payload (which already includes earlier records) cannot be overwritten by an
+// older in-flight write.
+const writeQueues = new Map<string, Promise<void>>()
+
+export const saveSettings = (
+  scope: ConfigScope,
+  settings: VixlSettings,
+  rootPath?: string | null,
+): Promise<void> => {
+  const key = scope === 'project' ? `project:${rootPath ?? ''}` : 'personal'
+  const previous = writeQueues.get(key) ?? Promise.resolve()
+  const run = previous.then(() => writeSettingsNow(scope, settings, rootPath))
+  const cleanup = (): void => {
+    if (writeQueues.get(key) === settled) {
+      writeQueues.delete(key)
+    }
+  }
+  // The queue tail must settle even when a write fails, so later saves run.
+  const settled = run.then(cleanup, cleanup)
+  writeQueues.set(key, settled)
+  return run
 }
 
 export const resetSettingsKeys = async (

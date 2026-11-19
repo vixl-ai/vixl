@@ -93,9 +93,6 @@ describe('ChatToolRun open persist', () => {
       props: { run: toolRun() },
       global: {
         provide: provideStore(store),
-        stubs: {
-          AiElementsShimmerShimmer: { template: '<span><slot /></span>' },
-        },
       },
     })
     expect(store.size()).toBe(0)
@@ -109,9 +106,6 @@ describe('ChatToolRun open persist', () => {
       props: { run: toolRun() },
       global: {
         provide: provideStore(store),
-        stubs: {
-          AiElementsShimmerShimmer: { template: '<span><slot /></span>' },
-        },
       },
     })
     expect(collapsibleOpen(wrapper)).toBe(true)
@@ -216,10 +210,6 @@ const reasoningDurationStubs = {
   CollapsibleTrigger: {
     name: 'CollapsibleTrigger',
     template: '<button type="button"><slot /></button>',
-  },
-  Shimmer: {
-    name: 'Shimmer',
-    template: '<span><slot /></span>',
   },
 }
 

@@ -2,7 +2,7 @@ import { computed, onMounted, ref, shallowRef } from 'vue'
 import { toast } from 'vue-sonner'
 import type { VixlSettings, VixlTheme } from '@/types/vixl/vixl-settings'
 import { defaultVixlSettings } from '@/schemas/vixl-settings'
-import { stripPersonalOnlyProjectOverrides } from '@/services/config/merge-settings'
+import { mergeSettings, stripPersonalOnlyProjectOverrides } from '@/services/config/merge-settings'
 import {
   isProjectOverride,
   loadEffectiveSettings,
@@ -25,9 +25,7 @@ export default () => {
   const fleet = useFleetRegistry()
 
   const activeRootPath = computed(() => fleet.activeProject.value?.rootPath ?? null)
-  const showProjectTab = computed(
-    () => activeRootPath.value !== null && fleet.hasProjectVixl.value,
-  )
+  const showProjectTab = computed(() => activeRootPath.value !== null && fleet.hasProjectVixl.value)
 
   const refreshAll = async (): Promise<void> => {
     personalSettings.value = await loadPersonalSettings()
@@ -50,26 +48,33 @@ export default () => {
     value: VixlSettings[K],
   ): Promise<void> => {
     const current = { ...getScopeSettings(tab), [key]: value, version: 1 as const }
+    const rootAtStart = activeRootPath.value
 
     if (tab === 'personal') {
       personalSettings.value = current
       await saveSettings('personal', current)
     } else {
-      if (!activeRootPath.value) {
+      if (!rootAtStart) {
         return
       }
       const stripped = stripPersonalOnlyProjectOverrides(current)
       projectSettings.value = stripped
-      await saveSettings('project', stripped, activeRootPath.value)
+      await saveSettings('project', stripped, rootAtStart)
     }
 
-    effectiveSettings.value = await loadEffectiveSettings(activeRootPath.value)
+    // Both scopes are already in memory and match what was just written, so
+    // merge locally instead of re-reading personal + project from disk. Skip
+    // the merge when the active project changed mid-save; the live-sync
+    // watcher's refreshAll owns reconciliation for the new root.
+    if (activeRootPath.value !== rootAtStart) {
+      return
+    }
+    effectiveSettings.value = rootAtStart
+      ? mergeSettings(personalSettings.value, projectSettings.value)
+      : personalSettings.value
   }
 
-  const removeSettings = async (
-    tab: SettingsTab,
-    keys: string[],
-  ): Promise<void> => {
+  const removeSettings = async (tab: SettingsTab, keys: string[]): Promise<void> => {
     const current = getScopeSettings(tab)
 
     if (tab === 'personal') {
@@ -89,10 +94,7 @@ export default () => {
     effectiveSettings.value = await loadEffectiveSettings(activeRootPath.value)
   }
 
-  const resetSectionToPersonal = async (
-    tab: SettingsTab,
-    sectionPrefix: string,
-  ): Promise<void> => {
+  const resetSectionToPersonal = async (tab: SettingsTab, sectionPrefix: string): Promise<void> => {
     if (tab !== 'project' || !activeRootPath.value) {
       return
     }
@@ -133,8 +135,7 @@ export default () => {
     removeSettings,
     resetSectionToPersonal,
     usingPersonalDefault,
-    setTheme: (tab: SettingsTab, theme: VixlTheme) =>
-      updateSetting(tab, 'appearance.theme', theme),
+    setTheme: (tab: SettingsTab, theme: VixlTheme) => updateSetting(tab, 'appearance.theme', theme),
     setTransparency: (tab: SettingsTab, enabled: boolean) =>
       updateSetting(tab, 'appearance.transparency', enabled),
     setTransparencyHue: (tab: SettingsTab, hue: number) =>

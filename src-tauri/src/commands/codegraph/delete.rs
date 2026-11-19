@@ -42,7 +42,7 @@ pub fn resolve_graph_delete_dir(store_root: &Path, id: &str) -> Result<PathBuf, 
     Ok(candidate)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_graph(app: AppHandle, id: String) -> Result<(), String> {
     let store_root = graph_store_dir(&app)?;
     let graph_dir = resolve_graph_delete_dir(&store_root, &id)?;

@@ -39,14 +39,13 @@ type PumpPreparedStreamInput = {
   emitTurnEnded: (stop: AgentStop) => Promise<void>
   toolInputBuffers: Map<string, string>
   toolInputNames: Map<string, string>
+  toolInputEmitted: Map<string, string>
   hitOutputLimit: boolean
   lastFinishReason: string | undefined
   lastStepHadTokens: boolean
 }
 
-export default async (
-  input: PumpPreparedStreamInput,
-): Promise<PumpedPreparedStream> => {
+export default async (input: PumpPreparedStreamInput): Promise<PumpedPreparedStream> => {
   const {
     prepared,
     messagesForCall,
@@ -56,6 +55,7 @@ export default async (
     emitTurnEnded,
     toolInputBuffers,
     toolInputNames,
+    toolInputEmitted,
   } = input
   const {
     model,
@@ -206,12 +206,19 @@ export default async (
     if (part.type === 'tool-input-delta') {
       const fields = extractPartialToolFields(toolInputBuffers, part.id, part.delta)
       if (fields) {
-        onEvent({
-          type: 'tool-input-delta',
-          toolCallId: part.id,
-          name: toolInputNames.get(part.id) ?? '',
-          args: fields,
-        })
+        // The extractor reports the same fields on every delta once a value
+        // completes. Only emit when they actually change, so a long content
+        // payload does not fire one UI upsert per network chunk.
+        const key = `${fields.path ?? ''}\u0000${fields.tool ?? ''}\u0000${fields.description ?? ''}`
+        if (toolInputEmitted.get(part.id) !== key) {
+          toolInputEmitted.set(part.id, key)
+          onEvent({
+            type: 'tool-input-delta',
+            toolCallId: part.id,
+            name: toolInputNames.get(part.id) ?? '',
+            args: fields,
+          })
+        }
       }
       continue
     }
@@ -219,19 +226,14 @@ export default async (
     if (part.type === 'tool-call') {
       toolInputBuffers.delete(part.toolCallId)
       toolInputNames.delete(part.toolCallId)
+      toolInputEmitted.delete(part.toolCallId)
       await steps.ensureStepOpen()
       await steps.emitToolStart(part.toolCallId, part.toolName, part.input)
       continue
     }
 
     if (part.type === 'tool-result') {
-      await steps.emitToolResult(
-        part.toolCallId,
-        part.toolName,
-        part.output,
-        false,
-        part.input,
-      )
+      await steps.emitToolResult(part.toolCallId, part.toolName, part.output, false, part.input)
       continue
     }
 

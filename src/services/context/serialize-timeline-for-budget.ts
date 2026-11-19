@@ -3,7 +3,14 @@ import type { AgentTurn } from '@/types/chat/agent-turn'
 import type { ChatTimelineItem } from '@/types/chat/chat-timeline-item'
 import type { ToolRun } from '@/types/harness/tool-run'
 
-const serializeMessageParts = (message: UIMessage): string =>
+// Timeline items are replaced immutably by the chat store, so a serialized
+// string stays valid for the lifetime of the object. Caching by identity lets
+// a recount re-serialize only the actively streaming turn instead of every
+// turn and tool result in the thread.
+const messageTextCache = new WeakMap<UIMessage, string>()
+const turnTextCache = new WeakMap<AgentTurn, string>()
+
+const serializeMessagePartsUncached = (message: UIMessage): string =>
   message.parts
     .map((part) => {
       if (part.type === 'text' || part.type === 'reasoning') {
@@ -13,12 +20,18 @@ const serializeMessageParts = (message: UIMessage): string =>
     })
     .join('\n')
 
+const serializeMessageParts = (message: UIMessage): string => {
+  const cached = messageTextCache.get(message)
+  if (cached !== undefined) {
+    return cached
+  }
+  const text = serializeMessagePartsUncached(message)
+  messageTextCache.set(message, text)
+  return text
+}
+
 const serializeToolRun = (tool: ToolRun): string => {
-  const chunks = [
-    `tool:${tool.name}`,
-    `id:${tool.toolCallId}`,
-    `status:${tool.status}`,
-  ]
+  const chunks = [`tool:${tool.name}`, `id:${tool.toolCallId}`, `status:${tool.status}`]
   if (tool.args !== undefined) {
     chunks.push(`args:${JSON.stringify(tool.args)}`)
   }
@@ -28,7 +41,7 @@ const serializeToolRun = (tool: ToolRun): string => {
   return chunks.join('\n')
 }
 
-const serializeAgentTurn = (turn: AgentTurn): string => {
+const serializeAgentTurnUncached = (turn: AgentTurn): string => {
   const chunks: string[] = []
   for (const step of turn.steps) {
     if (step.reasoning) {
@@ -45,6 +58,16 @@ const serializeAgentTurn = (turn: AgentTurn): string => {
     chunks.push(turn.text)
   }
   return chunks.join('\n')
+}
+
+const serializeAgentTurn = (turn: AgentTurn): string => {
+  const cached = turnTextCache.get(turn)
+  if (cached !== undefined) {
+    return cached
+  }
+  const text = serializeAgentTurnUncached(turn)
+  turnTextCache.set(turn, text)
+  return text
 }
 
 const getUserCreatedAt = (message: UIMessage): string | null => {
@@ -92,9 +115,7 @@ export default (input: SerializeTimelineForBudgetInput): string => {
   if (lastCompactionIndex >= 0) {
     const marker = input.timeline[lastCompactionIndex]
     const checkpointText = input.checkpointText ?? ''
-    const prefix =
-      checkpointText ||
-      (marker?.type === 'compaction' ? marker.summary : '')
+    const prefix = checkpointText || (marker?.type === 'compaction' ? marker.summary : '')
     const chunks: string[] = []
 
     for (const item of input.timeline.slice(lastCompactionIndex + 1)) {
@@ -107,10 +128,7 @@ export default (input: SerializeTimelineForBudgetInput): string => {
       }
     }
 
-    return combinePrefixAndBody(
-      prefix,
-      chunks.filter((chunk) => chunk.length > 0).join('\n\n'),
-    )
+    return combinePrefixAndBody(prefix, chunks.filter((chunk) => chunk.length > 0).join('\n\n'))
   }
 
   const cutoff = input.includeFromCreatedAt

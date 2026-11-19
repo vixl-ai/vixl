@@ -53,7 +53,7 @@ fn resolve_git_dir(root_path: &str) -> Option<PathBuf> {
     Some(PathBuf::from(path))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn watch_git_head(app: AppHandle, root_path: Option<String>) -> Result<(), String> {
     let state = app.state::<GitHeadWatchState>();
     let mut guard = state.inner.lock().map_err(|e| e.to_string())?;

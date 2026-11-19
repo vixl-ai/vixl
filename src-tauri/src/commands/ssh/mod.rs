@@ -55,7 +55,7 @@ use crate::commands::keychain::webview_secret_command_prepare;
 use self::channels::SshChannelInfo;
 use self::config::parse_host_aliases;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ssh_list_aliases(config_file: Option<String>) -> Result<Vec<String>, String> {
     let path = match config_file {
         Some(path) => std::path::PathBuf::from(path),
@@ -67,7 +67,7 @@ pub fn ssh_list_aliases(config_file: Option<String>) -> Result<Vec<String>, Stri
     Ok(parse_host_aliases(&path).aliases)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ssh_preview(
     destination: String,
     port: Option<u16>,
@@ -209,7 +209,7 @@ pub async fn ssh_cancel_prompt(request_id: String) -> Result<(), String> {
     prompt::cancel_prompt(request_id).await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn ssh_remove_vixl_host_key(
     hostname: String,
     port: u16,

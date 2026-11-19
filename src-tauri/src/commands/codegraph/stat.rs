@@ -16,7 +16,7 @@ pub struct CodegraphStoreStat {
     pub graph_id: String,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn codegraph_store_stat(
     app: AppHandle,
     project_root: String,

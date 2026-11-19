@@ -1,6 +1,7 @@
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import mergeToolRunArgs from '@/utils/merge-tool-run-args'
+import rawToolPayload from '@/utils/raw-tool-payload'
 import toolArgsPath from '@/utils/tool-args-path'
 
 const HOLD_PATH_TOOLS = new Set(['write_file', 'edit_file'])
@@ -9,7 +10,7 @@ export default (tools: ToolRun[], event: HarnessEvent): ToolRun[] => {
   if (event.type === 'tool-input-delta') {
     const existing = tools.find((item) => item.toolCallId === event.toolCallId)
     const name = event.name || existing?.name || 'tool'
-    const args = mergeToolRunArgs(existing?.args, event.args)
+    const args = rawToolPayload(mergeToolRunArgs(existing?.args, event.args))
     if (HOLD_PATH_TOOLS.has(name) && !toolArgsPath(args)) {
       return tools
     }
@@ -31,7 +32,7 @@ export default (tools: ToolRun[], event: HarnessEvent): ToolRun[] => {
       toolCallId: event.toolCallId,
       name: event.name,
       status: 'running',
-      args: mergeToolRunArgs(existing?.args, event.args),
+      args: rawToolPayload(mergeToolRunArgs(existing?.args, event.args)),
     }
     return [...tools.filter((item) => item.toolCallId !== event.toolCallId), run]
   }
@@ -43,9 +44,9 @@ export default (tools: ToolRun[], event: HarnessEvent): ToolRun[] => {
       name: existing?.name ?? 'tool',
       status: event.isError ? 'error' : 'done',
       args: existing?.args,
-      result: event.result,
+      result: rawToolPayload(event.result),
       artifact: event.artifact ?? existing?.artifact,
-      diffs: event.diffs ?? existing?.diffs,
+      diffs: rawToolPayload(event.diffs ?? existing?.diffs),
     }
     if (!existing) {
       return [...tools, run]

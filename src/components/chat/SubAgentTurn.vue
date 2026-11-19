@@ -9,14 +9,9 @@ import {
   SquareIcon,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import NavigationAsideLeftChatRunningDots from '@/components/navigation/aside/left/ChatRunningDots.vue'
 import { Button } from '@/components/shadcn/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/ui/tooltip'
 import type { SubagentTimelineItem } from '@/types/chat/chat-timeline-item'
 import { HOME_CHAT_SLUG, isHomeChatSlug } from '@/constants/home-chat'
 import chatRouteFor from '@/utils/chat-route-for'
@@ -76,13 +71,9 @@ const openSubagentChat = async (): Promise<void> => {
     route.name === 'home-chat' ||
     route.name === 'home-chat-subagent' ||
     isHomeChatSlug(String(route.params.slug ?? ''))
-  const projectSlug = isStandalone
-    ? HOME_CHAT_SLUG
-    : String(route.params.slug ?? '')
+  const projectSlug = isStandalone ? HOME_CHAT_SLUG : String(route.params.slug ?? '')
   try {
-    await router.push(
-      chatRouteFor(projectSlug, chatId, props.subagent.subagentId),
-    )
+    await router.push(chatRouteFor(projectSlug, chatId, props.subagent.subagentId))
   } catch (error) {
     toast.error('Failed to open sub-agent', {
       description: error instanceof Error ? error.message : 'Unknown error',
@@ -103,39 +94,27 @@ const handleStop = (): void => {
         class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-0.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
         @click="openSubagentChat"
       >
-        <NavigationAsideLeftChatRunningDots
-          v-if="isRunning"
-        />
-        <Tooltip
-          v-else-if="subagent.status === 'error'"
-        >
+        <NavigationAsideLeftChatRunningDots v-if="isRunning" />
+        <Tooltip v-else-if="subagent.status === 'error'">
           <TooltipTrigger as-child>
-            <component
-              :is="statusIcon"
-              :class="statusIconClass"
-            />
+            <component :is="statusIcon" :class="statusIconClass" />
           </TooltipTrigger>
           <TooltipContent>{{ errorTooltip }}</TooltipContent>
         </Tooltip>
-        <component
-          v-else
-          :is="statusIcon"
-          :class="statusIconClass"
-        />
+        <component v-else :is="statusIcon" :class="statusIconClass" />
         <span class="min-w-0 flex-1">
           <span
             v-if="modelLabel"
             class="block truncate text-[10px] leading-tight text-muted-foreground/80"
-          >{{ modelLabel }}</span>
+            >{{ modelLabel }}</span
+          >
           <span class="block truncate text-foreground/90">{{ displayName }}</span>
-          <AiElementsShimmerShimmer
+          <span
             v-if="activityLabel"
-            :duration="1"
-            as="span"
-            class="block min-w-0 truncate text-[10px] leading-tight"
+            class="shimmer shimmer-duration-1000 shimmer-angle-0 block w-fit max-w-full min-w-0 truncate text-[10px] leading-tight"
           >
             {{ activityLabel }}
-          </AiElementsShimmerShimmer>
+          </span>
         </span>
         <Tooltip v-if="isRunning">
           <TooltipTrigger as-child>

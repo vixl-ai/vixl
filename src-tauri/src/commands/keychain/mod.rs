@@ -150,19 +150,25 @@ pub(crate) fn vault_keys_prefixed(app: &AppHandle, prefix: &str) -> Result<Vec<S
 }
 
 #[tauri::command]
-pub fn get_secret(app: AppHandle, key: String) -> Result<Option<String>, String> {
+pub async fn get_secret(app: AppHandle, key: String) -> Result<Option<String>, String> {
     webview_secret_command_prepare(&key)?;
-    vault_get(&app, &key)
+    tauri::async_runtime::spawn_blocking(move || vault_get(&app, &key))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn set_secret(app: AppHandle, key: String, value: String) -> Result<(), String> {
+pub async fn set_secret(app: AppHandle, key: String, value: String) -> Result<(), String> {
     webview_secret_command_prepare(&key)?;
-    vault_set(&app, &key, value)
+    tauri::async_runtime::spawn_blocking(move || vault_set(&app, &key, value))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn delete_secret(app: AppHandle, key: String) -> Result<(), String> {
+pub async fn delete_secret(app: AppHandle, key: String) -> Result<(), String> {
     webview_secret_command_prepare(&key)?;
-    vault_delete(&app, &key)
+    tauri::async_runtime::spawn_blocking(move || vault_delete(&app, &key))
+        .await
+        .map_err(|e| e.to_string())?
 }

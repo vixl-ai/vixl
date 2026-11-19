@@ -3,16 +3,11 @@ import type { AgentStep } from '@/types/chat/agent-step'
 import type { ToolRun } from '@/types/harness/tool-run'
 import type { HarnessEvent } from '@/types/harness/harness-event'
 import mapSubagentResultStatus from '@/utils/map-subagent-result-status'
-import {
-  parseCapabilities,
-  parseOptionalBoolean,
-  parseWorkspace,
-} from './hydrate-subagent-fields'
+import rawToolPayload from '@/utils/raw-tool-payload'
+import { parseCapabilities, parseOptionalBoolean, parseWorkspace } from './hydrate-subagent-fields'
 import attachTurnEnded, { parseAgentStop } from './attach-turn-ended'
 import { parseChatArtifact, parseChatDiffs, parseTodoItems } from './helpers'
-import hydrateTimelineBuilder, {
-  type HydrateAccumulator,
-} from './hydrate-timeline-builder'
+import hydrateTimelineBuilder, { type HydrateAccumulator } from './hydrate-timeline-builder'
 import { pushHarnessWakeUserMessage } from './hydrate-wake'
 import {
   closeRunningTools,
@@ -33,17 +28,10 @@ const applyHydrateHarnessEvent = (
   lineId?: string,
 ): boolean => {
   const type = harnessEvent.type
-  const isParentTurnPrefixLine =
-    type === 'step-boundary' || type === 'step-text'
-  const canStampPendingTurn =
-    isParentTurnPrefixLine || type === 'tool-run'
+  const isParentTurnPrefixLine = type === 'step-boundary' || type === 'step-text'
+  const canStampPendingTurn = isParentTurnPrefixLine || type === 'tool-run'
 
-  if (
-    !acc.pendingTurn &&
-    createdAt &&
-    !acc.firstLineCreatedAt &&
-    isParentTurnPrefixLine
-  ) {
+  if (!acc.pendingTurn && createdAt && !acc.firstLineCreatedAt && isParentTurnPrefixLine) {
     acc.firstLineCreatedAt = createdAt
   }
   if (acc.pendingTurn && !acc.pendingTurn.createdAt && canStampPendingTurn) {
@@ -69,8 +57,7 @@ const applyHydrateHarnessEvent = (
   if (type === 'subagent-start') {
     const subagentId = String(harnessEvent.subagentId ?? '')
     const toolCallId =
-      typeof harnessEvent.toolCallId === 'string' &&
-      harnessEvent.toolCallId.length > 0
+      typeof harnessEvent.toolCallId === 'string' && harnessEvent.toolCallId.length > 0
         ? harnessEvent.toolCallId
         : undefined
     const name = String(harnessEvent.name ?? 'Sub-agent')
@@ -85,10 +72,7 @@ const applyHydrateHarnessEvent = (
         : undefined
     const capabilities = parseCapabilities(harnessEvent.capabilities)
     const workspace = parseWorkspace(harnessEvent.workspace)
-    const startedAt =
-      typeof createdAt === 'string' && createdAt.length > 0
-        ? createdAt
-        : undefined
+    const startedAt = typeof createdAt === 'string' && createdAt.length > 0 ? createdAt : undefined
     if (subagentId) {
       hydrateTimelineBuilder.startSubagent(acc, {
         subagentId,
@@ -133,9 +117,7 @@ const applyHydrateHarnessEvent = (
       const nestedEvent = nested as HarnessEvent
       if (nestedEvent.type === 'subagent-history') {
         const historyCreatedAt =
-          typeof createdAt === 'string' && createdAt.length > 0
-            ? createdAt
-            : undefined
+          typeof createdAt === 'string' && createdAt.length > 0 ? createdAt : undefined
         if (historyCreatedAt) {
           const existingAt = acc.subagentHistories.get(subagentId)?.createdAt
           if (!existingAt || historyCreatedAt >= existingAt) {
@@ -146,11 +128,7 @@ const applyHydrateHarnessEvent = (
           }
         }
       }
-      hydrateTimelineBuilder.appendSubagentEvent(
-        acc,
-        subagentId,
-        nestedEvent,
-      )
+      hydrateTimelineBuilder.appendSubagentEvent(acc, subagentId, nestedEvent)
     }
     return true
   }
@@ -181,9 +159,7 @@ const applyHydrateHarnessEvent = (
         ? (harnessEvent.messages as ModelMessage[])
         : []
       const resumeCreatedAt =
-        typeof createdAt === 'string' && createdAt.length > 0
-          ? createdAt
-          : undefined
+        typeof createdAt === 'string' && createdAt.length > 0 ? createdAt : undefined
       const blocking = parseOptionalBoolean(harnessEvent.blocking)
       acc.subagentResumes.set(subagentId, {
         messages,
@@ -228,9 +204,7 @@ const applyHydrateHarnessEvent = (
       return true
     }
     acc.pendingTurn = patchStep(acc.pendingTurn, stepId, {
-      text:
-        (acc.pendingTurn.steps.find((step) => step.id === stepId)?.text ?? '') +
-        text,
+      text: (acc.pendingTurn.steps.find((step) => step.id === stepId)?.text ?? '') + text,
     })
     return true
   }
@@ -261,18 +235,14 @@ const applyHydrateHarnessEvent = (
     const run: ToolRun = {
       toolCallId: String(harnessEvent.toolCallId ?? ''),
       name: String(harnessEvent.name ?? 'tool'),
-      status:
-        persistedStatus === 'running'
-          ? 'error'
-          : (persistedStatus ?? 'done'),
-      args: harnessEvent.args,
-      result:
+      status: persistedStatus === 'running' ? 'error' : (persistedStatus ?? 'done'),
+      args: rawToolPayload(harnessEvent.args),
+      result: rawToolPayload(
         harnessEvent.result ??
-        (persistedStatus === 'running'
-          ? { error: 'Tool did not complete' }
-          : undefined),
+          (persistedStatus === 'running' ? { error: 'Tool did not complete' } : undefined),
+      ),
       artifact: parseChatArtifact(harnessEvent.artifact),
-      diffs: parseChatDiffs(harnessEvent.diffs),
+      diffs: rawToolPayload(parseChatDiffs(harnessEvent.diffs)),
     }
     if (!run.toolCallId) {
       return true
@@ -298,13 +268,8 @@ const applyHydrateHarnessEvent = (
         ? harnessEvent.stepId
         : acc.currentStepId
     const existingStep =
-      acc.pendingTurn.steps.find((step) => step.id === stepId) ??
-      createStep(stepId)
-    acc.pendingTurn = patchStep(
-      acc.pendingTurn,
-      stepId,
-      upsertToolInStep(existingStep, run),
-    )
+      acc.pendingTurn.steps.find((step) => step.id === stepId) ?? createStep(stepId)
+    acc.pendingTurn = patchStep(acc.pendingTurn, stepId, upsertToolInStep(existingStep, run))
     return true
   }
 

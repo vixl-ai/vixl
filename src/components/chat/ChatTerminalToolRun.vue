@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { CheckIcon, ChevronRightIcon, ExternalLinkIcon, ShieldIcon, ShieldOffIcon, TerminalIcon, XIcon } from '@lucide/vue'
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
+import {
+  CheckIcon,
+  ChevronRightIcon,
+  ExternalLinkIcon,
+  ShieldIcon,
+  ShieldOffIcon,
+  TerminalIcon,
+  XIcon,
+} from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import type { ToolRun } from '@/types/harness/tool-run'
 import formatToolRunLabel from '@/utils/format-tool-run-label'
@@ -14,18 +21,9 @@ import {
   terminalPhaseStatusTooltip,
 } from '@/components/chat/chat-terminal-status'
 import { overlayLiveShellExit } from '@/components/chat/overlay-live-shell-exit'
-import {
-  Terminal,
-  TerminalContent,
-  TerminalCopyButton,
-} from '@/components/ai-elements/terminal'
+import { Terminal, TerminalContent, TerminalCopyButton } from '@/components/ai-elements/terminal'
 import { Button } from '@/components/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Collapsible,
   CollapsibleContent,
@@ -34,10 +32,7 @@ import {
 import useFleetRegistry from '@/composables/use-fleet-registry'
 import useWorkbenchStore from '@/composables/use-workbench-store'
 import { HOME_WORKSPACE_ID, isHomeChatSlug } from '@/constants/home-chat'
-import {
-  agentShellRevision,
-  getAgentShell,
-} from '@/services/harness/shell/registry'
+import { agentShellRevision, getAgentShell } from '@/services/harness/shell/registry'
 
 const props = defineProps<{
   run: ToolRun
@@ -76,10 +71,7 @@ const phaseOutput = (output: string): string => {
   return output.length > 0 ? `$ ${command}\n${output}` : `$ ${command}`
 }
 
-const phaseStatus = (
-  phase: TerminalToolPhaseView,
-  phaseIndex: number,
-) => {
+const phaseStatus = (phase: TerminalToolPhaseView, phaseIndex: number) => {
   const isLast = phaseIndex === (view.value?.phases.length ?? 0) - 1
   const kind = terminalPhaseStatusKind({
     phase,
@@ -87,12 +79,7 @@ const phaseStatus = (
     isRunning: isRunning.value,
     isError: isError.value,
   })
-  const icon =
-    kind === 'ok'
-      ? CheckIcon
-      : kind === 'fail'
-        ? XIcon
-        : TerminalIcon
+  const icon = kind === 'ok' ? CheckIcon : kind === 'fail' ? XIcon : TerminalIcon
   return {
     icon,
     tooltip: terminalPhaseStatusTooltip(kind, phase.exitCode),
@@ -142,13 +129,9 @@ const handleShowTerminal = (): void => {
           :class="open ? 'rotate-90' : ''"
         />
         <span class="min-w-0 truncate text-xs">
-          <AiElementsShimmerShimmer
-            v-if="isRunning"
-            :duration="1"
-            as="span"
-          >
+          <span v-if="isRunning" class="shimmer shimmer-duration-1000 shimmer-angle-0">
             {{ headline }}
-          </AiElementsShimmerShimmer>
+          </span>
           <template v-else>{{ headline }}</template>
         </span>
       </CollapsibleTrigger>

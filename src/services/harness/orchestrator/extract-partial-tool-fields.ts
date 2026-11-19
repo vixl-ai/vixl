@@ -7,6 +7,26 @@ type PartialToolFields = {
   description?: string
 }
 
+type StringScan = {
+  start: number
+  pos: number
+  escape: boolean
+}
+
+type ScanState = {
+  textLength: number
+  offset: number
+  depth: number
+  incomplete: StringScan | null
+  fields: PartialToolFields
+}
+
+// Scan state is keyed by the caller's buffer Map so each stream parses
+// incrementally: a delta only scans new characters (plus the small pending
+// token), instead of re-scanning the whole accumulated tool input. This keeps
+// large write_file payloads from turning every delta into an O(n) rescan.
+const statesByBuffers = new WeakMap<Map<string, string>, Map<string, ScanState>>()
+
 const unescapeJsonString = (raw: string): string | null => {
   let result = ''
   for (let i = 0; i < raw.length; i += 1) {
@@ -54,15 +74,15 @@ const unescapeJsonString = (raw: string): string | null => {
   return result
 }
 
-const readJsonString = (
-  source: string,
-  start: number,
-): { end: number; raw: string } | null => {
+type StringRead = { end: number; raw: string } | { incomplete: StringScan }
+
+const readJsonString = (source: string, start: number, resume: StringScan | null): StringRead => {
   if (source[start] !== '"') {
-    return null
+    return { incomplete: { start, pos: start + 1, escape: false } }
   }
-  let i = start + 1
-  let escape = false
+  const continuing = resume !== null && resume.start === start
+  let i = continuing ? resume.pos : start + 1
+  let escape = continuing ? resume.escape : false
   while (i < source.length) {
     const ch = source[i]!
     if (escape) {
@@ -80,14 +100,10 @@ const readJsonString = (
     }
     i += 1
   }
-  return null
+  return { incomplete: { start, pos: i, escape } }
 }
 
-const assignField = (
-  fields: PartialToolFields,
-  keyName: string,
-  value: string,
-): void => {
+const assignField = (fields: PartialToolFields, keyName: string, value: string): void => {
   if (keyName === 'path') {
     fields.path = value
     return
@@ -101,47 +117,77 @@ const assignField = (
   }
 }
 
-const extractCompleteFields = (partialJson: string): PartialToolFields | null => {
-  let i = 0
-  let depth = 0
-  const fields: PartialToolFields = {}
-  while (i < partialJson.length) {
-    const ch = partialJson[i]!
+const extractCompleteFields = (source: string, state: ScanState): void => {
+  let i = state.offset
+  let depth = state.depth
+  const hold = (): void => {
+    state.offset = i
+    state.depth = depth
+  }
+  while (i < source.length) {
+    const tokenStart = i
+    const ch = source[i]!
     if (ch === '"') {
-      const key = readJsonString(partialJson, i)
-      if (!key) {
-        break
+      const resume = state.incomplete
+      const key = readJsonString(source, i, resume)
+      if ('incomplete' in key) {
+        state.incomplete = key.incomplete
+        i = tokenStart
+        hold()
+        return
       }
       let j = key.end
-      while (j < partialJson.length && isWhitespace(partialJson[j]!)) {
+      while (j < source.length && isWhitespace(source[j]!)) {
         j += 1
       }
-      if (partialJson[j] === ':' && depth === 1) {
+      if (j >= source.length) {
+        // The colon or value may still arrive; reprocess this token next delta.
+        i = tokenStart
+        hold()
+        return
+      }
+      if (source[j] === ':' && depth === 1) {
         const keyName = unescapeJsonString(key.raw)
         j += 1
-        while (j < partialJson.length && isWhitespace(partialJson[j]!)) {
+        while (j < source.length && isWhitespace(source[j]!)) {
           j += 1
         }
         if (keyName === 'path' || keyName === 'tool' || keyName === 'description') {
-          if (partialJson[j] !== '"') {
+          if (j >= source.length) {
+            i = tokenStart
+            hold()
+            return
+          }
+          if (source[j] !== '"') {
             i = j
+            state.incomplete = null
+            hold()
             continue
           }
-          const value = readJsonString(partialJson, j)
-          if (!value) {
-            break
+          const value = readJsonString(source, j, resume)
+          if ('incomplete' in value) {
+            state.incomplete = value.incomplete
+            i = tokenStart
+            hold()
+            return
           }
           const unescaped = unescapeJsonString(value.raw)
           if (unescaped !== null && unescaped.length > 0) {
-            assignField(fields, keyName, unescaped)
+            assignField(state.fields, keyName, unescaped)
           }
           i = value.end
+          state.incomplete = null
+          hold()
           continue
         }
         i = j
+        state.incomplete = null
+        hold()
         continue
       }
       i = key.end
+      state.incomplete = null
+      hold()
       continue
     }
     if (ch === '{' || ch === '[') {
@@ -150,15 +196,9 @@ const extractCompleteFields = (partialJson: string): PartialToolFields | null =>
       depth = Math.max(0, depth - 1)
     }
     i += 1
+    hold()
   }
-  if (
-    fields.path === undefined &&
-    fields.tool === undefined &&
-    fields.description === undefined
-  ) {
-    return null
-  }
-  return fields
+  state.incomplete = null
 }
 
 export default (
@@ -168,5 +208,24 @@ export default (
 ): PartialToolFields | null => {
   const next = `${buffers.get(toolCallId) ?? ''}${delta}`
   buffers.set(toolCallId, next)
-  return extractCompleteFields(next)
+
+  let states = statesByBuffers.get(buffers)
+  if (!states) {
+    states = new Map<string, ScanState>()
+    statesByBuffers.set(buffers, states)
+  }
+  let state = states.get(toolCallId)
+  if (!state || next.length < state.textLength) {
+    state = { textLength: 0, offset: 0, depth: 0, incomplete: null, fields: {} }
+    states.set(toolCallId, state)
+  }
+  state.textLength = next.length
+
+  extractCompleteFields(next, state)
+
+  const { path, tool, description } = state.fields
+  if (path === undefined && tool === undefined && description === undefined) {
+    return null
+  }
+  return { ...state.fields }
 }

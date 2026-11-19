@@ -1,6 +1,6 @@
 use url::Url;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_external_url(url: String, allowed_origin: Option<String>) -> Result<(), String> {
     let parsed = Url::parse(&url).map_err(|error| format!("Invalid URL: {error}"))?;
     let scheme = parsed.scheme();

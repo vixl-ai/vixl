@@ -144,6 +144,11 @@ async fn join_output_pumps(stdout: JoinHandle<()>, stderr: JoinHandle<()>) {
     join_output_pumps_with_timeout(stdout, stderr, OUTPUT_PUMP_JOIN_TIMEOUT).await
 }
 
+/// Coalescing window for shell output events (about one frame at 60Hz).
+const SHELL_OUTPUT_FLUSH_WINDOW: Duration = Duration::from_millis(16);
+/// Flush early when a burst is large so memory stays bounded.
+const SHELL_OUTPUT_MAX_BATCH_BYTES: usize = 64 * 1024;
+
 async fn pump_shell_stream(
     app: AppHandle,
     shell_id: String,
@@ -152,23 +157,58 @@ async fn pump_shell_stream(
 ) {
     let event_name = format!("shell-output-{shell_id}");
     let mut buffer = [0u8; 4096];
+    let mut batch: Vec<u8> = Vec::new();
+    let mut disconnected = false;
 
-    loop {
+    while !disconnected {
         match reader.read(&mut buffer).await {
             Ok(0) => break,
-            Ok(count) => {
-                let data = String::from_utf8_lossy(&buffer[..count]).to_string();
-                let _ = app.emit(
-                    &event_name,
-                    serde_json::json!({
-                      "shellId": shell_id,
-                      "stream": stream,
-                      "data": data,
-                    }),
-                );
-            }
+            Ok(count) => batch.extend_from_slice(&buffer[..count]),
             Err(_) => break,
         }
+        // Drain whatever else is ready inside a short window so a verbose
+        // process produces about one event per frame, not one per read.
+        let deadline = tokio::time::Instant::now() + SHELL_OUTPUT_FLUSH_WINDOW;
+        while batch.len() < SHELL_OUTPUT_MAX_BATCH_BYTES {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            match tokio::time::timeout(remaining, reader.read(&mut buffer)).await {
+                Ok(Ok(0)) => {
+                    disconnected = true;
+                    break;
+                }
+                Ok(Ok(count)) => batch.extend_from_slice(&buffer[..count]),
+                Ok(Err(_)) => {
+                    disconnected = true;
+                    break;
+                }
+                Err(_) => break,
+            }
+        }
+        let data = String::from_utf8_lossy(&batch).into_owned();
+        batch.clear();
+        let _ = app.emit(
+            &event_name,
+            serde_json::json!({
+              "shellId": shell_id,
+              "stream": stream,
+              "data": data,
+            }),
+        );
+    }
+
+    if !batch.is_empty() {
+        let data = String::from_utf8_lossy(&batch).into_owned();
+        let _ = app.emit(
+            &event_name,
+            serde_json::json!({
+              "shellId": shell_id,
+              "stream": stream,
+              "data": data,
+            }),
+        );
     }
 }
 

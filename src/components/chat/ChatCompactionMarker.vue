@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import { Marker, MarkerContent } from '@/components/shadcn/ui/marker'
 
 defineProps<{
@@ -8,21 +7,10 @@ defineProps<{
 </script>
 
 <template>
-  <Marker
-    variant="default"
-    class="w-full"
-  >
+  <Marker variant="default" class="w-full">
     <MarkerContent>
-      <AiElementsShimmerShimmer
-        v-if="pending"
-        :duration="1.5"
-        as="span"
-      >
-        Compacting
-      </AiElementsShimmerShimmer>
-      <template v-else>
-        Compacted
-      </template>
+      <span v-if="pending" class="shimmer shimmer-duration-1500 shimmer-angle-0"> Compacting </span>
+      <template v-else> Compacted </template>
     </MarkerContent>
   </Marker>
 </template>

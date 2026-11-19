@@ -2,7 +2,6 @@ import { nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import AgentShellTab from '@/components/workbench/tabs/AgentShellTab.vue'
-import AiElementsShimmerShimmer from '@/components/ai-elements/shimmer/Shimmer.vue'
 import { Terminal } from '@/components/ai-elements/terminal'
 import { agentShellRevision } from '@/services/harness/shell/registry'
 import { mockTauriEvent } from '../../../test-utils/mocks/tauri-event'
@@ -79,7 +78,7 @@ describe('AgentShellTab header', () => {
     expect(wrapper.text()).not.toContain('Background 30s poll loop')
     expect(wrapper.text()).not.toContain('Running')
     expect(wrapper.find('[aria-label="Stop terminal"]').exists()).toBe(true)
-    expect(wrapper.findComponent(AiElementsShimmerShimmer).exists()).toBe(true)
+    expect(wrapper.find('.shimmer').exists()).toBe(true)
     expect(wrapper.findComponent(Terminal).props('isStreaming')).toBe(true)
   })
 
@@ -89,7 +88,7 @@ describe('AgentShellTab header', () => {
     expect(wrapper.text()).not.toContain('Exit')
     expect(wrapper.text()).not.toContain('Running')
     expect(wrapper.find('[aria-label="Stop terminal"]').exists()).toBe(false)
-    expect(wrapper.findComponent(AiElementsShimmerShimmer).exists()).toBe(false)
+    expect(wrapper.find('.shimmer').exists()).toBe(false)
     expect(wrapper.findComponent(Terminal).props('isStreaming')).toBe(false)
   })
 
@@ -110,7 +109,7 @@ describe('AgentShellTab header', () => {
     expect(wrapper.text()).not.toContain('Exit')
     expect(wrapper.text()).not.toContain('Running')
     expect(wrapper.find('[aria-label="Stop terminal"]').exists()).toBe(false)
-    expect(wrapper.findComponent(AiElementsShimmerShimmer).exists()).toBe(false)
+    expect(wrapper.find('.shimmer').exists()).toBe(false)
     expect(wrapper.findComponent(Terminal).props('isStreaming')).toBe(false)
   })
 })

@@ -82,78 +82,106 @@ fn ensure_json_path_allowed(app: &AppHandle, path: &Path) -> Result<PathBuf, Str
 }
 
 #[tauri::command]
-pub fn read_settings(
+pub async fn read_settings(
     app: AppHandle,
     scope: String,
     root_path: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    read_scoped_json(&scope, root_path.as_deref(), "settings.json", || {
-        user_vixl_dir(&app)
+    tauri::async_runtime::spawn_blocking(move || {
+        read_scoped_json(&scope, root_path.as_deref(), "settings.json", || {
+            user_vixl_dir(&app)
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn write_settings(
+pub async fn write_settings(
     app: AppHandle,
     scope: String,
     root_path: Option<String>,
     settings: serde_json::Value,
 ) -> Result<(), String> {
-    write_scoped_json(
-        &scope,
-        root_path.as_deref(),
-        "settings.json",
-        settings,
-        || user_vixl_dir(&app),
-    )
+    tauri::async_runtime::spawn_blocking(move || {
+        write_scoped_json(
+            &scope,
+            root_path.as_deref(),
+            "settings.json",
+            settings,
+            || user_vixl_dir(&app),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn read_mcp_config(
+pub async fn read_mcp_config(
     app: AppHandle,
     scope: String,
     root_path: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    read_scoped_json(&scope, root_path.as_deref(), "mcp.json", || {
-        user_vixl_dir(&app)
+    tauri::async_runtime::spawn_blocking(move || {
+        read_scoped_json(&scope, root_path.as_deref(), "mcp.json", || {
+            user_vixl_dir(&app)
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn write_mcp_config(
+pub async fn write_mcp_config(
     app: AppHandle,
     scope: String,
     root_path: Option<String>,
     config: serde_json::Value,
 ) -> Result<(), String> {
-    write_scoped_json(&scope, root_path.as_deref(), "mcp.json", config, || {
-        user_vixl_dir(&app)
+    tauri::async_runtime::spawn_blocking(move || {
+        write_scoped_json(&scope, root_path.as_deref(), "mcp.json", config, || {
+            user_vixl_dir(&app)
+        })
     })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn read_json_file(app: AppHandle, path: String) -> Result<serde_json::Value, String> {
-    let allowed = ensure_json_path_allowed(&app, Path::new(&path))?;
-    read_json(&allowed)
+pub async fn read_json_file(app: AppHandle, path: String) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let allowed = ensure_json_path_allowed(&app, Path::new(&path))?;
+        read_json(&allowed)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn write_json_file(
+pub async fn write_json_file(
     app: AppHandle,
     path: String,
     value: serde_json::Value,
 ) -> Result<(), String> {
-    let allowed = ensure_json_path_allowed(&app, Path::new(&path))?;
-    write_json(&allowed, value)
+    tauri::async_runtime::spawn_blocking(move || {
+        let allowed = ensure_json_path_allowed(&app, Path::new(&path))?;
+        write_json(&allowed, value)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn config_exists(
+pub async fn config_exists(
     app: AppHandle,
     scope: String,
     root_path: Option<String>,
 ) -> Result<bool, String> {
-    scoped_config_exists(&scope, root_path.as_deref(), || user_vixl_dir(&app))
+    tauri::async_runtime::spawn_blocking(move || {
+        scoped_config_exists(&scope, root_path.as_deref(), || user_vixl_dir(&app))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 pub(crate) fn tray_background_enabled(_app: &AppHandle) -> bool {
@@ -225,13 +253,17 @@ pub(crate) fn write_lsp_config_internal(
 }
 
 #[tauri::command]
-pub fn read_lsp_config(app: AppHandle) -> Result<serde_json::Value, String> {
-    load_lsp_config(&app)
+pub async fn read_lsp_config(app: AppHandle) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || load_lsp_config(&app))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn write_lsp_config(app: AppHandle, config: serde_json::Value) -> Result<(), String> {
-    write_lsp_config_internal(&app, config)
+pub async fn write_lsp_config(app: AppHandle, config: serde_json::Value) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || write_lsp_config_internal(&app, config))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 pub(crate) fn read_settings_for_lsp(app: &AppHandle) -> Result<serde_json::Value, String> {

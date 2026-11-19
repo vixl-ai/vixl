@@ -1,13 +1,16 @@
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 
 use super::migrate::migrate;
 use super::open::open_at;
 
+/// Cheap to clone so commands can move a handle into blocking tasks instead
+/// of borrowing `State` (which cannot cross threads).
+#[derive(Clone)]
 pub struct AppDb {
-    conn: Mutex<Connection>,
+    conn: Arc<Mutex<Connection>>,
 }
 
 impl AppDb {
@@ -22,6 +25,6 @@ pub fn open_managed(path: &Path) -> Result<AppDb, String> {
     let conn = open_at(path)?;
     migrate(&conn)?;
     Ok(AppDb {
-        conn: Mutex::new(conn),
+        conn: Arc::new(Mutex::new(conn)),
     })
 }

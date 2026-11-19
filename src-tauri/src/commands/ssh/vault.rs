@@ -83,39 +83,55 @@ pub fn list_saved_identities(app: &AppHandle) -> Result<Vec<SshSavedIdentity>, S
 }
 
 #[tauri::command]
-pub fn ssh_save_password(
+pub async fn ssh_save_password(
     app: AppHandle,
     user: String,
     hostname: String,
     port: u16,
     value: String,
 ) -> Result<(), String> {
-    save_password(&app, &user, &hostname, port, value)
+    tauri::async_runtime::spawn_blocking(move || {
+        save_password(&app, &user, &hostname, port, value)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn ssh_delete_password(
+pub async fn ssh_delete_password(
     app: AppHandle,
     user: String,
     hostname: String,
     port: u16,
 ) -> Result<(), String> {
-    delete_password(&app, &user, &hostname, port)
+    tauri::async_runtime::spawn_blocking(move || delete_password(&app, &user, &hostname, port))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn ssh_save_passphrase(app: AppHandle, key_path: String, value: String) -> Result<(), String> {
-    save_passphrase(&app, &key_path, value)
+pub async fn ssh_save_passphrase(
+    app: AppHandle,
+    key_path: String,
+    value: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || save_passphrase(&app, &key_path, value))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn ssh_delete_passphrase(app: AppHandle, key_path: String) -> Result<(), String> {
-    delete_passphrase(&app, &key_path)
+pub async fn ssh_delete_passphrase(app: AppHandle, key_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || delete_passphrase(&app, &key_path))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn ssh_list_saved_identities(app: AppHandle) -> Result<Vec<SshSavedIdentity>, String> {
-    list_saved_identities(&app)
+pub async fn ssh_list_saved_identities(app: AppHandle) -> Result<Vec<SshSavedIdentity>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_saved_identities(&app))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]

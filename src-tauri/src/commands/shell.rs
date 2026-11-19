@@ -1,5 +1,7 @@
 mod builders;
 mod pty;
+#[path = "shell/pty-output.rs"]
+mod pty_output;
 mod reveal;
 mod spawn;
 
