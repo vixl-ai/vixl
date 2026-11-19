@@ -82,7 +82,7 @@ describe('harness guidance clauses', () => {
   it('states the approved unsandboxed retry is blocking-only on the run_terminal description', () => {
     const description = runTerminal(baseCtx()).description
     expect(description).toContain(
-      'A sandbox spawn failure retries unsandboxed after approval',
+      'A sandbox spawn failure or runtime sandbox block retries unsandboxed after approval',
     )
     expect(description).toContain('blocking runs only')
   })

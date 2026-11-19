@@ -2,9 +2,9 @@ import { gateToolPermission } from '@/services/harness/permission/gate'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
 
-// A wrapper spawn failure may fall back to an unsandboxed run only after an
-// explicit shell.unsandboxed approval. This keeps the escalation behind the
-// same permission gate as a directly requested unsandboxed shell.
+// A sandbox spawn failure or runtime block may fall back to an unsandboxed run
+// only after an explicit shell.unsandboxed approval. This keeps the escalation
+// behind the same permission gate as a directly requested unsandboxed shell.
 const gateUnsandboxedRetry = (
   ctx: HarnessToolContext,
   toolCallId: string,

@@ -7,13 +7,17 @@ import {
   sessionAllowsUnsandboxed,
 } from '@/services/harness/permission/policy'
 import commandNeedsSandboxNetwork from '@/services/harness/shell/command-needs-network'
-import { isSandboxSpawnError } from '@/services/harness/shell/sandbox-denial'
+import {
+  isSandboxSpawnError,
+  parseSandboxRuntimeDenialKind,
+} from '@/services/harness/shell/sandbox-denial'
 import {
   attachSandboxResult,
   resolveSandboxResultMeta,
   wrapWithSandboxingFooter,
 } from '@/services/harness/shell/sandbox-result'
 import { runTerminalCommand } from '@/services/harness/shell/run-command'
+import retryUnsandboxed from '@/services/harness/shell/retry-unsandboxed'
 import gateUnsandboxedRetry from '@/services/harness/shell/unsandboxed-retry-gate'
 import { getSubagent } from '@/services/harness/subagent/registry'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
@@ -64,7 +68,7 @@ const CWD_TOOL_HINT =
   'Optional cwd is a project slug; defaults to the primary project and is not kept between calls.'
 
 const SANDBOX_RETRY_HINT =
-  ' A sandbox spawn failure retries unsandboxed after approval, blocking runs only.'
+  ' A sandbox spawn failure or runtime sandbox block retries unsandboxed after approval, blocking runs only.'
 
 const runTerminal = (ctx: HarnessToolContext) => {
   const readOnlyProject = isReadOnlySubagentShell(ctx)
@@ -76,8 +80,8 @@ const runTerminal = (ctx: HarnessToolContext) => {
         ? 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. Optional cwd is a project slug; defaults to the primary project and is not kept between calls. When the sandbox blocks a command, report the denial as the result.'
         : 'Run a shell command in the project cwd, sandboxed with the project read-only; TMPDIR and tool caches stay writable. When the sandbox blocks a command, report the denial as the result.'
       : multiRoot
-        ? `Run a shell command in the project cwd. ${CWD_TOOL_HINT}${sandboxRetryHint} ${noPollTerminal} Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`
-        : `Run a shell command in the project cwd.${sandboxRetryHint} ${noPollTerminal} Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when the sandbox still blocks a command, report the denial.`,
+        ? `Run a shell command in the project cwd. ${CWD_TOOL_HINT}${sandboxRetryHint} ${noPollTerminal} Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when a retry approval is denied or unavailable, report the denial.`
+        : `Run a shell command in the project cwd.${sandboxRetryHint} ${noPollTerminal} Scratch dirs and TMPDIR, TEMP, TMP stay outside the repo and .gitignore stays as is; when a retry approval is denied or unavailable, report the denial.`,
     inputSchema: z.object({
       description: z
         .string()
@@ -201,38 +205,6 @@ const runTerminal = (ctx: HarnessToolContext) => {
         toolCallId,
       }
 
-      const retryUnsandboxed = async (
-        priorPhase: Record<string, unknown>,
-      ): Promise<Record<string, unknown>> => {
-        try {
-          const result = await runTerminalCommand(ctx, {
-            ...runArgs,
-            sandboxed: false,
-            allowNetwork: true,
-          })
-          return {
-            ...result,
-            priorPhase,
-          }
-        } catch (retryError) {
-          const retryMessage =
-            retryError instanceof Error ? retryError.message : String(retryError)
-          return attachSandboxResult(
-            {
-              command,
-              error: retryMessage,
-              priorPhase,
-            },
-            resolveSandboxResultMeta({
-              sandboxed: false,
-              allowNetwork: true,
-              cwd: resolvedCwd.projectRoot,
-              cwdSlug: resolvedCwd.slug,
-            }),
-          )
-        }
-      }
-
       const blockUnsandboxedRetry =
         remoteRoot || commandLooksLikeSsh(command)
 
@@ -304,7 +276,25 @@ const runTerminal = (ctx: HarnessToolContext) => {
             },
             meta,
           )
-          return retryUnsandboxed(priorPhase)
+          return retryUnsandboxed(ctx, runArgs, priorPhase)
+        }
+
+        // A runtime sandbox block is derived from untrusted command output,
+        // so it never escalates on its own. It may retry unsandboxed only
+        // behind the same explicit shell.unsandboxed approval as a spawn
+        // failure, never for background or ssh runs. A denied approval
+        // leaves the denial as the reported error below.
+        if (
+          sandboxEnabled &&
+          !is_background &&
+          !blockUnsandboxedRetry &&
+          parseSandboxRuntimeDenialKind(message) !== null
+        ) {
+          const retryAllowed = await gateUnsandboxedRetry(ctx, toolCallId, uiTitle, command)
+          if (retryAllowed) {
+            const priorPhase = attachSandboxResult({ command, error: message }, meta)
+            return retryUnsandboxed(ctx, runArgs, priorPhase)
+          }
         }
 
         if (remoteRoot) {
