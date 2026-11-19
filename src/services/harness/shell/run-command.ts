@@ -53,6 +53,7 @@ export const runTerminalCommand = async (
     allowNetwork: args.allowNetwork,
     cwd: projectRoot,
     cwdSlug: args.cwdSlug,
+    background: args.is_background === true,
   })
 
   try {

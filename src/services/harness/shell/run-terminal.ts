@@ -14,6 +14,7 @@ import {
   wrapWithSandboxingFooter,
 } from '@/services/harness/shell/sandbox-result'
 import { runTerminalCommand } from '@/services/harness/shell/run-command'
+import gateUnsandboxedRetry from '@/services/harness/shell/unsandboxed-retry-gate'
 import { getSubagent } from '@/services/harness/subagent/registry'
 import toPermCtx from '@/services/harness/shared/to-perm-ctx'
 import { noPollTerminal } from '@/services/harness/guidance'
@@ -63,7 +64,7 @@ const CWD_TOOL_HINT =
   'Optional cwd is a project slug; defaults to the primary project and is not kept between calls.'
 
 const SANDBOX_RETRY_HINT =
-  ' A sandbox block retries unsandboxed automatically within the same call.'
+  ' A sandbox spawn failure retries unsandboxed after approval, blocking runs only.'
 
 const runTerminal = (ctx: HarnessToolContext) => {
   const readOnlyProject = isReadOnlySubagentShell(ctx)
@@ -83,7 +84,12 @@ const runTerminal = (ctx: HarnessToolContext) => {
         .min(1)
         .describe('2-6 word UI title'),
       command: z.string().describe('Shell command'),
-      is_background: z.boolean().optional().describe('Return shell_id without waiting'),
+      is_background: z
+        .boolean()
+        .optional()
+        .describe(
+          'Return shell_id without waiting. Background runs stay sandboxed for their whole life.',
+        ),
       timeout_ms: z.number().optional().describe('Optional max wait for blocking runs'),
       ...cwdSlugFields(ctx),
     }),
@@ -180,6 +186,7 @@ const runTerminal = (ctx: HarnessToolContext) => {
         allowNetwork,
         cwd: resolvedCwd.projectRoot,
         cwdSlug: resolvedCwd.slug,
+        background: is_background === true,
       })
       const runsAt = sshRunsAsLineFromRoot(resolvedCwd.projectRoot)
 
@@ -275,7 +282,21 @@ const runTerminal = (ctx: HarnessToolContext) => {
           )
         }
 
-        if (sandboxEnabled && isSandboxSpawnError(message)) {
+        // A wrapper spawn failure may fall back to an unsandboxed run, but only
+        // after an explicit shell.unsandboxed approval, and never for a
+        // background run (it stays sandboxed for its whole life).
+        if (sandboxEnabled && isSandboxSpawnError(message) && !is_background) {
+          const retryAllowed = await gateUnsandboxedRetry(ctx, toolCallId, uiTitle, command)
+          if (!retryAllowed) {
+            return attachSandboxResult(
+              {
+                rejected: true,
+                command,
+                error: message,
+              },
+              meta,
+            )
+          }
           const priorPhase = attachSandboxResult(
             {
               command,

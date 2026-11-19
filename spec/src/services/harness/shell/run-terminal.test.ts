@@ -249,7 +249,7 @@ describe('build-tools run_terminal', () => {
       'SANDBOXING:',
     )
     expect(String((result as { sandboxing: string }).sandboxing)).toContain(
-      'the harness retries outside the sandbox when the user already approved this command',
+      'the harness asks before retrying outside the sandbox',
     )
     expect(String((result as { sandboxing: string }).sandboxing)).toContain(
       'TMPDIR redirects',
@@ -345,6 +345,9 @@ describe('build-tools run_terminal', () => {
     expect(String((result as { sandboxing: string }).sandboxing)).toContain(
       'Network: allow',
     )
+    expect(String((result as { sandboxing: string }).sandboxing)).toContain(
+      'A background run stays sandboxed for its whole life',
+    )
   })
 
   it('appends the SANDBOXING footer on timeout errors', async () => {
@@ -361,7 +364,7 @@ describe('build-tools run_terminal', () => {
     ).rejects.toThrow(/Command timed out after 10ms[\s\S]*SANDBOXING:/)
   })
 
-  it('gates sandboxed shell first, then unsandboxed after spawn denial', async () => {
+  it('gates sandboxed shell first, then asks shell.unsandboxed after a spawn failure', async () => {
     createAgentShell
       .mockRejectedValueOnce(new Error('SANDBOX_FAILED: bwrap'))
       .mockResolvedValueOnce({
@@ -380,18 +383,22 @@ describe('build-tools run_terminal', () => {
     const tools = buildTools(ctx)
     const result = await runTool(tools.run_terminal.execute, { command: 'echo hello' })
 
-    expect(gateToolPermission).toHaveBeenCalledTimes(1)
-    expect(gateToolPermission).toHaveBeenCalledWith(
+    expect(gateToolPermission).toHaveBeenCalledTimes(2)
+    expect(gateToolPermission).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
         action: 'shell',
         capability: 'shell',
         unsandboxed: false,
       }),
     )
-    expect(gateToolPermission).not.toHaveBeenCalledWith(
+    expect(gateToolPermission).toHaveBeenNthCalledWith(
+      2,
       expect.objectContaining({
         action: 'shell.unsandboxed',
         capability: 'shell.unsandboxed',
+        unsandboxed: true,
+        detail: 'echo hello',
       }),
     )
     expect(createAgentShell).toHaveBeenNthCalledWith(
@@ -458,6 +465,68 @@ describe('build-tools run_terminal', () => {
     })
     expect(String((result as { priorPhase: { error: string } }).priorPhase.error)).toContain(
       'SANDBOX_FAILED: bwrap',
+    )
+  })
+
+  it('does not spawn unsandboxed when the retry approval is denied', async () => {
+    createAgentShell.mockRejectedValueOnce(new Error('SANDBOX_FAILED: bwrap'))
+    gateToolPermission
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(tools.run_terminal.execute, { command: 'echo hello' })
+
+    expect(gateToolPermission).toHaveBeenCalledTimes(2)
+    expect(gateToolPermission).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        action: 'shell.unsandboxed',
+        capability: 'shell.unsandboxed',
+        unsandboxed: true,
+      }),
+    )
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(result).toMatchObject({
+      rejected: true,
+      sandboxed: true,
+      command: 'echo hello',
+    })
+    expect(String((result as { error: string }).error)).toContain('SANDBOX_FAILED: bwrap')
+  })
+
+  it('never retries a background run unsandboxed after a spawn failure', async () => {
+    createAgentShell.mockRejectedValueOnce(
+      new Error('SANDBOX_UNAVAILABLE: no OS sandbox on this platform'),
+    )
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+
+    await expect(
+      runTool(tools.run_terminal.execute, {
+        command: 'npm run dev',
+        is_background: true,
+      }),
+    ).rejects.toThrow(
+      /SANDBOX_UNAVAILABLE[\s\S]*A background run stays sandboxed for its whole life/,
+    )
+
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: 'npm run dev',
+        sandboxed: true,
+        background: true,
+      }),
+    )
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'shell.unsandboxed',
+        capability: 'shell.unsandboxed',
+      }),
     )
   })
 
@@ -534,103 +603,55 @@ describe('build-tools run_terminal', () => {
     )
   })
 
-  it('retries unsandboxed after a network jail when first gate was shell', async () => {
+  it('reports a runtime network denial without retrying unsandboxed', async () => {
     const denyNetworkCtx = {
       ...ctx,
       settings: { version: 1, 'agent.sandbox.network': 'deny' } as VixlSettings,
     }
 
-    createAgentShell
-      .mockRejectedValueOnce(
-        new Error(
-          'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
-        ),
-      )
-      .mockResolvedValueOnce({
-        shellId: 'shell-1',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
-        command: 'git status',
-        startedAt: new Date().toISOString(),
-      })
+    createAgentShell.mockRejectedValueOnce(
+      new Error(
+        'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
+      ),
+    )
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(denyNetworkCtx)
-    const result = await runTool(tools.run_terminal.execute, { command: 'git status' })
+
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'git status' }),
+    ).rejects.toThrow(/SANDBOX_RUNTIME_BLOCKED[\s\S]*SANDBOXING:/)
 
     expect(gateToolPermission).toHaveBeenCalledTimes(1)
-    expect(gateToolPermission).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'shell',
-        capability: 'shell',
-        unsandboxed: false,
-      }),
-    )
-    expect(gateToolPermission).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'shell.network',
-        capability: 'shell.network',
-      }),
-    )
     expect(gateToolPermission).not.toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'shell.unsandboxed',
         capability: 'shell.unsandboxed',
       }),
     )
-    expect(createAgentShell).toHaveBeenCalledTimes(2)
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      1,
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
       expect.objectContaining({
         command: 'git status',
         sandboxed: true,
         allowNetwork: false,
       }),
     )
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        command: 'git status',
-        sandboxed: false,
-        allowNetwork: true,
-      }),
-    )
-    expect(result).toMatchObject({
-      sandboxed: false,
-      network: 'allow',
-      priorPhase: {
-        sandboxed: true,
-        network: 'deny',
-      },
-    })
   })
 
-  it('skips the network hop for isolated devices and goes unsandboxed', async () => {
-    createAgentShell
-      .mockRejectedValueOnce(
-        new Error(
-          'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (isolated devices).',
-        ),
-      )
-      .mockResolvedValueOnce({
-        shellId: 'shell-1',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
-        command: 'lsblk',
-        startedAt: new Date().toISOString(),
-      })
+  it('reports an isolated-devices runtime denial without retrying unsandboxed', async () => {
+    createAgentShell.mockRejectedValueOnce(
+      new Error(
+        'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (isolated devices).',
+      ),
+    )
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(ctx)
-    const result = await runTool(tools.run_terminal.execute, { command: 'lsblk' })
+
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'lsblk' }),
+    ).rejects.toThrow(/SANDBOX_RUNTIME_BLOCKED[\s\S]*SANDBOXING:/)
 
     expect(gateToolPermission).toHaveBeenCalledTimes(1)
     expect(gateToolPermission).not.toHaveBeenCalledWith(
@@ -639,68 +660,35 @@ describe('build-tools run_terminal', () => {
         capability: 'shell.unsandboxed',
       }),
     )
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        sandboxed: false,
-        allowNetwork: true,
-      }),
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'lsblk', sandboxed: true }),
     )
-    expect(result).toMatchObject({
-      sandboxed: false,
-      network: 'allow',
-      priorPhase: {
-        sandboxed: true,
-        network: 'allow',
-      },
-    })
   })
 
-  it('retries unsandboxed after a sandboxed Go DNS failure', async () => {
+  it('reports a sandboxed Go DNS failure as a runtime denial without retrying', async () => {
     const goDns =
       'Error: Get "https://api.digitalocean.com/v2/account": dial tcp: lookup api.digitalocean.com: no such host'
 
-    createAgentShell
-      .mockResolvedValueOnce({
-        shellId: 'shell-1',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
-        command: 'doctl account get',
-        startedAt: new Date().toISOString(),
-      })
-      .mockResolvedValueOnce({
-        shellId: 'shell-2',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
-        command: 'doctl account get',
-        startedAt: new Date().toISOString(),
-      })
-    waitForShellExit
-      .mockResolvedValueOnce({ exitCode: 1, timedOut: false })
-      .mockResolvedValueOnce({ exitCode: 0, timedOut: false })
-    getAgentShell
-      .mockReturnValueOnce({
-        shellId: 'shell-1',
-        status: 'failed',
-        stdout: '',
-        stderr: goDns,
-        exitCode: 1,
-      })
-      .mockReturnValueOnce({
-        shellId: 'shell-2',
-        status: 'completed',
-        stdout: 'ok\n',
-        stderr: '',
-        exitCode: 0,
-      })
+    createAgentShell.mockResolvedValueOnce({
+      shellId: 'shell-1',
+      status: 'running',
+      stdout: '',
+      stderr: '',
+      exitCode: null,
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'doctl account get',
+      startedAt: new Date().toISOString(),
+    })
+    waitForShellExit.mockResolvedValueOnce({ exitCode: 1, timedOut: false })
+    getAgentShell.mockReturnValueOnce({
+      shellId: 'shell-1',
+      status: 'failed',
+      stdout: '',
+      stderr: goDns,
+      exitCode: 1,
+    })
 
     const denyNetworkCtx = {
       ...ctx,
@@ -708,145 +696,90 @@ describe('build-tools run_terminal', () => {
     }
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(denyNetworkCtx)
-    const result = await runTool(tools.run_terminal.execute, {
-      command: 'doctl account get',
-    })
 
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'doctl account get' }),
+    ).rejects.toThrow(/SANDBOX_RUNTIME_BLOCKED[\s\S]*network denied/)
+
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
     expect(gateToolPermission).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'shell.network',
         capability: 'shell.network',
       }),
     )
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      1,
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'shell.unsandboxed',
+        capability: 'shell.unsandboxed',
+      }),
+    )
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
       expect.objectContaining({
         command: 'doctl account get',
         sandboxed: true,
         allowNetwork: true,
       }),
     )
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        command: 'doctl account get',
-        sandboxed: false,
-        allowNetwork: true,
-      }),
-    )
-    expect(result).toMatchObject({
-      sandboxed: false,
-      network: 'allow',
-      priorPhase: {
-        sandboxed: true,
-        network: 'allow',
-      },
-    })
-    expect(
-      String((result as { priorPhase: { error: string } }).priorPhase.error),
-    ).toContain('SANDBOX_RUNTIME_BLOCKED:')
-    expect(
-      String((result as { priorPhase: { error: string } }).priorPhase.error),
-    ).toContain('network denied')
   })
 
-  it('retries unsandboxed after Node EPERM stat on a temp dir', async () => {
+  it('reports Node EPERM output as a runtime denial without retrying', async () => {
     const eperm =
       "Error: EPERM: operation not permitted, stat '/var/folders/zz/npm-XXXX/T'"
 
-    createAgentShell
-      .mockResolvedValueOnce({
-        shellId: 'shell-1',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
-        command: 'npm run build',
-        startedAt: new Date().toISOString(),
-      })
-      .mockResolvedValueOnce({
-        shellId: 'shell-2',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
-        command: 'npm run build',
-        startedAt: new Date().toISOString(),
-      })
-    waitForShellExit
-      .mockResolvedValueOnce({ exitCode: 1, timedOut: false })
-      .mockResolvedValueOnce({ exitCode: 0, timedOut: false })
-    getAgentShell
-      .mockReturnValueOnce({
-        shellId: 'shell-1',
-        status: 'failed',
-        stdout: '',
-        stderr: eperm,
-        exitCode: 1,
-      })
-      .mockReturnValueOnce({
-        shellId: 'shell-2',
-        status: 'completed',
-        stdout: 'ok\n',
-        stderr: '',
-        exitCode: 0,
-      })
+    createAgentShell.mockResolvedValueOnce({
+      shellId: 'shell-1',
+      status: 'running',
+      stdout: '',
+      stderr: '',
+      exitCode: null,
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'npm run build',
+      startedAt: new Date().toISOString(),
+    })
+    waitForShellExit.mockResolvedValueOnce({ exitCode: 1, timedOut: false })
+    getAgentShell.mockReturnValueOnce({
+      shellId: 'shell-1',
+      status: 'failed',
+      stdout: '',
+      stderr: eperm,
+      exitCode: 1,
+    })
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(ctx)
-    const result = await runTool(tools.run_terminal.execute, {
-      command: 'npm run build',
-    })
 
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      2,
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'npm run build' }),
+    ).rejects.toThrow(/SANDBOX_RUNTIME_BLOCKED[\s\S]*filesystem EPERM/)
+
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
       expect.objectContaining({
-        sandboxed: false,
-        allowNetwork: true,
+        action: 'shell.unsandboxed',
+        capability: 'shell.unsandboxed',
       }),
     )
-    expect(result).toMatchObject({
-      sandboxed: false,
-      network: 'allow',
-      priorPhase: {
-        sandboxed: true,
-        network: 'allow',
-      },
-    })
-    expect(
-      String((result as { priorPhase: { error: string } }).priorPhase.error),
-    ).toContain('SANDBOX_RUNTIME_BLOCKED:')
-    expect(
-      String((result as { priorPhase: { error: string } }).priorPhase.error),
-    ).toContain('filesystem EPERM')
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'npm run build', sandboxed: true }),
+    )
   })
 
-  it('skips the network hop for filesystem jail and goes unsandboxed', async () => {
-    createAgentShell
-      .mockRejectedValueOnce(
-        new Error(
-          'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (filesystem EPERM).',
-        ),
-      )
-      .mockResolvedValueOnce({
-        shellId: 'shell-1',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
-        command: 'find /srv',
-        startedAt: new Date().toISOString(),
-      })
+  it('reports a filesystem runtime denial without retrying unsandboxed', async () => {
+    createAgentShell.mockRejectedValueOnce(
+      new Error(
+        'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (filesystem EPERM).',
+      ),
+    )
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(ctx)
-    await runTool(tools.run_terminal.execute, { command: 'find /srv' })
+
+    await expect(
+      runTool(tools.run_terminal.execute, { command: 'find /srv' }),
+    ).rejects.toThrow(/SANDBOX_RUNTIME_BLOCKED[\s\S]*SANDBOXING:/)
 
     expect(gateToolPermission).toHaveBeenCalledTimes(1)
     expect(gateToolPermission).not.toHaveBeenCalledWith(
@@ -855,16 +788,13 @@ describe('build-tools run_terminal', () => {
         capability: 'shell.unsandboxed',
       }),
     )
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        sandboxed: false,
-        allowNetwork: true,
-      }),
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'find /srv', sandboxed: true }),
     )
   })
 
-  it('retries unsandboxed after a network jail when sandbox network is already allow', async () => {
+  it('reports a runtime network denial even when sandbox network is allow', async () => {
     const networkCtx = {
       ...ctx,
       settings: {
@@ -874,42 +804,25 @@ describe('build-tools run_terminal', () => {
       } as VixlSettings,
     }
 
-    createAgentShell
-      .mockRejectedValueOnce(
-        new Error(
-          'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
-        ),
-      )
-      .mockResolvedValueOnce({
-        shellId: 'shell-1',
-        status: 'running',
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        chatId: 'chat-1',
-        projectRoot: '/project',
-        command: 'curl -s https://example.com',
-        startedAt: new Date().toISOString(),
-      })
+    createAgentShell.mockRejectedValueOnce(
+      new Error(
+        'SANDBOX_RUNTIME_BLOCKED: Sandbox blocked this command (network denied).',
+      ),
+    )
 
     const buildTools = (await import('@/services/harness/build-tools')).default
     const tools = buildTools(networkCtx)
-    const result = await runTool(tools.run_terminal.execute, {
-      command: 'curl -s https://example.com',
-    })
 
-    expect(createAgentShell).toHaveBeenCalledTimes(2)
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      1,
+    await expect(
+      runTool(tools.run_terminal.execute, {
+        command: 'curl -s https://example.com',
+      }),
+    ).rejects.toThrow(/SANDBOX_RUNTIME_BLOCKED[\s\S]*SANDBOXING:/)
+
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
       expect.objectContaining({
         sandboxed: true,
-        allowNetwork: true,
-      }),
-    )
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        sandboxed: false,
         allowNetwork: true,
       }),
     )
@@ -920,14 +833,6 @@ describe('build-tools run_terminal', () => {
         capability: 'shell.unsandboxed',
       }),
     )
-    expect(result).toMatchObject({
-      sandboxed: false,
-      network: 'allow',
-      priorPhase: {
-        sandboxed: true,
-        network: 'allow',
-      },
-    })
   })
 
   it('spawns with allowNetwork when sessionAllows has shell.network', async () => {
@@ -989,7 +894,7 @@ describe('build-tools run_terminal', () => {
     )
   })
 
-  it('does not add shell.unsandboxed to sessionAllows after a silent retry', async () => {
+  it('asks shell.unsandboxed on a spawn-failure retry and leaves session persistence to the gate', async () => {
     const sessionAllows = new Set<string>()
     const stickyCtx = {
       ...ctx,
@@ -1005,8 +910,17 @@ describe('build-tools run_terminal', () => {
       command: 'cat /var/lib/jellyfin/config.xml',
     })
 
+    // run_terminal itself never mutates sessionAllows; the gate owns persistence.
     expect(sessionAllows.has('shell.unsandboxed')).toBe(false)
-    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).toHaveBeenCalledTimes(2)
+    expect(gateToolPermission).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        action: 'shell.unsandboxed',
+        capability: 'shell.unsandboxed',
+        unsandboxed: true,
+      }),
+    )
     expect(createAgentShell).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({

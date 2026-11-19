@@ -101,6 +101,7 @@ describe('run_terminal ssh retry rule', () => {
   })
 
   it('does not unsandbox-retry a local ssh that the sandbox blocked', async () => {
+    createAgentShell.mockRejectedValueOnce(new Error('SANDBOX_FAILED: seatbelt'))
     const result = (await execute('/tmp/project', 'ssh eva ls')) as {
       error?: string
     }
@@ -114,14 +115,14 @@ describe('run_terminal ssh retry rule', () => {
   it('omits sandbox retry from the description on an ssh root', () => {
     const tool = runTerminal(baseCtx(sshRoot))
     expect(tool.description).not.toContain(
-      'A sandbox block retries unsandboxed automatically within the same call',
+      'A sandbox spawn failure retries unsandboxed after approval',
     )
   })
 
   it('keeps sandbox retry in the description on a local root', () => {
     const tool = runTerminal(baseCtx('/tmp/project'))
     expect(tool.description).toContain(
-      'A sandbox block retries unsandboxed automatically within the same call',
+      'A sandbox spawn failure retries unsandboxed after approval',
     )
   })
 
@@ -140,28 +141,20 @@ describe('run_terminal ssh retry rule', () => {
     expect(result.runsAt).toBe('Runs as aidanhibbard on eva')
   })
 
-  it('still unsandbox-retries a local non-ssh sandbox block', async () => {
-    getAgentShell
-      .mockReturnValueOnce({
-        stdout: 'operation not permitted',
-        stderr: '',
-      })
-      .mockReturnValueOnce({
-        stdout: 'ok',
-        stderr: '',
-      })
-    waitForShellExit
-      .mockResolvedValueOnce({ exitCode: 0, timedOut: false })
-      .mockResolvedValueOnce({ exitCode: 0, timedOut: false })
-    createAgentShell
-      .mockResolvedValueOnce({ shellId: 'sh-1' })
-      .mockResolvedValueOnce({ shellId: 'sh-2' })
+  it('reports a local non-ssh output denial without retrying unsandboxed', async () => {
+    getAgentShell.mockReturnValueOnce({
+      stdout: 'operation not permitted',
+      stderr: '',
+    })
+    waitForShellExit.mockResolvedValueOnce({ exitCode: 0, timedOut: false })
+    createAgentShell.mockResolvedValueOnce({ shellId: 'sh-1' })
 
-    await execute('/tmp/project', 'cat /etc/hosts')
-    expect(createAgentShell).toHaveBeenCalledTimes(2)
-    expect(createAgentShell).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ sandboxed: false, command: 'cat /etc/hosts' }),
+    await expect(execute('/tmp/project', 'cat /etc/hosts')).rejects.toThrow(
+      /SANDBOX_RUNTIME_BLOCKED[\s\S]*SANDBOXING:/,
+    )
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(createAgentShell).toHaveBeenCalledWith(
+      expect.objectContaining({ sandboxed: true, command: 'cat /etc/hosts' }),
     )
   })
 
