@@ -21,6 +21,8 @@ import {
   wrapWithSandboxingFooter,
 } from '@/services/harness/shell/sandbox-result'
 import { hasSubagent } from '@/services/harness/subagent/registry'
+import maskedEnoentCandidates from '@/services/harness/shell/masked-enoent-candidates'
+import { hostPathExists } from '@/services/vixl/vixl-tauri'
 import { sessionDroppedError, sshHostFromRoot } from '@/services/harness/ssh/model-errors'
 import { sshMasterIsDead } from '@/services/harness/ssh/session-alive'
 import { ipcProjectRoots } from '@/services/harness/tool-roots'
@@ -90,7 +92,7 @@ export const runTerminalCommand = async (
     const stdout = current?.stdout ?? ''
     const stderr = current?.stderr ?? ''
     const combined = `${stdout}\n${stderr}`
-    const denial = meta.sandboxed
+    let denial = meta.sandboxed
       ? detectSandboxRuntimeDenial(combined, {
           command: args.command,
           projectRoot,
@@ -102,6 +104,23 @@ export const runTerminalCommand = async (
     if (waitResult.timedOut) {
       await killAgentShell(shell.shellId)
       throw new Error(`Command timed out after ${timeoutMs}ms: ${args.command}`)
+    }
+
+    // A read denial can surface as ENOENT (ssh-keygen on a denied ~/.ssh key).
+    // Probe candidates against the unsandboxed host: a path the child called
+    // missing that exists here is a masked denial. A failed probe cannot
+    // confirm the mask, so stop probing and keep the original error.
+    if (!denial && meta.sandboxed) {
+      for (const candidate of maskedEnoentCandidates(combined, projectRoot)) {
+        try {
+          if (await hostPathExists(candidate)) {
+            denial = 'filesystem'
+            break
+          }
+        } catch {
+          break
+        }
+      }
     }
 
     if (isSshProjectRoot(projectRoot) && !stdout.trim() && !stderr.trim()) {

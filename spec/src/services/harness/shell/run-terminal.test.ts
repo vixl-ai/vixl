@@ -42,6 +42,9 @@ const fileCheckpointCapture = vi
 
 const lspEnsureServer = vi.fn<() => Promise<unknown>>()
 const lspRequest = vi.fn<() => Promise<unknown>>()
+const hostPathExists = vi
+  .fn<(path: string) => Promise<boolean>>()
+  .mockResolvedValue(false)
 
 const gateToolPermission = vi
   .fn<(args: { capability: string }) => Promise<boolean>>()
@@ -63,6 +66,7 @@ vi.mock('@/services/vixl/vixl-tauri', () =>
     lspEnsureServer,
     lspRequest,
     readMcpConfig,
+    hostPathExists,
   }),
 )
 
@@ -160,6 +164,7 @@ describe('build-tools run_terminal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     gateToolPermission.mockResolvedValue(true)
+    hostPathExists.mockResolvedValue(false)
     createAgentShell.mockResolvedValue({
       shellId: 'shell-1',
       status: 'running',
@@ -909,6 +914,103 @@ describe('build-tools run_terminal', () => {
     })
     expect(String((result as { priorPhase: { error: string } }).priorPhase.error)).toContain(
       'SANDBOX_RUNTIME_BLOCKED',
+    )
+  })
+
+  it('offers the retry when ssh-keygen reports a denied key as missing (masked ENOENT)', async () => {
+    const keyFile = '/Users/tester/.ssh/id_ed25519.pub'
+    createAgentShell.mockResolvedValueOnce({
+      shellId: 'shell-1',
+      status: 'running',
+      stdout: '',
+      stderr: '',
+      exitCode: null,
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'git commit -S -m signed',
+      startedAt: new Date().toISOString(),
+    })
+    waitForShellExit.mockResolvedValueOnce({ exitCode: 128, timedOut: false })
+    getAgentShell.mockReturnValueOnce({
+      shellId: 'shell-1',
+      status: 'failed',
+      stdout: '',
+      stderr: `error: Couldn't load public key ${keyFile}: No such file or directory?\nfatal: failed to write commit object`,
+      exitCode: 128,
+    })
+    hostPathExists.mockResolvedValueOnce(true)
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+    const result = await runTool(tools.run_terminal.execute, {
+      command: 'git commit -S -m signed',
+    })
+
+    expect(hostPathExists).toHaveBeenCalledWith(keyFile)
+    expect(gateToolPermission).toHaveBeenCalledTimes(2)
+    expect(gateToolPermission).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        action: 'shell.unsandboxed',
+        capability: 'shell.unsandboxed',
+        unsandboxed: true,
+      }),
+    )
+    expect(createAgentShell).toHaveBeenCalledTimes(2)
+    expect(createAgentShell).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        command: 'git commit -S -m signed',
+        sandboxed: false,
+      }),
+    )
+    expect(result).toMatchObject({ sandboxed: false })
+    expect(
+      String((result as { priorPhase: { error: string } }).priorPhase.error),
+    ).toContain('filesystem EPERM')
+  })
+
+  it('keeps a genuinely missing file as an ordinary error when the host probe says missing', async () => {
+    createAgentShell.mockResolvedValueOnce({
+      shellId: 'shell-1',
+      status: 'running',
+      stdout: '',
+      stderr: '',
+      exitCode: null,
+      chatId: 'chat-1',
+      projectRoot: '/project',
+      command: 'cat /etc/absent.conf',
+      startedAt: new Date().toISOString(),
+    })
+    waitForShellExit.mockResolvedValueOnce({ exitCode: 1, timedOut: false })
+    getAgentShell.mockReturnValueOnce({
+      shellId: 'shell-1',
+      status: 'failed',
+      stdout: '',
+      stderr: 'cat: /etc/absent.conf: No such file or directory',
+      exitCode: 1,
+    })
+
+    const buildTools = (await import('@/services/harness/build-tools')).default
+    const tools = buildTools(ctx)
+
+    const result = await runTool(tools.run_terminal.execute, {
+      command: 'cat /etc/absent.conf',
+    })
+
+    expect(result).toMatchObject({
+      exitCode: 1,
+      sandboxed: true,
+      stderr: 'cat: /etc/absent.conf: No such file or directory',
+    })
+    expect(hostPathExists).toHaveBeenCalledWith('/etc/absent.conf')
+    expect(createAgentShell).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).toHaveBeenCalledTimes(1)
+    expect(gateToolPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'shell.unsandboxed',
+        capability: 'shell.unsandboxed',
+      }),
     )
   })
 

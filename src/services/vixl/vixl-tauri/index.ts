@@ -81,6 +81,7 @@ export {
   unwatchWorkspace,
   watchWorkspacePaths,
   fsStat,
+  hostPathExists,
   fsListDirTree,
   fsRename,
   fsDelete,
