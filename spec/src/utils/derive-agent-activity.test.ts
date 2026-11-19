@@ -225,24 +225,43 @@ describe('deriveAgentActivity', () => {
     ).toBe('Processing')
   })
 
-  it('shows Generating before first content when streaming', () => {
+  it('shows Processing before first content when streaming', () => {
     expect(
       deriveAgentActivity({
         status: 'streaming',
         turn: turn({}),
         runningSubagents: [],
       }),
-    ).toBe('Generating')
+    ).toBe('Processing')
   })
 
-  it('shows Generating when the turn has text but no steps', () => {
+  it('shows Processing while the live turn has only empty steps', () => {
+    expect(
+      deriveAgentActivity({
+        status: 'streaming',
+        turn: turn({
+          steps: [
+            {
+              id: 'step-1',
+              text: '',
+              reasoning: '',
+              tools: [],
+            },
+          ],
+        }),
+        runningSubagents: [],
+      }),
+    ).toBe('Processing')
+  })
+
+  it('hides activity while turn text with no steps is on screen', () => {
     expect(
       deriveAgentActivity({
         status: 'streaming',
         turn: turn({ text: 'The backend manages a' }),
         runningSubagents: [],
       }),
-    ).toBe('Generating')
+    ).toBeNull()
   })
 
   it('shows Processing after last-step tools finish', () => {

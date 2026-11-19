@@ -77,15 +77,18 @@ export default (args: DeriveAgentActivityArgs): string | null => {
     return null
   }
 
-  // submitted: prefill, stream not open. streaming: decode, nothing
-  // renderable yet.
+  // submitted and early streaming are one server wait: the run is live, no
+  // part has reached the thread yet. running is set before context prep, so
+  // this window is real even though it is labelled streaming.
   if (!args.turn || !hasTurnContent(args.turn)) {
-    return args.status === 'submitted' ? 'Processing' : 'Generating'
+    return 'Processing'
   }
 
+  // Turn content exists but no step yet: the text is already on screen, so
+  // the output owns the live signal.
   const lastStep = args.turn.steps.at(-1)
   if (!lastStep) {
-    return 'Generating'
+    return null
   }
 
   const hasText =
