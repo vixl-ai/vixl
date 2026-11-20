@@ -249,6 +249,28 @@ fn list_and_pin_order() {
 }
 
 #[test]
+fn list_omits_heavy_blobs_but_get_chat_keeps_them() {
+    let (_dir, conn) = open_migrated();
+    let mut meta = sample_meta("c1", "slug", "Chat", "2026-01-01T00:00:00Z");
+    meta.prefix_snapshot = Some(serde_json::json!({ "hash": "abc", "messages": [] }));
+    meta.active_context = Some(serde_json::json!({ "summary": "kept" }));
+    meta.usage_totals = Some(serde_json::json!({ "inputTokens": 10 }));
+    store::insert_chat(&conn, &meta, "pid").expect("insert");
+
+    let listed = store::list_chats_for_slug(&conn, "slug").expect("list");
+    assert_eq!(listed.len(), 1);
+    assert!(listed[0].prefix_snapshot.is_none());
+    assert!(listed[0].active_context.is_none());
+    assert!(listed[0].usage_totals.is_none());
+    assert_eq!(listed[0].title, "Chat");
+
+    let fetched = store::get_chat(&conn, "slug", "c1").expect("get");
+    assert!(fetched.meta.prefix_snapshot.is_some());
+    assert!(fetched.meta.active_context.is_some());
+    assert!(fetched.meta.usage_totals.is_some());
+}
+
+#[test]
 fn list_orders_by_last_user_message_not_updated_at() {
     let (_dir, conn) = open_migrated();
     let older_user = sample_meta("c-old-user", "slug", "Older user", "2026-01-12T00:00:00Z");

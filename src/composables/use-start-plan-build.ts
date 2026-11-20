@@ -276,8 +276,14 @@ export default () => {
         },
       })
 
-      await refreshFleetSidebar()
+      // Navigate first: the thread paints immediately and picks up the pending
+      // message on mount. The sidebar catches up in the background.
       await router.push(chatRouteFor(chatSlug, chatId))
+      refreshFleetSidebar().catch((error: unknown) => {
+        toast.error('Failed to refresh sidebar', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        })
+      })
       return true
     } catch (error) {
       toast.error('Could not start plan build', {

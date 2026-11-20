@@ -91,7 +91,24 @@ fn migrate_creates_chat_schema() {
     assert!(table_exists(&conn, "workbench_tabs"));
     assert!(table_exists(&conn, "editor_view_state"));
     assert!(table_exists(&conn, "workbench_prefs"));
-    assert_eq!(migration_versions(&conn), vec![1, 2, 3, 4, 5]);
+    assert_eq!(migration_versions(&conn), vec![1, 2, 3, 4, 5, 6]);
+}
+
+#[test]
+fn migrate_creates_user_activity_index() {
+    let dir = TempDbDir::new();
+    let conn = open_at(&dir.sqlite_path()).expect("open_at");
+    migrate(&conn).expect("migrate");
+
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type = 'index' AND name = 'idx_chat_messages_user_activity'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("index lookup");
+    assert_eq!(count, 1);
 }
 
 #[test]

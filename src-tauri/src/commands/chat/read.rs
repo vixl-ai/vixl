@@ -28,7 +28,7 @@ pub async fn read_chat_messages(
     let conn = db.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let conn = conn.lock()?;
-        store::get_chat(&conn, &project_slug, &chat_id)?;
+        store::require_chat(&conn, &project_slug, &chat_id)?;
         store::list_messages(&conn, &chat_id)
     })
     .await

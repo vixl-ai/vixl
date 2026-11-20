@@ -139,4 +139,15 @@ pub const MIGRATIONS: &[SqlMigration] = &[
         name: "chats_permission_level",
         sql: "ALTER TABLE chats ADD COLUMN permission_level TEXT;",
     },
+    SqlMigration {
+        version: 6,
+        name: "chat_messages_user_activity_index",
+        // Covering index for the last-user-message aggregation in
+        // list_chats_for_slug. Without it, every sidebar list refresh
+        // full-scans chat_messages (hundreds of thousands of rows, GBs of
+        // harness_event_json) once per project slug. With it, the subquery
+        // reads only the role='user' range, entirely from the index.
+        sql: "CREATE INDEX idx_chat_messages_user_activity
+              ON chat_messages (role, chat_id, created_at, id);",
+    },
 ];

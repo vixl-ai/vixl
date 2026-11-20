@@ -10,6 +10,17 @@ const CHAT_COLUMNS: &str = "
     active_plan_path, permission_level
 ";
 
+// Sidebar listings never read prefix_snapshot, active_context, or usage_totals.
+// Those blobs can be hundreds of KB per chat, so the list query selects NULL in
+// their positions (map_row is positional) and keeps the IPC payload small.
+// Single-chat reads (get_chat) still use the full CHAT_COLUMNS.
+const LIST_CHAT_COLUMNS: &str = "
+    id, project_id, project_slug, project_root, title, mode, model, status, attention,
+    created_at, updated_at, forked_from, pinned, pinned_at, NULL, NULL,
+    awaiting_plan_go, subagent_model, reasoning, subagent_reasoning, NULL,
+    active_plan_path, permission_level
+";
+
 pub fn insert_chat(conn: &Connection, meta: &ChatMeta, project_id: &str) -> Result<(), String> {
     conn.execute(
         "INSERT INTO chats (
@@ -132,9 +143,26 @@ pub fn chat_exists(conn: &Connection, chat_id: &str) -> Result<bool, String> {
     Ok(count > 0)
 }
 
+/// Existence check for write paths that do not need the chat row.
+/// get_chat reads and parses heavy JSON blobs (prefix_snapshot can be
+/// hundreds of KB); per-line writes must not pay that cost under the lock.
+pub fn require_chat(conn: &Connection, project_slug: &str, chat_id: &str) -> Result<(), String> {
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM chats WHERE id = ?1 AND project_slug = ?2",
+            params![chat_id, project_slug],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if count == 0 {
+        return Err("Chat not found".to_string());
+    }
+    Ok(())
+}
+
 pub fn list_chats_for_slug(conn: &Connection, project_slug: &str) -> Result<Vec<ChatMeta>, String> {
     let sql = format!(
-        "SELECT {CHAT_COLUMNS}, last_user.last_user_message_at
+        "SELECT {LIST_CHAT_COLUMNS}, last_user.last_user_message_at
          FROM chats
          LEFT JOIN (
              SELECT chat_id, MAX(created_at) AS last_user_message_at
