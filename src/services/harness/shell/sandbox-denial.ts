@@ -5,10 +5,11 @@ import type {
   SandboxRuntimeDenialKind,
 } from '@/services/harness/shell/sandbox-denial-detectors'
 
-// Only wrapper-level spawn failures may drive an unsandboxed retry. These
-// prefixes come from the Rust sandbox builder rejecting the spawn, not from
-// child output. SANDBOX_RUNTIME_BLOCKED is derived from untrusted command
-// stdout/stderr, so it is reported as a denial and never auto-escalated.
+// Only wrapper-level spawn failures match isSandboxSpawnError. These prefixes
+// come from the Rust sandbox builder rejecting the spawn, not from child
+// output. SANDBOX_RUNTIME_BLOCKED is derived from untrusted command
+// stdout/stderr, so it never auto-escalates; run_terminal offers it the same
+// explicit shell.unsandboxed approval gate as a spawn failure.
 const isSandboxSpawnError = (message: string): boolean =>
   message.startsWith('SANDBOX_FAILED:') ||
     message.startsWith('SANDBOX_UNAVAILABLE:')
@@ -34,7 +35,7 @@ const parseSandboxRuntimeDenialKind = (
 const SANDBOX_DENIAL_DETAIL_MAX = 500
 
 const SANDBOX_JAIL_RETRY_HINT =
-  'The OS sandbox (Seatbelt or bubblewrap) blocked this, not a missing package; the fix is an approved unsandboxed retry rather than a script rewrite.'
+  'The OS sandbox (Seatbelt or bubblewrap) blocked this, not a missing package. Do not rerun the same sandboxed command or rewrite it as a script; if no unsandboxed retry approval is offered, or it is denied, report the denial.'
 
 const trimSandboxDenialDetail = (detail: string): string => {
   const trimmed = detail.trim()

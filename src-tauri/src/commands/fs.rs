@@ -1,5 +1,6 @@
 mod diff;
 mod edit;
+mod host_exists;
 mod path;
 mod read;
 mod remote;
@@ -15,6 +16,7 @@ pub use edit::{
     fs_apply_patch, fs_apply_patch_command, fs_edit_file, fs_edit_file_command, fs_stage_preview,
     fs_stage_preview_command,
 };
+pub use host_exists::{host_path_exists, host_path_exists_command};
 pub(crate) use path::{
     canonical_project_root, relative_path, resolve_command_path, resolve_workspace_path,
     workspace_roots_from_args,

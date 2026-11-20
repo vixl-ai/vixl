@@ -61,6 +61,7 @@ export function createVixlTauriMock(overrides: Record<string, unknown> = {}) {
         kind: 'file',
         size: 0,
       }),
+    hostPathExists: vi.fn<(path: string) => Promise<boolean>>(async () => false),
     fileCheckpointCapture: vi
       .fn<
         () => Promise<{

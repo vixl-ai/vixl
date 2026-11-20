@@ -10,9 +10,9 @@ export type SandboxResultMeta = {
 
 const sandboxBlockLine = (background: boolean | undefined): string => {
   if (background) {
-    return 'A background run stays sandboxed for its whole life: a spawn failure here is not retried unsandboxed, so run the command again without is_background to get the approved unsandboxed retry. No workaround such as a .py script, in-repo temp dirs, TMPDIR redirects, or .gitignore edits.'
+    return 'A background run stays sandboxed for its whole life: a spawn failure or runtime block here is not retried unsandboxed, so run the command again without is_background to get the approved unsandboxed retry. No workaround such as a .py script, in-repo temp dirs, TMPDIR redirects, or .gitignore edits.'
   }
-  return 'On a sandbox spawn failure, the harness asks before retrying outside the sandbox; a runtime sandbox block is reported as the result, with no workaround such as a .py script, in-repo temp dirs, TMPDIR redirects, or .gitignore edits.'
+  return 'On a sandbox spawn failure or runtime sandbox block, the harness asks before retrying outside the sandbox; without approval the denial is reported as the result. No workaround such as a .py script, in-repo temp dirs, TMPDIR redirects, or .gitignore edits.'
 }
 
 const hasSandboxingFooter = (text: string): boolean => text.includes('SANDBOXING:')

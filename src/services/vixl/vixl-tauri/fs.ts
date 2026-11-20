@@ -149,6 +149,9 @@ export const fsStat = (
     ...(allowSensitive ? { allowSensitive } : {}),
   })
 
+export const hostPathExists = (path: string): Promise<boolean> =>
+  call('host_path_exists', { path })
+
 export const fsListDirTree = (
   projectRoot: string,
   path: string,

@@ -49,6 +49,7 @@ pub use fs::{
     fs_stage_preview, fs_stage_preview_command, fs_stat, fs_stat_command, fs_write_file,
     fs_write_file_command, write_temp_bytes, write_temp_handoff, write_text_file,
 };
+pub use fs::{host_path_exists, host_path_exists_command};
 pub use git::{
     git_branch_create, git_checkout_branch, git_commit, git_diff, git_list_branches, git_log,
     git_repo_info, git_show_file, git_status,
