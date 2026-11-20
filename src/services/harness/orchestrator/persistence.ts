@@ -3,6 +3,7 @@ import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type { HarnessEvent, TodoItem } from '@/types/harness/harness-event'
 import { appendChatLine } from '@/services/vixl/vixl-tauri'
+import capToolRunPayload from './cap-tool-run-payload'
 import { nowIso } from './helpers'
 
 export const persistLine = async (
@@ -36,10 +37,10 @@ export const persistToolRun = async (
       name,
       status,
       stepId,
-      args,
-      result,
-      ...(artifact ? { artifact } : {}),
-      ...(diffs ? { diffs } : {}),
+      args: capToolRunPayload(args),
+      result: capToolRunPayload(result),
+      ...(artifact ? { artifact: capToolRunPayload(artifact) } : {}),
+      ...(diffs ? { diffs: capToolRunPayload(diffs) } : {}),
     },
   })
 }

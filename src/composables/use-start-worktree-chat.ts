@@ -45,9 +45,15 @@ export default (options: {
         mode: defaultMode,
         model,
       })
-      await refreshFleetSidebar()
+      // Navigate first: the new session is already warm, so the thread paints
+      // immediately. The sidebar catches up in the background.
       options.openRow()
       await router.push(chatRouteFor(project.slug, chat.id))
+      refreshFleetSidebar().catch((error: unknown) => {
+        toast.error('Failed to refresh sidebar', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        })
+      })
     } catch (error) {
       toast.error('Could not start chat', {
         description: error instanceof Error ? error.message : 'Unknown error',

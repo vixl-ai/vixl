@@ -34,8 +34,14 @@ export default () => {
         mode: 'agent',
         model,
       })
-      await refreshFleetSidebar()
+      // Navigate first: the new session is already warm, so the thread paints
+      // immediately. The sidebar catches up in the background.
       await router.push(chatRouteFor(HOME_CHAT_SLUG, chat.id))
+      refreshFleetSidebar().catch((error: unknown) => {
+        toast.error('Failed to refresh sidebar', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        })
+      })
     } catch (error) {
       toast.error('Could not start chat', {
         description: error instanceof Error ? error.message : 'Unknown error',

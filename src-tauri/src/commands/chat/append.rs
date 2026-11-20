@@ -16,7 +16,7 @@ pub async fn append_chat_line(
     let conn = db.inner().clone();
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         let conn = conn.lock()?;
-        store::get_chat(&conn, &project_slug, &chat_id)?;
+        store::require_chat(&conn, &project_slug, &chat_id)?;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let seq = store::next_seq(&tx, &chat_id)?;
         store::insert_message_value(&tx, &chat_id, seq, &line)?;
