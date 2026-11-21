@@ -64,9 +64,7 @@ const updatePlanTodo = (ctx: HarnessToolContext) =>
       planPath: z.string().optional(),
       todos: z
         .array(planTodoItemPatchSchema)
-        .describe(
-          'Todo patches. id is required. content and status are optional for existing ids. New ids must include content.',
-        ),
+        .describe('Todo patches. id required; new ids must include content.'),
     }),
     execute: async ({ planPath, todos }) => {
       const session = getPlanExecutionSession(ctx.projectSlug, ctx.chatId)
