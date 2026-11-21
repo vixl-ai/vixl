@@ -18,9 +18,12 @@ const MODES: VixlChatMode[] = ['ask', 'plan', 'agent', 'orchestrator']
 /**
  * Empty-project (standalone, no rules, no MCP) ceilings after slim prompts
  * and builtin tool descriptions.
- * Measured totals (system join + builtin tool defs, chars/4):
- * ask 3685, plan 4254, agent 5334, orchestrator 4708.
- * Headroom is about 3 percent so waste cannot return unnoticed.
+ * Measured totals (system join + builtin tool defs, chars/4), re-measured
+ * after ask_user batched questions, under the lockfile zod version:
+ * ask 3771, plan 4326, agent 5459, orchestrator 4798.
+ * Ceilings are unchanged from the original budget. Schema serialization
+ * size depends on the installed zod version; measure with npm ci state,
+ * not a drifted node_modules.
  */
 const TOTAL_CEILINGS: Record<VixlChatMode, number> = {
   ask: 3796,
@@ -46,9 +49,10 @@ const SKILLS_CEILINGS: Record<VixlChatMode, number> = {
 }
 
 /**
- * Measured builtin tool-def tokens (chars/4):
- * ask 3355, plan 3864, agent 4986, orchestrator 4220.
- * Ceilings are measured plus about 3 percent.
+ * Measured builtin tool-def tokens (chars/4), re-measured after ask_user
+ * batched questions and todo description trims, under the lockfile zod:
+ * ask 3441, plan 3936, agent 5111, orchestrator 4262.
+ * Ceilings were the original measurements plus about 3 percent.
  */
 const TOOL_DEF_CEILINGS: Record<VixlChatMode, number> = {
   ask: 3456,

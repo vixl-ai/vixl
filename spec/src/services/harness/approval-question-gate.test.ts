@@ -11,6 +11,7 @@ import {
   rejectPendingQuestionsForChat,
   requestQuestion,
   resetQuestionGateForTests,
+  resolveQuestion,
 } from '@/services/harness/permission/question-gate'
 
 describe('approval and question gates scoped by chat', () => {
@@ -67,8 +68,19 @@ describe('approval and question gates scoped by chat', () => {
     expect(listPendingQuestionsForChat('chat-a')).toHaveLength(0)
     expect(listPendingQuestionsForChat('chat-b')).toHaveLength(1)
 
-    const { resolveQuestion } = await import('@/services/harness/permission/question-gate')
     resolveQuestion('q-b', 'answer')
     await expect(questionB).resolves.toBe('answer')
+  })
+
+  it('keeps batched questions on the pending entry', async () => {
+    const questions = [{ question: 'Question A?' }, { question: 'Question B?', options: ['x'] }]
+    const batched = requestQuestion('chat-a', 'q-batch', 'Question A?', undefined, questions)
+
+    const entry = listPendingQuestionsForChat('chat-a')[0]
+    expect(entry?.questions).toEqual(questions)
+
+    resolveQuestion('q-batch', 'combined answer')
+    await expect(batched).resolves.toBe('combined answer')
+    expect(listPendingQuestionsForChat('chat-a')).toHaveLength(0)
   })
 })

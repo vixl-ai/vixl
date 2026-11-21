@@ -30,7 +30,7 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   terminal_output: 'Read output from a background agent shell (not subagent ids)',
   stop_terminal: 'Stop a background agent shell',
   load_skill: 'Load a skill by name',
-  ask_user: 'Ask the user a clarifying question',
+  ask_user: 'Ask the user clarifying questions, batched into one card',
   call_mcp_tool: 'Invoke a tool on a configured MCP server',
   get_mcp_tool: 'Fetch the full schema for one MCP tool',
   get_mcp_tools: 'List MCP servers and tool names, or one server\'s tool schemas',

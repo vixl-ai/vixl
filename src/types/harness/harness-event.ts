@@ -4,6 +4,7 @@ import type { ChatArtifact } from '@/types/chat/chat-artifact'
 import type { ContextBucket } from '@/types/harness/context-bucket'
 import type { FileDiff } from '@/types/harness/file-diff'
 import type { ApprovalKind, PermissionScope } from '@/types/harness/permission'
+import type { QuestionItem } from '@/types/harness/question-item'
 import type { SideTaskKind } from '@/types/harness/side-task-kind'
 import type { SubagentWorkspace } from '@/types/harness/subagent-record'
 import type { ChatMeta } from '@/types/chat/chat-meta'
@@ -120,7 +121,13 @@ export type HarnessEvent =
       turnId: string
       stop: AgentStop
     }
-  | { type: 'question-request'; toolCallId: string; question: string; options?: string[] }
+  | {
+      type: 'question-request'
+      toolCallId: string
+      question: string
+      options?: string[]
+      questions?: QuestionItem[]
+    }
   | {
       type: 'workspace-moved'
       fromProjectSlug: string

@@ -8,13 +8,11 @@ import type { HarnessToolContext } from '@/types/harness/tool-context'
 const updateTodos = (ctx: HarnessToolContext) =>
   tool({
     description:
-      'Merge in-chat todos by id into the Tasks list. Matching ids update the provided fields, new ids append, and unmentioned todos keep their state. New ids must include content. Each todo is one short verb-first actionable line.',
+      'Merge in-chat todos by id. Matching ids update provided fields, new ids append, others keep their state. Each todo is one short verb-first actionable line.',
     inputSchema: z.object({
       todos: z
         .array(planTodoItemPatchSchema)
-        .describe(
-          'Todo patches. id is required. content and status are optional for existing ids. New ids must include content.',
-        ),
+        .describe('Todo patches. id required; new ids must include content.'),
     }),
     execute: async ({ todos }) => {
       const existing = useChatStore().forChat(ctx.projectSlug, ctx.chatId).todos.value

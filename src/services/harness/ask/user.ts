@@ -2,29 +2,50 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { requestQuestion } from '@/services/harness/permission/question-gate'
 import type { HarnessToolContext } from '@/types/harness/tool-context'
+import type { QuestionItem } from '@/types/harness/question-item'
 
 const askUser = (ctx: HarnessToolContext) =>
   tool({
-    description: 'Ask the user a clarifying question',
+    description:
+      'Ask the user clarifying questions. Batch related questions into one call, not separate calls.',
     inputSchema: z.object({
-      question: z.string().describe('Question for the user'),
-      options: z.array(z.string()).optional().describe('Optional answer choices'),
+      questions: z.array(
+        z.object({
+          question: z.string(),
+          options: z.array(z.string()).optional(),
+        }),
+      ),
     }),
-    execute: async ({ question, options }, { toolCallId }) => {
-      if (ctx.signal?.aborted) {
-        throw new Error('Question aborted')
+    execute: async ({ questions }, { toolCallId }) => {
+      const items: QuestionItem[] = questions ?? []
+      const first = items[0]
+      if (!first) {
+        throw new Error('Provide at least one question')
       }
+      if (ctx.signal?.aborted) {
+        throw new Error('Question cancelled')
+      }
+      const batch = items.length > 1 ? items : undefined
       ctx.onHarnessEvent?.({
         type: 'question-request',
         toolCallId,
-        question,
-        options,
+        question: first.question,
+        options: first.options,
+        questions: batch,
       })
-      const answer = await requestQuestion(ctx.chatId, toolCallId, question, options)
+      const answer = await requestQuestion(
+        ctx.chatId,
+        toolCallId,
+        first.question,
+        first.options,
+        batch,
+      )
       if (ctx.signal?.aborted) {
-        throw new Error('Question aborted')
+        throw new Error('Question cancelled')
       }
-      return { question, answer, options }
+      return batch
+        ? { questions: items, answer }
+        : { question: first.question, answer, options: first.options }
     },
   })
 
