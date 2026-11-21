@@ -194,6 +194,7 @@ export default (state: AgentHarnessState, attention: AttentionHelpers, deps: Eve
         toolCallId: event.toolCallId,
         question: event.question,
         options: event.options,
+        questions: event.questions,
       })
       attention.setChatAttention('needs_input')
     }

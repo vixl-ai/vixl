@@ -200,6 +200,7 @@ export const restorePendingQuestion = (session: ChatSession): void => {
     toolCallId: first.toolCallId,
     question: first.question,
     options: first.options,
+    questions: first.questions,
   }
 }
 

@@ -1,8 +1,11 @@
+import type { QuestionItem } from '@/types/harness/question-item'
+
 export type PendingQuestion = {
   chatId: string
   toolCallId: string
   question: string
   options?: string[]
+  questions?: QuestionItem[]
   resolve: (answer: string) => void
   reject: (error: Error) => void
 }
@@ -14,6 +17,7 @@ export const requestQuestion = (
   toolCallId: string,
   question: string,
   options?: string[],
+  questions?: QuestionItem[],
 ): Promise<string> =>
   new Promise((resolve, reject) => {
     pending.set(toolCallId, {
@@ -21,6 +25,7 @@ export const requestQuestion = (
       toolCallId,
       question,
       options,
+      questions,
       resolve,
       reject,
     })

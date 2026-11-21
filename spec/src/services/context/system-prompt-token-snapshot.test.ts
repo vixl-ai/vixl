@@ -18,9 +18,12 @@ const MODES: VixlChatMode[] = ['ask', 'plan', 'agent', 'orchestrator']
 /**
  * Empty-project (standalone, no rules, no MCP) ceilings after slim prompts
  * and builtin tool descriptions.
- * Measured totals (system join + builtin tool defs, chars/4):
- * ask 3685, plan 4254, agent 5334, orchestrator 4708.
- * Headroom is about 3 percent so waste cannot return unnoticed.
+ * Measured totals (system join + builtin tool defs, chars/4), re-measured
+ * after ask_user batched questions:
+ * ask 3750, plan 4319, agent 5482, orchestrator 4821.
+ * Ceilings are unchanged from the original budget. Agent mode sits within
+ * about 12 tokens of its ceiling, so any agent tool growth needs an
+ * explicit budget decision, not a silent ceiling bump.
  */
 const TOTAL_CEILINGS: Record<VixlChatMode, number> = {
   ask: 3796,
@@ -46,9 +49,11 @@ const SKILLS_CEILINGS: Record<VixlChatMode, number> = {
 }
 
 /**
- * Measured builtin tool-def tokens (chars/4):
- * ask 3355, plan 3864, agent 4986, orchestrator 4220.
- * Ceilings are measured plus about 3 percent.
+ * Measured builtin tool-def tokens (chars/4), re-measured after ask_user
+ * batched questions:
+ * ask 3420, plan 3929, agent 5134, orchestrator 4285.
+ * Ceilings were the original measurements plus about 3 percent; agent mode
+ * has since grown into nearly all of that headroom.
  */
 const TOOL_DEF_CEILINGS: Record<VixlChatMode, number> = {
   ask: 3456,
